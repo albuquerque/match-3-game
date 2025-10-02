@@ -36,16 +36,18 @@ jobs:
           PRIMARY_BASE="$GODOT_DL_BASE"
           FALLBACK_BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
           HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-            TEMPLATES_FILE="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          TEMPLATES_FILE="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
           download() {
             local url="$1" out="$2"
-            echo "Attempt download: $url"
+            echo "-> Download attempt: $url"
             curl -fSL --connect-timeout 20 --retry 5 --retry-delay 5 --retry-all-errors -o "$out" "$url"
           }
           get_artifact() {
-            local file="$1" primary_url="$PRIMARY_BASE/$file" fallback_url="$FALLBACK_BASE/$file"
+            local file="$1"
+            local primary_url="${PRIMARY_BASE}/$file"
+            local fallback_url="${FALLBACK_BASE}/$file"
             if ! download "$primary_url" "$file"; then
-              echo "Primary failed, trying fallback: $fallback_url" >&2
+              echo "Primary failed for $file, trying fallback: $fallback_url" >&2
               download "$fallback_url" "$file"
             fi
           }
