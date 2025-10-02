@@ -59,41 +59,33 @@ jobs:
           ls -la $ANDROID_HOME/
           find $ANDROID_HOME -name "sdkmanager" -type f 2>/dev/null || echo "No sdkmanager found"
           
-          # Create cmdline-tools/latest if it doesn't exist
-          if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
-            echo "Creating cmdline-tools/latest directory..."
-            mkdir -p $ANDROID_HOME/cmdline-tools/latest
-            # Copy tools from cmdline-tools to latest
-            if [ -d "$ANDROID_HOME/cmdline-tools" ]; then
-              # Move everything except latest to latest directory
-              for item in $ANDROID_HOME/cmdline-tools/*; do
-                if [ "$(basename "$item")" != "latest" ]; then
-                  cp -r "$item" $ANDROID_HOME/cmdline-tools/latest/ 2>/dev/null || true
-                fi
-              done
-            fi
-          fi
+          # The old sdkmanager in tools/bin is incompatible with Java 17
+          # Let's download and install a newer version of command line tools
+          echo "=== Installing newer Android Command Line Tools ==="
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip
           
-          # Find and use sdkmanager
-          SDKMANAGER=""
-          for path in "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/cmdline-tools/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"; do
-            if [ -f "$path" ]; then
-              SDKMANAGER="$path"
-              echo "Found sdkmanager at: $SDKMANAGER"
-              break
-            fi
-          done
+          # Move the new cmdline-tools to the SDK
+          rm -rf $ANDROID_HOME/cmdline-tools/latest 2>/dev/null || true
+          mkdir -p $ANDROID_HOME/cmdline-tools/latest
+          mv cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
           
-          if [ -z "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found!"
-            echo "Searching for sdkmanager in entire Android SDK..."
-            find $ANDROID_HOME -name "sdkmanager" -type f 2>/dev/null || echo "No sdkmanager found anywhere"
-            echo "Available files in cmdline-tools:"
-            find $ANDROID_HOME/cmdline-tools -type f 2>/dev/null | head -10
+          # Update PATH to use the new tools
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+          
+          # Use the new sdkmanager
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          
+          if [ ! -f "$SDKMANAGER" ]; then
+            echo "ERROR: New sdkmanager not installed correctly!"
+            ls -la $ANDROID_HOME/cmdline-tools/latest/bin/
             exit 1
           fi
           
-          # Accept licenses
+          echo "Using updated sdkmanager: $SDKMANAGER"
+          
+          # Accept licenses with the new sdkmanager
           echo "Accepting Android SDK licenses..."
           yes | $SDKMANAGER --licenses || true
           
