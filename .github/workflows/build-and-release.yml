@@ -65,45 +65,64 @@ jobs:
           ls -la $ANDROID_HOME/
           find $ANDROID_HOME -name "sdkmanager" -type f 2>/dev/null || echo "No sdkmanager found"
           
-          # The old sdkmanager in tools/bin is incompatible with Java 17
-          # Let's download and install a newer version of command line tools
-          echo "=== Installing newer Android Command Line Tools ==="
-          cd /tmp
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip
+          # Check if platform-tools exist
+          echo "=== Checking for platform-tools ==="
+          ls -la $ANDROID_HOME/platform-tools/ 2>/dev/null || echo "platform-tools directory missing"
           
-          # Move the new cmdline-tools to the SDK
-          rm -rf $ANDROID_HOME/cmdline-tools/latest 2>/dev/null || true
-          mkdir -p $ANDROID_HOME/cmdline-tools/latest
-          mv cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
+          # Use the existing sdkmanager to install missing components
+          SDKMANAGER=""
+          for path in "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/cmdline-tools/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"; do
+            if [ -f "$path" ]; then
+              SDKMANAGER="$path"
+              echo "Found sdkmanager at: $SDKMANAGER"
+              break
+            fi
+          done
           
-          # Update PATH to use the new tools
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
-          
-          # Use the new sdkmanager
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          
-          if [ ! -f "$SDKMANAGER" ]; then
-            echo "ERROR: New sdkmanager not installed correctly!"
-            ls -la $ANDROID_HOME/cmdline-tools/latest/bin/
-            exit 1
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found! Installing newer command line tools..."
+            cd /tmp
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+            unzip -q commandlinetools-linux-9477386_latest.zip
+            
+            # Move the new cmdline-tools to the SDK
+            rm -rf $ANDROID_HOME/cmdline-tools/latest 2>/dev/null || true
+            mkdir -p $ANDROID_HOME/cmdline-tools/latest
+            mv cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
+            
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           fi
           
-          echo "Using updated sdkmanager: $SDKMANAGER"
+          echo "Using sdkmanager: $SDKMANAGER"
           
-          # Accept licenses with the new sdkmanager
+          # Accept licenses
           echo "Accepting Android SDK licenses..."
           yes | $SDKMANAGER --licenses || true
           
-          # Install build-tools explicitly
-          echo "Installing build-tools 33.0.2..."
+          # Install missing components explicitly
+          echo "Installing missing Android SDK components..."
+          $SDKMANAGER "platform-tools"
           $SDKMANAGER "build-tools;33.0.2"
+          $SDKMANAGER "platforms;android-33"
           
-          # Verify installation
-          echo "=== Verifying build-tools installation ==="
-          ls -la $ANDROID_HOME/
+          # Verify all components are installed
+          echo "=== Verifying Android SDK components ==="
+          ls -la $ANDROID_HOME/platform-tools/ 2>/dev/null || echo "platform-tools still missing"
           ls -la $ANDROID_HOME/build-tools/ 2>/dev/null || echo "build-tools directory still missing"
           ls -la $ANDROID_HOME/build-tools/33.0.2/ 2>/dev/null || echo "build-tools 33.0.2 directory missing"
+          
+          # Check for specific tools that Godot needs
+          if [ -f "$ANDROID_HOME/platform-tools/adb" ]; then
+            echo "✅ adb found in platform-tools"
+          else
+            echo "❌ adb NOT found in platform-tools"
+          fi
+          
+          if [ -f "$ANDROID_HOME/build-tools/33.0.2/apksigner" ]; then
+            echo "✅ apksigner found in build-tools"
+          else
+            echo "❌ apksigner NOT found in build-tools"
+          fi
           
           # Update environment variables for next steps
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
@@ -202,11 +221,23 @@ jobs:
           
           echo "=== Android SDK Structure ==="
           ls -la $ANDROID_HOME/ || echo "Android SDK not found"
+          ls -la $ANDROID_HOME/platform-tools/ || echo "platform-tools not found"
           ls -la $ANDROID_HOME/build-tools/ || echo "build-tools not found"
           ls -la $ANDROID_HOME/build-tools/33.0.2/ || echo "build-tools 33.0.2 not found"
           
-          # Verify apksigner exists
-          find $ANDROID_HOME -name "apksigner" -type f 2>/dev/null || echo "apksigner not found"
+          # Verify required tools exist
+          echo "=== Verifying Required Android Tools ==="
+          if [ -f "$ANDROID_HOME/platform-tools/adb" ]; then
+            echo "✅ adb found in platform-tools"
+          else
+            echo "❌ adb NOT found in platform-tools"
+          fi
+          
+          if [ -f "$ANDROID_HOME/build-tools/33.0.2/apksigner" ]; then
+            echo "✅ apksigner found in build-tools"
+          else
+            echo "❌ apksigner NOT found in build-tools"
+          fi
           
           echo "=== Java Version ==="
           java -version
@@ -221,75 +252,27 @@ jobs:
             ls -la android/ 2>/dev/null || echo "android/ directory does not exist"
           fi
           
-          # Create Godot editor settings in multiple possible locations
-          for settings_dir in ~/.local/share/godot/editor_settings-4.3/ ~/.config/godot/ /root/.config/godot/; do
-            mkdir -p "$settings_dir"
-            echo "Creating editor settings in: $settings_dir"
-            
-            # Create the editor settings file using echo statements instead of heredoc
-            echo '[gd_resource type="EditorSettings" format=3]' > "${settings_dir}editor_settings-4.tres"
-            echo '' >> "${settings_dir}editor_settings-4.tres"
-            echo '[resource]' >> "${settings_dir}editor_settings-4.tres"
-            echo "export/android/android_sdk_path = \"$ANDROID_HOME\"" >> "${settings_dir}editor_settings-4.tres"
-            echo 'export/android/debug_keystore = ""' >> "${settings_dir}editor_settings-4.tres"
-            echo 'export/android/debug_keystore_user = "androiddebugkey"' >> "${settings_dir}editor_settings-4.tres"
-            echo 'export/android/debug_keystore_pass = "android"' >> "${settings_dir}editor_settings-4.tres"
-            echo "export/android/java_sdk_path = \"$JAVA_HOME\"" >> "${settings_dir}editor_settings-4.tres"
-            echo 'export/android/force_system_user = false' >> "${settings_dir}editor_settings-4.tres"
-            echo 'export/android/shutdown_adb_on_exit = true' >> "${settings_dir}editor_settings-4.tres"
-            echo 'export/android/one_click_deploy_clear_previous_installs = false' >> "${settings_dir}editor_settings-4.tres"
-            echo 'export/android/use_custom_build_tools_version = false' >> "${settings_dir}editor_settings-4.tres"
-            echo 'export/android/custom_build_tools_version = "33.0.2"' >> "${settings_dir}editor_settings-4.tres"
-            echo 'network/http_proxy/host = ""' >> "${settings_dir}editor_settings-4.tres"
-            echo 'network/http_proxy/port = -1' >> "${settings_dir}editor_settings-4.tres"
-            echo 'network/https_proxy/host = ""' >> "${settings_dir}editor_settings-4.tres"
-            echo 'network/https_proxy/port = -1' >> "${settings_dir}editor_settings-4.tres"
-          done
-          
-          # Set additional environment variables that Godot might check
-          export ANDROID_SDK_ROOT="$ANDROID_HOME"
-          export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/25.1.8937393"
-          
-          echo "=== Created Godot Editor Settings ==="
-          find ~/.local ~/.config /root/.config -name "*editor_settings*" -type f 2>/dev/null | head -5
-          
-          # Test if build-tools are accessible
-          echo "=== Testing Android Build Tools ==="
-          if [ -d "$ANDROID_HOME/build-tools/33.0.2" ]; then
-            echo "Build tools directory exists"
-            ls -la "$ANDROID_HOME/build-tools/33.0.2/" | head -10
-            if [ -f "$ANDROID_HOME/build-tools/33.0.2/apksigner" ]; then
-              echo "apksigner found and executable"
-              "$ANDROID_HOME/build-tools/33.0.2/apksigner" --help | head -3 || echo "apksigner exists but might need setup"
-            else
-              echo "apksigner not found in expected location"
-            fi
-          fi
-          
-          # Create Godot editor settings directory
+          # Create Godot editor settings (single location to avoid duplicates)
           mkdir -p ~/.local/share/godot/editor_settings-4.3/
+          echo "Creating Godot editor settings..."
           
-          # Create comprehensive Godot editor settings using echo
-          echo '[gd_resource type="EditorSettings" format=3]' > ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo '' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo '[resource]' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo "export/android/android_sdk_path = \"$ANDROID_HOME\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'export/android/debug_keystore = ""' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'export/android/debug_keystore_user = "androiddebugkey"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'export/android/debug_keystore_pass = "android"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'export/android/force_system_user = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'export/android/shutdown_adb_on_exit = true' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'export/android/one_click_deploy_clear_previous_installs = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo "export/android/java_sdk_path = \"$JAVA_HOME\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'export/android/use_custom_build_tools_version = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'export/android/custom_build_tools_version = "33.0.2"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'network/http_proxy/host = ""' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'network/http_proxy/port = -1' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'network/https_proxy/host = ""' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo 'network/https_proxy/port = -1' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          # Create the editor settings file using echo statements
+          echo '[gd_resource type="EditorSettings" format=3]' > ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo '' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo '[resource]' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo "export/android/android_sdk_path = \"$ANDROID_HOME\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo 'export/android/debug_keystore = ""' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo 'export/android/debug_keystore_user = "androiddebugkey"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo 'export/android/debug_keystore_pass = "android"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo "export/android/java_sdk_path = \"$JAVA_HOME\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo 'export/android/force_system_user = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo 'export/android/shutdown_adb_on_exit = true' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo 'export/android/one_click_deploy_clear_previous_installs = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo 'export/android/use_custom_build_tools_version = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
+          echo 'export/android/custom_build_tools_version = "33.0.2"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
           
           echo "=== Created Godot Editor Settings ==="
-          cat ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          cat ~/.local/share/godot/editor_settings-4.3/editor_settings-4.tres
 
       - name: Debug Environment
         run: |
