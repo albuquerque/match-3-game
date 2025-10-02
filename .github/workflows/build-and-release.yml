@@ -77,23 +77,41 @@ jobs:
           echo "Ensuring clean android build template..."
           rm -rf android
           mkdir -p android
-          # Locate android_source.zip inside export templates
           ANDROID_SRC=$(find ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable -maxdepth 1 -name 'android_source.zip' | head -1)
           if [ -z "$ANDROID_SRC" ]; then
             echo "android_source.zip not found in export templates" && exit 1
           fi
-          unzip -q "$ANDROID_SRC" -d android
-          # Accept either nested build/ structure or root-level Gradle project
+          TMP_EXTRACT=$(mktemp -d)
+          unzip -q "$ANDROID_SRC" -d "$TMP_EXTRACT"
+          # Move contents (supports both direct files and nested android/ directory inside zip)
+          if [ -d "$TMP_EXTRACT/android" ]; then
+            shopt -s dotglob
+            mv "$TMP_EXTRACT/android"/* android/
+          else
+            shopt -s dotglob
+            mv "$TMP_EXTRACT"/* android/
+          fi
+          echo "Post-extract structure (top level):"; find android -maxdepth 2 -type f -name build.gradle
+          # Ensure expected gradle layout (allow either android/build/ or root-level) - if root-level, create build/ wrapper
           if [ -f android/build/build.gradle ]; then
             echo "Detected nested Gradle build at android/build/build.gradle"
           elif [ -f android/build.gradle ]; then
-            echo "Detected root-level Gradle build at android/build.gradle"
+            echo "Wrapping root-level Gradle project into build/ directory for consistency"
+            mkdir -p android/build
+            # Move gradle-related files into build/
+            mv android/build.gradle android/settings.gradle android/gradle.properties android/build/ 2>/dev/null || true
+            [ -d android/gradle ] && mv android/gradle android/build/
+            [ -f android/gradlew ] && mv android/gradlew android/build/
+            [ -f android/gradlew.bat ] && mv android/gradlew.bat android/build/
+            # Move any libs/res/src if present
+            for d in libs res src assetPacks; do [ -d "android/$d" ] && mv "android/$d" android/build/; done
           else
             echo "No build.gradle found after extraction" && find android -maxdepth 4 -name build.gradle && exit 1
           fi
-          echo "Located build.gradle files:"; find android -maxdepth 3 -type f -name build.gradle
-          # Remove any accidentally committed compiled assets if present (both possible locations)
+          echo "Final build.gradle locations:"; find android -maxdepth 3 -type f -name build.gradle
+          # Clean precompiled assets (Godot will generate fresh ones)
           rm -rf android/build/assets android/assets || true
+          echo "Android template normalization complete."
 
       - name: Create Editor Settings
         run: |
