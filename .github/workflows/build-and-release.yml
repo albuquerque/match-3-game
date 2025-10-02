@@ -65,26 +65,24 @@ jobs:
           # Create Godot editor settings directory
           mkdir -p ~/.local/share/godot/editor_settings-4.3/
           
-          # Create comprehensive Godot editor settings
-          cat > ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres << 'EOF'
-[gd_resource type="EditorSettings" format=3]
-
-[resource]
-export/android/android_sdk_path = "$ANDROID_HOME"
-export/android/debug_keystore = ""
-export/android/debug_keystore_user = "androiddebugkey"
-export/android/debug_keystore_pass = "android"
-export/android/force_system_user = false
-export/android/shutdown_adb_on_exit = true
-export/android/one_click_deploy_clear_previous_installs = false
-export/android/java_sdk_path = "$JAVA_HOME"
-export/android/use_custom_build_tools_version = false
-export/android/custom_build_tools_version = "33.0.2"
-network/http_proxy/host = ""
-network/http_proxy/port = -1
-network/https_proxy/host = ""
-network/https_proxy/port = -1
-EOF
+          # Create comprehensive Godot editor settings using echo
+          echo '[gd_resource type="EditorSettings" format=3]' > ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo '' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo '[resource]' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo "export/android/android_sdk_path = \"$ANDROID_HOME\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'export/android/debug_keystore = ""' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'export/android/debug_keystore_user = "androiddebugkey"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'export/android/debug_keystore_pass = "android"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'export/android/force_system_user = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'export/android/shutdown_adb_on_exit = true' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'export/android/one_click_deploy_clear_previous_installs = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo "export/android/java_sdk_path = \"$JAVA_HOME\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'export/android/use_custom_build_tools_version = false' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'export/android/custom_build_tools_version = "33.0.2"' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'network/http_proxy/host = ""' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'network/http_proxy/port = -1' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'network/https_proxy/host = ""' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo 'network/https_proxy/port = -1' >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
           
           echo "=== Created Godot Editor Settings ==="
           cat ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
