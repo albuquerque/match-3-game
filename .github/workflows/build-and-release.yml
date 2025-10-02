@@ -89,19 +89,22 @@ jobs:
             mv "$TMP_EXTRACT/android"/* android/
           else
             shopt -s dotglob
-            mv "$TMP_EXTRACT"/* android/
-          fi
-          echo "Post-extract structure (top level):"; find android -maxdepth 2 -type f -name build.gradle
-          # Ensure expected gradle layout (allow either android/build/ or root-level) - if root-level, create build/ wrapper
+          # Ensure nested build/ directory (Godot expects android/build/build.gradle for custom template)
           if [ -f android/build/build.gradle ]; then
-            echo "Detected nested Gradle build at android/build/build.gradle"
+            echo "Nested build directory present."
           elif [ -f android/build.gradle ]; then
-            echo "Wrapping root-level Gradle project into build/ directory for consistency"
+            echo "Wrapping root-level gradle project into build/ directory."
             mkdir -p android/build
-            # Move gradle-related files into build/
             mv android/build.gradle android/settings.gradle android/gradle.properties android/build/ 2>/dev/null || true
             [ -d android/gradle ] && mv android/gradle android/build/
             [ -f android/gradlew ] && mv android/gradlew android/build/
+            [ -f android/gradlew.bat ] && mv android/gradlew.bat android/build/
+            for d in libs res src assetPacks assets ; do [ -d "android/$d" ] && mv "android/$d" android/build/; done
+            echo "Wrapping root-level Gradle project into build/ directory for consistency"
+            mkdir -p android/build
+            # Move gradle-related files into build/
+          echo "Final build.gradle at:"; ls -1 android/build/build.gradle
+          rm -rf android/build/assets || true
             [ -f android/gradlew.bat ] && mv android/gradlew.bat android/build/
             # Move any libs/res/src if present
             for d in libs res src assetPacks; do [ -d "android/$d" ] && mv "android/$d" android/build/; done
