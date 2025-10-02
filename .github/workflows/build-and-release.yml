@@ -104,18 +104,51 @@ jobs:
           cd /tmp
           unzip -q export_templates.tpz
           
-          # Find Android template
-          ANDROID_TEMPLATE=$(find . -name "android_source.zip" | head -1)
+          # Debug: Show extracted structure
+          echo "=== Export templates structure ==="
+          find . -name "*android*" -type f
+          find . -name "*.zip" -type f | head -10
+          
+          # Find Android template with more specific search
+          ANDROID_TEMPLATE=$(find . -name "android_source.zip" -type f | head -1)
           if [ -n "$ANDROID_TEMPLATE" ]; then
             echo "Found Android template: $ANDROID_TEMPLATE"
-            # Extract Android template to project
-            cd "$GITHUB_WORKSPACE"
-            unzip -q "$ANDROID_TEMPLATE" -d android/
-            echo "Android build template installed successfully"
-            ls -la android/
+            # Check if file actually exists and is readable
+            if [ -f "$ANDROID_TEMPLATE" ] && [ -r "$ANDROID_TEMPLATE" ]; then
+              echo "Android template file is accessible"
+              # Extract Android template to project
+              cd "$GITHUB_WORKSPACE"
+              unzip -q "$ANDROID_TEMPLATE" -d android/
+              echo "Android build template installed successfully"
+              ls -la android/
+            else
+              echo "Android template file exists but is not readable"
+              ls -la "$ANDROID_TEMPLATE"
+            fi
           else
-            echo "Android template not found in export templates"
-            find /tmp -name "*android*" -type f
+            echo "Android template not found, trying alternative approach..."
+            # Look for template files in templates directory
+            cd /tmp
+            TEMPLATE_DIR=$(find . -name "templates" -type d | head -1)
+            if [ -n "$TEMPLATE_DIR" ]; then
+              echo "Found templates directory: $TEMPLATE_DIR"
+              ls -la "$TEMPLATE_DIR"
+              ANDROID_TEMPLATE=$(find "$TEMPLATE_DIR" -name "*android*" -type f | head -1)
+              if [ -n "$ANDROID_TEMPLATE" ]; then
+                echo "Found Android template in templates dir: $ANDROID_TEMPLATE"
+                cd "$GITHUB_WORKSPACE"
+                unzip -q "$ANDROID_TEMPLATE" -d android/
+                echo "Android build template installed successfully"
+                ls -la android/
+              else
+                echo "No Android template found in templates directory"
+                ls -la "$TEMPLATE_DIR"
+              fi
+            else
+              echo "No templates directory found"
+              echo "Available files in /tmp:"
+              find /tmp -name "*" -type f | head -20
+            fi
           fi
 
       - name: Debug Environment
