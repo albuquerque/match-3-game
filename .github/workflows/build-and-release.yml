@@ -34,6 +34,12 @@ jobs:
           build-tools: '33.0.2'
           ndk-version: '25.1.8937393'
 
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Install Android Build Tools
         run: |
           echo "=== Installing Android Build Tools Manually ==="
@@ -103,11 +109,83 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
 
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - name: Install Android Build Template
+        run: |
+          # Download and install Android build template
+          echo "Installing Android build template..."
+          
+          # Create android directory if it doesn't exist
+          mkdir -p android
+          
+          # Download Android export template from Godot
+          TEMPLATE_URL="https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz"
+          echo "Downloading export templates..."
+          wget -q "$TEMPLATE_URL" -O /tmp/export_templates.tpz
+          
+          # Extract templates
+          cd /tmp
+          unzip -q export_templates.tpz
+          
+          # Debug: Show extracted structure
+          echo "=== Export templates structure ==="
+          find . -name "*android*" -type f
+          find . -name "*.zip" -type f | head -10
+          
+          # Find Android template with more specific search
+          ANDROID_TEMPLATE=$(find . -name "android_source.zip" -type f | head -1)
+          if [ -n "$ANDROID_TEMPLATE" ]; then
+            echo "Found Android template: $ANDROID_TEMPLATE"
+            # Convert to absolute path
+            ANDROID_TEMPLATE_ABS=$(realpath "$ANDROID_TEMPLATE")
+            echo "Absolute path: $ANDROID_TEMPLATE_ABS"
+            # Check if file actually exists and is readable
+            if [ -f "$ANDROID_TEMPLATE_ABS" ] && [ -r "$ANDROID_TEMPLATE_ABS" ]; then
+              echo "Android template file is accessible"
+              # Extract Android template to project
+              cd "$GITHUB_WORKSPACE"
+              unzip -q "$ANDROID_TEMPLATE_ABS" -d android/
+              echo "Android build template installed successfully"
+              ls -la android/
+              
+              # Verify that build.gradle exists (this is what Godot checks for)
+              if [ -f "android/build.gradle" ]; then
+                echo "✅ Android build template properly installed - build.gradle found"
+              else
+                echo "❌ Android build template installation failed - build.gradle not found"
+                ls -la android/
+              fi
+            else
+              echo "Android template file exists but is not readable"
+              ls -la "$ANDROID_TEMPLATE_ABS"
+            fi
+          else
+            echo "Android template not found, trying alternative approach..."
+            # Look for template files in templates directory
+            cd /tmp
+            TEMPLATE_DIR=$(find . -name "templates" -type d | head -1)
+            if [ -n "$TEMPLATE_DIR" ]; then
+              echo "Found templates directory: $TEMPLATE_DIR"
+              ls -la "$TEMPLATE_DIR"
+              ANDROID_TEMPLATE=$(find "$TEMPLATE_DIR" -name "*android*" -type f | head -1)
+              if [ -n "$ANDROID_TEMPLATE" ]; then
+                echo "Found Android template in templates dir: $ANDROID_TEMPLATE"
+                # Convert to absolute path
+                ANDROID_TEMPLATE_ABS=$(realpath "$ANDROID_TEMPLATE")
+                echo "Absolute path: $ANDROID_TEMPLATE_ABS"
+                cd "$GITHUB_WORKSPACE"
+                unzip -q "$ANDROID_TEMPLATE_ABS" -d android/
+                echo "Android build template installed successfully"
+                ls -la android/
+              else
+                echo "No Android template found in templates directory"
+                ls -la "$TEMPLATE_DIR"
+              fi
+            else
+              echo "No templates directory found"
+              echo "Available files in /tmp:"
+              find /tmp -name "*" -type f | head -20
+            fi
+          fi
 
       - name: Configure Android Build Environment
         run: |
@@ -133,6 +211,15 @@ jobs:
           echo "=== Java Version ==="
           java -version
           javac -version
+          
+          echo "=== Android Build Template Verification ==="
+          if [ -f "android/build.gradle" ]; then
+            echo "✅ Android build template is installed (build.gradle found)"
+          else
+            echo "❌ Android build template is NOT installed (build.gradle missing)"
+            echo "Contents of android/ directory:"
+            ls -la android/ 2>/dev/null || echo "android/ directory does not exist"
+          fi
           
           # Create Godot editor settings in multiple possible locations
           for settings_dir in ~/.local/share/godot/editor_settings-4.3/ ~/.config/godot/ /root/.config/godot/; do
@@ -203,76 +290,6 @@ jobs:
           
           echo "=== Created Godot Editor Settings ==="
           cat ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-
-      - name: Install Android Build Template
-        run: |
-          # Download and install Android build template
-          echo "Installing Android build template..."
-          
-          # Create android directory if it doesn't exist
-          mkdir -p android
-          
-          # Download Android export template from Godot
-          TEMPLATE_URL="https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz"
-          echo "Downloading export templates..."
-          wget -q "$TEMPLATE_URL" -O /tmp/export_templates.tpz
-          
-          # Extract templates
-          cd /tmp
-          unzip -q export_templates.tpz
-          
-          # Debug: Show extracted structure
-          echo "=== Export templates structure ==="
-          find . -name "*android*" -type f
-          find . -name "*.zip" -type f | head -10
-          
-          # Find Android template with more specific search
-          ANDROID_TEMPLATE=$(find . -name "android_source.zip" -type f | head -1)
-          if [ -n "$ANDROID_TEMPLATE" ]; then
-            echo "Found Android template: $ANDROID_TEMPLATE"
-            # Convert to absolute path
-            ANDROID_TEMPLATE_ABS=$(realpath "$ANDROID_TEMPLATE")
-            echo "Absolute path: $ANDROID_TEMPLATE_ABS"
-            # Check if file actually exists and is readable
-            if [ -f "$ANDROID_TEMPLATE_ABS" ] && [ -r "$ANDROID_TEMPLATE_ABS" ]; then
-              echo "Android template file is accessible"
-              # Extract Android template to project
-              cd "$GITHUB_WORKSPACE"
-              unzip -q "$ANDROID_TEMPLATE_ABS" -d android/
-              echo "Android build template installed successfully"
-              ls -la android/
-            else
-              echo "Android template file exists but is not readable"
-              ls -la "$ANDROID_TEMPLATE_ABS"
-            fi
-          else
-            echo "Android template not found, trying alternative approach..."
-            # Look for template files in templates directory
-            cd /tmp
-            TEMPLATE_DIR=$(find . -name "templates" -type d | head -1)
-            if [ -n "$TEMPLATE_DIR" ]; then
-              echo "Found templates directory: $TEMPLATE_DIR"
-              ls -la "$TEMPLATE_DIR"
-              ANDROID_TEMPLATE=$(find "$TEMPLATE_DIR" -name "*android*" -type f | head -1)
-              if [ -n "$ANDROID_TEMPLATE" ]; then
-                echo "Found Android template in templates dir: $ANDROID_TEMPLATE"
-                # Convert to absolute path
-                ANDROID_TEMPLATE_ABS=$(realpath "$ANDROID_TEMPLATE")
-                echo "Absolute path: $ANDROID_TEMPLATE_ABS"
-                cd "$GITHUB_WORKSPACE"
-                unzip -q "$ANDROID_TEMPLATE_ABS" -d android/
-                echo "Android build template installed successfully"
-                ls -la android/
-              else
-                echo "No Android template found in templates directory"
-                ls -la "$TEMPLATE_DIR"
-              fi
-            else
-              echo "No templates directory found"
-              echo "Available files in /tmp:"
-              find /tmp -name "*" -type f | head -20
-            fi
-          fi
 
       - name: Debug Environment
         run: |
