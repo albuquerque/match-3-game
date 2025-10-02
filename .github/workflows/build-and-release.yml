@@ -220,34 +220,34 @@ jobs:
         run: |
           # Create build directories that match export preset paths
           mkdir -v -p build/android
-          mkdir -v -p build/windows  
-          mkdir -v -p build/linux
-          mkdir -v -p build/web
-          mkdir -v -p build/mac
+          # mkdir -v -p build/windows  
+          # mkdir -v -p build/linux
+          # mkdir -v -p build/web
+          # mkdir -v -p build/mac
           
           # Show directory structure before building
           echo "Directory structure before building:"
           find build -type d
           
           # Build Windows
-          echo "Building Windows..."
-          godot --headless --verbose --export-release "Windows Desktop"
+          # echo "Building Windows..."
+          # godot --headless --verbose --export-release "Windows Desktop"
           
           # Build Linux  
-          echo "Building Linux..."
-          godot --headless --verbose --export-release "Linux/X11"
+          # echo "Building Linux..."
+          # godot --headless --verbose --export-release "Linux/X11"
           
           # Build Web
-          echo "Building Web..."
-          godot --headless --verbose --export-release "Web"
+          # echo "Building Web..."
+          # godot --headless --verbose --export-release "Web"
           
           # Build macOS
-          echo "Building macOS..."
-          godot --headless --verbose --export-release "macOS"
+          # echo "Building macOS..."
+          # godot --headless --verbose --export-release "macOS"
           
-          # Build Android (skip if Android SDK issues)
+          # Build Android - FOCUS ON THIS ONLY
           echo "Building Android..."
-          godot --headless --verbose --export-release "Android" || echo "Android build failed, continuing..."
+          godot --headless --verbose --export-release "Android"
           
           # Verify builds were created
           echo "Build verification:"
