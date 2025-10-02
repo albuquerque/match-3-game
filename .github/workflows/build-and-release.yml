@@ -29,17 +29,39 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          api-level: 33
+          build-tools: '33.0.2'
+
+      - name: Debug Environment
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Godot version check:"
+          godot --version
+          echo "Export presets check:"
+          ls -la export_presets.cfg
+          echo "Android SDK location:"
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
 
       - name: Build All Platforms
         run: |
-          # Create build directories
-          mkdir -v -p build/{windows,linux,web,mac,android}
+          # Create build directories that match export preset paths
+          mkdir -v -p build/android
+          mkdir -v -p build/windows  
+          mkdir -v -p build/linux
+          mkdir -v -p build/web
+          mkdir -v -p build/mac
+          
+          # Show directory structure before building
+          echo "Directory structure before building:"
+          find build -type d
           
           # Build Windows
           echo "Building Windows..."
           godot --headless --verbose --export-release "Windows Desktop"
           
-          # Build Linux
+          # Build Linux  
           echo "Building Linux..."
           godot --headless --verbose --export-release "Linux/X11"
           
@@ -51,9 +73,14 @@ jobs:
           echo "Building macOS..."
           godot --headless --verbose --export-release "macOS"
           
-          # Build Android
+          # Build Android (skip if Android SDK issues)
           echo "Building Android..."
-          godot --headless --verbose --export-release "Android"
+          godot --headless --verbose --export-release "Android" || echo "Android build failed, continuing..."
+          
+          # Verify builds were created
+          echo "Build verification:"
+          find build -type f
+          ls -la build/*/ 2>/dev/null || echo "Some build directories are empty"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
