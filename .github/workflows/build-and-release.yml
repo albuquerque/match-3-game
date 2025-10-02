@@ -37,23 +37,23 @@ jobs:
           
           # Build Windows
           echo "Building Windows..."
-          godot --headless --verbose --export-release "Windows Desktop" build/windows/$EXPORT_NAME.exe
+          godot --headless --verbose --export-release "Windows Desktop"
           
           # Build Linux
           echo "Building Linux..."
-          godot --headless --verbose --export-release "Linux/X11" build/linux/$EXPORT_NAME.x86_64
+          godot --headless --verbose --export-release "Linux/X11"
           
           # Build Web
           echo "Building Web..."
-          godot --headless --verbose --export-release "Web" build/web/index.html
+          godot --headless --verbose --export-release "Web"
           
           # Build macOS
           echo "Building macOS..."
-          godot --headless --verbose --export-release "macOS" build/mac/$EXPORT_NAME.zip
+          godot --headless --verbose --export-release "macOS"
           
           # Build Android
           echo "Building Android..."
-          godot --headless --verbose --export-release "Android" build/android/$EXPORT_NAME.apk
+          godot --headless --verbose --export-release "Android"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
