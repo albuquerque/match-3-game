@@ -32,18 +32,33 @@ jobs:
       - name: Download Godot Headless + Export Templates (if needed)
         if: steps.cache-godot.outputs.cache-hit != 'true'
         run: |
-          set -e
-          echo "Downloading Godot headless..."
-          curl -L -o godot_headless.zip "$GODOT_DL_BASE/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          unzip -q godot_headless.zip -d ~/godot_raw
+          set -euo pipefail
+          PRIMARY_BASE="$GODOT_DL_BASE"
+          FALLBACK_BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+            TEMPLATES_FILE="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          download() {
+            local url="$1" out="$2"
+            echo "Attempt download: $url"
+            curl -fSL --connect-timeout 20 --retry 5 --retry-delay 5 --retry-all-errors -o "$out" "$url"
+          }
+          get_artifact() {
+            local file="$1" primary_url="$PRIMARY_BASE/$file" fallback_url="$FALLBACK_BASE/$file"
+            if ! download "$primary_url" "$file"; then
+              echo "Primary failed, trying fallback: $fallback_url" >&2
+              download "$fallback_url" "$file"
+            fi
+          }
+          echo "Downloading Godot headless (with fallback)..."
+          get_artifact "$HEADLESS_FILE"
+          unzip -q "$HEADLESS_FILE" -d ~/godot_raw
           mv ~/godot_raw/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot
           chmod +x ~/godot
           echo "Godot headless installed at ~/godot"
-          echo "Downloading export templates..."
-          curl -L -o templates.tpz "$GODOT_DL_BASE/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          echo "Downloading export templates (with fallback)..."
+          get_artifact "$TEMPLATES_FILE"
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          unzip -q templates.tpz -d /tmp/templates_extracted
-          # Move contents of templates dir to version folder
+          unzip -q "$TEMPLATES_FILE" -d /tmp/templates_extracted
           mv /tmp/templates_extracted/templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
           echo "Templates installed: $(ls ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable | wc -l) files"
 
