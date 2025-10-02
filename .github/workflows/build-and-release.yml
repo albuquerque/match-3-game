@@ -38,10 +38,26 @@ jobs:
         run: |
           echo "=== Installing Android Build Tools Manually ==="
           
-          # Set up Android SDK paths
-          export ANDROID_HOME=/home/runner/.android/sdk
+          # Debug: Check what ANDROID_HOME is actually set to
+          echo "Current ANDROID_HOME: $ANDROID_HOME"
+          echo "Current ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+          echo "Environment variables:"
+          env | grep -i android || echo "No Android environment variables found"
+          
+          # Use the actual ANDROID_HOME from the environment
+          if [ -z "$ANDROID_HOME" ]; then
+            echo "ERROR: ANDROID_HOME not set by android-actions/setup-android"
+            exit 1
+          fi
+          
+          echo "Using ANDROID_HOME: $ANDROID_HOME"
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          
+          # Debug: Show Android SDK structure
+          echo "=== Android SDK Structure ==="
+          ls -la $ANDROID_HOME/
+          find $ANDROID_HOME -name "sdkmanager" -type f 2>/dev/null || echo "No sdkmanager found"
           
           # Create cmdline-tools/latest if it doesn't exist
           if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
@@ -49,7 +65,12 @@ jobs:
             mkdir -p $ANDROID_HOME/cmdline-tools/latest
             # Copy tools from cmdline-tools to latest
             if [ -d "$ANDROID_HOME/cmdline-tools" ]; then
-              cp -r $ANDROID_HOME/cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/ 2>/dev/null || true
+              # Move everything except latest to latest directory
+              for item in $ANDROID_HOME/cmdline-tools/*; do
+                if [ "$(basename "$item")" != "latest" ]; then
+                  cp -r "$item" $ANDROID_HOME/cmdline-tools/latest/ 2>/dev/null || true
+                fi
+              done
             fi
           fi
           
@@ -65,7 +86,10 @@ jobs:
           
           if [ -z "$SDKMANAGER" ]; then
             echo "ERROR: sdkmanager not found!"
+            echo "Searching for sdkmanager in entire Android SDK..."
             find $ANDROID_HOME -name "sdkmanager" -type f 2>/dev/null || echo "No sdkmanager found anywhere"
+            echo "Available files in cmdline-tools:"
+            find $ANDROID_HOME/cmdline-tools -type f 2>/dev/null | head -10
             exit 1
           fi
           
