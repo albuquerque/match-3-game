@@ -34,6 +34,23 @@ jobs:
           build-tools: '33.0.2'
           ndk-version: '25.1.8937393'
 
+      - name: Configure Android SDK for Godot
+        run: |
+          # Set Android SDK environment variables for Godot
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          
+          # Verify Android SDK installation
+          echo "Android SDK verification:"
+          ls -la $ANDROID_HOME/
+          ls -la $ANDROID_HOME/build-tools/ 2>/dev/null || echo "build-tools directory not found"
+          
+          # Create Godot editor settings to configure Android SDK
+          mkdir -p ~/.local/share/godot/editor_settings-4.3/
+          echo "[export/android]" > ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo "android_sdk_path = \"$ANDROID_HOME\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          echo "debug_keystore = \"\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+
       - name: Debug Environment
         run: |
           echo "Current directory: $(pwd)"
