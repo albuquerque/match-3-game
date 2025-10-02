@@ -113,17 +113,20 @@ jobs:
           ANDROID_TEMPLATE=$(find . -name "android_source.zip" -type f | head -1)
           if [ -n "$ANDROID_TEMPLATE" ]; then
             echo "Found Android template: $ANDROID_TEMPLATE"
+            # Convert to absolute path
+            ANDROID_TEMPLATE_ABS=$(realpath "$ANDROID_TEMPLATE")
+            echo "Absolute path: $ANDROID_TEMPLATE_ABS"
             # Check if file actually exists and is readable
-            if [ -f "$ANDROID_TEMPLATE" ] && [ -r "$ANDROID_TEMPLATE" ]; then
+            if [ -f "$ANDROID_TEMPLATE_ABS" ] && [ -r "$ANDROID_TEMPLATE_ABS" ]; then
               echo "Android template file is accessible"
               # Extract Android template to project
               cd "$GITHUB_WORKSPACE"
-              unzip -q "$ANDROID_TEMPLATE" -d android/
+              unzip -q "$ANDROID_TEMPLATE_ABS" -d android/
               echo "Android build template installed successfully"
               ls -la android/
             else
               echo "Android template file exists but is not readable"
-              ls -la "$ANDROID_TEMPLATE"
+              ls -la "$ANDROID_TEMPLATE_ABS"
             fi
           else
             echo "Android template not found, trying alternative approach..."
@@ -136,8 +139,11 @@ jobs:
               ANDROID_TEMPLATE=$(find "$TEMPLATE_DIR" -name "*android*" -type f | head -1)
               if [ -n "$ANDROID_TEMPLATE" ]; then
                 echo "Found Android template in templates dir: $ANDROID_TEMPLATE"
+                # Convert to absolute path
+                ANDROID_TEMPLATE_ABS=$(realpath "$ANDROID_TEMPLATE")
+                echo "Absolute path: $ANDROID_TEMPLATE_ABS"
                 cd "$GITHUB_WORKSPACE"
-                unzip -q "$ANDROID_TEMPLATE" -d android/
+                unzip -q "$ANDROID_TEMPLATE_ABS" -d android/
                 echo "Android build template installed successfully"
                 ls -la android/
               else
