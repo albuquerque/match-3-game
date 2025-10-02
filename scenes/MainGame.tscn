@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://pu3wcj43djjh"]
 
-[ext_resource type="Script" uid="uid://db7qg00wuqlbb" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
-[ext_resource type="Script" uid="uid://bfx77ne3vy5c2" path="res://scripts/GameUI.gd" id="2_4y7z1"]
+[ext_resource type="Script" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
+[ext_resource type="Script" path="res://scripts/GameUI.gd" id="2_4y7z1"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
 bg_color = Color(0.2, 0.2, 0.3, 0.8)
