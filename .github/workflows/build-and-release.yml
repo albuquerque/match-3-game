@@ -34,22 +34,91 @@ jobs:
           build-tools: '33.0.2'
           ndk-version: '25.1.8937393'
 
-      - name: Configure Android SDK for Godot
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Configure Android Build Environment
         run: |
-          # Set Android SDK environment variables for Godot
+          # Set Android SDK environment variables
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
           
-          # Verify Android SDK installation
-          echo "Android SDK verification:"
-          ls -la $ANDROID_HOME/
-          ls -la $ANDROID_HOME/build-tools/ 2>/dev/null || echo "build-tools directory not found"
+          # Verify installations
+          echo "=== Environment Check ==="
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          echo "JAVA_HOME: $JAVA_HOME"
+          echo "PATH: $PATH"
           
-          # Create Godot editor settings to configure Android SDK
+          echo "=== Android SDK Structure ==="
+          ls -la $ANDROID_HOME/ || echo "Android SDK not found"
+          ls -la $ANDROID_HOME/build-tools/ || echo "build-tools not found"
+          ls -la $ANDROID_HOME/build-tools/33.0.2/ || echo "build-tools 33.0.2 not found"
+          
+          echo "=== Java Version ==="
+          java -version
+          javac -version
+          
+          # Create Godot editor settings directory
           mkdir -p ~/.local/share/godot/editor_settings-4.3/
-          echo "[export/android]" > ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo "android_sdk_path = \"$ANDROID_HOME\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
-          echo "debug_keystore = \"\"" >> ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+          
+          # Create comprehensive Godot editor settings
+          cat > ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres << EOF
+[gd_resource type="EditorSettings" format=3]
+
+[resource]
+export/android/android_sdk_path = "$ANDROID_HOME"
+export/android/debug_keystore = ""
+export/android/debug_keystore_user = "androiddebugkey"
+export/android/debug_keystore_pass = "android"
+export/android/force_system_user = false
+export/android/shutdown_adb_on_exit = true
+export/android/one_click_deploy_clear_previous_installs = false
+export/android/java_sdk_path = "$JAVA_HOME"
+export/android/use_custom_build_tools_version = false
+export/android/custom_build_tools_version = "33.0.2"
+network/http_proxy/host = ""
+network/http_proxy/port = -1
+network/https_proxy/host = ""
+network/https_proxy/port = -1
+EOF
+          
+          echo "=== Created Godot Editor Settings ==="
+          cat ~/.local/share/godot/editor_settings-4.3/editor_settings-4.3.tres
+
+      - name: Install Android Build Template
+        run: |
+          # Download and install Android build template
+          echo "Installing Android build template..."
+          
+          # Create android directory if it doesn't exist
+          mkdir -p android
+          
+          # Download Android export template from Godot
+          TEMPLATE_URL="https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz"
+          echo "Downloading export templates..."
+          wget -q "$TEMPLATE_URL" -O /tmp/export_templates.tpz
+          
+          # Extract templates
+          cd /tmp
+          unzip -q export_templates.tpz
+          
+          # Find Android template
+          ANDROID_TEMPLATE=$(find . -name "android_source.zip" | head -1)
+          if [ -n "$ANDROID_TEMPLATE" ]; then
+            echo "Found Android template: $ANDROID_TEMPLATE"
+            # Extract Android template to project
+            cd "$GITHUB_WORKSPACE"
+            unzip -q "$ANDROID_TEMPLATE" -d android/
+            echo "Android build template installed successfully"
+            ls -la android/
+          else
+            echo "Android template not found in export templates"
+            find /tmp -name "*android*" -type f
+          fi
 
       - name: Debug Environment
         run: |
