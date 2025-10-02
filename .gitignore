@@ -1,0 +1,37 @@
+# Godot-specific ignores
+.godot/
+.import/
+*.import
+*.uid
+export.cfg
+export_presets.cfg
+
+# Android build artifacts
+android/build/build/
+android/build/.gradle/
+android/.gradle/
+*.keystore
+
+# General build artifacts
+builds/*.apk
+builds/*.aab
+builds/*.exe
+builds/*.dmg
+builds/*.zip
+build/
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.log

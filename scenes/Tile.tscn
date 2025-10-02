@@ -1,0 +1,47 @@
+[gd_scene load_steps=4 format=3 uid="uid://bwxkqj8p1n7y5"]
+
+[ext_resource type="Script" path="res://scripts/Tile.gd" id="1_8x9j4"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_1"]
+radius = 32.0
+
+[sub_resource type="Animation" id="Animation_1"]
+resource_name = "pulse"
+length = 1.0
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("SelectionRing:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(1.2, 1.2), Vector2(1, 1)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_1"]
+_data = {
+"pulse": SubResource("Animation_1")
+}
+
+[node name="Tile" type="Area2D"]
+script = ExtResource("1_8x9j4")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_1")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(1.25, 1.25)
+
+[node name="SelectionRing" type="Sprite2D" parent="."]
+modulate = Color(1, 1, 0, 0.7)
+scale = Vector2(1.5, 1.5)
+visible = false
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"default": SubResource("AnimationLibrary_1")
+}
