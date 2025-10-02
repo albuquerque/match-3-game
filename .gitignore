@@ -4,7 +4,7 @@
 *.import
 *.uid
 export.cfg
-export_presets.cfg
+# export_presets.cfg - ALLOW this file to be committed for CI/CD
 
 # Android build artifacts
 android/build/build/
