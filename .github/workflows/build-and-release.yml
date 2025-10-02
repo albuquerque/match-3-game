@@ -34,6 +34,59 @@ jobs:
           build-tools: '33.0.2'
           ndk-version: '25.1.8937393'
 
+      - name: Install Android Build Tools
+        run: |
+          echo "=== Installing Android Build Tools Manually ==="
+          
+          # Set up Android SDK paths
+          export ANDROID_HOME=/home/runner/.android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          
+          # Create cmdline-tools/latest if it doesn't exist
+          if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
+            echo "Creating cmdline-tools/latest directory..."
+            mkdir -p $ANDROID_HOME/cmdline-tools/latest
+            # Copy tools from cmdline-tools to latest
+            if [ -d "$ANDROID_HOME/cmdline-tools" ]; then
+              cp -r $ANDROID_HOME/cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/ 2>/dev/null || true
+            fi
+          fi
+          
+          # Find and use sdkmanager
+          SDKMANAGER=""
+          for path in "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/cmdline-tools/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"; do
+            if [ -f "$path" ]; then
+              SDKMANAGER="$path"
+              echo "Found sdkmanager at: $SDKMANAGER"
+              break
+            fi
+          done
+          
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found!"
+            find $ANDROID_HOME -name "sdkmanager" -type f 2>/dev/null || echo "No sdkmanager found anywhere"
+            exit 1
+          fi
+          
+          # Accept licenses
+          echo "Accepting Android SDK licenses..."
+          yes | $SDKMANAGER --licenses || true
+          
+          # Install build-tools explicitly
+          echo "Installing build-tools 33.0.2..."
+          $SDKMANAGER "build-tools;33.0.2"
+          
+          # Verify installation
+          echo "=== Verifying build-tools installation ==="
+          ls -la $ANDROID_HOME/
+          ls -la $ANDROID_HOME/build-tools/ 2>/dev/null || echo "build-tools directory still missing"
+          ls -la $ANDROID_HOME/build-tools/33.0.2/ 2>/dev/null || echo "build-tools 33.0.2 directory missing"
+          
+          # Update environment variables for next steps
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
