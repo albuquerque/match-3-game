@@ -90,8 +90,14 @@ jobs:
           touch android/.gradle_build_template_installed
           
           # Clean up any .import files that might interfere with Android build
-          find android/build/res -name "*.import" -delete 2>/dev/null || true
-          find android/build/assets -name "*.import" -delete 2>/dev/null || true
+          echo "🧹 Cleaning up .import files from Android directories..."
+          find android -name "*.import" -type f -delete 2>/dev/null || true
+          
+          # Also clean up any build artifacts that might contain .import files
+          rm -rf android/build/build/ 2>/dev/null || true
+          rm -rf android/build/intermediates/ 2>/dev/null || true
+          rm -rf android/build/outputs/ 2>/dev/null || true
+          rm -rf android/build/.gradle/ 2>/dev/null || true
           
           # Verify the structure
           echo "✅ Android build template configured"
@@ -129,6 +135,11 @@ jobs:
           set -e
           mkdir -p builds
           ~/godot --headless --verbose --export-debug "Android" builds/${EXPORT_NAME}-debug.apk
+          
+          # Clean up any .import files that may have been generated during export
+          echo "🧹 Post-export cleanup of .import files..."
+          find android -name "*.import" -type f -delete 2>/dev/null || true
+          
           ls -lh builds
 
       - name: Upload APK Artifact
