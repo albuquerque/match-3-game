@@ -71,46 +71,14 @@ jobs:
           accept-android-sdk-licenses: true
           packages: 'platforms;android-33 platform-tools build-tools;33.0.2 ndk;25.1.8937393'
 
-      - name: Install Android Build Template
+      - name: Setup Android Environment (like build-android.sh)
         run: |
           set -e
-          echo "Configuring existing Android build template..."
-          
-          # Verify the android directory exists (it should be committed to repo)
-          if [ ! -d "android" ]; then
-            echo "❌ Android directory not found in repository"
-            exit 1
-          fi
-          
-          # Ensure proper permissions and metadata files
-          chmod +x android/build/gradlew || true
-          
-          # Create/verify the metadata files that Godot 4.5 expects
-          echo "4.5.stable" > android/.build_version
-          touch android/.gradle_build_template_installed
-          
-          # Clean up any .import files that might interfere with Android build
-          echo "🧹 Cleaning up .import files from Android directories..."
-          find android -name "*.import" -type f -delete 2>/dev/null || true
-          
-          # Also clean up any build artifacts that might contain .import files
-          rm -rf android/build/build/ 2>/dev/null || true
-          rm -rf android/build/intermediates/ 2>/dev/null || true
-          rm -rf android/build/outputs/ 2>/dev/null || true
-          rm -rf android/build/.gradle/ 2>/dev/null || true
-          
-          # Verify the structure
-          echo "✅ Android build template configured"
-          echo "📁 Template structure verification:"
-          ls -la android/ | head -10
-          
-          # Verify key files exist
-          if [ -f "android/build/build.gradle" ]; then
-            echo "✅ build.gradle found"
-          else
-            echo "❌ build.gradle missing"
-            exit 1
-          fi
+          echo "Setting up Android environment (mirroring build-android.sh)..."
+          export ANDROID_SDK_ROOT="${ANDROID_HOME}"
+          export PATH="${ANDROID_HOME}/platform-tools:$PATH"
+          echo "✅ Android SDK: $ANDROID_SDK_ROOT"
+          echo "✅ Godot Engine: ~/godot"
 
       - name: Create Editor Settings
         run: |
@@ -121,7 +89,7 @@ jobs:
             echo '[gd_resource type="EditorSettings" format=3]'
             echo
             echo '[resource]'
-            echo "export/android/android_sdk_path = \"${ANDROID_SDK_ROOT:-$ANDROID_HOME}\""
+            echo "export/android/android_sdk_path = \"${ANDROID_HOME}\""
             echo "export/android/java_sdk_path = \"$JAVA_HOME\""
             echo 'export/android/debug_keystore = ""'
             echo 'export/android/force_system_user = false'
@@ -130,17 +98,20 @@ jobs:
             echo 'export/android/custom_build_tools_version = "33.0.2"'
           } > "$SETTINGS_DIR/editor_settings-4.tres"
 
-      - name: Export Android APK
+      - name: Export Android APK (same as build-android.sh)
         run: |
           set -e
+          echo "🔨 Building Android APK (mirroring build-android.sh)..."
           mkdir -p builds
-          ~/godot --headless --verbose --export-debug "Android" builds/${EXPORT_NAME}-debug.apk
+          ~/godot --headless --export-debug "Android" "builds/${EXPORT_NAME}-debug.apk"
           
-          # Clean up any .import files that may have been generated during export
-          echo "🧹 Post-export cleanup of .import files..."
-          find android -name "*.import" -type f -delete 2>/dev/null || true
-          
-          ls -lh builds
+          if [ $? -eq 0 ]; then
+            echo "🎉 SUCCESS! Android APK built successfully!"
+            ls -lh builds/
+          else
+            echo "❌ Build failed"
+            exit 1
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
