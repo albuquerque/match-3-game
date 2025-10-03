@@ -6,14 +6,25 @@
 export.cfg
 # export_presets.cfg - ALLOW this file to be committed for CI/CD
 
-# Android build artifacts
+# Android build artifacts (exclude generated files but keep template files)
 android/build/build/
 android/build/.gradle/
+android/build/intermediates/
+android/build/outputs/
+android/build/tmp/
 android/.gradle/
 *.keystore
-# But allow the metadata files (required for CI)
+
+# But allow essential Android template files (required for CI)
 !android/.build_version
 !android/.gradle_build_template_installed
+!android/build/build.gradle
+!android/build/config.gradle
+!android/build/settings.gradle
+!android/build/gradlew
+!android/build/gradlew.bat
+!android/build/AndroidManifest.xml
+!android/build/gradle.properties
 
 # General build artifacts
 builds/*.apk
