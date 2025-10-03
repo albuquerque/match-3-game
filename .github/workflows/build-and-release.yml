@@ -89,6 +89,10 @@ jobs:
           echo "4.5.stable" > android/.build_version
           touch android/.gradle_build_template_installed
           
+          # Clean up any .import files that might interfere with Android build
+          find android/build/res -name "*.import" -delete 2>/dev/null || true
+          find android/build/assets -name "*.import" -delete 2>/dev/null || true
+          
           # Verify the structure
           echo "✅ Android build template configured"
           echo "📁 Template structure verification:"
