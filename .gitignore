@@ -11,8 +11,9 @@ android/build/build/
 android/build/.gradle/
 android/.gradle/
 *.keystore
-# But allow the .build_version file (required for CI)
+# But allow the metadata files (required for CI)
 !android/.build_version
+!android/.gradle_build_template_installed
 
 # General build artifacts
 builds/*.apk
