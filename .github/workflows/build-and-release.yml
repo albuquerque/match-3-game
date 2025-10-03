@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  GODOT_VERSION: 4.3
+  GODOT_VERSION: 4.5
   EXPORT_NAME: match3-game
 
 jobs:
@@ -81,7 +81,7 @@ jobs:
             echo "✅ Android build template already exists, ensuring proper structure..."
             
             # Create the .build_version file that Godot expects when template is "installed"
-            echo "4.3.stable" > android/.build_version
+            echo "4.5.stable" > android/.build_version
             
             # Ensure the android directory has the right structure and permissions
             chmod +x android/build/gradlew || true
@@ -115,7 +115,7 @@ jobs:
               rm -rf android_temp
               
               # Create the build version file
-              echo "4.3.stable" > android/.build_version
+              echo "4.5.stable" > android/.build_version
               
               # Set proper permissions
               chmod +x android/build/gradlew || chmod +x android/gradlew || true
