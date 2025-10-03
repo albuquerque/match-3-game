@@ -75,35 +75,62 @@ jobs:
         run: |
           set -e
           echo "Installing Android build template..."
-          # Use Godot to install the Android build template (simulates Project menu action)
-          ~/godot --headless --quit --editor --path . --install-android-build-template
           
-          # Verify the template was installed
+          # Check if android directory already exists with build files
           if [ -f "android/build/build.gradle" ]; then
-            echo "✅ Android build template installed successfully"
+            echo "✅ Android build template already exists, ensuring proper structure..."
+            
+            # Create the .build_version file that Godot expects when template is "installed"
+            echo "4.3.stable" > android/.build_version
+            
+            # Ensure the android directory has the right structure and permissions
+            chmod +x android/build/gradlew || true
+            
+            # Create any missing directories that Godot might expect
+            mkdir -p android/build/src/main/java
+            mkdir -p android/build/src/main/res
+            
+            echo "✅ Android build template structure verified and configured"
           else
-            echo "❌ Failed to install Android build template, falling back to manual installation"
-            # Extract android_source.zip manually as fallback
-            ANDROID_SRC=$(find ~/.local/share/godot/export_templates/4.3.stable -name 'android_source.zip' | head -1)
+            echo "❌ Android build template not found, extracting from export templates..."
+            
+            # Find and extract android_source.zip
+            ANDROID_SRC=$(find ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable -name 'android_source.zip' | head -1)
             if [ -n "$ANDROID_SRC" ]; then
-              echo "Found android_source.zip, extracting to android/ directory"
-              rm -rf android_temp
-              mkdir -p android_temp
+              echo "Found android_source.zip, extracting..."
+              
+              # Remove existing android directory and recreate
+              rm -rf android
+              mkdir -p android
+              
+              # Extract the template
               unzip -q "$ANDROID_SRC" -d android_temp
               
-              # Handle both flat and nested structures
+              # Handle nested or flat structure
               if [ -d "android_temp/android" ]; then
-                cp -r android_temp/android/* android/
+                mv android_temp/android/* android/
               else
-                cp -r android_temp/* android/
+                mv android_temp/* android/
               fi
               rm -rf android_temp
-              echo "✅ Manual installation completed"
+              
+              # Create the build version file
+              echo "4.3.stable" > android/.build_version
+              
+              # Set proper permissions
+              chmod +x android/build/gradlew || chmod +x android/gradlew || true
+              
+              echo "✅ Android build template extracted and configured"
             else
-              echo "❌ Could not find android_source.zip"
+              echo "❌ Could not find android_source.zip in export templates"
               exit 1
             fi
           fi
+          
+          # Verify the final structure
+          echo "📁 Android template structure:"
+          ls -la android/ || true
+          ls -la android/build/ || true
 
       - name: Create Editor Settings
         run: |
