@@ -12,6 +12,8 @@ android/build/.gradle/
 android/build/intermediates/
 android/build/outputs/
 android/build/tmp/
+android/build/libs/debug/*.aar
+android/build/libs/release/*.aar
 android/.gradle/
 *.keystore
 
