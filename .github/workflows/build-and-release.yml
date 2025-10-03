@@ -64,57 +64,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK (platform + build tools + NDK)
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: '9477386'
           accept-android-sdk-licenses: true
           packages: 'platforms;android-33 platform-tools build-tools;33.0.2 ndk;25.1.8937393'
-
-      - name: Prepare Android Build Template
-        run: |
-          set -e
-          echo "Ensuring clean android build template..."
-          rm -rf android
-          mkdir -p android
-          ANDROID_SRC=$(find ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable -maxdepth 1 -name 'android_source.zip' | head -1)
-          if [ -z "$ANDROID_SRC" ]; then
-            echo "android_source.zip not found in export templates" && exit 1
-          fi
-          TMP_EXTRACT=$(mktemp -d)
-          unzip -q "$ANDROID_SRC" -d "$TMP_EXTRACT"
-          # Move contents (supports both direct files and nested android/ directory inside zip)
-          if [ -d "$TMP_EXTRACT/android" ]; then
-            shopt -s dotglob
-            mv "$TMP_EXTRACT/android"/* android/
-          else
-            shopt -s dotglob
-          # Ensure nested build/ directory (Godot expects android/build/build.gradle for custom template)
-          if [ -f android/build/build.gradle ]; then
-            echo "Nested build directory present."
-          elif [ -f android/build.gradle ]; then
-            echo "Wrapping root-level gradle project into build/ directory."
-            mkdir -p android/build
-            mv android/build.gradle android/settings.gradle android/gradle.properties android/build/ 2>/dev/null || true
-            [ -d android/gradle ] && mv android/gradle android/build/
-            [ -f android/gradlew ] && mv android/gradlew android/build/
-            [ -f android/gradlew.bat ] && mv android/gradlew.bat android/build/
-            for d in libs res src assetPacks assets ; do [ -d "android/$d" ] && mv "android/$d" android/build/; done
-            echo "Wrapping root-level Gradle project into build/ directory for consistency"
-            mkdir -p android/build
-            # Move gradle-related files into build/
-          echo "Final build.gradle at:"; ls -1 android/build/build.gradle
-          rm -rf android/build/assets || true
-            [ -f android/gradlew.bat ] && mv android/gradlew.bat android/build/
-            # Move any libs/res/src if present
-            for d in libs res src assetPacks; do [ -d "android/$d" ] && mv "android/$d" android/build/; done
-          else
-            echo "No build.gradle found after extraction" && find android -maxdepth 4 -name build.gradle && exit 1
-          fi
-          echo "Final build.gradle locations:"; find android -maxdepth 3 -type f -name build.gradle
-          # Clean precompiled assets (Godot will generate fresh ones)
-          rm -rf android/build/assets android/assets || true
-          echo "Android template normalization complete."
 
       - name: Create Editor Settings
         run: |
@@ -133,20 +88,6 @@ jobs:
             echo 'export/android/use_custom_build_tools_version = false'
             echo 'export/android/custom_build_tools_version = "33.0.2"'
           } > "$SETTINGS_DIR/editor_settings-4.tres"
-          echo "Editor settings created:"; sed -n '1,25p' "$SETTINGS_DIR/editor_settings-4.tres"
-
-      - name: Sanity Check Android Tooling
-        run: |
-          set -e
-          echo "ANDROID_HOME=$ANDROID_HOME"; echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"; echo "JAVA_HOME=$JAVA_HOME"
-          ls -1 $ANDROID_HOME/platform-tools | head -10 || true
-          test -x $ANDROID_HOME/platform-tools/adb || (echo "adb missing" && exit 1)
-          test -d $ANDROID_HOME/build-tools/33.0.2 || (echo "build tools 33.0.2 missing" && exit 1)
-          ls -1 android/build | head -20
-
-      - name: List Export Presets
-        run: |
-          echo "Export presets file:"; sed -n '1,120p' export_presets.cfg
 
       - name: Export Android APK
         run: |
