@@ -14,8 +14,9 @@ android/build/outputs/
 android/build/tmp/
 android/build/libs/debug/*.aar
 android/build/libs/release/*.aar
-android/build/res/**/*.import
 android/build/assets/**/*.import
+android/build/res/**/*.import
+android/build/**/*.import
 android/.gradle/
 *.keystore
 
