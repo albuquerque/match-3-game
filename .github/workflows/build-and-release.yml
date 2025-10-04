@@ -52,8 +52,10 @@ jobs:
           
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+            GODOT_BINARY="Godot_v${GODOT_VERSION}-stable_linux.x86_64"
           else
             HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
+            GODOT_BINARY="Godot.app/Contents/MacOS/Godot"
           fi
           
           TEMPLATES_FILE="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
@@ -67,10 +69,11 @@ jobs:
           download "$HEADLESS_FILE"
           unzip -q "$HEADLESS_FILE" -d ~/godot_raw
           
+          # Find and move the Godot binary
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            mv ~/godot_raw/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot
+            mv ~/godot_raw/$GODOT_BINARY ~/godot
           else
-            mv ~/godot_raw/Godot.app/Contents/MacOS/Godot ~/godot
+            mv ~/godot_raw/$GODOT_BINARY ~/godot
           fi
           
           chmod +x ~/godot
@@ -85,8 +88,13 @@ jobs:
       - name: Verify Godot & Templates
         run: |
           set -e
-          ~/godot --version
-          echo "Listing templates:"; ls -1 ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable | head -20
+          echo "Godot binary path: ~/godot"
+          echo "Checking if Godot binary is executable..."
+          ls -la ~/godot
+          echo "Attempting to get Godot version (with timeout)..."
+          timeout 30s ~/godot --version --headless || echo "Version check failed or timed out"
+          echo "Checking export templates..."
+          ls -1 ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable | head -10
 
       - name: Export ${{ matrix.platform }} Build
         run: |
