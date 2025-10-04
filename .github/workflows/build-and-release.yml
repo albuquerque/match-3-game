@@ -13,89 +13,54 @@ env:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        platform: [linux, macos, windows]
-        include:
-          - platform: linux
-            runner: ubuntu-latest
-            preset: "Linux/X11"
-            filename: "match3-game.x86_64"
-            path: "build/linux/"
-          - platform: macos
-            runner: macos-latest
-            preset: "macOS"
-            filename: "match3-game.zip"
-            path: "build/mac/"
-          - platform: windows
-            runner: windows-latest
-            preset: "Windows Desktop"
-            filename: "match3-game.exe"
-            path: "build/windows/"
-
-    name: Build ${{ matrix.platform }}
-    runs-on: ${{ matrix.runner }}
+    name: Build All Platforms
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Cache Godot Assets
-        id: cache-godot
-        uses: actions/cache@v4
         with:
-          path: |
-            ~/.local/share/godot/export_templates
-            ~/godot
-          key: godot-${{ env.GODOT_VERSION }}-${{ matrix.platform }}
+          lfs: false
 
-      - name: Download Godot Headless + Export Templates (if needed)
-        if: steps.cache-godot.outputs.cache-hit != 'true'
+      - name: Setup
         run: |
-          if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            curl -fSL -o godot_headless.zip "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip"
-            unzip -q godot_headless.zip
-            mv Godot_v4.3-stable_linux.x86_64 ~/godot
-          elif [[ "${{ matrix.platform }}" == "macos" ]]; then
-            curl -fSL -o godot_headless.zip "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_macos.universal.zip"
-            unzip -q godot_headless.zip
-            mv Godot.app/Contents/MacOS/Godot ~/godot
-          else
-            curl -fSL -o godot_headless.zip "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_win64.exe.zip"
-            unzip -q godot_headless.zip
-            mv Godot_v4.3-stable_win64.exe ~/godot.exe
-          fi
-          
-          chmod +x ~/godot* || true
-          
-          curl -fSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz"
-          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
-          unzip -q templates.tpz -d /tmp/templates_extracted
-          mv /tmp/templates_extracted/templates/* ~/.local/share/godot/export_templates/4.3.stable/
+          mkdir -p ~/.local/share/godot/export_templates
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
 
-      - name: Export ${{ matrix.platform }} Build
+      - name: Build for Windows
         run: |
-          mkdir -p ${{ matrix.path }}
-          
-          if [[ "${{ matrix.platform }}" == "windows" ]]; then
-            ~/godot.exe --headless --export-debug "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}"
-          else
-            ~/godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}"
-          fi
-          
-          if [ -f "${{ matrix.path }}${{ matrix.filename }}" ]; then
-            echo "✅ ${{ matrix.platform }} build completed!"
-            ls -lh ${{ matrix.path }}
-          else
-            echo "❌ ${{ matrix.platform }} build failed"
-            exit 1
-          fi
+          mkdir -p build/windows
+          godot --headless --verbose --export-debug "Windows Desktop" build/windows/match3-game.exe
 
-      - name: Upload ${{ matrix.platform }} Artifact
+      - name: Build for Linux
+        run: |
+          mkdir -p build/linux
+          godot --headless --verbose --export-debug "Linux/X11" build/linux/match3-game.x86_64
+
+      - name: Build for macOS
+        run: |
+          mkdir -p build/mac
+          godot --headless --verbose --export-debug "macOS" build/mac/match3-game.zip
+
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-build
-          path: ${{ matrix.path }}${{ matrix.filename }}
+          name: windows-build
+          path: build/windows/match3-game.exe
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: build/linux/match3-game.x86_64
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: build/mac/match3-game.zip
 
   release:
     if: github.ref == 'refs/heads/main'
