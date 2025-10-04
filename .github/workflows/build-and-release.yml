@@ -8,14 +8,14 @@ on:
   workflow_dispatch:
 
 env:
-  GODOT_VERSION: 4.5
+  GODOT_VERSION: 4.3
   EXPORT_NAME: match3-game
 
 jobs:
   build:
     strategy:
       matrix:
-        platform: [linux, macos]
+        platform: [linux, macos, windows]
         include:
           - platform: linux
             runner: ubuntu-latest
@@ -27,6 +27,11 @@ jobs:
             preset: "macOS"
             filename: "match3-game.zip"
             path: "build/mac/"
+          - platform: windows
+            runner: windows-latest
+            preset: "Windows Desktop"
+            filename: "match3-game.exe"
+            path: "build/windows/"
 
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
@@ -47,75 +52,42 @@ jobs:
       - name: Download Godot Headless + Export Templates (if needed)
         if: steps.cache-godot.outputs.cache-hit != 'true'
         run: |
-          set -euo pipefail
-          RELEASE_BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
-          
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-            GODOT_BINARY="Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+            curl -fSL -o godot_headless.zip "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip"
+            unzip -q godot_headless.zip
+            mv Godot_v4.3-stable_linux.x86_64 ~/godot
+          elif [[ "${{ matrix.platform }}" == "macos" ]]; then
+            curl -fSL -o godot_headless.zip "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_macos.universal.zip"
+            unzip -q godot_headless.zip
+            mv Godot.app/Contents/MacOS/Godot ~/godot
           else
-            HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
-            GODOT_BINARY="Godot.app/Contents/MacOS/Godot"
+            curl -fSL -o godot_headless.zip "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_win64.exe.zip"
+            unzip -q godot_headless.zip
+            mv Godot_v4.3-stable_win64.exe ~/godot.exe
           fi
           
-          TEMPLATES_FILE="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          chmod +x ~/godot* || true
           
-          download() {
-            local file="$1" url="${RELEASE_BASE}/$1"
-            echo "Downloading $file from $url"
-            curl -fSL --connect-timeout 20 --retry 6 --retry-delay 5 --retry-all-errors -o "$file" "$url"
-          }
-          
-          download "$HEADLESS_FILE"
-          unzip -q "$HEADLESS_FILE" -d ~/godot_raw
-          
-          # Find and move the Godot binary
-          if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            mv ~/godot_raw/$GODOT_BINARY ~/godot
-          else
-            mv ~/godot_raw/$GODOT_BINARY ~/godot
-          fi
-          
-          chmod +x ~/godot
-          echo "Godot headless installed at ~/godot"
-          
-          download "$TEMPLATES_FILE"
-          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          unzip -q "$TEMPLATES_FILE" -d /tmp/templates_extracted
-          mv /tmp/templates_extracted/templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
-          echo "Templates installed: $(ls ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable | wc -l) files"
-
-      - name: Verify Godot & Templates
-        run: |
-          set -e
-          echo "Godot binary path: ~/godot"
-          echo "Checking if Godot binary is executable..."
-          ls -la ~/godot
-          echo "Attempting to get Godot version (with timeout)..."
-          timeout 30s ~/godot --version --headless || echo "Version check failed or timed out"
-          echo "Checking export templates..."
-          ls -1 ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable | head -10
+          curl -fSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz"
+          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+          unzip -q templates.tpz -d /tmp/templates_extracted
+          mv /tmp/templates_extracted/templates/* ~/.local/share/godot/export_templates/4.3.stable/
 
       - name: Export ${{ matrix.platform }} Build
         run: |
-          set -e
-          echo "🔨 Building ${{ matrix.platform }} version..."
           mkdir -p ${{ matrix.path }}
           
-          # Use debug export (like the working build-android.sh script) and add timeout protection
-          echo "Starting export with timeout protection..."
-          timeout 600s ~/godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}" || {
-            echo "Export timed out or failed, trying without timeout..."
+          if [[ "${{ matrix.platform }}" == "windows" ]]; then
+            ~/godot.exe --headless --export-debug "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}"
+          else
             ~/godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}"
-          }
+          fi
           
           if [ -f "${{ matrix.path }}${{ matrix.filename }}" ]; then
-            echo "🎉 SUCCESS! ${{ matrix.platform }} build completed!"
+            echo "✅ ${{ matrix.platform }} build completed!"
             ls -lh ${{ matrix.path }}
           else
-            echo "❌ ${{ matrix.platform }} build failed - output file not found"
-            echo "Contents of build directory:"
-            ls -la ${{ matrix.path }} || echo "Build directory does not exist"
+            echo "❌ ${{ matrix.platform }} build failed"
             exit 1
           fi
 
@@ -146,6 +118,7 @@ jobs:
             **Platforms included:**
             - 🐧 Linux (x86_64)
             - 🍎 macOS (Universal)
+            - 🪟 Windows (x64)
             
             **Build info:**
             - Godot Version: ${{ env.GODOT_VERSION }}
