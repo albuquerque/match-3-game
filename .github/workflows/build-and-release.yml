@@ -1,4 +1,4 @@
-name: Android Build (Godot)
+name: Multi-Platform Build (Godot)
 
 on:
   push:
@@ -12,9 +12,25 @@ env:
   EXPORT_NAME: match3-game
 
 jobs:
-  android-export:
-    name: Android Export
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      matrix:
+        platform: [linux, macos]
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+            preset: "Linux/X11"
+            filename: "match3-game.x86_64"
+            path: "build/linux/"
+          - platform: macos
+            runner: macos-latest
+            preset: "macOS"
+            filename: "match3-game.zip"
+            path: "build/mac/"
+
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,25 +42,40 @@ jobs:
           path: |
             ~/.local/share/godot/export_templates
             ~/godot
-          key: godot-${{ env.GODOT_VERSION }}
+          key: godot-${{ env.GODOT_VERSION }}-${{ matrix.platform }}
 
       - name: Download Godot Headless + Export Templates (if needed)
         if: steps.cache-godot.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           RELEASE_BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
-          HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          else
+            HEADLESS_FILE="Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
+          fi
+          
           TEMPLATES_FILE="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          
           download() {
             local file="$1" url="${RELEASE_BASE}/$1"
             echo "Downloading $file from $url"
             curl -fSL --connect-timeout 20 --retry 6 --retry-delay 5 --retry-all-errors -o "$file" "$url"
           }
+          
           download "$HEADLESS_FILE"
           unzip -q "$HEADLESS_FILE" -d ~/godot_raw
-          mv ~/godot_raw/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot
+          
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            mv ~/godot_raw/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot
+          else
+            mv ~/godot_raw/Godot.app/Contents/MacOS/Godot ~/godot
+          fi
+          
           chmod +x ~/godot
           echo "Godot headless installed at ~/godot"
+          
           download "$TEMPLATES_FILE"
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
           unzip -q "$TEMPLATES_FILE" -d /tmp/templates_extracted
@@ -56,78 +87,54 @@ jobs:
           set -e
           ~/godot --version
           echo "Listing templates:"; ls -1 ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable | head -20
-          test -f ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_release.apk || (echo "Android template missing" && exit 1)
 
-      - name: Setup Java (Temurin 17)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '9477386'
-          accept-android-sdk-licenses: true
-          packages: 'platforms;android-33 platform-tools build-tools;33.0.2 ndk;25.1.8937393'
-
-      - name: Setup Android Environment (like build-android.sh)
+      - name: Export ${{ matrix.platform }} Build
         run: |
           set -e
-          echo "Setting up Android environment (mirroring build-android.sh)..."
-          export ANDROID_SDK_ROOT="${ANDROID_HOME}"
-          export PATH="${ANDROID_HOME}/platform-tools:$PATH"
-          echo "✅ Android SDK: $ANDROID_SDK_ROOT"
-          echo "✅ Godot Engine: ~/godot"
-
-      - name: Create Editor Settings
-        run: |
-          set -e
-          SETTINGS_DIR=~/.config/godot
-          mkdir -p "$SETTINGS_DIR"
-          {
-            echo '[gd_resource type="EditorSettings" format=3]'
-            echo
-            echo '[resource]'
-            echo "export/android/android_sdk_path = \"${ANDROID_HOME}\""
-            echo "export/android/java_sdk_path = \"$JAVA_HOME\""
-            echo 'export/android/debug_keystore = ""'
-            echo 'export/android/force_system_user = false'
-            echo 'export/android/shutdown_adb_on_exit = true'
-            echo 'export/android/use_custom_build_tools_version = false'
-            echo 'export/android/custom_build_tools_version = "33.0.2"'
-          } > "$SETTINGS_DIR/editor_settings-4.tres"
-
-      - name: Export Android APK (same as build-android.sh)
-        run: |
-          set -e
-          echo "🔨 Building Android APK (mirroring build-android.sh)..."
-          mkdir -p builds
-          ~/godot --headless --export-debug "Android" "builds/${EXPORT_NAME}-debug.apk"
+          echo "🔨 Building ${{ matrix.platform }} version..."
+          mkdir -p ${{ matrix.path }}
+          ~/godot --headless --export-release "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}"
           
           if [ $? -eq 0 ]; then
-            echo "🎉 SUCCESS! Android APK built successfully!"
-            ls -lh builds/
+            echo "🎉 SUCCESS! ${{ matrix.platform }} build completed!"
+            ls -lh ${{ matrix.path }}
           else
-            echo "❌ Build failed"
+            echo "❌ ${{ matrix.platform }} build failed"
             exit 1
           fi
 
-      - name: Upload APK Artifact
+      - name: Upload ${{ matrix.platform }} Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: builds/*.apk
+          name: ${{ matrix.platform }}-build
+          path: ${{ matrix.path }}${{ matrix.filename }}
 
-      - name: (Optional) Create Timestamped Release
-        if: github.ref == 'refs/heads/main'
+  release:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: android-v${{ env.GODOT_VERSION }}-${{ github.run_number }}
-          name: Android Build ${{ env.GODOT_VERSION }} (Run ${{ github.run_number }})
+          tag_name: v${{ env.GODOT_VERSION }}-${{ github.run_number }}
+          name: Multi-Platform Build ${{ env.GODOT_VERSION }} (Run ${{ github.run_number }})
           body: |
-            Automated Android export generated by CI.
-            Commit: ${{ github.sha }}
-          files: builds/*.apk
+            Automated multi-platform export generated by CI.
+            
+            **Platforms included:**
+            - 🐧 Linux (x86_64)
+            - 🍎 macOS (Universal)
+            
+            **Build info:**
+            - Godot Version: ${{ env.GODOT_VERSION }}
+            - Commit: ${{ github.sha }}
+            - Build Number: ${{ github.run_number }}
+          files: ./artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
