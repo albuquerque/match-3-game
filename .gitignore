@@ -1,0 +1,56 @@
+# Godot-specific ignores
+.godot/
+.import/
+*.import
+*.uid
+export.cfg
+# export_presets.cfg - ALLOW this file to be committed for CI/CD
+
+# Android build artifacts (exclude generated files but keep template files)
+android/build/build/
+android/build/.gradle/
+android/build/intermediates/
+android/build/outputs/
+android/build/tmp/
+android/build/libs/debug/*.aar
+android/build/libs/release/*.aar
+android/build/assets/**/*.import
+android/build/res/**/*.import
+android/build/**/*.import
+android/.gradle/
+*.keystore
+
+# But allow essential Android template files (required for CI)
+!android/.build_version
+!android/.gradle_build_template_installed
+!android/build/build.gradle
+!android/build/config.gradle
+!android/build/settings.gradle
+!android/build/gradlew
+!android/build/gradlew.bat
+!android/build/AndroidManifest.xml
+!android/build/gradle.properties
+
+# General build artifacts
+builds/*.apk
+builds/*.aab
+builds/*.exe
+builds/*.dmg
+builds/*.zip
+build/
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.log
