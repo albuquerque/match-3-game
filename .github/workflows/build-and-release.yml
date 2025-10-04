@@ -101,13 +101,21 @@ jobs:
           set -e
           echo "🔨 Building ${{ matrix.platform }} version..."
           mkdir -p ${{ matrix.path }}
-          ~/godot --headless --export-release "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}"
           
-          if [ $? -eq 0 ]; then
+          # Use debug export (like the working build-android.sh script) and add timeout protection
+          echo "Starting export with timeout protection..."
+          timeout 600s ~/godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}" || {
+            echo "Export timed out or failed, trying without timeout..."
+            ~/godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.path }}${{ matrix.filename }}"
+          }
+          
+          if [ -f "${{ matrix.path }}${{ matrix.filename }}" ]; then
             echo "🎉 SUCCESS! ${{ matrix.platform }} build completed!"
             ls -lh ${{ matrix.path }}
           else
-            echo "❌ ${{ matrix.platform }} build failed"
+            echo "❌ ${{ matrix.platform }} build failed - output file not found"
+            echo "Contents of build directory:"
+            ls -la ${{ matrix.path }} || echo "Build directory does not exist"
             exit 1
           fi
 
