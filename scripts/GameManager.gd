@@ -11,6 +11,9 @@ const GRID_WIDTH = 8
 const GRID_HEIGHT = 8
 const TILE_TYPES = 6
 const MIN_MATCH_SIZE = 3
+const HORIZTONAL_ARROW = 7
+const VERTICAL_ARROW = 8
+const FOUR_WAY_ARROW = 9
 
 # Scoring
 const POINTS_PER_TILE = 100
@@ -147,18 +150,79 @@ func remove_duplicates(matches: Array) -> Array:
 			unique_matches.append(match)
 	return unique_matches
 
-func remove_matches(matches: Array) -> int:
+func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> int:
 	var tiles_removed = 0
+	var horizontal = false
+	var vertical = false
+
+	# Only create special tiles if we have a valid swapped position
+	var create_special = swapped_pos.x >= 0 and swapped_pos.y >= 0
+
+	# Determine match directions (only if creating special tiles)
+	var matches_on_same_row = 0
+	var matches_on_same_col = 0
+
+	if create_special:
+		# Check if there are multiple matches on the same row (horizontal match)
+		for match_pos in matches:
+			if match_pos.y == swapped_pos.y:
+				matches_on_same_row += 1
+
+		# Check if there are multiple matches on the same column (vertical match)
+		for match_pos in matches:
+			if match_pos.x == swapped_pos.x:
+				matches_on_same_col += 1
+
+		# Detect horizontal and vertical matches (3+ tiles for T/L shapes, 4+ for directional arrows)
+		horizontal = matches_on_same_row >= 3
+		vertical = matches_on_same_col >= 3
+
+	# Determine which special tile to create (before removing tiles)
+	var special_tile_type = 0
+	if create_special:
+		if horizontal and vertical:
+			# Both horizontal and vertical matches (T or L shape) - create 4-way arrow
+			special_tile_type = FOUR_WAY_ARROW
+		elif horizontal and matches_on_same_row >= 4:
+			# Only horizontal match of 4+ tiles - create horizontal arrow
+			special_tile_type = HORIZTONAL_ARROW
+		elif vertical and matches_on_same_col >= 4:
+			# Only vertical match of 4+ tiles - create vertical arrow
+			special_tile_type = VERTICAL_ARROW
+
+	# Remove matched tiles (but preserve swapped position if creating special tile)
 	for match_pos in matches:
 		if grid[match_pos.x][match_pos.y] > 0:
+			# Skip the swapped position if we're creating a special tile there
+			if special_tile_type > 0 and match_pos.x == swapped_pos.x and match_pos.y == swapped_pos.y:
+				continue
 			grid[match_pos.x][match_pos.y] = 0
 			tiles_removed += 1
+
+	# Create special tile at swapped position if applicable
+	if special_tile_type > 0:
+		grid[swapped_pos.x][swapped_pos.y] = special_tile_type
 
 	var points = calculate_points(tiles_removed)
 	add_score(points)
 	combo_count += 1
 
 	return tiles_removed
+
+func activate_special_tile(pos: Vector2):
+	var tile_type = grid[pos.x][pos.y]
+	if tile_type == HORIZTONAL_ARROW:
+		for x in range(GRID_WIDTH):
+			grid[x][pos.y] = 0
+	elif tile_type == VERTICAL_ARROW:
+		for y in range(GRID_HEIGHT):
+			grid[pos.x][y] = 0
+	elif tile_type == FOUR_WAY_ARROW:
+		for x in range(GRID_WIDTH):
+			grid[x][pos.y] = 0
+		for y in range(GRID_HEIGHT):
+			grid[pos.x][y] = 0
+
 
 func calculate_points(tiles_removed: int) -> int:
 	var base_points = tiles_removed * POINTS_PER_TILE

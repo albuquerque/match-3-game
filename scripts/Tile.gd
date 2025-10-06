@@ -2,12 +2,18 @@ extends Area2D
 class_name Tile
 
 signal tile_clicked(tile)
+signal tile_swiped(tile, direction)
 
 var tile_type: int = 0
 var grid_position: Vector2 = Vector2.ZERO
 var is_selected: bool = false
 var is_falling: bool = false
 var tile_scale: float = 1.0  # Dynamic scale factor
+
+# Swipe detection variables
+var swipe_start_pos: Vector2 = Vector2.ZERO
+var is_swiping: bool = false
+var swipe_threshold: float = 30.0  # Minimum distance to register as swipe
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var selection_ring: Sprite2D = $SelectionRing
@@ -57,35 +63,65 @@ func update_visual():
 		call_deferred("update_visual")
 		return
 
-	if tile_type <= 0 or tile_type > COLORS.size():
+	if tile_type <= 0:
 		visible = false
 		return
 
 	visible = true
-	sprite.modulate = COLORS[tile_type - 1]
 
-	# Create a simple colored circle
-	var texture = ImageTexture.new()
-	var image = Image.create(64, 64, false, Image.FORMAT_RGBA8)
-	image.fill(Color.WHITE)
+	# Store current sprite scale to preserve it
+	var current_sprite_scale = sprite.scale if sprite.scale != Vector2.ZERO else Vector2(tile_scale, tile_scale)
 
-	# Draw a circle
-	for x in range(64):
-		for y in range(64):
-			var center = Vector2(32, 32)
-			var distance = Vector2(x, y).distance_to(center)
-			if distance <= 28:
-				image.set_pixel(x, y, Color.WHITE)
-			else:
-				image.set_pixel(x, y, Color.TRANSPARENT)
+	# Load texture from file instead of generating it
+	var texture_path = "res://textures/tile_%d.png" % tile_type
+	if ResourceLoader.exists(texture_path):
+		sprite.texture = load(texture_path)
+		# Reset modulate for special tiles (7, 8, 9), apply color for regular tiles (1-6)
+		if tile_type <= COLORS.size():
+			sprite.modulate = COLORS[tile_type - 1]
+		else:
+			sprite.modulate = Color.WHITE
+	else:
+		# Fallback to old method if texture doesn't exist
+		if tile_type > COLORS.size():
+			visible = false
+			return
 
-	texture.set_image(image)
-	sprite.texture = texture
+		sprite.modulate = COLORS[tile_type - 1]
+
+		# Create a simple colored circle
+		var texture = ImageTexture.new()
+		var image = Image.create(64, 64, false, Image.FORMAT_RGBA8)
+		image.fill(Color.WHITE)
+
+		# Draw a circle
+		for x in range(64):
+			for y in range(64):
+				var center = Vector2(32, 32)
+				var distance = Vector2(x, y).distance_to(center)
+				if distance <= 28:
+					image.set_pixel(x, y, Color.WHITE)
+				else:
+					image.set_pixel(x, y, Color.TRANSPARENT)
+
+		texture.set_image(image)
+		sprite.texture = texture
+
+	# Restore the sprite scale (preserve current animated scale or use tile_scale for initial setup)
+	sprite.scale = current_sprite_scale
 
 	# Create selection ring texture if it doesn't exist
 	if selection_ring and not selection_ring.texture:
 		var ring_texture = create_ring_texture()
 		selection_ring.texture = ring_texture
+		selection_ring.scale = Vector2(tile_scale, tile_scale)
+
+func update_type(new_type: int):
+	"""Update the tile to a new type and refresh its visual appearance"""
+	print("Updating tile at ", grid_position, " from type ", tile_type, " to type ", new_type)
+	tile_type = new_type
+	update_visual()
+	print("Tile updated. Sprite visible: ", sprite.visible if sprite else "no sprite", " Texture: ", sprite.texture if sprite else "no sprite", " Scale: ", sprite.scale if sprite else "no sprite")
 
 func create_ring_texture() -> ImageTexture:
 	var image = Image.create(64, 64, false, Image.FORMAT_RGBA8)
@@ -135,12 +171,47 @@ func _input(event):
 
 func _on_input_event(viewport, event, shape_idx):
 	print("Input event detected: ", event.get_class(), " on tile at ", grid_position)
-	if event is InputEventScreenTouch and event.pressed:
-		print("Touch detected on tile at ", grid_position)
-		handle_click()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		print("Mouse click detected on tile at ", grid_position)
-		handle_click()
+
+	# Handle touch/mouse press - start tracking potential swipe
+	if (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed:
+		print("Touch/Click started on tile at ", grid_position)
+		swipe_start_pos = event.position
+		is_swiping = true
+
+	# Handle touch/mouse release - check if it's a tap or swipe
+	elif (event is InputEventScreenTouch and not event.pressed) or \
+		 (event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+		print("Touch/Click released on tile at ", grid_position)
+		if is_swiping:
+			var swipe_end_pos = event.position
+			var swipe_vector = swipe_end_pos - swipe_start_pos
+			var swipe_distance = swipe_vector.length()
+
+			print("Swipe distance: ", swipe_distance)
+
+			if swipe_distance >= swipe_threshold:
+				# It's a swipe - determine direction
+				var swipe_direction = get_swipe_direction(swipe_vector)
+				print("Swipe detected in direction: ", swipe_direction)
+				emit_signal("tile_swiped", self, swipe_direction)
+			else:
+				# It's a tap - use normal click behavior
+				print("Tap detected (swipe too short)")
+				handle_click()
+
+			is_swiping = false
+
+func get_swipe_direction(swipe_vector: Vector2) -> Vector2:
+	"""Determine the primary swipe direction (up, down, left, right)"""
+	var abs_x = abs(swipe_vector.x)
+	var abs_y = abs(swipe_vector.y)
+
+	if abs_x > abs_y:
+		# Horizontal swipe
+		return Vector2(1, 0) if swipe_vector.x > 0 else Vector2(-1, 0)
+	else:
+		# Vertical swipe
+		return Vector2(0, 1) if swipe_vector.y > 0 else Vector2(0, -1)
 
 func _on_mouse_entered():
 	print("Mouse entered tile at ", grid_position)
