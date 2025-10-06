@@ -14,6 +14,7 @@ var tile_scale: float = 1.0  # Dynamic scale factor
 var swipe_start_pos: Vector2 = Vector2.ZERO
 var is_swiping: bool = false
 var swipe_threshold: float = 30.0  # Minimum distance to register as swipe
+var touch_started_on_this_tile: bool = false
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var selection_ring: Sprite2D = $SelectionRing
@@ -162,32 +163,28 @@ func set_selected(selected: bool):
 				tween.kill()
 
 func _input(event):
-	# Global input handling as backup
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var local_pos = to_local(get_global_mouse_position())
-		if get_rect().has_point(local_pos):
-			print("Global click detected on tile at ", grid_position)
-			handle_click()
-
-func _on_input_event(viewport, event, shape_idx):
-	print("Input event detected: ", event.get_class(), " on tile at ", grid_position)
-
-	# Handle touch/mouse press - start tracking potential swipe
+	# Handle touch/mouse press - check if it started on this tile
 	if (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed:
-		print("Touch/Click started on tile at ", grid_position)
-		swipe_start_pos = event.position
-		is_swiping = true
+		var global_pos = event.position if event is InputEventScreenTouch else get_global_mouse_position()
+		var local_pos = to_local(global_pos)
 
-	# Handle touch/mouse release - check if it's a tap or swipe
+		if get_rect().has_point(local_pos):
+			print("Touch started on tile at ", grid_position)
+			swipe_start_pos = global_pos
+			touch_started_on_this_tile = true
+			is_swiping = true
+
+	# Handle touch/mouse release - check if it's a swipe or tap
 	elif (event is InputEventScreenTouch and not event.pressed) or \
 		 (event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
-		print("Touch/Click released on tile at ", grid_position)
-		if is_swiping:
-			var swipe_end_pos = event.position
-			var swipe_vector = swipe_end_pos - swipe_start_pos
+
+		if touch_started_on_this_tile:
+			print("Touch released, checking swipe on tile at ", grid_position)
+			var global_pos = event.position if event is InputEventScreenTouch else get_global_mouse_position()
+			var swipe_vector = global_pos - swipe_start_pos
 			var swipe_distance = swipe_vector.length()
 
-			print("Swipe distance: ", swipe_distance)
+			print("Swipe distance: ", swipe_distance, " Start: ", swipe_start_pos, " End: ", global_pos)
 
 			if swipe_distance >= swipe_threshold:
 				# It's a swipe - determine direction
@@ -199,7 +196,12 @@ func _on_input_event(viewport, event, shape_idx):
 				print("Tap detected (swipe too short)")
 				handle_click()
 
+			touch_started_on_this_tile = false
 			is_swiping = false
+
+func _on_input_event(viewport, event, shape_idx):
+	# Keep for compatibility but main input is handled in _input now
+	pass
 
 func get_swipe_direction(swipe_vector: Vector2) -> Vector2:
 	"""Determine the primary swipe direction (up, down, left, right)"""
