@@ -5,10 +5,11 @@ signal level_changed(new_level)
 signal moves_changed(moves_left)
 signal game_over
 signal level_complete
+signal level_loaded
 
 # Game configuration
-const GRID_WIDTH = 8
-const GRID_HEIGHT = 8
+var GRID_WIDTH = 8
+var GRID_HEIGHT = 8
 const TILE_TYPES = 6
 const MIN_MATCH_SIZE = 3
 const HORIZTONAL_ARROW = 7
@@ -18,7 +19,6 @@ const FOUR_WAY_ARROW = 9
 # Scoring
 const POINTS_PER_TILE = 100
 const COMBO_MULTIPLIER = 1.5
-const LEVEL_SCORE_REQUIREMENT = 10000
 
 # Game state
 var score = 0
@@ -29,23 +29,64 @@ var grid = []
 var combo_count = 0
 var processing_moves = false
 
+# Level system
+var level_manager: Node = null
+
 func _ready():
+	# Get or create LevelManager
+	level_manager = get_node_or_null("/root/LevelManager")
+	if not level_manager:
+		level_manager = preload("res://scripts/LevelManager.gd").new()
+		level_manager.name = "LevelManager"
+		add_child(level_manager)
+
 	initialize_game()
 
 func initialize_game():
 	score = 0
-	level = 1
-	moves_left = 30
-	target_score = LEVEL_SCORE_REQUIREMENT
+	level = 3
 	combo_count = 0
 	processing_moves = false
 
-	create_empty_grid()
-	fill_initial_grid()
+	# Load the first level
+	load_current_level()
 
 	emit_signal("score_changed", score)
 	emit_signal("level_changed", level)
 	emit_signal("moves_changed", moves_left)
+
+func load_current_level():
+	"""Load the current level from LevelManager"""
+	processing_moves = false  # Reset the processing flag when loading a level
+	score = 0  # Reset score for the new level
+	combo_count = 0  # Reset combo count
+
+	var level_data = level_manager.get_current_level()
+
+	if level_data:
+		GRID_WIDTH = level_data.width
+		GRID_HEIGHT = level_data.height
+		target_score = level_data.target_score
+		moves_left = level_data.moves
+		level = level_data.level_number
+
+		create_empty_grid()
+		fill_grid_from_layout(level_data.grid_layout)
+
+		print("Loaded level ", level, ": ", level_data.description)
+		print("Grid size: ", GRID_WIDTH, "x", GRID_HEIGHT)
+		print("Target: ", target_score, " in ", moves_left, " moves")
+	else:
+		# Fallback to default grid
+		print("No level data found, using default grid")
+		GRID_WIDTH = 8
+		GRID_HEIGHT = 8
+		target_score = 10000
+		moves_left = 30
+		create_empty_grid()
+		fill_initial_grid()
+
+	emit_signal("level_loaded")
 
 func create_empty_grid():
 	grid.clear()
@@ -54,13 +95,36 @@ func create_empty_grid():
 		for y in range(GRID_HEIGHT):
 			grid[x].append(0)
 
-func fill_initial_grid():
+func fill_grid_from_layout(layout: Array):
+	"""Fill the grid based on level layout (-1 = blocked, 0 = random tile)"""
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
-			var tile_type = get_safe_random_tile(x, y)
-			grid[x][y] = tile_type
+			var cell_value = layout[x][y]
+
+			if cell_value == -1:
+				# Blocked cell - stays as -1
+				grid[x][y] = -1
+			elif cell_value == 0:
+				# Empty - fill with random tile
+				var tile_type = get_safe_random_tile(x, y)
+				grid[x][y] = tile_type
+			else:
+				# Specific tile type
+				grid[x][y] = cell_value
+
+func fill_initial_grid():
+	"""Legacy method for backward compatibility"""
+	for x in range(GRID_WIDTH):
+		for y in range(GRID_HEIGHT):
+			if grid[x][y] != -1:  # Don't fill blocked cells
+				var tile_type = get_safe_random_tile(x, y)
+				grid[x][y] = tile_type
 
 func get_safe_random_tile(x: int, y: int) -> int:
+	# Skip if cell is blocked
+	if is_cell_blocked(x, y):
+		return -1
+
 	var attempts = 0
 	while attempts < 50:
 		var tile_type = randi() % TILE_TYPES + 1
@@ -86,8 +150,19 @@ func would_create_initial_match(x: int, y: int, tile_type: int) -> bool:
 
 	return h_count >= MIN_MATCH_SIZE or v_count >= MIN_MATCH_SIZE
 
+func is_cell_blocked(x: int, y: int) -> bool:
+	"""Check if a cell is blocked"""
+	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT:
+		return true
+
+	return grid[x][y] == -1
+
 func is_valid_position(pos: Vector2) -> bool:
-	return pos.x >= 0 and pos.x < GRID_WIDTH and pos.y >= 0 and pos.y < GRID_HEIGHT
+	if pos.x < 0 or pos.x >= GRID_WIDTH or pos.y < 0 or pos.y >= GRID_HEIGHT:
+		return false
+
+	# Check if the cell is blocked
+	return not is_cell_blocked(int(pos.x), int(pos.y))
 
 func are_adjacent(pos1: Vector2, pos2: Vector2) -> bool:
 	var dx = abs(pos1.x - pos2.x)
@@ -119,10 +194,15 @@ func find_matches() -> Array:
 		for x in range(1, GRID_WIDTH + 1):
 			var tile_type = grid[x][y] if x < GRID_WIDTH else -1
 
+			# Skip blocked cells
+			if x < GRID_WIDTH and is_cell_blocked(x, y):
+				tile_type = -2  # Use -2 to break the match
+
 			if tile_type != current_type or x == GRID_WIDTH:
-				if x - match_start >= MIN_MATCH_SIZE and current_type > 0:
+				if x - match_start >= MIN_MATCH_SIZE and current_type > 0 and current_type < 7:
 					for i in range(match_start, x):
-						matches.append(Vector2(i, y))
+						if not is_cell_blocked(i, y):
+							matches.append(Vector2(i, y))
 				current_type = tile_type
 				match_start = x
 
@@ -134,10 +214,15 @@ func find_matches() -> Array:
 		for y in range(1, GRID_HEIGHT + 1):
 			var tile_type = grid[x][y] if y < GRID_HEIGHT else -1
 
+			# Skip blocked cells
+			if y < GRID_HEIGHT and is_cell_blocked(x, y):
+				tile_type = -2  # Use -2 to break the match
+
 			if tile_type != current_type or y == GRID_HEIGHT:
-				if y - match_start >= MIN_MATCH_SIZE and current_type > 0:
+				if y - match_start >= MIN_MATCH_SIZE and current_type > 0 and current_type < 7:
 					for i in range(match_start, y):
-						matches.append(Vector2(x, i))
+						if not is_cell_blocked(x, i):
+							matches.append(Vector2(x, i))
 				current_type = tile_type
 				match_start = y
 
@@ -213,16 +298,19 @@ func activate_special_tile(pos: Vector2):
 	var tile_type = grid[pos.x][pos.y]
 	if tile_type == HORIZTONAL_ARROW:
 		for x in range(GRID_WIDTH):
-			grid[x][pos.y] = 0
+			if not is_cell_blocked(x, int(pos.y)):
+				grid[x][pos.y] = 0
 	elif tile_type == VERTICAL_ARROW:
 		for y in range(GRID_HEIGHT):
-			grid[pos.x][y] = 0
+			if not is_cell_blocked(int(pos.x), y):
+				grid[pos.x][y] = 0
 	elif tile_type == FOUR_WAY_ARROW:
 		for x in range(GRID_WIDTH):
-			grid[x][pos.y] = 0
+			if not is_cell_blocked(x, int(pos.y)):
+				grid[x][pos.y] = 0
 		for y in range(GRID_HEIGHT):
-			grid[pos.x][y] = 0
-
+			if not is_cell_blocked(int(pos.x), y):
+				grid[pos.x][y] = 0
 
 func calculate_points(tiles_removed: int) -> int:
 	var base_points = tiles_removed * POINTS_PER_TILE
@@ -233,15 +321,34 @@ func apply_gravity() -> bool:
 	var moved = false
 
 	for x in range(GRID_WIDTH):
+		# Start from the bottom and work upward
 		var write_pos = GRID_HEIGHT - 1
 
-		for y in range(GRID_HEIGHT - 1, -1, -1):
-			if grid[x][y] > 0:
-				if y != write_pos:
-					grid[x][write_pos] = grid[x][y]
-					grid[x][y] = 0
+		# Find the lowest available (non-blocked) position
+		while write_pos >= 0 and is_cell_blocked(x, write_pos):
+			write_pos -= 1
+
+		# Scan from bottom to top, moving tiles down to fill gaps
+		for read_pos in range(GRID_HEIGHT - 1, -1, -1):
+			# Skip blocked cells
+			if is_cell_blocked(x, read_pos):
+				continue
+
+			# If we find a tile
+			if grid[x][read_pos] > 0:
+				# If the tile needs to move down
+				if read_pos != write_pos:
+					grid[x][write_pos] = grid[x][read_pos]
+					if read_pos != write_pos:
+						grid[x][read_pos] = 0
 					moved = true
+
+				# Move write position up for next tile
 				write_pos -= 1
+
+				# Skip any blocked cells in write position
+				while write_pos >= 0 and is_cell_blocked(x, write_pos):
+					write_pos -= 1
 
 	return moved
 
@@ -250,6 +357,9 @@ func fill_empty_spaces() -> Array:
 
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
+			if is_cell_blocked(x, y):
+				continue  # Skip blocked cells
+
 			if grid[x][y] == 0:
 				grid[x][y] = randi() % TILE_TYPES + 1
 				new_tiles.append(Vector2(x, y))
@@ -264,20 +374,30 @@ func add_score(points: int):
 		advance_level()
 
 func advance_level():
-	level += 1
-	target_score += LEVEL_SCORE_REQUIREMENT
-	moves_left = 30
-	combo_count = 0
+	# Try to advance to next level
+	if level_manager.advance_to_next_level():
+		level += 1
+		combo_count = 0
 
-	emit_signal("level_changed", level)
-	emit_signal("moves_changed", moves_left)
-	emit_signal("level_complete")
+		emit_signal("level_complete")
+
+		# Load the next level after a short delay
+		await get_tree().create_timer(2.0).timeout
+		load_current_level()
+
+		emit_signal("level_changed", level)
+		emit_signal("moves_changed", moves_left)
+		emit_signal("score_changed", score)
+	else:
+		# No more levels - game complete!
+		print("All levels completed!")
+		emit_signal("game_over")
 
 func use_move():
 	moves_left -= 1
 	emit_signal("moves_changed", moves_left)
 
-	if moves_left <= 0:
+	if moves_left <= 0 and score < target_score:
 		emit_signal("game_over")
 
 func reset_combo():
@@ -286,21 +406,24 @@ func reset_combo():
 func get_tile_at(pos: Vector2) -> int:
 	if is_valid_position(pos):
 		return grid[pos.x][pos.y]
-	return 0
+	return -1
 
 func has_possible_moves() -> bool:
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
+			if is_cell_blocked(x, y):
+				continue
+
 			var pos = Vector2(x, y)
 
 			# Check right
-			if x < GRID_WIDTH - 1:
+			if x < GRID_WIDTH - 1 and not is_cell_blocked(x + 1, y):
 				var right_pos = Vector2(x + 1, y)
 				if would_create_match_after_swap(pos, right_pos):
 					return true
 
 			# Check down
-			if y < GRID_HEIGHT - 1:
+			if y < GRID_HEIGHT - 1 and not is_cell_blocked(x, y + 1):
 				var down_pos = Vector2(x, y + 1)
 				if would_create_match_after_swap(pos, down_pos):
 					return true

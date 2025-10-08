@@ -78,17 +78,16 @@ func update_visual():
 	if ResourceLoader.exists(texture_path):
 		sprite.texture = load(texture_path)
 		# Reset modulate for special tiles (7, 8, 9), apply color for regular tiles (1-6)
-		if tile_type <= COLORS.size():
+		if tile_type >= 1 and tile_type <= COLORS.size():
 			sprite.modulate = COLORS[tile_type - 1]
 		else:
 			sprite.modulate = Color.WHITE
 	else:
 		# Fallback to old method if texture doesn't exist
 		if tile_type > COLORS.size():
-			visible = false
-			return
-
-		sprite.modulate = COLORS[tile_type - 1]
+			sprite.modulate = Color.WHITE
+		else:
+			sprite.modulate = COLORS[tile_type - 1]
 
 		# Create a simple colored circle
 		var texture = ImageTexture.new()
@@ -283,7 +282,7 @@ func animate_destroy() -> Tween:
 		tween.parallel().tween_property(sprite, "scale", Vector2.ZERO, 0.3)
 		tween.parallel().tween_property(sprite, "rotation", PI * 2, 0.3)
 	tween.parallel().tween_property(self, "modulate", Color.TRANSPARENT, 0.3)
-	tween.tween_callback(queue_free)
+	# Don't call queue_free here - let GameBoard handle it after the animation completes
 	return tween
 
 func animate_spawn() -> Tween:
@@ -303,8 +302,14 @@ func animate_match_highlight() -> Tween:
 		return create_tween()  # Return empty tween if sprite not ready
 
 	var tween = create_tween()
-	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
-	tween.tween_property(sprite, "modulate", COLORS[tile_type - 1], 0.1)
-	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
-	tween.tween_property(sprite, "modulate", COLORS[tile_type - 1], 0.1)
+	# Check bounds before accessing COLORS array
+	if tile_type >= 1 and tile_type <= COLORS.size():
+		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+		tween.tween_property(sprite, "modulate", COLORS[tile_type - 1], 0.1)
+		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+		tween.tween_property(sprite, "modulate", COLORS[tile_type - 1], 0.1)
+	else:
+		# For special tiles, just flash white
+		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 	return tween
