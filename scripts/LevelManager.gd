@@ -23,7 +23,9 @@ var levels: Array[LevelData] = []
 var current_level_index: int = 0
 
 func _ready():
+	print("LevelManager is ready and initializing levels...")
 	load_all_levels()
+	print("Debug: Levels loaded: ", levels.size())
 
 func load_all_levels():
 	"""Load all level configurations from JSON files"""
@@ -37,6 +39,7 @@ func load_all_levels():
 			var level_data = load_level_from_json(file_path)
 			if level_data:
 				levels.append(level_data)
+				print("Loaded level: ", level_data.level_number, " - ", level_data.description)
 	else:
 		# If no JSON files found, use built-in levels
 		print("No level JSON files found, using built-in levels")
@@ -77,35 +80,50 @@ func load_level_from_json(file_path: String) -> LevelData:
 
 	var json = JSON.new()
 	var error = json.parse(json_text)
-
 	if error != OK:
-		print("Failed to parse JSON in ", file_path, ": ", json.get_error_message())
+		print("Failed to parse JSON in file: ", file_path)
 		return null
 
-	var data = json.data
+	var data = json.get_data()
+	var layout_lines = data["layout"].split("\n")
 
-	# Validate required fields
-	if not data.has("level") or not data.has("layout") or not data.has("width") or not data.has("height"):
-		print("Invalid level JSON format in ", file_path)
-		return null
+	# Parse the layout correctly: each line is a Y row, we need to convert to [x][y] format
+	var width = data["width"]
+	var height = data["height"]
+	var grid_layout = []
 
-	# Parse the layout (supports multiple formats)
-	var layout = parse_layout(data["layout"], data["width"], data["height"])
-	if layout.size() == 0:
-		print("Failed to parse layout in ", file_path)
-		return null
+	# Initialize the grid with proper dimensions [x][y]
+	for x in range(width):
+		grid_layout.append([])
+		for y in range(height):
+			grid_layout[x].append(0)
 
-	var level_data = LevelData.new(
+	# Parse each line (Y row) and fill the grid
+	for y in range(min(layout_lines.size(), height)):
+		var line = layout_lines[y].strip_edges()
+		var cells = line.split(" ")
+
+		for x in range(min(cells.size(), width)):
+			var cell_value = cells[x].strip_edges()
+
+			if cell_value == "X" or cell_value == "x":
+				grid_layout[x][y] = -1  # Blocked cell
+			elif cell_value == "." or cell_value == "_":
+				grid_layout[x][y] = 0  # Empty cell
+			elif cell_value.is_valid_int():
+				grid_layout[x][y] = int(cell_value)
+			else:
+				grid_layout[x][y] = 0  # Default to empty
+
+	return LevelData.new(
 		data["level"],
-		layout,
+		grid_layout,
 		data["width"],
 		data["height"],
-		data.get("target_score", 10000),
-		data.get("moves", 30),
-		data.get("description", "")
+		data["target_score"],
+		data["moves"],
+		data["description"]
 	)
-
-	return level_data
 
 func parse_layout(layout_data, width: int, height: int) -> Array:
 	"""Parse layout from various formats (string grid, array of arrays, or flat array)"""
@@ -287,3 +305,9 @@ func is_cell_blocked(x: int, y: int) -> bool:
 
 	return level.grid_layout[x][y] == -1
 
+func set_current_level(index: int):
+	if index >= 0 and index < levels.size():
+		current_level_index = index
+		print("Current level set to", current_level_index)
+	else:
+		print("Invalid level index", index)

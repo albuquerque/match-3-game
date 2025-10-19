@@ -32,6 +32,16 @@ var processing_moves = false
 # Level system
 var level_manager: Node = null
 
+# Add a flag to prevent multiple triggers of level completion
+var level_transitioning = false
+
+# Level completion state
+var last_level_won = false
+var last_level_score = 0
+var last_level_target = 0
+var last_level_number = 0
+var last_level_moves_left = 0
+
 func _ready():
 	# Get or create LevelManager
 	level_manager = get_node_or_null("/root/LevelManager")
@@ -47,6 +57,7 @@ func initialize_game():
 	level = 3
 	combo_count = 0
 	processing_moves = false
+	level_transitioning = false
 
 	# Load the first level
 	load_current_level()
@@ -236,6 +247,7 @@ func remove_duplicates(matches: Array) -> Array:
 	return unique_matches
 
 func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> int:
+	matches = matches.filter(func(pos): return not is_cell_blocked(pos.x, pos.y))
 	var tiles_removed = 0
 	var horizontal = false
 	var vertical = false
@@ -277,6 +289,8 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 
 	# Remove matched tiles (but preserve swapped position if creating special tile)
 	for match_pos in matches:
+		if is_cell_blocked(match_pos.x, match_pos.y):
+			continue  # Never remove blocked cells
 		if grid[match_pos.x][match_pos.y] > 0:
 			# Skip the swapped position if we're creating a special tile there
 			if special_tile_type > 0 and match_pos.x == swapped_pos.x and match_pos.y == swapped_pos.y:
@@ -285,7 +299,7 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 			tiles_removed += 1
 
 	# Create special tile at swapped position if applicable
-	if special_tile_type > 0:
+	if special_tile_type > 0 and not is_cell_blocked(swapped_pos.x, swapped_pos.y):
 		grid[swapped_pos.x][swapped_pos.y] = special_tile_type
 
 	var points = calculate_points(tiles_removed)
@@ -328,6 +342,9 @@ func apply_gravity() -> bool:
 		while write_pos >= 0 and is_cell_blocked(x, write_pos):
 			write_pos -= 1
 
+		if write_pos < 0:
+			continue  # Entire column blocked
+
 		# Scan from bottom to top, moving tiles down to fill gaps
 		for read_pos in range(GRID_HEIGHT - 1, -1, -1):
 			# Skip blocked cells
@@ -335,12 +352,11 @@ func apply_gravity() -> bool:
 				continue
 
 			# If we find a tile
-			if grid[x][read_pos] > 0:
-				# If the tile needs to move down
+			var tile = grid[x][read_pos]
+			if tile > 0:
 				if read_pos != write_pos:
-					grid[x][write_pos] = grid[x][read_pos]
-					if read_pos != write_pos:
-						grid[x][read_pos] = 0
+					grid[x][write_pos] = tile
+					grid[x][read_pos] = 0
 					moved = true
 
 				# Move write position up for next tile
@@ -361,7 +377,7 @@ func fill_empty_spaces() -> Array:
 				continue  # Skip blocked cells
 
 			if grid[x][y] == 0:
-				grid[x][y] = randi() % TILE_TYPES + 1
+				grid[x][y] = randi_range(1, TILE_TYPES)
 				new_tiles.append(Vector2(x, y))
 
 	return new_tiles
@@ -370,7 +386,13 @@ func add_score(points: int):
 	score += points
 	emit_signal("score_changed", score)
 
-	if score >= target_score:
+	if score >= target_score and not level_transitioning:
+		# Store level completion state
+		last_level_won = true
+		last_level_score = score
+		last_level_target = target_score
+		last_level_number = level
+		last_level_moves_left = moves_left
 		advance_level()
 
 func advance_level():
@@ -379,55 +401,125 @@ func advance_level():
 		level += 1
 		combo_count = 0
 
-		emit_signal("level_complete")
-
-		# Load the next level after a short delay
-		await get_tree().create_timer(2.0).timeout
-		load_current_level()
-
-		emit_signal("level_changed", level)
-		emit_signal("moves_changed", moves_left)
-		emit_signal("score_changed", score)
+		# Trigger level completion and transition to LevelProgressScene
+		on_level_complete()
 	else:
 		# No more levels - game complete!
 		print("All levels completed!")
-		emit_signal("game_over")
+		last_level_won = true
+		last_level_score = score
+		last_level_target = target_score
+		last_level_number = level
+		last_level_moves_left = moves_left
+		on_level_complete()
 
 func use_move():
 	moves_left -= 1
 	emit_signal("moves_changed", moves_left)
 
-	if moves_left <= 0 and score < target_score:
+	if moves_left <= 0 and score < target_score and not level_transitioning:
+		# Store level failure state
+		last_level_won = false
+		last_level_score = score
+		last_level_target = target_score
+		last_level_number = level
+		last_level_moves_left = 0
 		emit_signal("game_over")
+		# Transition to results screen
+		on_level_failed()
 
 func reset_combo():
 	combo_count = 0
 
 func get_tile_at(pos: Vector2) -> int:
 	if is_valid_position(pos):
-		return grid[pos.x][pos.y]
+		return grid[int(pos.x)][int(pos.y)]
 	return -1
 
 func has_possible_moves() -> bool:
+	"""Check if there are any valid moves available on the board"""
+	# First check if there are any special tiles - they're always valid moves
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
-			if is_cell_blocked(x, y):
+			if not is_cell_blocked(x, y):
+				var tile_type = grid[x][y]
+				if tile_type >= 7 and tile_type <= 9:
+					print("Special tile found at (", x, ", ", y, ") - valid move exists")
+					return true
+
+	# Check for regular match-creating moves
+	for x in range(GRID_WIDTH):
+		for y in range(GRID_HEIGHT):
+			if is_cell_blocked(x, y) or grid[x][y] <= 0:
 				continue
 
 			var pos = Vector2(x, y)
 
-			# Check right
+			# Check right swap
 			if x < GRID_WIDTH - 1 and not is_cell_blocked(x + 1, y):
 				var right_pos = Vector2(x + 1, y)
 				if would_create_match_after_swap(pos, right_pos):
 					return true
 
-			# Check down
+			# Check down swap
 			if y < GRID_HEIGHT - 1 and not is_cell_blocked(x, y + 1):
 				var down_pos = Vector2(x, y + 1)
 				if would_create_match_after_swap(pos, down_pos):
 					return true
 
+	return false
+
+func shuffle_board():
+	"""Shuffle all non-blocked tiles on the board"""
+	print("Shuffling board...")
+
+	# Collect all non-blocked, non-special tile values
+	var tile_values = []
+	for x in range(GRID_WIDTH):
+		for y in range(GRID_HEIGHT):
+			if not is_cell_blocked(x, y) and grid[x][y] > 0 and grid[x][y] < 7:
+				tile_values.append(grid[x][y])
+
+	# Shuffle the values
+	tile_values.shuffle()
+
+	# Redistribute the shuffled values (keep special tiles in place)
+	var index = 0
+	for x in range(GRID_WIDTH):
+		for y in range(GRID_HEIGHT):
+			if not is_cell_blocked(x, y) and grid[x][y] > 0 and grid[x][y] < 7:
+				grid[x][y] = tile_values[index]
+				index += 1
+
+	print("Board shuffled")
+
+func has_immediate_matches() -> bool:
+	"""Check if the current board has any matches without any moves"""
+	var matches = find_matches()
+	return matches.size() > 0
+
+func shuffle_until_moves_available() -> bool:
+	"""Shuffle the board until valid moves are available and no immediate matches exist"""
+	var max_attempts = 100
+	var attempts = 0
+
+	while attempts < max_attempts:
+		shuffle_board()
+		attempts += 1
+
+		# Check if shuffle created immediate matches - if so, reshuffle
+		if has_immediate_matches():
+			print("Shuffle created matches, reshuffling... (attempt ", attempts, ")")
+			continue
+
+		# Check if valid moves exist
+		if has_possible_moves():
+			print("Valid moves found after ", attempts, " shuffle(s)")
+			return true
+
+		print("No valid moves after shuffle attempt ", attempts)
+
+	print("WARNING: Could not find valid moves after ", max_attempts, " attempts")
 	return false
 
 func would_create_match_after_swap(pos1: Vector2, pos2: Vector2) -> bool:
@@ -442,3 +534,35 @@ func would_create_match_after_swap(pos1: Vector2, pos2: Vector2) -> bool:
 	swap_tiles(pos1, pos2)
 
 	return has_match
+
+func on_level_failed():
+	if level_transitioning:
+		return
+
+	level_transitioning = true
+
+	# Wait a moment for any animations to complete
+	await get_tree().create_timer(0.5).timeout
+
+	print("Level failed, transitioning to LevelProgressScene...")
+	get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
+
+	level_transitioning = false
+
+func on_level_complete():
+	if level_transitioning:
+		return
+
+	level_transitioning = true
+
+	# Ensure LevelManager is initialized before transitioning
+	if not level_manager or level_manager.levels.size() == 0:
+		print("Waiting for LevelManager to initialize...")
+		await get_tree().create_timer(0.1).timeout
+		on_level_complete()
+		return
+
+	print("Transitioning to LevelProgressScene...")
+	get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
+
+	level_transitioning = false
