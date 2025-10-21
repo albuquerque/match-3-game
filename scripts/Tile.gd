@@ -58,6 +58,9 @@ func setup(type: int, pos: Vector2, scale_factor: float = 1.0):
 	update_visual()
 
 func update_visual():
+	if is_queued_for_deletion() or not is_inside_tree():
+		return
+
 	# Add null check for sprite to prevent nil assignment error
 	if not sprite:
 		# If sprite isn't ready yet, defer the visual update
@@ -265,6 +268,9 @@ func get_rect() -> Rect2:
 	return Rect2(-32, -32, 64, 64)
 
 func animate_to_position(target_pos: Vector2, duration: float = 0.3) -> Tween:
+	if is_queued_for_deletion() or not is_inside_tree():
+		return null
+
 	is_falling = true
 	var tween = create_tween()
 	tween.tween_property(self, "position", target_pos, duration)
@@ -272,11 +278,17 @@ func animate_to_position(target_pos: Vector2, duration: float = 0.3) -> Tween:
 	return tween
 
 func animate_swap_to(target_pos: Vector2, duration: float = 0.2) -> Tween:
+	if is_queued_for_deletion() or not is_inside_tree():
+		return null
+
 	var tween = create_tween()
 	tween.tween_property(self, "position", target_pos, duration)
 	return tween
 
 func animate_destroy() -> Tween:
+	if is_queued_for_deletion() or not is_inside_tree():
+		return null
+
 	var tween = create_tween()
 	if sprite:
 		tween.parallel().tween_property(sprite, "scale", Vector2.ZERO, 0.3)
@@ -286,6 +298,9 @@ func animate_destroy() -> Tween:
 	return tween
 
 func animate_spawn() -> Tween:
+	if is_queued_for_deletion() or not is_inside_tree():
+		return null
+
 	if sprite:
 		sprite.scale = Vector2.ZERO
 	modulate = Color.WHITE
@@ -298,6 +313,9 @@ func animate_spawn() -> Tween:
 	return tween
 
 func animate_match_highlight() -> Tween:
+	if is_queued_for_deletion() or not is_inside_tree():
+		return null
+
 	if not sprite:
 		return create_tween()  # Return empty tween if sprite not ready
 

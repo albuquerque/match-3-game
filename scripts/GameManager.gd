@@ -42,6 +42,12 @@ var last_level_target = 0
 var last_level_number = 0
 var last_level_moves_left = 0
 
+# Add a flag to request level completion when score threshold is reached but animations are still running
+var pending_level_complete = false
+
+# Debugging
+var DEBUG_LOGGING = true
+
 func _ready():
 	# Get or create LevelManager
 	level_manager = get_node_or_null("/root/LevelManager")
@@ -236,7 +242,14 @@ func find_matches() -> Array:
 							matches.append(Vector2(x, i))
 				current_type = tile_type
 				match_start = y
-
+	if DEBUG_LOGGING:
+		print("find_matches: END — grid snapshot after gravity:")
+		for x in range(GRID_WIDTH):
+			var col = []
+			for y in range(GRID_HEIGHT):
+				col.append(grid[x][y])
+			print("col[", x, "] = ", col)
+		print("find_matches = ", matches)
 	return remove_duplicates(matches)
 
 func remove_duplicates(matches: Array) -> Array:
@@ -334,6 +347,14 @@ func calculate_points(tiles_removed: int) -> int:
 func apply_gravity() -> bool:
 	var moved = false
 
+	if DEBUG_LOGGING:
+		print("apply_gravity: START — grid snapshot before gravity:")
+		for x in range(GRID_WIDTH):
+			var col = []
+			for y in range(GRID_HEIGHT):
+				col.append(grid[x][y])
+			print("col[", x, "] = ", col)
+
 	for x in range(GRID_WIDTH):
 		# Start from the bottom and work upward
 		var write_pos = GRID_HEIGHT - 1
@@ -366,6 +387,15 @@ func apply_gravity() -> bool:
 				while write_pos >= 0 and is_cell_blocked(x, write_pos):
 					write_pos -= 1
 
+	if DEBUG_LOGGING:
+		print("apply_gravity: END — grid snapshot after gravity:")
+		for x in range(GRID_WIDTH):
+			var col = []
+			for y in range(GRID_HEIGHT):
+				col.append(grid[x][y])
+			print("col[", x, "] = ", col)
+		print("apply_gravity: moved = ", moved)
+
 	return moved
 
 func fill_empty_spaces() -> Array:
@@ -393,7 +423,12 @@ func add_score(points: int):
 		last_level_target = target_score
 		last_level_number = level
 		last_level_moves_left = moves_left
-		advance_level()
+
+		# Mark that a level completion should occur, but defer until board activity stops
+		if not pending_level_complete:
+			pending_level_complete = true
+			# Start the coroutine that will wait for ongoing activity to finish before advancing
+			_attempt_level_complete()
 
 func advance_level():
 	# Try to advance to next level
@@ -535,17 +570,48 @@ func would_create_match_after_swap(pos1: Vector2, pos2: Vector2) -> bool:
 
 	return has_match
 
+func _attempt_level_complete():
+	# Wait until no board activity (swaps/cascades/refills) are in progress
+	# If another transition is already in progress, cancel
+	if level_transitioning:
+		pending_level_complete = false
+		return
+
+	# Poll until processing_moves is false, yielding small delays to avoid blocking
+	while processing_moves:
+		await get_tree().create_timer(0.1).timeout
+		# If a transition began while waiting, abort
+		if level_transitioning:
+			pending_level_complete = false
+			return
+
+	# Give a short extra buffer so any last deferred callbacks/tweens complete
+	if get_tree() != null:
+		await get_tree().create_timer(0.2).timeout
+
+	# Clear pending flag and advance level now that the board is idle
+	pending_level_complete = false
+	advance_level()
+
 func on_level_failed():
 	if level_transitioning:
 		return
 
 	level_transitioning = true
 
-	# Wait a moment for any animations to complete
-	await get_tree().create_timer(0.5).timeout
+	# Wait for any board activity to finish before transitioning
+	while processing_moves:
+		if get_tree() == null:
+			break
+		await get_tree().create_timer(0.1).timeout
+
+	# Short buffer to allow final tweens/deferred calls to complete
+	if get_tree() != null:
+		await get_tree().create_timer(0.2).timeout
 
 	print("Level failed, transitioning to LevelProgressScene...")
-	get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
+	if get_tree() != null:
+		get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
 
 	level_transitioning = false
 
@@ -558,11 +624,23 @@ func on_level_complete():
 	# Ensure LevelManager is initialized before transitioning
 	if not level_manager or level_manager.levels.size() == 0:
 		print("Waiting for LevelManager to initialize...")
-		await get_tree().create_timer(0.1).timeout
+		if get_tree() != null:
+			await get_tree().create_timer(0.1).timeout
 		on_level_complete()
 		return
 
+	# Wait for any ongoing board activity to finish before changing scene
+	while processing_moves:
+		if get_tree() == null:
+			break
+		await get_tree().create_timer(0.1).timeout
+
+	# Small buffer to ensure tweens/deferred callbacks finish
+	if get_tree() != null:
+		await get_tree().create_timer(0.2).timeout
+
 	print("Transitioning to LevelProgressScene...")
-	get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
+	if get_tree() != null:
+		get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
 
 	level_transitioning = false

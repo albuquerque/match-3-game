@@ -2,6 +2,38 @@ extends Node2D
 class_name GameBoard
 
 signal move_completed
+signal board_idle
+
+# Helper: await multiple tweens with timeout to avoid hanging if a tween never finishes
+func _await_tweens_with_timeout(tweens: Array, timeout: float = 2.0) -> void:
+	if tweens == null or tweens.size() == 0:
+		return
+
+	var finished_map = {}
+	for tween in tweens:
+		if tween == null:
+			continue
+		finished_map[tween] = false
+		var local_tween = tween
+		# Connect finished to set flag
+		local_tween.finished.connect(func(): finished_map[local_tween] = true)
+
+	var start_time = Time.get_ticks_msec()
+	while true:
+		var all_done = true
+		for t in finished_map.keys():
+			if not finished_map[t]:
+				all_done = false
+				break
+		if all_done:
+			break
+		var elapsed = (Time.get_ticks_msec() - start_time) / 1000.0
+		if elapsed >= timeout:
+			print("[WARNING] Tween wait timed out after ", timeout, "s")
+			break
+		if get_tree() == null:
+			break
+		await get_tree().create_timer(0.05).timeout
 
 var tiles = []
 var selected_tile = null
@@ -186,8 +218,11 @@ func _on_tile_swiped(tile, direction: Vector2):
 	print("GameBoard: Swipe swap from ", tile.grid_position, " to ", target_pos)
 	await perform_swap(tile, target_tile)
 
+# gdscript
 func perform_swap(tile1, tile2):
+	print("perform_swap: starting swap")
 	GameManager.processing_moves = true
+	print("perform_swap: processing_moves = true")
 
 	# Clear selections
 	tile1.set_selected(false)
@@ -213,9 +248,13 @@ func perform_swap(tile1, tile2):
 	tile1.grid_position = pos2
 	tile2.grid_position = pos1
 
-	await tween1.finished
+	# Wait for both swap tweens to finish to avoid racing visual/logic
+	if tween1 != null:
+		await tween1.finished
+	if tween2 != null:
+		await tween2.finished
 
-	# Check for matches
+    # Check for matches
 	var matches = GameManager.find_matches()
 	if matches.size() > 0:
 		GameManager.use_move()
@@ -227,13 +266,12 @@ func perform_swap(tile1, tile2):
 		elif pos2 in matches:
 			swap_pos_in_match = pos2
 
-		# Pass the swapped position to cascade for special tile creation
 		await process_cascade(swap_pos_in_match)
-
-		# After cascade completes, check if level/game is over
-		# The cascade animations have all finished at this point
+		GameManager.processing_moves = false
+		print("perform_swap: processing_moves = false (from cascade end)")
+		emit_signal("move_completed")
+		return
 	else:
-		# No matches, revert swap
 		GameManager.swap_tiles(pos1, pos2)
 
 		var revert_tween1 = tile1.animate_swap_to(target_pos2)
@@ -244,30 +282,44 @@ func perform_swap(tile1, tile2):
 		tile1.grid_position = pos1
 		tile2.grid_position = pos2
 
-		await revert_tween1.finished
+		if revert_tween1 != null:
+			await revert_tween1.finished
+		if revert_tween2 != null:
+			await revert_tween2.finished
 
 	GameManager.processing_moves = false
+	print("perform_swap: processing_moves = false")
 	emit_signal("move_completed")
+
 
 func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 	var is_first_match = initial_swap_pos.x >= 0
+	var cascade_depth = 0
+	var cascade_error = null
 	print("=== Starting cascade process ===")
-
 	while true:
+		cascade_depth += 1
+		if cascade_depth > 20:
+			print("[ERROR] Cascade depth exceeded limit! Breaking loop.")
+			break
 		var matches = GameManager.find_matches()
 		print("Found ", matches.size(), " matches in cascade")
+		print("Grid after match check:")
+		for y in range(GameManager.GRID_HEIGHT):
+			var row = []
+			for x in range(GameManager.GRID_WIDTH):
+				row.append(GameManager.grid[x][y])
+			print(row)
+		print("Matches found:", matches)
 		if matches.size() == 0:
 			break
 
-		# Highlight matches briefly
 		await highlight_matches(matches)
 
-		# For first match, use the swap position. For cascade matches, find the best position
 		var special_tile_pos = null
 		var will_create_special = false
 
 		if is_first_match and initial_swap_pos.x >= 0 and initial_swap_pos.y >= 0:
-			# Use the swap position for the first match
 			var matches_on_same_row = 0
 			var matches_on_same_col = 0
 			for match_pos in matches:
@@ -290,7 +342,6 @@ func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 
 			is_first_match = false
 		else:
-			# For cascade matches, detect T/L shapes or 4+ lines anywhere in the matches
 			special_tile_pos = find_special_tile_position_in_matches(matches)
 			will_create_special = special_tile_pos != null
 
@@ -298,21 +349,15 @@ func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 				print("Cascade match - Special tile will be created at: ", special_tile_pos)
 
 		if will_create_special and special_tile_pos != null:
-			# Don't destroy the tile at special position - it will become special
 			await animate_destroy_matches_except(matches, special_tile_pos)
-			GameManager.remove_matches(matches, special_tile_pos)
-
-			# Update the visual tile to show the special arrow
-			var special_tile_type = GameManager.get_tile_at(special_tile_pos)
-			if special_tile_type > 0:
-				var tile_at_pos = tiles[int(special_tile_pos.x)][int(special_tile_pos.y)]
-				if is_instance_valid(tile_at_pos):
-					tile_at_pos.update_type(special_tile_type)
+			var tiles_removed = GameManager.remove_matches(matches, special_tile_pos)
 		else:
-			# Normal match, destroy all tiles
 			print("Destroying ", matches.size(), " matched tiles")
 			await animate_destroy_matches(matches)
-			GameManager.remove_matches(matches)
+			var tiles_removed = GameManager.remove_matches(matches)
+			# Points are added inside GameManager.remove_matches(), do not add again here to avoid double-counting
+			# var points = GameManager.calculate_points(tiles_removed)
+			# GameManager.add_score(points)
 
 		# Apply gravity
 		print("Applying gravity...")
@@ -323,14 +368,21 @@ func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 		print("Refilling empty spaces...")
 		await animate_refill()
 		print("Refill complete")
-
-	print("=== Cascade process complete ===")
+		print("Grid after refill:")
+		for y in range(GameManager.GRID_HEIGHT):
+			var row = []
+			for x in range(GameManager.GRID_WIDTH):
+				row.append(GameManager.grid[x][y])
+			print(row)
+	# Always reset processing_moves and combo, even if an error occurred
+	GameManager.processing_moves = false
 	GameManager.reset_combo()
-
-	# Check if there are any valid moves left
+	print("=== Cascade process complete ===")
+	# Short buffer to ensure all last tweens/deferred calls have finished before marking board idle
+	if get_tree() != null:
+		await get_tree().create_timer(0.2).timeout
 	if not GameManager.has_possible_moves():
 		print("No valid moves detected! Auto-shuffling...")
-		# Add a delay before shuffling so player can see the board state
 		await get_tree().create_timer(1.0).timeout
 		await perform_auto_shuffle()
 
@@ -377,10 +429,10 @@ func animate_shuffle():
 	else:
 		await get_tree().create_timer(0.3).timeout
 
-func find_special_tile_position_in_matches(matches: Array) -> Vector2:
-	"""Find if there's a T/L shape or 4+ line match in the matches, return the position for the special tile"""
+func find_special_tile_position_in_matches(matches: Array) -> Variant:
+	"""Find if there's a T/L shape or 4+ line match in the matches, return the position for the special tile, or null if none."""
 	if matches.size() < 4:
-		return Vector2(-1, -1)  # Need at least 4 tiles for a special tile
+		return null  # Need at least 4 tiles for a special tile
 
 	# First, check for T/L shapes (intersection of 3+ horizontal and 3+ vertical)
 	for test_pos in matches:
@@ -409,7 +461,6 @@ func find_special_tile_position_in_matches(matches: Array) -> Vector2:
 	for row_y in rows_dict:
 		var row_matches = rows_dict[row_y]
 		if row_matches.size() >= 4:
-			# Pick a random tile from this row for the special tile
 			print("Found 4+ horizontal line at row ", row_y, " with ", row_matches.size(), " tiles")
 			return row_matches[row_matches.size() / 2]  # Use middle tile
 
@@ -423,11 +474,10 @@ func find_special_tile_position_in_matches(matches: Array) -> Vector2:
 	for col_x in cols_dict:
 		var col_matches = cols_dict[col_x]
 		if col_matches.size() >= 4:
-			# Pick a random tile from this column for the special tile
 			print("Found 4+ vertical line at col ", col_x, " with ", col_matches.size(), " tiles")
 			return col_matches[col_matches.size() / 2]  # Use middle tile
 
-	return Vector2(-1, -1)  # No special tile pattern found
+	return null  # No special tile pattern found
 
 func highlight_matches(matches: Array):
 	var highlight_tweens = []
@@ -436,8 +486,11 @@ func highlight_matches(matches: Array):
 		if tile:
 			highlight_tweens.append(tile.animate_match_highlight())
 
-	if highlight_tweens.size() > 0:
-		await highlight_tweens[0].finished
+	# Await all highlight tweens to finish
+	for tween in highlight_tweens:
+		if tween != null:
+			await tween.finished
+
 
 func animate_destroy_matches(matches: Array):
 	print("animate_destroy_matches called with ", matches.size(), " matches")
@@ -448,37 +501,37 @@ func animate_destroy_matches(matches: Array):
 	for match_pos in matches:
 		var tile = tiles[int(match_pos.x)][int(match_pos.y)]
 		if tile:
-			print("Creating destroy tween for tile at ", match_pos)
 			var tween = tile.animate_destroy()
 			if tween:
 				destroy_tweens.append(tween)
-				print("Tween created successfully")
-			else:
-				print("WARNING: No tween returned from animate_destroy()")
-			# Don't queue_free yet - wait until after the animation
 			tiles_to_free.append(tile)
 			destroyed_positions.append(match_pos)
 
-	print("Total destroy tweens: ", destroy_tweens.size())
-
+	# Await all destroy tweens (if any), otherwise short timeout
 	if destroy_tweens.size() > 0:
-		print("Waiting for destroy animation to complete...")
-		await destroy_tweens[0].finished
-		print("Destroy animation completed")
+		for tween in destroy_tweens:
+			if tween != null:
+				await tween.finished
 	else:
-		# No tweens to wait for, add a small delay for visual feedback
-		print("No tweens, using timer fallback")
-		await get_tree().create_timer(0.3).timeout
+		if get_tree() != null:
+			await get_tree().create_timer(0.3).timeout
 
-	# Now queue free after animations are done
-	print("Freeing ", tiles_to_free.size(), " tiles")
+	print("animate_destroy_matches: animations finished, clearing grid and freeing nodes")
+	# Now clear visual grid references and GameManager grid, then free tiles
 	for i in range(tiles_to_free.size()):
 		var pos = destroyed_positions[i]
-		tiles[int(pos.x)][int(pos.y)] = null
-		var tile = tiles_to_free[i]
-		if tile:
-			tile.queue_free()
-	print("animate_destroy_matches complete")
+		if pos.x >= 0 and pos.y >= 0:
+			# Only clear visual cell if it still points to the same instance
+			if tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
+				tiles[int(pos.x)][int(pos.y)] = null
+			# Ensure GameManager grid reflects cleared tile (skip blocked cells)
+			if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			# Safely free the tile node if not already queued
+			if not tiles_to_free[i].is_queued_for_deletion():
+				tiles_to_free[i].queue_free()
+	print("animate_destroy_matches: done")
+
 
 func animate_destroy_matches_except(matches: Array, skip_pos: Vector2):
 	var destroy_tweens = []
@@ -486,37 +539,76 @@ func animate_destroy_matches_except(matches: Array, skip_pos: Vector2):
 	var destroyed_positions = []
 
 	for match_pos in matches:
-		# Skip the position where special tile will be created
 		if match_pos == skip_pos:
 			continue
-
 		var tile = tiles[int(match_pos.x)][int(match_pos.y)]
 		if tile:
 			var tween = tile.animate_destroy()
 			if tween:
 				destroy_tweens.append(tween)
-			# Don't queue_free yet - wait until after the animation
 			tiles_to_free.append(tile)
 			destroyed_positions.append(match_pos)
 
+	# Await all destroy tweens
 	if destroy_tweens.size() > 0:
-		await destroy_tweens[0].finished
+		for tween in destroy_tweens:
+			if tween != null:
+				await tween.finished
 	else:
-		# No tweens to wait for, add a small delay for visual feedback
-		await get_tree().create_timer(0.2).timeout
+		if get_tree() != null:
+			await get_tree().create_timer(0.2).timeout
 
-	# Clear grid references *after* animation completes
+	for i in range(tiles_to_free.size()):
+		var pos = destroyed_positions[i]
+		if pos.x >= 0 and pos.y >= 0 and tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
+			tiles[int(pos.x)][int(pos.y)] = null
+			tiles_to_free[i].queue_free()
+
+
+func animate_destroy_tiles(positions: Array):
+	# Destroy tiles at the given positions with animation
+	var destroy_tweens = []
+	var tiles_to_free = []
+	var destroyed_positions = []
+
+	for pos in positions:
+		var tile = tiles[int(pos.x)][int(pos.y)]
+		if tile:
+			var tween = tile.animate_destroy()
+			if tween:
+				destroy_tweens.append(tween)
+			tiles_to_free.append(tile)
+			destroyed_positions.append(pos)
+
+	# Wait for animations to complete (or short timeout if none)
+	if destroy_tweens.size() > 0:
+		for tween in destroy_tweens:
+			if tween != null:
+				await tween.finished
+	else:
+		if get_tree() != null:
+			await get_tree().create_timer(0.3).timeout
+
+	print("animate_destroy_tiles: animations finished, clearing grid and freeing nodes")
+	# Now clear visual grid references and GameManager grid, then free tiles
 	for i in range(tiles_to_free.size()):
 		var pos = destroyed_positions[i]
 		if pos.x >= 0 and pos.y >= 0:
-			tiles[int(pos.x)][int(pos.y)] = null
+			# Only clear visual cell if it still points to the same instance
+			if tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
+				tiles[int(pos.x)][int(pos.y)] = null
+			# Ensure GameManager grid reflects cleared tile (skip blocked cells)
+			if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			# Safely free the tile node if not already queued
+			if not tiles_to_free[i].is_queued_for_deletion():
+				tiles_to_free[i].queue_free()
+	print("animate_destroy_tiles: done")
 
-		var tile = tiles_to_free[i]
-		if tile:
-			tile.queue_free()
 
 func animate_gravity():
-	GameManager.apply_gravity()
+	var moved = GameManager.apply_gravity()
+	print("animate_gravity: apply_gravity returned -> ", moved)
 
 	var gravity_tweens = []
 
@@ -530,7 +622,8 @@ func animate_gravity():
 
 		# Clear the visual tiles array for this column
 		for y in range(GameManager.GRID_HEIGHT):
-			tiles[x][y] = null
+			if GameManager.grid[x][y] == 0:
+				tiles[x][y] = null
 
 		# Now redistribute tiles based on GameManager grid (after gravity has been applied)
 		# Iterate from bottom to top and assign tiles from the column_tiles array
@@ -554,18 +647,34 @@ func animate_gravity():
 
 				tile_index += 1
 
+	# Await all gravity tweens (or short timeout)
 	if gravity_tweens.size() > 0:
-		await gravity_tweens[0].finished
+		for tween in gravity_tweens:
+			if tween != null:
+				await tween.finished
+	else:
+		if get_tree() != null:
+			await get_tree().create_timer(0.01).timeout
+	print("animate_gravity: done")
+	print("GameManager.grid after gravity:")
+	for y in range(GameManager.GRID_HEIGHT):
+		var row = []
+		for x in range(GameManager.GRID_WIDTH):
+			row.append(GameManager.grid[x][y])
+		print(row)
+
 
 func animate_refill():
 	var new_tile_positions = GameManager.fill_empty_spaces()
 	var spawn_tweens = []
 
+	# Debug: print all positions being refilled
+	print("Refilling positions:", new_tile_positions)
+
 	# Calculate scale factor for tiles based on dynamic tile size
 	var scale_factor = tile_size / 64.0  # 64 is the base tile size
 
 	for pos in new_tile_positions:
-		# Always spawn a new tile if the position is empty and not blocked
 		if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
 			if tiles[int(pos.x)][int(pos.y)] == null:
 				var tile = tile_scene.instantiate()
@@ -580,15 +689,52 @@ func animate_refill():
 				spawn_tweens.append(tile.animate_to_position(target_pos))
 				spawn_tweens.append(tile.animate_spawn())
 
+	# --- Sync step: ensure all non-blocked, non-empty grid cells have a visual tile ---
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(x, y) and GameManager.grid[x][y] > 0:
+				if tiles[x][y] == null:
+					print("[BUG] Visual grid still has null at:", x, y, " -- fixing!")
+					var tile = tile_scene.instantiate()
+					tile.setup(GameManager.grid[x][y], Vector2(x, y), scale_factor)
+					tile.position = grid_to_world_position(Vector2(x, -1))
+					tile.connect("tile_clicked", _on_tile_clicked)
+					tile.connect("tile_swiped", _on_tile_swiped)
+					add_child(tile)
+					tiles[x][y] = tile
+					var target_pos = grid_to_world_position(Vector2(x, y))
+					spawn_tweens.append(tile.animate_to_position(target_pos))
+					spawn_tweens.append(tile.animate_spawn())
+
+	# Debug: print visual grid state after refill
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if tiles[x][y] == null:
+				print("[BUG] Visual grid still has null at:", x, y)
+
+	# Await all spawn tweens
 	if spawn_tweens.size() > 0:
-		await spawn_tweens[0].finished
+		await _await_tweens_with_timeout(spawn_tweens, 2.0)
+	else:
+		if get_tree() != null:
+			print("Refilling positions... Awaiting timer...")
+			await get_tree().create_timer(0.3).timeout
+			print("Refilling positions... Awaiting timer... END!")
+
+	print("GameManager.grid after refill:")
+	for y in range(GameManager.GRID_HEIGHT):
+		var row = []
+		for x in range(GameManager.GRID_WIDTH):
+			row.append(GameManager.grid[x][y])
+		print(row)
 
 func activate_special_tile(pos: Vector2):
 	"""Activate a special arrow tile to clear row/column/both"""
-	GameManager.processing_moves = true
-
+	print("activate_special_tile: start at ", pos)
 	var tile_type = GameManager.get_tile_at(pos)
-	print("Activating special tile type ", tile_type, " at ", pos)
+	print("Tile type at ", pos, " is ", tile_type)
+	GameManager.processing_moves = true
+	print("activate_special_tile: processing_moves = true")
 
 	# Collect positions to clear based on tile type
 	var positions_to_clear = []
@@ -647,13 +793,17 @@ func activate_special_tile(pos: Vector2):
 			await activate_special_tile_chain(special_tile_data["pos"], special_tile_data["type"])
 
 	# Apply gravity and refill AFTER all chain reactions
+	print("activate_special_tile: applying gravity")
 	await animate_gravity()
+	print("activate_special_tile: gravity complete")
 	await animate_refill()
+	print("activate_special_tile: refill complete")
 
 	# Check for cascade matches after refill
 	await process_cascade()
 
 	GameManager.processing_moves = false
+	print("activate_special_tile: processing_moves = false")
 
 func activate_special_tile_chain(pos: Vector2, tile_type: int):
 	"""Activate a special tile as part of a chain"""
@@ -716,18 +866,6 @@ func highlight_special_activation(positions: Array):
 
 	if highlight_tweens.size() > 0:
 		await highlight_tweens[0].finished
-
-func animate_destroy_tiles(positions: Array):
-	# Destroy tiles at the given positions with animation
-	var destroy_tweens = []
-	for pos in positions:
-		var tile = tiles[int(pos.x)][int(pos.y)]
-		if tile:
-			destroy_tweens.append(tile.animate_destroy())
-			tiles[int(pos.x)][int(pos.y)] = null
-
-	if destroy_tweens.size() > 0:
-		await destroy_tweens[0].finished
 
 func _on_game_over():
 	GameManager.processing_moves = true
