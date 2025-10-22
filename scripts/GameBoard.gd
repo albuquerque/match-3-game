@@ -257,12 +257,21 @@ func perform_swap(tile1: Tile, tile2: Tile):
 	if matches.size() > 0:
 		GameManager.use_move()
 
+		# Award points for the first match
+		var points = GameManager.calculate_points(matches.size())
+		GameManager.add_score(points)
+
 		# Determine which swapped position is part of the match
-		var swap_pos_in_match = null
+		var swap_pos_in_match = Vector2(-1, -1)
 		if pos1 in matches:
 			swap_pos_in_match = pos1
 		elif pos2 in matches:
 			swap_pos_in_match = pos2
+		else:
+			# If neither swapped tile is in the matches, check for a 4+ / T/L match and use that position
+			var fallback_pos = find_special_tile_position_in_matches(matches)
+			if fallback_pos.x >= 0 and fallback_pos.y >= 0:
+				swap_pos_in_match = fallback_pos
 
 		await process_cascade(swap_pos_in_match)
 		GameManager.processing_moves = false
@@ -336,6 +345,14 @@ func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 			will_create_special = is_t_or_l_shape or is_long_line
 			if will_create_special:
 				special_tile_pos = initial_swap_pos
+			else:
+				# If swapped tile wasn't in the 4+/T but the overall matches include one,
+				# choose a fallback position from the matches so a special tile is created.
+				var fallback = find_special_tile_position_in_matches(matches)
+				if fallback.x >= 0 and fallback.y >= 0:
+					will_create_special = true
+					special_tile_pos = fallback
+					print("First-match fallback: creating special at ", special_tile_pos)
 
 			print("First match - Row: ", matches_on_same_row, " Col: ", matches_on_same_col,
 				  " T/L: ", is_t_or_l_shape, " Long: ", is_long_line, " Special: ", will_create_special)
@@ -349,16 +366,13 @@ func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 			if will_create_special:
 				print("Cascade match - Special tile will be created at: ", special_tile_pos)
 
-		if will_create_special and special_tile_pos != null:
+		if will_create_special and special_tile_pos.x >= 0 and special_tile_pos.y >= 0:
 			await animate_destroy_matches_except(matches, special_tile_pos)
-			var tiles_removed = GameManager.remove_matches(matches, special_tile_pos)
+			GameManager.remove_matches(matches, special_tile_pos)
 		else:
 			print("Destroying ", matches.size(), " matched tiles")
 			await animate_destroy_matches(matches)
-			var tiles_removed = GameManager.remove_matches(matches)
-			# Points are added inside GameManager.remove_matches(), do not add again here to avoid double-counting
-			# var points = GameManager.calculate_points(tiles_removed)
-			# GameManager.add_score(points)
+			GameManager.remove_matches(matches)
 
 		# Apply gravity
 		print("Applying gravity...")
@@ -462,9 +476,10 @@ func find_special_tile_position_in_matches(matches: Array) -> Vector2:
 	for row_y in rows_dict:
 		var row_matches = rows_dict[row_y]
 		if row_matches.size() >= 4:
-			# Pick a random tile from this row for the special tile
+			# Pick the middle tile from this row for the special tile
 			print("Found 4+ horizontal line at row ", row_y, " with ", row_matches.size(), " tiles")
-			return row_matches[row_matches.size() / 2]  # Use middle tile
+			var mid = int(row_matches.size() / 2)
+			return row_matches[mid]
 
 	# Group by columns
 	var cols_dict = {}
@@ -472,14 +487,13 @@ func find_special_tile_position_in_matches(matches: Array) -> Vector2:
 		if not cols_dict.has(match_pos.x):
 			cols_dict[match_pos.x] = []
 		cols_dict[match_pos.x].append(match_pos)
-
 	for col_x in cols_dict:
 		var col_matches = cols_dict[col_x]
 		if col_matches.size() >= 4:
-			# Pick a random tile from this column for the special tile
+			# Pick the middle tile from this column for the special tile
 			print("Found 4+ vertical line at col ", col_x, " with ", col_matches.size(), " tiles")
-			return col_matches[col_matches.size() / 2]  # Use middle tile
-
+			var midc = int(col_matches.size() / 2)
+			return col_matches[midc]
 	return Vector2(-1, -1)  # No special tile pattern found
 
 func highlight_matches(matches: Array):
@@ -487,12 +501,14 @@ func highlight_matches(matches: Array):
 	for match_pos in matches:
 		var tile = tiles[int(match_pos.x)][int(match_pos.y)]
 		if tile:
-			highlight_tweens.append(tile.animate_match_highlight())
+			var tween = tile.animate_match_highlight()
+			if tween != null:
+				highlight_tweens.append(tween)
 
 	# Await all highlight tweens to finish
-	for tween in highlight_tweens:
-		if tween != null:
-			await tween.finished
+	for tw in highlight_tweens:
+		if tw != null:
+			await tw.finished
 
 
 func animate_destroy_matches(matches: Array):
@@ -694,16 +710,20 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 
 	if tile_type == GameManager.HORIZTONAL_ARROW:
 		for x in range(GameManager.GRID_WIDTH):
-			positions_to_clear.append(Vector2(x, pos.y))
+			if not GameManager.is_cell_blocked(x, int(pos.y)):
+				positions_to_clear.append(Vector2(x, pos.y))
 	elif tile_type == GameManager.VERTICAL_ARROW:
 		for y in range(GameManager.GRID_HEIGHT):
-			positions_to_clear.append(Vector2(pos.x, y))
+			if not GameManager.is_cell_blocked(int(pos.x), y):
+				positions_to_clear.append(Vector2(pos.x, y))
 	elif tile_type == GameManager.FOUR_WAY_ARROW:
 		for x in range(GameManager.GRID_WIDTH):
-			positions_to_clear.append(Vector2(x, pos.y))
+			if not GameManager.is_cell_blocked(x, int(pos.y)):
+				positions_to_clear.append(Vector2(x, pos.y))
 		for y in range(GameManager.GRID_HEIGHT):
-			if !positions_to_clear.has(Vector2(pos.x, y)):
-				positions_to_clear.append(Vector2(pos.x, y))
+			if not GameManager.is_cell_blocked(int(pos.x), y):
+				if not positions_to_clear.has(Vector2(pos.x, y)):
+					positions_to_clear.append(Vector2(pos.x, y))
 
 	var special_tiles_to_activate = []
 	for clear_pos in positions_to_clear:
