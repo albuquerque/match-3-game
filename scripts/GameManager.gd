@@ -45,6 +45,9 @@ var last_level_moves_left = 0
 # Add a flag to request level completion when score threshold is reached but animations are still running
 var pending_level_complete = false
 
+# Add a flag to request level failure when moves reach zero but cascades are still in progress
+var pending_level_failed = false
+
 # Debugging
 var DEBUG_LOGGING = true
 
@@ -290,6 +293,9 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 	# Determine which special tile to create (before removing tiles)
 	var special_tile_type = 0
 	if create_special:
+		print("remove_matches: create_special true, swapped_pos=", swapped_pos)
+		print("remove_matches: initial matches count=", matches.size())
+		print("remove_matches: computed matches_on_same_row=", matches_on_same_row, " matches_on_same_col=", matches_on_same_col)
 		if horizontal and vertical:
 			# Both horizontal and vertical matches (T or L shape) - create 4-way arrow
 			special_tile_type = FOUR_WAY_ARROW
@@ -299,6 +305,41 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 		elif vertical and matches_on_same_col >= 4:
 			# Only vertical match of 4+ tiles - create vertical arrow
 			special_tile_type = VERTICAL_ARROW
+
+		print("remove_matches: special_tile_type after basic checks =", special_tile_type)
+
+		# If nothing selected but there exists a 4+ line or T/L anywhere in the matches,
+		# pick a valid position from the matches to create the special tile.
+		if special_tile_type == 0:
+			print("remove_matches: special_tile_type == 0, scanning matches for fallback special")
+			# Scan matches for T/L or 4+ lines
+			for test_pos in matches:
+				var row_count = 0
+				var col_count = 0
+				for mpos in matches:
+					if mpos.y == test_pos.y:
+						row_count += 1
+					if mpos.x == test_pos.x:
+						col_count += 1
+				# T/L shape
+				if row_count >= 3 and col_count >= 3:
+					special_tile_type = FOUR_WAY_ARROW
+					swapped_pos = test_pos
+					print("remove_matches: found T/L fallback at ", test_pos)
+					break
+				# 4+ horizontal
+				if row_count >= 4:
+					special_tile_type = HORIZTONAL_ARROW
+					swapped_pos = test_pos
+					print("remove_matches: found 4+ horizontal fallback at ", test_pos)
+					break
+				# 4+ vertical
+				if col_count >= 4:
+					special_tile_type = VERTICAL_ARROW
+					swapped_pos = test_pos
+					print("remove_matches: found 4+ vertical fallback at ", test_pos)
+					break
+			print("remove_matches: fallback result special_tile_type=", special_tile_type, " swapped_pos=", swapped_pos)
 
 	# Remove matched tiles (but preserve swapped position if creating special tile)
 	for match_pos in matches:
@@ -314,6 +355,14 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 	# Create special tile at swapped position if applicable
 	if special_tile_type > 0 and not is_cell_blocked(swapped_pos.x, swapped_pos.y):
 		grid[swapped_pos.x][swapped_pos.y] = special_tile_type
+		print("remove_matches: placed special tile type", special_tile_type, "at", swapped_pos)
+	# Safeguard: if a special was expected but not placed for some reason, force it (avoid blocked cells)
+	if special_tile_type > 0:
+		if is_cell_blocked(swapped_pos.x, swapped_pos.y):
+			print("remove_matches: expected special at", swapped_pos, "but cell is blocked; skipping force-creation")
+		elif grid[swapped_pos.x][swapped_pos.y] != special_tile_type:
+			grid[swapped_pos.x][swapped_pos.y] = special_tile_type
+			print("remove_matches: [safeguard] forced special tile type", special_tile_type, "at", swapped_pos)
 
 	var points = calculate_points(tiles_removed)
 	add_score(points)
@@ -416,6 +465,10 @@ func add_score(points: int):
 	score += points
 	emit_signal("score_changed", score)
 
+	# If a failure was pending but the score reached the target during a cascade, cancel failure
+	if score >= target_score and pending_level_failed:
+		pending_level_failed = false
+
 	if score >= target_score and not level_transitioning:
 		# Store level completion state
 		last_level_won = true
@@ -453,15 +506,15 @@ func use_move():
 	emit_signal("moves_changed", moves_left)
 
 	if moves_left <= 0 and score < target_score and not level_transitioning:
-		# Store level failure state
+		# Instead of immediately failing, mark a pending failure and wait for cascades to finish
+		pending_level_failed = true
+		# Store level failure state snapshot (may be updated if score reaches target during cascade)
 		last_level_won = false
 		last_level_score = score
 		last_level_target = target_score
 		last_level_number = level
 		last_level_moves_left = 0
-		emit_signal("game_over")
-		# Transition to results screen
-		on_level_failed()
+		_attempt_level_failed()
 
 func reset_combo():
 	combo_count = 0
@@ -593,6 +646,36 @@ func _attempt_level_complete():
 	pending_level_complete = false
 	advance_level()
 
+func _attempt_level_failed():
+	if level_transitioning:
+		pending_level_failed = false
+		return
+
+	# Wait until board activity completes
+	while processing_moves:
+		await get_tree().create_timer(0.1).timeout
+		# If level completed while waiting, cancel failure
+		if score >= target_score or level_transitioning:
+			pending_level_failed = false
+			return
+
+	# Short buffer
+	if get_tree() != null:
+		await get_tree().create_timer(0.2).timeout
+
+	# If the score reached target during the wait, cancel failure
+	if score >= target_score:
+		pending_level_failed = false
+		# Trigger completion flow
+		if not level_transitioning:
+			pending_level_complete = true
+			_attempt_level_complete()
+		return
+
+	# Proceed with failure transition
+	pending_level_failed = false
+	on_level_failed()
+
 func on_level_failed():
 	if level_transitioning:
 		return
@@ -608,6 +691,13 @@ func on_level_failed():
 	# Short buffer to allow final tweens/deferred calls to complete
 	if get_tree() != null:
 		await get_tree().create_timer(0.2).timeout
+
+	# Ensure the last level score is the final score at transition time
+	last_level_won = false
+	last_level_score = score
+	last_level_target = target_score
+	last_level_number = level
+	last_level_moves_left = 0
 
 	print("Level failed, transitioning to LevelProgressScene...")
 	if get_tree() != null:
@@ -638,6 +728,13 @@ func on_level_complete():
 	# Small buffer to ensure tweens/deferred callbacks finish
 	if get_tree() != null:
 		await get_tree().create_timer(0.2).timeout
+
+	# Ensure final level score snapshot is stored
+	last_level_won = true
+	last_level_score = score
+	last_level_target = target_score
+	last_level_number = level
+	last_level_moves_left = moves_left
 
 	print("Transitioning to LevelProgressScene...")
 	if get_tree() != null:
