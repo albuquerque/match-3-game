@@ -121,10 +121,10 @@ func update_visual():
 
 func update_type(new_type: int):
 	"""Update the tile to a new type and refresh its visual appearance"""
-#	print("Updating tile at ", grid_position, " from type ", tile_type, " to type ", new_type)
+	print("Updating tile at ", grid_position, " from type ", tile_type, " to type ", new_type)
 	tile_type = new_type
 	update_visual()
-#	print("Tile updated. Sprite visible: ", sprite.visible if sprite else "no sprite", " Texture: ", sprite.texture if sprite else "no sprite", " Scale: ", sprite.scale if sprite else "no sprite")
+	print("Tile updated. Sprite visible: ", sprite.visible if sprite else "no sprite", " Texture: ", sprite.texture if sprite else "no sprite", " Scale: ", sprite.scale if sprite else "no sprite")
 
 func create_ring_texture() -> ImageTexture:
 	var image = Image.create(64, 64, false, Image.FORMAT_RGBA8)
