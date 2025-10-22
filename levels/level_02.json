@@ -1,0 +1,10 @@
+{
+  "level": 2,
+  "width": 8,
+  "height": 8,
+  "target_score": 7000,
+  "moves": 28,
+  "description": "The corners are blocked!",
+  "layout": "X 0 0 0 0 0 0 X\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX 0 0 0 0 0 0 X"
+}
+

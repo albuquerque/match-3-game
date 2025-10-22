@@ -13,6 +13,10 @@ config_version=5
 config/name="Match-3 Game"
 run/main_scene="res://scenes/MainGame.tscn"
 config/features=PackedStringArray("4.5", "Mobile")
+boot_splash/bg_color=Color(0.2, 0.15, 0.35, 1)
+boot_splash/fullsize=false
+boot_splash/use_filter=false
+boot_splash/image="res://textures/splash_screen.png"
 config/icon="res://icon.svg"
 boot_splash/bg_color=Color(0.2, 0.15, 0.35, 1)
 boot_splash/image="res://textures/splash_screen.png"
@@ -21,6 +25,7 @@ boot_splash/use_filter=false
 
 [autoload]
 
+LevelManager="*res://scripts/LevelManager.gd"
 GameManager="*res://scripts/GameManager.gd"
 
 [display]

@@ -1,0 +1,10 @@
+{
+  "level": 4,
+  "width": 8,
+  "height": 8,
+  "target_score": 9000,
+  "moves": 25,
+  "description": "The diamond challenge!",
+  "layout": "X X X X X X X X\nX X X 0 0 X X X\nX X 0 0 0 0 X X\nX 0 0 0 0 0 0 X\nX 0 0 0 0 0 0 X\nX X 0 0 0 0 X X\nX X X 0 0 X X X\nX X X X X X X X"
+}
+

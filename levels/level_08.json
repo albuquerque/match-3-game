@@ -1,0 +1,9 @@
+{
+  "level": 8,
+  "width": 8,
+  "height": 8,
+  "target_score": 16000,
+  "moves": 18,
+  "description": "The hourglass!",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX 0 0 0 0 0 0 X\nX X 0 0 0 0 X X\nX X 0 0 0 0 X X\nX 0 0 0 0 0 0 X\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0"
+}

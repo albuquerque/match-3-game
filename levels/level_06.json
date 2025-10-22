@@ -1,0 +1,10 @@
+{
+  "level": 6,
+  "width": 8,
+  "height": 8,
+  "target_score": 12000,
+  "moves": 20,
+  "description": "T-shape challenge!",
+  "layout": "X X X 0 0 X X X\nX X X 0 0 X X X\nX X X 0 0 X X X\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0"
+}
+

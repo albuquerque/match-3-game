@@ -1,0 +1,9 @@
+{
+  "level": 10,
+  "width": 8,
+  "height": 8,
+  "target_score": 20000,
+  "moves": 15,
+  "description": "The ultimate challenge!",
+  "layout": "X 0 0 0 0 0 0 X\n0 0 X 0 0 X 0 0\n0 X 0 0 0 0 X 0\n0 0 0 X X 0 0 0\n0 0 0 X X 0 0 0\n0 X 0 0 0 0 X 0\n0 0 X 0 0 X 0 0\nX 0 0 0 0 0 0 X"
+}
