@@ -5,6 +5,7 @@
   "target_score": 10000,
   "moves": 22,
   "description": "The donut - avoid the hole!",
+  "theme": "legacy",
   "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 X X 0 0 0\n0 0 0 X X 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0"
 }
 

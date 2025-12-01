@@ -55,15 +55,15 @@ func setup(type: int, pos: Vector2, scale_factor: float = 1.0):
 		var circle_shape = collision_shape.shape as CircleShape2D
 		circle_shape.radius = (BASE_TILE_SIZE / 2) * tile_scale
 
+	# Call update_visual to set the correct sprite scale based on texture size
 	update_visual()
 
 func update_visual():
-	if is_queued_for_deletion() or not is_inside_tree():
+	if is_queued_for_deletion():
 		return
 
-	# Add null check for sprite to prevent nil assignment error
+	# If sprite is not ready yet (called before _ready), wait one frame
 	if not sprite:
-		# If sprite isn't ready yet, defer the visual update
 		call_deferred("update_visual")
 		return
 
@@ -73,31 +73,29 @@ func update_visual():
 
 	visible = true
 
-	# Store current sprite scale to preserve it
-	var current_sprite_scale = sprite.scale if sprite.scale != Vector2.ZERO else Vector2(tile_scale, tile_scale)
-
-	# Load texture from file instead of generating it
+	# Get texture path from ThemeManager (autoload singleton)
 	var texture_path = "res://textures/tile_%d.png" % tile_type
+	var theme_manager = get_node_or_null("/root/ThemeManager")
+	if theme_manager:
+		texture_path = theme_manager.get_tile_texture_path(tile_type)
+
 	if ResourceLoader.exists(texture_path):
-		sprite.texture = load(texture_path)
-		# Reset modulate for special tiles (7, 8, 9), apply color for regular tiles (1-6)
-		if tile_type >= 1 and tile_type <= COLORS.size():
-			sprite.modulate = COLORS[tile_type - 1]
-		else:
-			sprite.modulate = Color.WHITE
+		var texture = load(texture_path)
+		sprite.texture = texture
+		sprite.centered = true
+		sprite.region_enabled = false
+		sprite.scale = Vector2(64.0 / float(texture.get_width()), 64.0 / float(texture.get_height())) * tile_scale
+		sprite.modulate = Color.WHITE
+		print("[Tile.update_visual] Applied scale to sprite:", sprite.scale, "Texture size:", texture.get_width(), texture.get_height())
 	else:
-		# Fallback to old method if texture doesn't exist
 		if tile_type > COLORS.size():
 			sprite.modulate = Color.WHITE
 		else:
 			sprite.modulate = COLORS[tile_type - 1]
 
-		# Create a simple colored circle
 		var texture = ImageTexture.new()
 		var image = Image.create(64, 64, false, Image.FORMAT_RGBA8)
 		image.fill(Color.WHITE)
-
-		# Draw a circle
 		for x in range(64):
 			for y in range(64):
 				var center = Vector2(32, 32)
@@ -106,14 +104,13 @@ func update_visual():
 					image.set_pixel(x, y, Color.WHITE)
 				else:
 					image.set_pixel(x, y, Color.TRANSPARENT)
-
 		texture.set_image(image)
 		sprite.texture = texture
+		sprite.centered = true
+		sprite.region_enabled = false
+		sprite.scale = Vector2(64.0 / float(texture.get_width()), 64.0 / float(texture.get_height())) * tile_scale
+		print("[Tile.update_visual] Fallback scale:", sprite.scale, "Texture size:", texture.get_width(), texture.get_height())
 
-	# Restore the sprite scale (preserve current animated scale or use tile_scale for initial setup)
-	sprite.scale = current_sprite_scale
-
-	# Create selection ring texture if it doesn't exist
 	if selection_ring and not selection_ring.texture:
 		var ring_texture = create_ring_texture()
 		selection_ring.texture = ring_texture
@@ -220,21 +217,23 @@ func get_swipe_direction(swipe_vector: Vector2) -> Vector2:
 func _on_mouse_entered():
 	print("Mouse entered tile at ", grid_position)
 	if not is_falling and not GameManager.processing_moves and sprite:
+		# Store the base scale (calculated by update_visual based on texture size)
+		var base_scale = Vector2(64.0 / float(sprite.texture.get_width()), 64.0 / float(sprite.texture.get_height())) * tile_scale
 		var tween = create_tween()
-		# Scale from 1.25 to 1.375 (1.25 * 1.1) for hover effect
-		tween.tween_property(sprite, "scale", Vector2(1.375, 1.375), 0.1)
+		# Scale 10% larger for hover effect
+		tween.tween_property(sprite, "scale", base_scale * 1.1, 0.1)
 		# Add visual feedback
 		sprite.modulate = sprite.modulate.lightened(0.3)
 
 func _on_mouse_exited():
 	print("Mouse exited tile at ", grid_position)
 	if not is_falling and sprite:
+		# Restore the correct base scale (calculated by update_visual based on texture size)
+		var base_scale = Vector2(64.0 / float(sprite.texture.get_width()), 64.0 / float(sprite.texture.get_height())) * tile_scale
 		var tween = create_tween()
-		# Return to original scale of 1.25
-		tween.tween_property(sprite, "scale", Vector2(1.25, 1.25), 0.1)
-		# Restore original color
-		if tile_type > 0 and tile_type <= COLORS.size():
-			sprite.modulate = COLORS[tile_type - 1]
+		tween.tween_property(sprite, "scale", base_scale, 0.1)
+		# Restore original color (only for loaded textures we don't modulate)
+		sprite.modulate = Color.WHITE
 
 func handle_click():
 	print("Handle click called on tile at ", grid_position, " type: ", tile_type)
@@ -306,9 +305,11 @@ func animate_spawn() -> Tween:
 	modulate = Color.WHITE
 
 	var tween = create_tween()
-	if sprite:
-		# Use the proper target scale (1.25, 1.25) to match existing tiles from the scene
-		tween.tween_property(sprite, "scale", Vector2(1.25, 1.25), 0.4)
+	if sprite and sprite.texture:
+		# Calculate the correct target scale based on texture size
+		var target_scale = Vector2(64.0 / float(sprite.texture.get_width()), 64.0 / float(sprite.texture.get_height())) * tile_scale
+		# Animate to the correct scale
+		tween.tween_property(sprite, "scale", target_scale, 0.4)
 	tween.tween_callback(func(): is_falling = false)
 	return tween
 

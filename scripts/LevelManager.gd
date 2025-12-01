@@ -9,8 +9,9 @@ class LevelData:
 	var target_score: int
 	var moves: int
 	var description: String
+	var theme: String = ""  # Theme name for this level
 
-	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = ""):
+	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = ""):
 		level_number = num
 		grid_layout = layout
 		width = w
@@ -18,6 +19,7 @@ class LevelData:
 		target_score = score
 		moves = mv
 		description = desc
+		theme = thm
 
 var levels: Array[LevelData] = []
 var current_level_index: int = 0
@@ -115,6 +117,9 @@ func load_level_from_json(file_path: String) -> LevelData:
 			else:
 				grid_layout[x][y] = 0  # Default to empty
 
+	# Extract theme if present
+	var theme = data.get("theme", "")
+
 	return LevelData.new(
 		data["level"],
 		grid_layout,
@@ -122,7 +127,8 @@ func load_level_from_json(file_path: String) -> LevelData:
 		data["height"],
 		data["target_score"],
 		data["moves"],
-		data["description"]
+		data["description"],
+		theme
 	)
 
 func parse_layout(layout_data, width: int, height: int) -> Array:

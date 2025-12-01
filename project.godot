@@ -18,14 +18,11 @@ boot_splash/fullsize=false
 boot_splash/use_filter=false
 boot_splash/image="res://textures/splash_screen.png"
 config/icon="res://icon.svg"
-boot_splash/bg_color=Color(0.2, 0.15, 0.35, 1)
-boot_splash/image="res://textures/splash_screen.png"
-boot_splash/fullsize=false
-boot_splash/use_filter=false
 
 [autoload]
 
 LevelManager="*res://scripts/LevelManager.gd"
+ThemeManager="*res://scripts/ThemeManager.gd"
 GameManager="*res://scripts/GameManager.gd"
 
 [display]

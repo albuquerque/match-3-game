@@ -5,6 +5,7 @@
   "target_score": 5000,
   "moves": 30,
   "description": "Welcome! Match 3 tiles to score points.",
+  "theme": "legacy",
   "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0"
 }
 
