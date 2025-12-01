@@ -32,6 +32,9 @@ var processing_moves = false
 # Level system
 var level_manager: Node = null
 
+# Theme system
+var theme_manager: Node = null
+
 # Add a flag to prevent multiple triggers of level completion
 var level_transitioning = false
 
@@ -52,12 +55,15 @@ var pending_level_failed = false
 var DEBUG_LOGGING = true
 
 func _ready():
-	# Get or create LevelManager
+	# Get the autoloaded LevelManager
 	level_manager = get_node_or_null("/root/LevelManager")
 	if not level_manager:
-		level_manager = preload("res://scripts/LevelManager.gd").new()
-		level_manager.name = "LevelManager"
-		add_child(level_manager)
+		print("[GameManager] WARNING: LevelManager not found as autoload!")
+
+	# Get the autoloaded ThemeManager
+	theme_manager = get_node_or_null("/root/ThemeManager")
+	if not theme_manager:
+		print("[GameManager] WARNING: ThemeManager not found as autoload!")
 
 	initialize_game()
 
@@ -90,6 +96,19 @@ func load_current_level():
 		moves_left = level_data.moves
 		level = level_data.level_number
 
+		# Set theme if specified in level data
+		if theme_manager:
+			if level_data.theme != "" and level_data.theme != null:
+				theme_manager.set_theme_by_name(level_data.theme)
+				print("Applied theme: ", level_data.theme)
+			else:
+				# Default: use legacy for odd levels, modern for even levels
+				if level % 2 == 1:
+					theme_manager.set_theme_by_name("legacy")
+				else:
+					theme_manager.set_theme_by_name("modern")
+				print("Applied default theme for level ", level)
+
 		create_empty_grid()
 		fill_grid_from_layout(level_data.grid_layout)
 
@@ -103,6 +122,8 @@ func load_current_level():
 		GRID_HEIGHT = 8
 		target_score = 10000
 		moves_left = 30
+		if theme_manager:
+			theme_manager.set_theme_by_name("modern")
 		create_empty_grid()
 		fill_initial_grid()
 

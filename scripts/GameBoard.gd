@@ -252,7 +252,7 @@ func perform_swap(tile1: Tile, tile2: Tile):
 	if tween2 != null:
 		await tween2.finished
 
-    # Check for matches
+	# Check for matches
 	var matches = GameManager.find_matches()
 	if matches.size() > 0:
 		GameManager.use_move()

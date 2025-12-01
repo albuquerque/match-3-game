@@ -5,6 +5,7 @@
   "target_score": 14000,
   "moves": 18,
   "description": "Stairway pattern!",
+  "theme": "legacy",
   "layout": "0 0 X X X X X X\n0 0 0 0 X X X X\n0 0 0 0 0 0 X X\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX X 0 0 0 0 0 0\nX X X X 0 0 0 0\nX X X X X X 0 0"
 }
 
