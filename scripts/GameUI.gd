@@ -1,6 +1,12 @@
 extends Control
 class_name GameUI
 
+# Currency UI
+@onready var coins_label = $VBoxContainer/CurrencyPanel/HBoxContainer/CoinsLabel
+@onready var gems_label = $VBoxContainer/CurrencyPanel/HBoxContainer/GemsLabel
+@onready var lives_label = $VBoxContainer/CurrencyPanel/HBoxContainer/LivesLabel
+
+# Game UI
 @onready var score_label = $VBoxContainer/TopPanel/ScoreContainer/ScoreLabel
 @onready var level_label = $VBoxContainer/TopPanel/LevelContainer/LevelLabel
 @onready var moves_label = $VBoxContainer/TopPanel/MovesContainer/MovesLabel
@@ -20,6 +26,11 @@ class_name GameUI
 var is_paused = false
 
 func _ready():
+	# Connect to RewardManager signals
+	RewardManager.connect("coins_changed", _on_coins_changed)
+	RewardManager.connect("gems_changed", _on_gems_changed)
+	RewardManager.connect("lives_changed", _on_lives_changed)
+
 	# Connect to GameManager signals
 	GameManager.connect("score_changed", _on_score_changed)
 	GameManager.connect("level_changed", _on_level_changed)
@@ -37,6 +48,7 @@ func _ready():
 	game_over_panel.visible = false
 	level_complete_panel.visible = false
 	update_display()
+	update_currency_display()
 
 func update_display():
 	score_label.text = "Score: %d" % GameManager.score
@@ -140,3 +152,36 @@ func animate_low_moves_warning():
 	tween.set_loops(3)
 	tween.tween_property(moves_label, "scale", Vector2(1.2, 1.2), 0.2)
 	tween.tween_property(moves_label, "scale", Vector2.ONE, 0.2)
+
+# ============================================
+# Currency Display Functions
+# ============================================
+
+func update_currency_display():
+	coins_label.text = "💰 %d" % RewardManager.get_coins()
+	gems_label.text = "💎 %d" % RewardManager.get_gems()
+
+	var lives = RewardManager.get_lives()
+	var max_lives = RewardManager.MAX_LIVES
+	lives_label.text = "❤️ %d/%d" % [lives, max_lives]
+
+func _on_coins_changed(new_amount: int):
+	coins_label.text = "💰 %d" % new_amount
+	animate_currency_change(coins_label)
+
+func _on_gems_changed(new_amount: int):
+	gems_label.text = "💎 %d" % new_amount
+	animate_currency_change(gems_label)
+
+func _on_lives_changed(new_amount: int):
+	var max_lives = RewardManager.MAX_LIVES
+	lives_label.text = "❤️ %d/%d" % [new_amount, max_lives]
+	animate_currency_change(lives_label)
+
+func animate_currency_change(label: Label):
+	var tween = create_tween()
+	tween.tween_property(label, "scale", Vector2(1.3, 1.3), 0.15)
+	tween.tween_property(label, "scale", Vector2.ONE, 0.15)
+	tween.tween_property(label, "modulate", Color.YELLOW, 0.1)
+	tween.tween_property(label, "modulate", Color.WHITE, 0.2)
+

@@ -32,6 +32,14 @@ A feature-rich match-3 puzzle game built with Godot 4.5, featuring dynamic level
 - **Responsive UI** - Adaptive board sizing for different screen resolutions
 - **Visual Feedback** - Hover effects, selection rings, and match highlights
 
+### Progression & Rewards
+- **Currency System** - Earn coins and gems from gameplay
+- **Star Ratings** - 1-3 stars per level based on performance
+- **Daily Login Rewards** - Consecutive login bonuses
+- **Lives System** - 5 lives with 30-minute regeneration
+- **Booster Inventory** - Collect and manage power-up boosters
+- **Persistent Progress** - All progress automatically saved
+
 ### Technical Features
 - **JSON-Based Level Configuration** - Easy level creation and modification
 - **Modular Architecture** - Separate managers for game logic, levels, and themes
@@ -46,6 +54,7 @@ match-3-game/
 │   ├── GameManager.gd          # Core game logic and state management
 │   ├── LevelManager.gd         # Level loading and progression
 │   ├── ThemeManager.gd         # Visual theme management
+│   ├── RewardManager.gd        # Currency, progression & rewards system
 │   ├── GameBoard.gd            # Board rendering and tile management
 │   ├── GameUI.gd               # UI elements and HUD
 │   ├── Tile.gd                 # Individual tile behavior
@@ -147,6 +156,7 @@ The APK will be generated in `builds/match3-game-debug.apk`
 
 ## 📄 Additional Documentation
 
+- `REWARD_SYSTEM_README.md` - Currency, progression & rewards system
 - `THEME_SYSTEM_README.md` - Detailed theme system documentation
 - `LEVEL_COMPLETION_FEATURE.md` - Level completion and progression features
 - `AUTO_SHUFFLE_FEATURE.md` - Auto-shuffle system documentation
@@ -169,13 +179,21 @@ The APK will be generated in `builds/match3-game-debug.apk`
 - **Combo Matches** - Cascading matches increase combo multiplier
 - **Special Tiles** - Bonus points for clearing multiple tiles
 
+### Level Rewards
+- **Coins** - Base reward: 100 + (50 × level number)
+- **Star Ratings** - 1-3 stars based on score performance:
+  - ⭐ 1 star: 100%-149% of target
+  - ⭐⭐ 2 stars: 150%-199% of target
+  - ⭐⭐⭐ 3 stars: 200%+ of target
+- **Bonus Gems** - 5 gems for first 3-star completion per level
+
 ## 📝 License
 
 [Add your license information here]
 
 ## 👥 Credits
 
-[Sam Albuquerque](
+[Sam Albuquerque]
 ---
 
 **Version:** 1.0  

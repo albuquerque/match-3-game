@@ -23,6 +23,7 @@ config/icon="res://icon.svg"
 
 LevelManager="*res://scripts/LevelManager.gd"
 ThemeManager="*res://scripts/ThemeManager.gd"
+RewardManager="*res://scripts/RewardManager.gd"
 GameManager="*res://scripts/GameManager.gd"
 
 [display]
