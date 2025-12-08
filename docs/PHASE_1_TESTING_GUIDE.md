@@ -59,7 +59,7 @@
 rm ~/Library/Application\ Support/Godot/app_userdata/Match-3\ Game/player_progress.json
 
 # Launch game
-cd /Users/sal76/src/match-3-game
+cd $HOME/src/match-3-game
 /Applications/Godot.app/Contents/MacOS/Godot --path .
 
 # Expected: 500 coins, 50 gems, 5 lives, Day 1 reward (+50 coins = 550 total)
