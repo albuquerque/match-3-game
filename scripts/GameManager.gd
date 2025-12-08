@@ -757,8 +757,32 @@ func on_level_complete():
 	last_level_number = level
 	last_level_moves_left = moves_left
 
+	# Calculate stars based on performance (1-3 stars)
+	var stars = calculate_stars(score, target_score)
+	print("Level completed with %d stars!" % stars)
+
+	# Grant rewards through RewardManager
+	RewardManager.grant_level_completion_reward(level, stars)
+
 	print("Transitioning to LevelProgressScene...")
 	if get_tree() != null:
 		get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
 
 	level_transitioning = false
+
+func calculate_stars(final_score: int, target: int) -> int:
+	"""Calculate star rating (1-3) based on score performance"""
+	var performance_ratio = float(final_score) / float(target)
+
+	if performance_ratio >= 2.0:
+		# 200%+ of target = 3 stars
+		return 3
+	elif performance_ratio >= 1.5:
+		# 150%-199% of target = 2 stars
+		return 2
+	elif performance_ratio >= 1.0:
+		# 100%-149% of target = 1 star
+		return 1
+	else:
+		# Below target = 0 stars (shouldn't happen as level completes when target reached)
+		return 1
