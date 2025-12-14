@@ -1,7 +1,10 @@
-[gd_scene load_steps=5 format=3 uid="uid://pu3wcj43djjh"]
+[gd_scene load_steps=8 format=3 uid="uid://pu3wcj43djjh"]
 
 [ext_resource type="Script" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
 [ext_resource type="Script" path="res://scripts/GameUI.gd" id="2_4y7z1"]
+[ext_resource type="Script" path="res://scripts/ShopUI.gd" id="3_shopui"]
+[ext_resource type="Script" path="res://scripts/OutOfLivesDialog.gd" id="4_outoflivesdialog"]
+[ext_resource type="Script" path="res://scripts/RewardNotification.gd" id="5_rewardnotification"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
 bg_color = Color(0.2, 0.2, 0.3, 0.8)
@@ -140,6 +143,11 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Menu"
 
+[node name="ShopButton" type="Button" parent="GameUI/VBoxContainer/BottomPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Shop 🛒"
+
 [node name="PauseButton" type="Button" parent="GameUI/VBoxContainer/BottomPanel"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -211,3 +219,176 @@ horizontal_alignment = 1
 [node name="ContinueButton" type="Button" parent="GameUI/LevelCompletePanel/VBoxContainer"]
 layout_mode = 2
 text = "Continue"
+
+[node name="ShopUI" type="Control" parent="GameUI"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("3_shopui")
+
+[node name="Panel" type="Panel" parent="GameUI/ShopUI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -400.0
+offset_right = 300.0
+offset_bottom = 400.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameUI/ShopUI/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopBar" type="HBoxContainer" parent="GameUI/ShopUI/Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="GameUI/ShopUI/Panel/VBoxContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Shop"
+horizontal_alignment = 1
+
+[node name="CoinsLabel" type="Label" parent="GameUI/ShopUI/Panel/VBoxContainer/TopBar"]
+layout_mode = 2
+text = "💰 0"
+
+[node name="GemsLabel" type="Label" parent="GameUI/ShopUI/Panel/VBoxContainer/TopBar"]
+layout_mode = 2
+text = "💎 0"
+
+[node name="CloseButton" type="Button" parent="GameUI/ShopUI/Panel/VBoxContainer/TopBar"]
+layout_mode = 2
+text = "X"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="GameUI/ShopUI/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ShopItemsContainer" type="VBoxContainer" parent="GameUI/ShopUI/Panel/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="OutOfLivesDialog" type="Control" parent="GameUI"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("4_outoflivesdialog")
+
+[node name="Panel" type="Panel" parent="GameUI/OutOfLivesDialog"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -200.0
+offset_right = 250.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameUI/OutOfLivesDialog/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LivesLabel" type="Label" parent="GameUI/OutOfLivesDialog/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Out of Lives!"
+horizontal_alignment = 1
+
+[node name="TimerLabel" type="Label" parent="GameUI/OutOfLivesDialog/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Next life in: 30:00"
+horizontal_alignment = 1
+
+[node name="ButtonContainer" type="VBoxContainer" parent="GameUI/OutOfLivesDialog/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="GemRefillButton" type="Button" parent="GameUI/OutOfLivesDialog/Panel/VBoxContainer/ButtonContainer"]
+layout_mode = 2
+text = "Refill (50 💎)"
+
+[node name="WatchAdButton" type="Button" parent="GameUI/OutOfLivesDialog/Panel/VBoxContainer/ButtonContainer"]
+layout_mode = 2
+text = "Watch Ad (+1 ❤️)"
+
+[node name="WaitButton" type="Button" parent="GameUI/OutOfLivesDialog/Panel/VBoxContainer/ButtonContainer"]
+layout_mode = 2
+text = "Wait"
+
+[node name="RewardNotification" type="Control" parent="GameUI"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("5_rewardnotification")
+
+[node name="Panel" type="Panel" parent="GameUI/RewardNotification"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -150.0
+offset_right = 200.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameUI/RewardNotification/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="IconContainer" type="CenterContainer" parent="GameUI/RewardNotification/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RewardLabel" type="Label" parent="GameUI/RewardNotification/Panel/VBoxContainer"]
+layout_mode = 2
+text = "+100 Coins"
+horizontal_alignment = 1
+
+[node name="DescriptionLabel" type="Label" parent="GameUI/RewardNotification/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Level completion reward"
+horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="GameUI/RewardNotification/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Awesome!"
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="GameUI/RewardNotification"]
+
+
