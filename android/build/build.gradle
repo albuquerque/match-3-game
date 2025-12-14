@@ -34,8 +34,10 @@ configurations {
 }
 
 dependencies {
+    implementation 'com.google.android.gms:play-services-ads:23.3.0'
     implementation "androidx.fragment:fragment:$versions.fragmentVersion"
     implementation "androidx.core:core-splashscreen:$versions.splashscreenVersion"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.10"
 
     if (rootProject.findProject(":lib")) {
         implementation project(":lib")

@@ -49,6 +49,13 @@
             </intent-filter>
         </activity>
 
+        <!-- AdMob App ID (Test ID - Override this for production) -->
+        <!-- To use your own App ID, change the value below -->
+        <!-- For production: ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"
+            tools:replace="android:value"/>
     </application>
 
 </manifest>

@@ -49,8 +49,26 @@ Thumbs.db
 
 # IDE
 .vscode/
+
+# Keep only our custom plugin
+!addons/droid_admob/
+!addons/droid_admob/**
+
 .idea/
 
 # Temporary files
 *.tmp
 *.log
+*.bak
+*_OLD.md
+*_NEW.md
+
+# Logs
+logs/
+
+# Test and debug scripts
+test-*.sh
+analyze-*.sh
+diagnose-*.sh
+setup-*.sh
+clear-*.sh

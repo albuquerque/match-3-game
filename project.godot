@@ -24,6 +24,7 @@ config/icon="res://icon.svg"
 LevelManager="*res://scripts/LevelManager.gd"
 ThemeManager="*res://scripts/ThemeManager.gd"
 RewardManager="*res://scripts/RewardManager.gd"
+AdMobManager="*res://scripts/AdMobManager.gd"
 GameManager="*res://scripts/GameManager.gd"
 
 [display]
@@ -33,6 +34,10 @@ window/size/viewport_height=1280
 window/size/mode=2
 window/stretch/mode="viewport"
 window/handheld/orientation=1
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/droid_admob/plugin.cfg")
 
 [rendering]
 

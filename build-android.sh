@@ -68,6 +68,10 @@ echo "✅ Godot Engine: $GODOT_PATH"
 cd "$(dirname "$0")"
 
 echo ""
+echo "🔧 Setting up AdMob Plugin..."
+echo "=================================="
+
+echo ""
 echo "🔨 Building Android APK..."
 echo "=================================="
 

@@ -74,6 +74,12 @@ func initialize_game():
 	processing_moves = false
 	level_transitioning = false
 
+	# Check if player has lives
+	if RewardManager.get_lives() <= 0:
+		print("[GameManager] No lives available, showing out of lives dialog")
+		# The GameUI will handle showing the dialog
+		return
+
 	# Load the first level
 	load_current_level()
 
@@ -86,6 +92,12 @@ func load_current_level():
 	processing_moves = false  # Reset the processing flag when loading a level
 	score = 0  # Reset score for the new level
 	combo_count = 0  # Reset combo count
+
+	# Consume a life when starting a level
+	if not RewardManager.use_life():
+		print("[GameManager] No lives available!")
+		# Don't load level if no lives
+		return
 
 	var level_data = level_manager.get_current_level()
 

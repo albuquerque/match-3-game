@@ -23,6 +23,12 @@ class_name GameUI
 @onready var final_score_label = $GameOverPanel/VBoxContainer/FinalScoreLabel
 @onready var level_complete_score = $LevelCompletePanel/VBoxContainer/LevelScoreLabel
 
+# Phase 2: Shop and Dialogs
+@onready var shop_button = $VBoxContainer/BottomPanel/ShopButton
+@onready var shop_ui = $ShopUI
+@onready var out_of_lives_dialog = $OutOfLivesDialog
+@onready var reward_notification = $RewardNotification
+
 var is_paused = false
 
 func _ready():
@@ -44,11 +50,28 @@ func _ready():
 	menu_button.connect("pressed", _on_menu_pressed)
 	pause_button.connect("pressed", _on_pause_pressed)
 
+	# Phase 2: Shop button
+	if shop_button:
+		shop_button.connect("pressed", _on_shop_pressed)
+
+	# Connect shop and dialog signals
+	if shop_ui:
+		shop_ui.connect("shop_closed", _on_shop_closed)
+		shop_ui.connect("item_purchased", _on_item_purchased)
+
+	if out_of_lives_dialog:
+		out_of_lives_dialog.connect("refill_requested", _on_refill_requested)
+		out_of_lives_dialog.connect("dialog_closed", _on_out_of_lives_closed)
+
 	# Initialize UI
 	game_over_panel.visible = false
 	level_complete_panel.visible = false
 	update_display()
 	update_currency_display()
+
+	# Check if player has lives
+	if RewardManager.get_lives() <= 0:
+		_show_out_of_lives_dialog()
 
 func update_display():
 	score_label.text = "Score: %d" % GameManager.score
@@ -185,3 +208,55 @@ func animate_currency_change(label: Label):
 	tween.tween_property(label, "modulate", Color.YELLOW, 0.1)
 	tween.tween_property(label, "modulate", Color.WHITE, 0.2)
 
+# ============================================
+# Phase 2: Shop and Dialog Functions
+# ============================================
+
+func _on_shop_pressed():
+	"""Open the shop"""
+	if shop_ui:
+		shop_ui.show_shop()
+		print("[GameUI] Shop opened")
+
+func _on_shop_closed():
+	"""Handle shop close"""
+	print("[GameUI] Shop closed")
+
+func _on_item_purchased(item_type: String, cost_type: String, cost_amount: int):
+	"""Handle item purchase from shop"""
+	print("[GameUI] Purchased: %s for %d %s" % [item_type, cost_amount, cost_type])
+
+	# Show reward notification
+	if reward_notification:
+		if item_type == "lives_refill":
+			reward_notification.show_reward("lives", 5, "Lives refilled!")
+		else:
+			reward_notification.show_reward("booster", 1, "%s booster added!" % item_type.capitalize())
+
+func _show_out_of_lives_dialog():
+	"""Show the out of lives dialog"""
+	if out_of_lives_dialog:
+		out_of_lives_dialog.show_dialog()
+		print("[GameUI] Showing out of lives dialog")
+
+func _on_refill_requested(method: String):
+	"""Handle life refill from dialog"""
+	print("[GameUI] Lives refilled via: %s" % method)
+
+	# Show success notification
+	if reward_notification:
+		reward_notification.show_reward("lives", RewardManager.get_lives(), "Lives restored!")
+
+	# DON'T automatically start game - let the dialog close naturally
+	# The player can see their lives increased and manually start when ready
+	print("[GameUI] Life granted. Player now has %d lives" % RewardManager.get_lives())
+
+func _on_out_of_lives_closed():
+	"""Handle out of lives dialog close"""
+	print("[GameUI] Out of lives dialog closed")
+
+	# If still no lives, go back to menu
+	if RewardManager.get_lives() <= 0:
+		print("[GameUI] Still no lives, returning to menu")
+		await get_tree().create_timer(0.5).timeout
+		_on_menu_pressed()
