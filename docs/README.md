@@ -9,29 +9,33 @@ This directory contains all documentation for the Match-3 Game project.
 
 ### Game Systems
 - **[FEATURES.md](FEATURES.md)** - Complete overview of all implemented game features
+- **[BOOSTERS_IMPLEMENTATION.md](BOOSTERS_IMPLEMENTATION.md)** - Complete booster system documentation
 - **[LEVELS_README.md](LEVELS_README.md)** - Level system documentation and JSON format
 - **[REWARD_SYSTEM_README.md](REWARD_SYSTEM_README.md)** - Lives, coins, gems, and daily rewards
 - **[THEME_SYSTEM_README.md](THEME_SYSTEM_README.md)** - Visual theme system documentation
 
 ### Technical Guides
-- **[SUCCESS_REPORT.md](SUCCESS_REPORT.md)** - AdMob plugin integration success story and architecture
-- **[GDPR_CONSENT_GUIDE.md](GDPR_CONSENT_GUIDE.md)** - Complete GDPR compliance implementation guide
-- **[GDPR_CONSENT_GUIDE.md](GDPR_CONSENT_GUIDE.md)** - Complete GDPR compliance implementation guide
+- **[ADMOB_GUIDE.md](ADMOB_GUIDE.md)** - AdMob plugin usage, API, and GDPR compliance
+- **[BUILD_SUCCESS.md](BUILD_SUCCESS.md)** - Build verification and setup
+- **[EXTRA_MOVES_FEATURE.md](EXTRA_MOVES_FEATURE.md)** - Extra Moves instant-use feature
 
 ## 📖 Quick Links
 
 ### For Developers
 - Building the game → [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)
 - Understanding features → [FEATURES.md](FEATURES.md)
-- GDPR compliance → [GDPR_CONSENT_GUIDE.md](GDPR_CONSENT_GUIDE.md)
+- Implementing boosters → [BOOSTERS_IMPLEMENTATION.md](BOOSTERS_IMPLEMENTATION.md)
+- AdMob integration → [ADMOB_GUIDE.md](ADMOB_GUIDE.md)
+- Extra Moves feature → [EXTRA_MOVES_FEATURE.md](EXTRA_MOVES_FEATURE.md)
 
-- AdMob plugin usage → [ADMOB_GUIDE.md](ADMOB_GUIDE.md)
 ### For Level Designers
 - Creating levels → [LEVELS_README.md](LEVELS_README.md)
 - Reward balancing → [REWARD_SYSTEM_README.md](REWARD_SYSTEM_README.md)
+- Using boosters → [BOOSTERS_IMPLEMENTATION.md](BOOSTERS_IMPLEMENTATION.md)
 
 ### For Artists
 - Theme system → [THEME_SYSTEM_README.md](THEME_SYSTEM_README.md)
+- Booster icons → [BOOSTERS_IMPLEMENTATION.md](BOOSTERS_IMPLEMENTATION.md#icon-system)
 
 ## 🎯 Document Purpose
 
@@ -39,11 +43,13 @@ This directory contains all documentation for the Match-3 Game project.
 |----------|---------|----------|
 | DEVELOPMENT_GUIDE.md | Build & deploy instructions | Developers |
 | FEATURES.md | Complete feature list | Everyone |
+| BOOSTERS_IMPLEMENTATION.md | Booster system guide | Developers/Designers |
+| EXTRA_MOVES_FEATURE.md | Extra Moves feature | Developers |
 | LEVELS_README.md | Level configuration | Level Designers |
 | REWARD_SYSTEM_README.md | Reward mechanics | Designers/Developers |
 | THEME_SYSTEM_README.md | Visual themes | Artists/Developers |
-| SUCCESS_REPORT.md | AdMob integration details | Developers |
 | ADMOB_GUIDE.md | AdMob plugin usage & GDPR | Developers |
+| BUILD_SUCCESS.md | Build verification | Developers |
 ## 📝 Documentation Standards
 
 ### File Naming
@@ -66,6 +72,14 @@ When you add a new feature:
 
 ## 🔄 Recent Changes
 
+**December 16, 2024**:
+- ✅ Consolidated all booster documentation into BOOSTERS_IMPLEMENTATION.md
+- ✅ Added EXTRA_MOVES_FEATURE.md for instant-use extra moves
+- ✅ Cleaned up root directory (removed 17+ booster-related markdown files)
+- ✅ Removed technical fix documentation (*_FIX*.md, *_FIXED.md files)
+- ✅ Streamlined docs folder - kept only essential documentation
+- ✅ Updated documentation index and cross-references
+
 **December 12, 2024**:
 - ✅ Cleaned up documentation (consolidated 20+ files to 6)
 - ✅ Created FEATURES.md to consolidate all feature docs
@@ -75,6 +89,6 @@ When you add a new feature:
 
 ---
 
-**Total Documents**: 7 (including this README)  
-**Last Updated**: December 12, 2024
+**Total Documents**: 10 (including this README)  
+**Last Updated**: December 16, 2024
 

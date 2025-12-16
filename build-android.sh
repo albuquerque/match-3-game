@@ -75,6 +75,9 @@ echo ""
 echo "🔨 Building Android APK..."
 echo "=================================="
 
+# Create builds directory if it doesn't exist
+mkdir -p builds
+
 # Export the game to Android
 "$GODOT_PATH" --headless --export-debug "Android" "builds/match3-game-debug.apk"
 

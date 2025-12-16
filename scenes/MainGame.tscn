@@ -59,6 +59,7 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = -120.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -219,6 +220,339 @@ horizontal_alignment = 1
 [node name="ContinueButton" type="Button" parent="GameUI/LevelCompletePanel/VBoxContainer"]
 layout_mode = 2
 text = "Continue"
+
+[node name="BoosterPanel" type="PanelContainer" parent="GameUI"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -110.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="GameUI/BoosterPanel"]
+layout_mode = 2
+theme_override_constants/separation = 5
+alignment = 1
+
+[node name="HammerButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/HammerButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/HammerButton"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="ShuffleButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/ShuffleButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/ShuffleButton"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="SwapButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/SwapButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/SwapButton"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="ChainReactionButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/ChainReactionButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/ChainReactionButton"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="Bomb3x3Button" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/Bomb3x3Button"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/Bomb3x3Button"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="LineBlastButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/LineBlastButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/LineBlastButton"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="TileSquasherButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/TileSquasherButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/TileSquasherButton"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="RowClearButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/RowClearButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/RowClearButton"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="ColumnClearButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/ColumnClearButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/ColumnClearButton"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -30.0
+offset_top = -30.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "0"
+horizontal_alignment = 2
+vertical_alignment = 2
 
 [node name="ShopUI" type="Control" parent="GameUI"]
 visible = false
@@ -390,5 +724,3 @@ layout_mode = 2
 text = "Awesome!"
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="GameUI/RewardNotification"]
-
-

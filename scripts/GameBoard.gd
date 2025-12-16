@@ -153,6 +153,66 @@ func _on_tile_clicked(tile):
 		print("GameBoard: Move processing blocked")
 		return
 
+	# Check if a booster is active
+	var game_ui = get_node("../GameUI")
+	if game_ui and game_ui.booster_mode_active:
+		var booster_type = game_ui.active_booster_type
+
+		if booster_type == "shuffle":
+			# Shuffle doesn't need tile selection - handled in button press
+			pass
+		elif booster_type == "swap":
+			# Swap needs 2 tiles
+			if game_ui.swap_first_tile == null:
+				# First tile selected
+				game_ui.swap_first_tile = tile.grid_position
+				tile.set_selected(true)
+				print("[GameBoard] Swap first tile selected: ", tile.grid_position, " - select second tile")
+				return  # Don't reset booster mode yet
+			else:
+				# Second tile selected
+				var first_pos = game_ui.swap_first_tile
+				var second_pos = tile.grid_position
+
+				# Deselect first tile
+				var first_tile = tiles[int(first_pos.x)][int(first_pos.y)]
+				if first_tile:
+					first_tile.set_selected(false)
+
+				await activate_swap_booster(int(first_pos.x), int(first_pos.y),
+				                            int(second_pos.x), int(second_pos.y))
+				game_ui.swap_first_tile = null
+		elif booster_type == "hammer":
+			await activate_hammer_booster(int(tile.grid_position.x), int(tile.grid_position.y))
+		elif booster_type == "chain_reaction":
+			await activate_chain_reaction_booster(int(tile.grid_position.x), int(tile.grid_position.y))
+		elif booster_type == "bomb_3x3":
+			await activate_bomb_3x3_booster(int(tile.grid_position.x), int(tile.grid_position.y))
+		elif booster_type == "line_blast":
+			await activate_line_blast_booster(game_ui.line_blast_direction,
+			                                   int(tile.grid_position.x), int(tile.grid_position.y))
+		elif booster_type == "tile_squasher":
+			await activate_tile_squasher_booster(int(tile.grid_position.x), int(tile.grid_position.y))
+		elif booster_type == "row_clear":
+			await activate_row_clear_booster(int(tile.grid_position.y))
+		elif booster_type == "column_clear":
+			await activate_column_clear_booster(int(tile.grid_position.x))
+
+		# Reset booster mode (unless swap waiting for second tile)
+		if not (booster_type == "swap" and game_ui.swap_first_tile != null):
+			game_ui.booster_mode_active = false
+			game_ui.active_booster_type = ""
+			game_ui.update_booster_ui()
+
+			# Reset all button colors
+			var all_buttons = [game_ui.hammer_button, game_ui.shuffle_button, game_ui.swap_button,
+			                   game_ui.chain_reaction_button, game_ui.bomb_3x3_button, game_ui.line_blast_button,
+			                   game_ui.tile_squasher_button, game_ui.row_clear_button, game_ui.column_clear_button]
+			for btn in all_buttons:
+				if btn:
+					btn.modulate = Color.WHITE
+		return
+
 	# Check if clicked tile is a special tile (7, 8, or 9)
 	var tile_type = GameManager.get_tile_at(tile.grid_position)
 	if tile_type >= 7 and tile_type <= 9:
@@ -188,7 +248,7 @@ func _on_tile_clicked(tile):
 			selected_tile = tile
 			tile.set_selected(true)
 
-func _on_tile_swiped(tile: Tile, direction: Vector2):
+func _on_tile_swiped(tile, direction: Vector2):
 	print("GameBoard received tile_swiped signal from tile at ", tile.grid_position, " direction: ", direction)
 
 	if GameManager.processing_moves:
@@ -218,7 +278,7 @@ func _on_tile_swiped(tile: Tile, direction: Vector2):
 	print("GameBoard: Swipe swap from ", tile.grid_position, " to ", target_pos)
 	await perform_swap(tile, target_tile)
 
-func perform_swap(tile1: Tile, tile2: Tile):
+func perform_swap(tile1, tile2):
 	GameManager.processing_moves = true
 	print("perform_swap: processing_moves = true")
 
@@ -905,3 +965,396 @@ func animate_refill():
 		for x in range(GameManager.GRID_WIDTH):
 			row.append(GameManager.grid[x][y])
 		print(row)
+
+# ============================================
+# Booster Activation Functions
+# ============================================
+
+func activate_shuffle_booster():
+	"""Activate shuffle booster - reorganizes entire board"""
+	if not RewardManager.use_booster("shuffle"):
+		print("[GameBoard] No shuffle boosters available!")
+		return
+
+	print("[GameBoard] Activating shuffle booster")
+	GameManager.processing_moves = true
+
+	# Shuffle until valid moves found
+	if GameManager.shuffle_until_moves_available():
+		await animate_shuffle()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] Shuffle booster complete")
+
+func activate_swap_booster(x1: int, y1: int, x2: int, y2: int):
+	"""Activate swap booster - swap any two tiles without adjacency requirement"""
+	if not RewardManager.use_booster("swap"):
+		print("[GameBoard] No swap boosters available!")
+		return
+
+	print("[GameBoard] Activating swap booster: (", x1, ",", y1, ") <-> (", x2, ",", y2, ")")
+	GameManager.processing_moves = true
+
+	# Check valid tiles
+	if GameManager.is_cell_blocked(x1, y1) or GameManager.is_cell_blocked(x2, y2):
+		print("[GameBoard] Cannot swap blocked tiles!")
+		GameManager.processing_moves = false
+		return
+
+	# Get tile references
+	var tile1 = tiles[x1][y1]
+	var tile2 = tiles[x2][y2]
+
+	if not tile1 or not tile2:
+		print("[GameBoard] Invalid tiles for swap!")
+		GameManager.processing_moves = false
+		return
+
+	# Swap in GameManager grid
+	var temp = GameManager.grid[x1][y1]
+	GameManager.grid[x1][y1] = GameManager.grid[x2][y2]
+	GameManager.grid[x2][y2] = temp
+
+	# Animate swap
+	var pos1 = grid_to_world_position(Vector2(x1, y1))
+	var pos2 = grid_to_world_position(Vector2(x2, y2))
+
+	var tween1 = tile1.animate_swap_to(pos2)
+	var tween2 = tile2.animate_swap_to(pos1)
+
+	# Update grid references
+	tiles[x1][y1] = tile2
+	tiles[x2][y2] = tile1
+	tile1.grid_position = Vector2(x2, y2)
+	tile2.grid_position = Vector2(x1, y1)
+
+	# Update tile types
+	tile1.update_type(GameManager.grid[x2][y2])
+	tile2.update_type(GameManager.grid[x1][y1])
+
+	if tween1:
+		await tween1.finished
+	if tween2:
+		await tween2.finished
+
+	# Check for matches after swap
+	var matches = GameManager.find_matches()
+	if matches.size() > 0:
+		await process_cascade()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] Swap booster complete")
+
+func activate_chain_reaction_booster(x: int, y: int):
+	"""Activate chain reaction booster - spreading explosion from selected tile"""
+	if not RewardManager.use_booster("chain_reaction"):
+		print("[GameBoard] No chain reaction boosters available!")
+		return
+
+	print("[GameBoard] Activating chain reaction booster at (", x, ",", y, ")")
+	GameManager.processing_moves = true
+
+	if GameManager.is_cell_blocked(x, y):
+		print("[GameBoard] Cannot use chain reaction on blocked tile!")
+		GameManager.processing_moves = false
+		return
+
+	# Wave 1: Center tile
+	var wave1 = [Vector2(x, y)]
+	await highlight_special_activation(wave1)
+	await animate_destroy_tiles(wave1)
+	for pos in wave1:
+		GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+	await get_tree().create_timer(0.3).timeout
+
+	# Wave 2: Adjacent tiles (4 directions)
+	var wave2 = []
+	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
+	for dir in directions:
+		var nx = x + int(dir.x)
+		var ny = y + int(dir.y)
+		if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
+			if not GameManager.is_cell_blocked(nx, ny) and GameManager.grid[nx][ny] > 0:
+				wave2.append(Vector2(nx, ny))
+
+	# Declare wave3 here so it's in scope for the total calculation later
+	var wave3 = []
+
+	if wave2.size() > 0:
+		await highlight_special_activation(wave2)
+		await animate_destroy_tiles(wave2)
+		for pos in wave2:
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		await get_tree().create_timer(0.3).timeout
+
+		# Wave 3: Their adjacent tiles
+		for pos in wave2:
+			for dir in directions:
+				var nx = int(pos.x) + int(dir.x)
+				var ny = int(pos.y) + int(dir.y)
+				if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
+					if not GameManager.is_cell_blocked(nx, ny) and GameManager.grid[nx][ny] > 0:
+						var vec = Vector2(nx, ny)
+						if not wave3.has(vec):
+							wave3.append(vec)
+
+		if wave3.size() > 0:
+			await highlight_special_activation(wave3)
+			await animate_destroy_tiles(wave3)
+			for pos in wave3:
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+	# Calculate total score
+	var total_destroyed = wave1.size() + wave2.size() + wave3.size()
+	var points = GameManager.calculate_points(total_destroyed)
+	GameManager.add_score(points)
+
+	await animate_gravity()
+	await animate_refill()
+	await process_cascade()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] Chain reaction booster complete - destroyed ", total_destroyed, " tiles")
+
+func activate_bomb_3x3_booster(x: int, y: int):
+	"""Activate 3x3 bomb booster - destroys 3x3 area around selected tile"""
+	if not RewardManager.use_booster("bomb_3x3"):
+		print("[GameBoard] No 3x3 bomb boosters available!")
+		return
+
+	print("[GameBoard] Activating 3x3 bomb booster at (", x, ",", y, ")")
+	GameManager.processing_moves = true
+
+	if GameManager.is_cell_blocked(x, y):
+		print("[GameBoard] Cannot use bomb on blocked tile!")
+		GameManager.processing_moves = false
+		return
+
+	# Collect 3x3 area
+	var positions_to_clear = []
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var nx = x + dx
+			var ny = y + dy
+			if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
+				if not GameManager.is_cell_blocked(nx, ny):
+					positions_to_clear.append(Vector2(nx, ny))
+
+	print("[GameBoard] 3x3 Bomb will destroy ", positions_to_clear.size(), " tiles")
+
+	if positions_to_clear.size() > 0:
+		await highlight_special_activation(positions_to_clear)
+		await animate_destroy_tiles(positions_to_clear)
+
+		for pos in positions_to_clear:
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		var points = GameManager.calculate_points(positions_to_clear.size())
+		GameManager.add_score(points)
+
+		await animate_gravity()
+		await animate_refill()
+		await process_cascade()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] 3x3 bomb booster complete")
+
+var line_blast_mode = ""  # "horizontal" or "vertical"
+
+func activate_line_blast_booster(direction: String, center_x: int, center_y: int):
+	"""Activate line blast booster - clears 3 rows or 3 columns"""
+	if not RewardManager.use_booster("line_blast"):
+		print("[GameBoard] No line blast boosters available!")
+		return
+
+	print("[GameBoard] Activating line blast booster: ", direction, " at (", center_x, ",", center_y, ")")
+	GameManager.processing_moves = true
+
+	var positions_to_clear = []
+
+	if direction == "horizontal":
+		# Clear 3 rows centered on center_y
+		for row_offset in range(-1, 2):
+			var target_y = center_y + row_offset
+			if target_y >= 0 and target_y < GameManager.GRID_HEIGHT:
+				for x in range(GameManager.GRID_WIDTH):
+					if not GameManager.is_cell_blocked(x, target_y):
+						positions_to_clear.append(Vector2(x, target_y))
+
+	elif direction == "vertical":
+		# Clear 3 columns centered on center_x
+		for col_offset in range(-1, 2):
+			var target_x = center_x + col_offset
+			if target_x >= 0 and target_x < GameManager.GRID_WIDTH:
+				for y in range(GameManager.GRID_HEIGHT):
+					if not GameManager.is_cell_blocked(target_x, y):
+						positions_to_clear.append(Vector2(target_x, y))
+
+	print("[GameBoard] Line blast will destroy ", positions_to_clear.size(), " tiles")
+
+	if positions_to_clear.size() > 0:
+		await highlight_special_activation(positions_to_clear)
+		await animate_destroy_tiles(positions_to_clear)
+
+		for pos in positions_to_clear:
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		var points = GameManager.calculate_points(positions_to_clear.size())
+		GameManager.add_score(points)
+
+		await animate_gravity()
+		await animate_refill()
+		await process_cascade()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] Line blast booster complete")
+
+func activate_hammer_booster(x: int, y: int):
+	"""Activate hammer booster on a single tile"""
+	if not RewardManager.use_booster("hammer"):
+		print("[GameBoard] No hammer boosters available!")
+		return
+
+	print("[GameBoard] Activating hammer booster on tile (", x, ",", y, ")")
+	GameManager.processing_moves = true
+
+	# Check if it's a valid tile (not blocked)
+	if GameManager.is_cell_blocked(x, y):
+		print("[GameBoard] Cannot use hammer on blocked tile!")
+		GameManager.processing_moves = false
+		return
+
+	var positions_to_clear = [Vector2(x, y)]
+
+	if positions_to_clear.size() > 0:
+		await highlight_special_activation(positions_to_clear)
+		await animate_destroy_tiles(positions_to_clear)
+
+		for pos in positions_to_clear:
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		var points = GameManager.calculate_points(positions_to_clear.size())
+		GameManager.add_score(points)
+
+		await animate_gravity()
+		await animate_refill()
+		await process_cascade()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] Hammer booster complete")
+
+func activate_tile_squasher_booster(x: int, y: int):
+	"""Activate tile squasher booster - removes all tiles of the same type as selected"""
+	if not RewardManager.use_booster("tile_squasher"):
+		print("[GameBoard] No tile squasher boosters available!")
+		return
+
+	print("[GameBoard] Activating tile squasher booster on tile (", x, ",", y, ")")
+	GameManager.processing_moves = true
+
+	# Check if it's a valid tile (not blocked)
+	if GameManager.is_cell_blocked(x, y):
+		print("[GameBoard] Cannot use tile squasher on blocked tile!")
+		GameManager.processing_moves = false
+		return
+
+	# Get the tile type at the selected position
+	var target_type = GameManager.get_tile_at(Vector2(x, y))
+
+	# Skip special tiles (types 7, 8, 9)
+	if target_type >= 7:
+		print("[GameBoard] Cannot use tile squasher on special tiles!")
+		GameManager.processing_moves = false
+		return
+
+	# Find all tiles of the same type
+	var positions_to_clear = []
+	for grid_x in range(GameManager.GRID_WIDTH):
+		for grid_y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(grid_x, grid_y):
+				var tile_type = GameManager.get_tile_at(Vector2(grid_x, grid_y))
+				if tile_type == target_type:
+					positions_to_clear.append(Vector2(grid_x, grid_y))
+
+	print("[GameBoard] Tile squasher will destroy ", positions_to_clear.size(), " tiles of type ", target_type)
+
+	if positions_to_clear.size() > 0:
+		await highlight_special_activation(positions_to_clear)
+		await animate_destroy_tiles(positions_to_clear)
+
+		for pos in positions_to_clear:
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		var points = GameManager.calculate_points(positions_to_clear.size())
+		GameManager.add_score(points)
+
+		await animate_gravity()
+		await animate_refill()
+		await process_cascade()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] Tile squasher booster complete")
+
+func activate_row_clear_booster(row: int):
+	"""Activate row clear booster on specified row"""
+	if not RewardManager.use_booster("row_clear"):
+		print("[GameBoard] No row clear boosters available!")
+		return
+
+	print("[GameBoard] Activating row clear booster on row ", row)
+	GameManager.processing_moves = true
+
+	var positions_to_clear = []
+	for x in range(GameManager.GRID_WIDTH):
+		if not GameManager.is_cell_blocked(x, row):
+			positions_to_clear.append(Vector2(x, row))
+
+	if positions_to_clear.size() > 0:
+		await highlight_special_activation(positions_to_clear)
+		await animate_destroy_tiles(positions_to_clear)
+
+		for pos in positions_to_clear:
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		var points = GameManager.calculate_points(positions_to_clear.size())
+		GameManager.add_score(points)
+
+		await animate_gravity()
+		await animate_refill()
+		await process_cascade()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] Row clear booster complete")
+
+func activate_column_clear_booster(column: int):
+	"""Activate column clear booster on specified column"""
+	if not RewardManager.use_booster("column_clear"):
+		print("[GameBoard] No column clear boosters available!")
+		return
+
+	print("[GameBoard] Activating column clear booster on column ", column)
+	GameManager.processing_moves = true
+
+	var positions_to_clear = []
+	for y in range(GameManager.GRID_HEIGHT):
+		if not GameManager.is_cell_blocked(column, y):
+			positions_to_clear.append(Vector2(column, y))
+
+	if positions_to_clear.size() > 0:
+		await highlight_special_activation(positions_to_clear)
+		await animate_destroy_tiles(positions_to_clear)
+
+		for pos in positions_to_clear:
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		var points = GameManager.calculate_points(positions_to_clear.size())
+		GameManager.add_score(points)
+
+		await animate_gravity()
+		await animate_refill()
+		await process_cascade()
+
+	GameManager.processing_moves = false
+	print("[GameBoard] Column clear booster complete")

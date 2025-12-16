@@ -6,7 +6,9 @@
 
 ## Overview
 
-DroidAdMob is a custom Java-based AdMob plugin for Godot 4.5+ with full GDPR compliance. It provides banner ads, interstitial ads, and rewarded video ads with built-in EU/EEA consent management.
+DroidAdMob is a custom Java-based AdMob plugin for Godot 4.5+ with full GDPR compliance. It provides banner ads, interstitial ads, and rewarded video ads with built-in EU/EEA consent management. This guide covers installation, usage, App ID & ad unit configuration, GDPR, testing, production setup, troubleshooting and plugin rebuild instructions.
+
+---
 
 ## Features
 
@@ -27,9 +29,12 @@ DroidAdMob is a custom Java-based AdMob plugin for Godot 4.5+ with full GDPR com
 - ✅ **Desktop simulation** (2-second fake ads)
 - ✅ **Easy GDScript API** through wrapper class
 
+---
+
 ## Installation
 
-The plugin is already installed at `addons/droid_admob/`:
+The plugin is installed at `addons/droid_admob/`:
+
 ```
 addons/droid_admob/
 ├── admob.gd                      # GDScript wrapper class
@@ -40,19 +45,20 @@ addons/droid_admob/
     └── release/DroidAdMob-release.aar
 ```
 
-**Plugin is enabled** in `Project > Project Settings > Plugins`
+Enable the plugin in Godot: `Project > Project Settings > Plugins` (ensure `DroidAdMob` is enabled in `export_presets.cfg`).
+
+---
 
 ## Quick Start
 
-### 1. Basic Usage (AdMobManager.gd already implemented)
-
-The game already has `AdMobManager.gd` which handles:
+### 1. AdMobManager (already implemented)
+The game includes `scripts/AdMobManager.gd` which handles:
 - GDPR consent flow
 - Ad loading and showing
 - Reward callbacks
-- Desktop test mode
+- Desktop test mode behavior
 
-### 2. Using in Your Code
+### 2. Example Usage
 
 ```gdscript
 # Get the AdMobManager singleton
@@ -75,6 +81,8 @@ func _on_reward_granted():
 func _on_ad_reward(reward_type: String, amount: int):
     print("Rewarded: ", amount, " ", reward_type)
 ```
+
+---
 
 ## API Reference
 
@@ -122,227 +130,167 @@ signal user_earned_reward(reward_type: String, reward_amount: int)
 signal consent_ready  # Emitted when consent flow completes
 ```
 
-## GDPR Compliance
+---
 
-### How It Works
+## App ID vs Ad Unit IDs — What goes where
 
-1. **On first launch**, the plugin requests consent information
-2. **If in EU/EEA**, a consent form is shown automatically
-3. **User responds** to consent form
-4. **Ads initialize** after consent is obtained/not required
-5. **Privacy options** available in settings if needed
+- **App ID (AndroidManifest.xml)** identifies your app to the AdMob SDK and uses the tilde `~` format:
+  - `ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY`
+  - This must be present in the merged Android manifest at build time.
 
-### Implementation (Already Done)
+- **Ad Unit IDs (GDScript code)** identify specific ad placements and use the slash `/` format:
+  - `ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY`
+  - These are used in `scripts/AdMobManager.gd` when loading ads.
 
-The `AdMobManager.gd` already implements:
-- Consent flow on startup
-- Consent form handling
-- Ad initialization after consent
-- Desktop test mode bypass
+**Notice:** App ID uses `~` (tilde), Ad Unit IDs use `/` (slash).
 
-### For Settings Menu
+---
 
-Add a privacy settings button if required:
+## Where App ID Is Currently Defined (project)
 
-```gdscript
-# In your settings menu
-func _ready():
-    var admob_manager = get_node("/root/AdMobManager")
-    
-    if admob_manager.is_privacy_options_required():
-        # Show privacy settings button
-        privacy_button.visible = true
-        privacy_button.pressed.connect(_on_privacy_pressed)
+1. **Embedded in plugin AAR** (default/test):
+   - `addons/droid_admob/bin/debug/DroidAdMob-debug.aar`
+   - `addons/droid_admob/bin/release/DroidAdMob-release.aar`
 
-func _on_privacy_pressed():
-    var admob_manager = get_node("/root/AdMobManager")
-    admob_manager.show_privacy_options_form()
+   Each AAR contains an `AndroidManifest.xml` with a `meta-data` entry for `com.google.android.gms.ads.APPLICATION_ID` (currently set to Google's test App ID inside the provided AARs).
+
+2. **Merged Manifest**
+   - During the build the plugin manifest is merged into the app manifest (see `android/build/.../merged_manifests/.../AndroidManifest.xml`).
+
+---
+
+## How to Set Your Real App ID
+
+You have two approaches depending on whether you can rebuild the plugin AAR:
+
+### Option 1 — Rebuild the Plugin AAR (Recommended)
+
+1. Edit the plugin source's `AndroidManifest.xml` and set:
+```xml
+<meta-data
+    android:name="com.google.android.gms.ads.APPLICATION_ID"
+    android:value="ca-app-pub-YOUR_PUBLISHER_ID~YOUR_APP_ID" />
 ```
+2. Rebuild the plugin AARs (`./gradlew assembleDebug` / `assembleRelease`) in the plugin project.
+3. Replace AARs in `addons/droid_admob/bin/debug/` and `addons/droid_admob/bin/release/`.
 
-### Consent Status Codes
+This ensures the correct App ID is embedded in the plugin manifest and merged at build time.
 
-| Code | Status | Meaning |
-|------|--------|---------|
-| 0 | UNKNOWN | Consent status not yet determined |
-| 1 | NOT_REQUIRED | User not in EU/EEA, no consent needed |
-| 2 | REQUIRED | User in EU/EEA, consent required |
-| 3 | OBTAINED | User has provided consent |
+### Option 2 — Override via Godot Android Build Template
 
-## Testing
+If you cannot rebuild the AAR, override the App ID using Godot's Android custom build template:
+
+1. Install Android build template in Godot: `Project > Install Android Build Template` (creates `android/build/`).
+2. Edit `android/build/AndroidManifest.xml` and add inside `<application>`:
+```xml
+<meta-data
+    android:name="com.google.android.gms.ads.APPLICATION_ID"
+    android:value="ca-app-pub-YOUR_PUBLISHER_ID~YOUR_APP_ID"
+    tools:replace="android:value" />
+```
+3. Ensure the `tools` namespace is declared on the root `<manifest>`:
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+```
+4. Enable Gradle builds in your export preset (Use Gradle Build).
+
+This will override the plugin-provided App ID during manifest merging.
+
+---
+
+## Complete Setup Checklist
+
+- [ ] Get your AdMob **App ID** (`ca-app-pub-...~...`) from AdMob console
+- [ ] Get your Ad Unit IDs (`ca-app-pub-.../...`) for each ad type
+- [ ] Choose App ID approach (Rebuild AAR or override manifest)
+- [ ] Update Ad Unit IDs in `scripts/AdMobManager.gd` (replace test IDs)
+- [ ] Disable test mode in `AdMobManager.gd` (`admob.initialize(false)`)
+- [ ] Build and test on real device
+- [ ] Verify consent flow and rewarded callbacks
+
+---
+
+## Testing & Development
 
 ### Desktop Testing
 - Run game in Godot Editor (F5)
-- Simulates 2-second ad with automatic reward
-- No actual ads shown
-- Consent flow skipped
+- Desktop simulates a 2-second fake ad with automatic reward
+- Consent flow is bypassed in desktop mode
 
 ### Android Testing (Test Mode)
+
+`AdMobManager.gd` is configured for test mode by default for safe development:
 ```gdscript
-# AdMobManager.gd is configured for test mode:
 admob.initialize(true)  # true = test ads
 admob.request_consent_info_update(false, "")  # Production consent
 ```
 
-**Test Ad Units** (already configured):
+**Test Ad Units** (already configured in code):
 - Rewarded Video: `ca-app-pub-3940256099942544/5224354917`
 
-### Testing EEA Consent Flow
+#### Testing EEA consent flow
+1. Get device test id (`adb logcat | grep "ConsentDebugSettings"`).
+2. Call `admob.request_consent_info_update(true, "YOUR_DEVICE_ID")` to enable debug consent.
+3. Reset consent with `get_node("/root/AdMobManager").reset_consent()` to retest.
 
-1. Get your device ID from logcat:
-```bash
-adb logcat | grep "ConsentDebugSettings"
-# Look for: addTestDeviceHashedId("YOUR_DEVICE_ID")
-```
-
-2. Update `AdMobManager.gd`:
-```gdscript
-# Change this line:
-admob.request_consent_info_update(false, "")
-
-# To this (with your device ID):
-admob.request_consent_info_update(true, "YOUR_DEVICE_ID")
-```
-
-3. Run on device - consent form will appear
-
-4. Reset consent for testing:
-```gdscript
-# In Godot debugger or code:
-get_node("/root/AdMobManager").reset_consent()
-# Then restart app
-```
+---
 
 ## Production Setup
 
-Before publishing to Play Store:
+1. Create your app and ad units in the AdMob Console
+2. Update App ID (Option 1 or 2 above)
+3. Update Ad Unit IDs in `scripts/AdMobManager.gd`
+4. Disable test mode (`admob.initialize(false)`)
+5. Keep consent request in production mode: `admob.request_consent_info_update(false, "")`
+6. Build release APK and verify on real device
 
-### 1. Get Real Ad Units
-1. Create app in [AdMob Console](https://apps.admob.com/)
-2. Create ad units for each ad type
-3. Copy ad unit IDs
-
-### 2. Update AdMobManager.gd
-
-```gdscript
-# Change test mode to false:
-admob.initialize(false)  # false = real ads
-
-# Replace test ad units:
-func load_rewarded_ad():
-    # Replace this:
-    var ad_unit_id = admob.get_test_rewarded_ad_unit()
-    
-    # With your real ad unit:
-    var ad_unit_id = "ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY"
-    
-    admob.load_rewarded(ad_unit_id)
-```
-
-### 3. Update AndroidManifest.xml
-
-Replace test App ID with your real App ID:
-
-```xml
-<!-- In android/build/AndroidManifest.xml -->
-<meta-data
-    android:name="com.google.android.gms.ads.APPLICATION_ID"
-    android:value="ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY"
-    tools:replace="android:value"/>
-```
-
-### 4. Consent Configuration
-
-Keep consent in production mode:
-```gdscript
-# Keep this as is for production:
-admob.request_consent_info_update(false, "")  # Production mode
-```
-
-### 5. Build & Test
-
+Build & test commands:
 ```bash
 # Build release APK
 ./build-android.sh
 
-# Test on real device
-adb install builds/match3-game-debug.apk
+# Install and view logs
+adb install -r builds/match3-game-debug.apk
 adb logcat | grep -E "AdMob|DroidAdMob"
 ```
+
+---
 
 ## Troubleshooting
 
 ### Ads Not Showing
-
-**Desktop**: Normal - desktop uses test mode simulation  
-**Android**: 
-1. Check internet connection
-2. Verify ad unit IDs are correct
-3. Check consent status: `get_consent_status()`
-4. Look for errors in logcat
+- Desktop: normal (simulation only)
+- Android:
+  1. Check internet connection
+  2. Verify your ad unit IDs
+  3. Check consent status via `get_consent_status()`
+  4. Inspect `adb logcat` for errors
 
 ### Consent Form Not Appearing
+- Consent shows only for EU/EEA users
+- Use test consent flow to force form for your device
 
-1. **Not in EEA**: Consent only shows for EU/EEA users
-2. **Already consented**: Consent saved from previous run
-3. **Test mode**: Enable EEA test mode (see Testing section)
-4. **Reset**: Use `reset_consent()` to test again
+### Common Build Errors
+- `DroidAdMob not found` — plugin disabled or missing AAR
+- `AAR file not found` — ensure `addons/droid_admob/bin/` contains the AARs
 
-### Build Errors
+---
 
-**"DroidAdMob not found"**:
-- Plugin not enabled in Godot Editor
-- Clear .godot cache and reimport
+## Plugin Rebuild & Update
 
-**"AAR file not found"**:
-- Check `addons/droid_admob/bin/` has AAR files
-- Rebuild if necessary
+If you need to rebuild the plugin (have source):
 
-## Technical Details
-
-### Architecture
-```
-Game Code (AdMobManager.gd)
-    ↓
-AdMob Wrapper (admob.gd)
-    ↓
-Java Plugin (DroidAdMob.aar)
-    ↓
-Google Mobile Ads SDK v22.6.0
-User Messaging Platform SDK v2.1.0
-```
-
-### Dependencies
-- `com.google.android.gms:play-services-ads:22.6.0`
-- `com.google.android.ump:user-messaging-platform:2.1.0`
-
-### Platform Requirements
-- Android API 21+ (Lollipop 5.0)
-- Target API 34
-- Internet permission (auto-added)
-
-### Plugin Location
-- Folder: `addons/droid_admob/`
-- Enabled in: `Project > Project Settings > Plugins`
-- Export config: `export_presets.cfg` (plugins/DroidAdMob=true)
-
-## Support & Updates
-
-### Updating Plugin
-
-If you need to rebuild the plugin:
-
-1. Navigate to plugin source:
-```bash
-cd /Users/sal76/src/Godot-Android-Plugin-Template
-```
-
-2. Build plugin:
+1. Open plugin source repository
+2. Set `JAVA_HOME` (example):
 ```bash
 export JAVA_HOME=/opt/homebrew/Cellar/openjdk@21/21.0.9/
+```
+3. Build plugin:
+```bash
 ./gradlew clean build
 ```
-
-3. Copy to game:
+4. Copy AARs into the project:
 ```bash
 cp plugin/build/outputs/aar/DroidAdMob-release.aar \
    ~/src/match-3-game/addons/droid_admob/bin/release/
@@ -350,7 +298,10 @@ cp plugin/build/outputs/aar/DroidAdMob-debug.aar \
    ~/src/match-3-game/addons/droid_admob/bin/debug/
 ```
 
-### Resources
+---
+
+## Troubleshooting & Support Resources
+
 - [AdMob Console](https://apps.admob.com/)
 - [Google UMP SDK Docs](https://developers.google.com/admob/ump/android/quick-start)
 - [AdMob Policy](https://support.google.com/admob/answer/6128543)
@@ -358,7 +309,6 @@ cp plugin/build/outputs/aar/DroidAdMob-debug.aar \
 
 ---
 
-**Last Updated**: December 12, 2024  
-**Plugin**: DroidAdMob v1.0  
+**Last Updated**: December 16, 2025
+**Plugin**: DroidAdMob v1.0
 **Status**: Production Ready ✅
-

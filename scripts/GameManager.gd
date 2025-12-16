@@ -208,6 +208,12 @@ func is_cell_blocked(x: int, y: int) -> bool:
 	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT:
 		return true
 
+	# Check if grid is properly initialized
+	if grid.size() <= x:
+		return true
+	if grid[x].size() <= y:
+		return true
+
 	return grid[x][y] == -1
 
 func is_valid_position(pos: Vector2) -> bool:
@@ -548,6 +554,17 @@ func use_move():
 		last_level_number = level
 		last_level_moves_left = 0
 		_attempt_level_failed()
+
+func add_moves(amount: int):
+	"""Add moves to the current game (e.g., from purchasing extra moves)"""
+	moves_left += amount
+	emit_signal("moves_changed", moves_left)
+	print("[GameManager] Added %d moves. New total: %d" % [amount, moves_left])
+
+	# If level was previously failed due to no moves, cancel pending failure
+	if pending_level_failed:
+		pending_level_failed = false
+		print("[GameManager] Cancelled pending level failure - extra moves added")
 
 func reset_combo():
 	combo_count = 0
