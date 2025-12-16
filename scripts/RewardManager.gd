@@ -23,10 +23,14 @@ var last_life_regen_time: float = 0.0
 var boosters = {
 	"hammer": 0,
 	"shuffle": 0,
+	"swap": 0,
+	"chain_reaction": 0,
+	"bomb_3x3": 0,
+	"line_blast": 0,
 	"row_clear": 0,
 	"column_clear": 0,
 	"extra_moves": 0,
-	"color_reducer": 0
+	"tile_squasher": 0
 }
 
 # Progression data
@@ -157,11 +161,16 @@ func get_time_until_next_life() -> float:
 # ============================================
 
 func add_booster(booster_type: String, amount: int = 1):
+	print("[RewardManager] add_booster called: ", booster_type, " amount: ", amount)
+	print("[RewardManager] boosters.has(", booster_type, "): ", boosters.has(booster_type))
 	if boosters.has(booster_type):
 		boosters[booster_type] += amount
+		print("[RewardManager] Emitting booster_changed signal for: ", booster_type, " new value: ", boosters[booster_type])
 		booster_changed.emit(booster_type, boosters[booster_type])
 		save_progress()
 		print("[RewardManager] +%d %s. Total: %d" % [amount, booster_type, boosters[booster_type]])
+	else:
+		print("[RewardManager] ERROR: Booster type not found: ", booster_type)
 
 func use_booster(booster_type: String) -> bool:
 	if boosters.has(booster_type) and boosters[booster_type] > 0:
@@ -382,10 +391,14 @@ func reset_progress():
 	boosters = {
 		"hammer": 0,
 		"shuffle": 0,
+		"swap": 0,
+		"chain_reaction": 0,
+		"bomb_3x3": 0,
+		"line_blast": 0,
 		"row_clear": 0,
 		"column_clear": 0,
 		"extra_moves": 0,
-		"color_reducer": 0
+		"tile_squasher": 0
 	}
 	daily_streak = 0
 	last_login_date = ""

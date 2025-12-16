@@ -14,10 +14,14 @@ signal item_purchased(item_type: String, cost_type: String, cost_amount: int)
 const BOOSTER_PRICES = {
 	"hammer": 150,
 	"shuffle": 100,
+	"swap": 175,
+	"chain_reaction": 325,
+	"bomb_3x3": 275,
+	"line_blast": 400,
 	"row_clear": 250,
 	"column_clear": 250,
 	"extra_moves": 200,
-	"color_reducer": 400
+	"tile_squasher": 400
 }
 
 # Lives refill price (gems)
@@ -47,10 +51,14 @@ func _setup_shop_items():
 	# Add booster items
 	_add_shop_item("Hammer", "🔨", "Destroy any tile", BOOSTER_PRICES["hammer"], "coins", "hammer")
 	_add_shop_item("Shuffle", "🔀", "Reorganize board", BOOSTER_PRICES["shuffle"], "coins", "shuffle")
+	_add_shop_item("Swap Tiles", "🔄", "Swap any 2 tiles", BOOSTER_PRICES["swap"], "coins", "swap")
+	_add_shop_item("Chain Reaction", "⚡", "Spreading explosion", BOOSTER_PRICES["chain_reaction"], "coins", "chain_reaction")
+	_add_shop_item("3x3 Bomb", "💣", "Destroy 3x3 area", BOOSTER_PRICES["bomb_3x3"], "coins", "bomb_3x3")
+	_add_shop_item("Line Blast", "📏", "Clear 3 rows or columns", BOOSTER_PRICES["line_blast"], "coins", "line_blast")
 	_add_shop_item("Row Clear", "↔️", "Clear entire row", BOOSTER_PRICES["row_clear"], "coins", "row_clear")
 	_add_shop_item("Column Clear", "↕️", "Clear entire column", BOOSTER_PRICES["column_clear"], "coins", "column_clear")
-	_add_shop_item("Extra Moves", "➕", "Start with +5 moves", BOOSTER_PRICES["extra_moves"], "coins", "extra_moves")
-	_add_shop_item("Color Reducer", "🎨", "Remove 1 tile type", BOOSTER_PRICES["color_reducer"], "coins", "color_reducer")
+	_add_shop_item("Extra Moves", "➕", "Add 10 moves instantly", BOOSTER_PRICES["extra_moves"], "coins", "extra_moves")
+	_add_shop_item("Tile Squasher", "💥", "Remove all tiles of same type", BOOSTER_PRICES["tile_squasher"], "coins", "tile_squasher")
 
 func _add_shop_item(item_name: String, icon: String, description: String, cost: int, cost_type: String, item_id: String):
 	"""Add a shop item to the container"""
@@ -84,8 +92,8 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 	desc_label.modulate = Color(0.8, 0.8, 0.8)
 	info_vbox.add_child(desc_label)
 
-	# Check if player owns any of this booster
-	if item_id != "lives_refill":
+	# Check if player owns any of this booster (skip for instant-use items)
+	if item_id != "lives_refill" and item_id != "extra_moves":
 		var owned = RewardManager.get_booster_count(item_id)
 		if owned > 0:
 			var owned_label = Label.new()
@@ -138,6 +146,13 @@ func _on_buy_pressed(item_id: String, cost: int, cost_type: String):
 		if item_id == "lives_refill":
 			RewardManager.refill_lives()
 			print("[Shop] Purchased lives refill")
+		elif item_id == "extra_moves":
+			# Extra moves: immediately add 10 moves to current game
+			if GameManager:
+				GameManager.add_moves(10)
+				print("[Shop] Purchased extra moves: +10 moves added")
+			else:
+				print("[Shop] Warning: GameManager not available, cannot add moves")
 		else:
 			RewardManager.add_booster(item_id, 1)
 			print("[Shop] Purchased booster: %s" % item_id)

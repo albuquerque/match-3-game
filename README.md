@@ -8,6 +8,7 @@ A polished match-3 puzzle game built with Godot 4.5, featuring progressive diffi
 - **10 Progressive Levels** with unique board layouts and challenges
 - **Match-3 Mechanics** with intuitive swipe controls
 - **Power-Up Tiles** - Horizontal/vertical clearers and bombs
+- **9 Unique Boosters** - Hammer, Shuffle, Swap, Chain Reaction, Bomb 3×3, Line Blast, Tile Squasher, Row Clear, Column Clear
 - **Auto-Shuffle** when no valid moves remain
 - **Move-Based Scoring** with level targets
 
@@ -175,13 +176,21 @@ Layout codes:
 
 For complete documentation, see the [docs/](docs/) directory:
 
+### Core Documentation
 - **[Documentation Index](docs/README.md)** - Complete documentation overview
 - **[Features](docs/FEATURES.md)** - All implemented game features
 - **[Development Guide](docs/DEVELOPMENT_GUIDE.md)** - Build and deployment instructions
-- **[AdMob Guide](docs/ADMOB_GUIDE.md)** - Plugin usage, API, and GDPR compliance
+
+### Game Systems
+- **[Boosters Implementation](docs/BOOSTERS_IMPLEMENTATION.md)** - Complete booster system guide
 - **[Level System](docs/LEVELS_README.md)** - Level configuration guide
 - **[Reward System](docs/REWARD_SYSTEM_README.md)** - Lives, coins, and rewards
 - **[Theme System](docs/THEME_SYSTEM_README.md)** - Visual themes
+
+### Integration & Technical
+- **[AdMob Guide](docs/ADMOB_GUIDE.md)** - Plugin usage, API, and GDPR compliance
+- **[Build Fixes](docs/ANDROID_BUILD_FIXES.md)** - Android build troubleshooting
+- **[Error Fixes](docs/ARRAY_ACCESS_FIX.md)** - Common error resolutions
 
 ## 🎮 Quick Start
 

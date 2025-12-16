@@ -12,7 +12,7 @@ signal user_earned_reward(reward_type: String, reward_amount: int)
 # Consent signals
 signal consent_ready
 
-var admob: AdMob = null
+var admob = null  # AdMob instance (created at runtime)
 var is_initialized = false
 var is_rewarded_ad_loaded = false
 var pending_reward_callback: Callable

@@ -115,7 +115,7 @@ RewardManager.get_booster_count(booster_type: String) -> int
 - `"row_clear"` - Clear entire row
 - `"column_clear"` - Clear entire column
 - `"extra_moves"` - Start with +5 moves
-- `"color_reducer"` - Remove 1 tile type
+- `"tile_squasher"` - Remove all tiles of same type
 
 ### Level Completion
 ```gdscript
@@ -162,7 +162,7 @@ The player progress is saved in JSON format at `user://player_progress.json`:
     "row_clear": 0,
     "column_clear": 0,
     "extra_moves": 0,
-    "color_reducer": 0
+    "tile_squasher": 0
   },
   "daily_streak": 1,
   "last_login_date": "2024-12-08",
