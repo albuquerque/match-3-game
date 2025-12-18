@@ -18,7 +18,9 @@ func _await_tweens_with_timeout(tweens: Array, timeout: float = 2.0) -> void:
 		# Connect finished to set flag
 		local_tween.finished.connect(func(): finished_map[local_tween] = true)
 
-	var start_time = Time.get_ticks_msec()
+	var start_time = 0
+	var attempts = 0
+	var max_attempts = int(timeout / 0.05)
 	while true:
 		var all_done = true
 		for t in finished_map.keys():
@@ -27,12 +29,12 @@ func _await_tweens_with_timeout(tweens: Array, timeout: float = 2.0) -> void:
 				break
 		if all_done:
 			break
-		var elapsed = (Time.get_ticks_msec() - start_time) / 1000.0
-		if elapsed >= timeout:
+		if attempts >= max_attempts:
 			print("[WARNING] Tween wait timed out after ", timeout, "s")
 			break
 		if get_tree() == null:
 			break
+		attempts += 1
 		await get_tree().create_timer(0.05).timeout
 
 var tiles = []
@@ -55,7 +57,12 @@ func _ready():
 
 	calculate_responsive_layout()
 	setup_background()
-	create_visual_grid()
+
+	# Only create visual grid if GameManager has initialized a level; otherwise wait for level_loaded
+	if Engine.has_singleton("GameManager") and GameManager.initialized:
+		create_visual_grid()
+	else:
+		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
 
 func calculate_responsive_layout():
 	var viewport = get_viewport()
@@ -154,63 +161,65 @@ func _on_tile_clicked(tile):
 		return
 
 	# Check if a booster is active
-	var game_ui = get_node("../GameUI")
-	if game_ui and game_ui.booster_mode_active:
-		var booster_type = game_ui.active_booster_type
+	var game_ui = get_node_or_null("../GameUI")
+	# Only access GameUI-specific properties if the node is actually the GameUI scripted object
+	if game_ui and game_ui is GameUI:
+		if game_ui.booster_mode_active:
+			var booster_type = game_ui.active_booster_type
 
-		if booster_type == "shuffle":
-			# Shuffle doesn't need tile selection - handled in button press
-			pass
-		elif booster_type == "swap":
-			# Swap needs 2 tiles
-			if game_ui.swap_first_tile == null:
-				# First tile selected
-				game_ui.swap_first_tile = tile.grid_position
-				tile.set_selected(true)
-				print("[GameBoard] Swap first tile selected: ", tile.grid_position, " - select second tile")
-				return  # Don't reset booster mode yet
-			else:
-				# Second tile selected
-				var first_pos = game_ui.swap_first_tile
-				var second_pos = tile.grid_position
+			if booster_type == "shuffle":
+				# Shuffle doesn't need tile selection - handled in button press
+				pass
+			elif booster_type == "swap":
+				# Swap needs 2 tiles
+				if game_ui.swap_first_tile == null:
+					# First tile selected
+					game_ui.swap_first_tile = tile.grid_position
+					tile.set_selected(true)
+					print("[GameBoard] Swap first tile selected: ", tile.grid_position, " - select second tile")
+					return  # Don't reset booster mode yet
+				else:
+					# Second tile selected
+					var first_pos = game_ui.swap_first_tile
+					var second_pos = tile.grid_position
 
-				# Deselect first tile
-				var first_tile = tiles[int(first_pos.x)][int(first_pos.y)]
-				if first_tile:
-					first_tile.set_selected(false)
+					# Deselect first tile
+					var first_tile = tiles[int(first_pos.x)][int(first_pos.y)]
+					if first_tile:
+						first_tile.set_selected(false)
 
-				await activate_swap_booster(int(first_pos.x), int(first_pos.y),
-				                            int(second_pos.x), int(second_pos.y))
-				game_ui.swap_first_tile = null
-		elif booster_type == "hammer":
-			await activate_hammer_booster(int(tile.grid_position.x), int(tile.grid_position.y))
-		elif booster_type == "chain_reaction":
-			await activate_chain_reaction_booster(int(tile.grid_position.x), int(tile.grid_position.y))
-		elif booster_type == "bomb_3x3":
-			await activate_bomb_3x3_booster(int(tile.grid_position.x), int(tile.grid_position.y))
-		elif booster_type == "line_blast":
-			await activate_line_blast_booster(game_ui.line_blast_direction,
-			                                   int(tile.grid_position.x), int(tile.grid_position.y))
-		elif booster_type == "tile_squasher":
-			await activate_tile_squasher_booster(int(tile.grid_position.x), int(tile.grid_position.y))
-		elif booster_type == "row_clear":
-			await activate_row_clear_booster(int(tile.grid_position.y))
-		elif booster_type == "column_clear":
-			await activate_column_clear_booster(int(tile.grid_position.x))
+					await activate_swap_booster(int(first_pos.x), int(first_pos.y),
+										int(second_pos.x), int(second_pos.y))
+					game_ui.swap_first_tile = null
+			elif booster_type == "hammer":
+				await activate_hammer_booster(int(tile.grid_position.x), int(tile.grid_position.y))
+			elif booster_type == "chain_reaction":
+				await activate_chain_reaction_booster(int(tile.grid_position.x), int(tile.grid_position.y))
+			elif booster_type == "bomb_3x3":
+				await activate_bomb_3x3_booster(int(tile.grid_position.x), int(tile.grid_position.y))
+			elif booster_type == "line_blast":
+				await activate_line_blast_booster(game_ui.line_blast_direction,
+										int(tile.grid_position.x), int(tile.grid_position.y))
+			elif booster_type == "tile_squasher":
+				await activate_tile_squasher_booster(int(tile.grid_position.x), int(tile.grid_position.y))
+			elif booster_type == "row_clear":
+				await activate_row_clear_booster(int(tile.grid_position.y))
+			elif booster_type == "column_clear":
+				await activate_column_clear_booster(int(tile.grid_position.x))
 
-		# Reset booster mode (unless swap waiting for second tile)
-		if not (booster_type == "swap" and game_ui.swap_first_tile != null):
-			game_ui.booster_mode_active = false
-			game_ui.active_booster_type = ""
-			game_ui.update_booster_ui()
+			# Reset booster mode (unless swap waiting for second tile)
+			if not (booster_type == "swap" and game_ui.swap_first_tile != null):
+				game_ui.booster_mode_active = false
+				game_ui.active_booster_type = ""
+				game_ui.update_booster_ui()
 
-			# Reset all button colors
-			var all_buttons = [game_ui.hammer_button, game_ui.shuffle_button, game_ui.swap_button,
-			                   game_ui.chain_reaction_button, game_ui.bomb_3x3_button, game_ui.line_blast_button,
-			                   game_ui.tile_squasher_button, game_ui.row_clear_button, game_ui.column_clear_button]
-			for btn in all_buttons:
-				if btn:
-					btn.modulate = Color.WHITE
+				# Reset all button colors
+				var all_buttons = [game_ui.hammer_button, game_ui.shuffle_button, game_ui.swap_button,
+									   game_ui.chain_reaction_button, game_ui.bomb_3x3_button, game_ui.line_blast_button,
+									   game_ui.tile_squasher_button, game_ui.row_clear_button, game_ui.column_clear_button]
+				for btn in all_buttons:
+					if btn:
+						btn.modulate = Color.WHITE
 		return
 
 	# Check if clicked tile is a special tile (7, 8, or 9)
@@ -841,8 +850,8 @@ func _on_level_complete():
 				tween.tween_property(tiles[x][y], "modulate", Color.WHITE, 0.3)
 
 func _on_level_loaded():
-	# Rebuild the board when a new level is loaded
-	print("Level loaded, rebuilding board")
+	# Called when GameManager loads a level; recalc layout and create the visual grid
+	print("[GameBoard] _on_level_loaded() - creating visual grid for loaded level")
 	calculate_responsive_layout()
 	setup_background()
 	create_visual_grid()
