@@ -54,7 +54,11 @@ var pending_level_failed = false
 # Debugging
 var DEBUG_LOGGING = true
 
+# Flag to check if the game manager has been initialized
+var initialized = false
+
 func _ready():
+	print("[GameManager] _ready() - initializing. Current lives=", RewardManager.get_lives() if Engine.has_singleton("RewardManager") else "<no RewardManager>")
 	# Get the autoloaded LevelManager
 	level_manager = get_node_or_null("/root/LevelManager")
 	if not level_manager:
@@ -65,7 +69,9 @@ func _ready():
 	if not theme_manager:
 		print("[GameManager] WARNING: ThemeManager not found as autoload!")
 
-	initialize_game()
+	# Do NOT auto-initialize the game here. The UI will present a StartPage and call initialize_game() when the
+	# player explicitly starts the level so we don't consume a life automatically on app launch.
+	# initialize_game()
 
 func initialize_game():
 	score = 0
@@ -73,15 +79,18 @@ func initialize_game():
 	combo_count = 0
 	processing_moves = false
 	level_transitioning = false
+	# Do NOT set initialized here; set it after a level is actually loaded in load_current_level()
+
+	print("[GameManager] initialize_game() - lives=", RewardManager.get_lives(), ", current score=", score, ", moves_left=", moves_left)
 
 	# Check if player has lives
 	if RewardManager.get_lives() <= 0:
-		print("[GameManager] No lives available, showing out of lives dialog")
+		print("[GameManager] No lives available, aborting initialize_game()")
 		# The GameUI will handle showing the dialog
 		return
 
-	# Load the first level
-	load_current_level()
+	# Load the first level and wait for it to finish so callers can rely on initialized
+	await load_current_level()
 
 	emit_signal("score_changed", score)
 	emit_signal("level_changed", level)
@@ -93,15 +102,34 @@ func load_current_level():
 	score = 0  # Reset score for the new level
 	combo_count = 0  # Reset combo count
 
+	print("[GameManager] load_current_level() - attempting to consume a life. Current lives=", RewardManager.get_lives())
 	# Consume a life when starting a level
 	if not RewardManager.use_life():
-		print("[GameManager] No lives available!")
+		print("[GameManager] use_life() returned false - not loading level")
 		# Don't load level if no lives
 		return
 
-	var level_data = level_manager.get_current_level()
+	# Ensure LevelManager is available and has loaded levels (wait briefly if needed)
+	if not level_manager or (level_manager and level_manager.levels.size() == 0):
+		print("[GameManager] LevelManager not ready yet - waiting up to 2s for levels to load")
+		var attempts = 0
+		var max_attempts = 40  # 40 * 0.05s = 2s
+		while (not level_manager or level_manager.levels.size() == 0) and attempts < max_attempts:
+			level_manager = get_node_or_null("/root/LevelManager")
+			await get_tree().create_timer(0.05).timeout
+			attempts += 1
+		if attempts >= max_attempts:
+			print("[GameManager] Waited 2s but LevelManager did not become ready")
+
+	if not level_manager:
+		print("[GameManager] ERROR: LevelManager still not available after waiting; using fallback default level")
+
+	var level_data = null
+	if level_manager:
+		level_data = level_manager.get_current_level()
 
 	if level_data:
+		print("[GameManager] Found level_data: level=", level_data.level_number)
 		GRID_WIDTH = level_data.width
 		GRID_HEIGHT = level_data.height
 		target_score = level_data.target_score
@@ -127,6 +155,15 @@ func load_current_level():
 		print("Loaded level ", level, ": ", level_data.description)
 		print("Grid size: ", GRID_WIDTH, "x", GRID_HEIGHT)
 		print("Target: ", target_score, " in ", moves_left, " moves")
+		initialized = true
+
+		# Debug: print a small snapshot of the grid to help UI select tiles
+		print("[GameManager] Grid snapshot after load:")
+		for y in range(GRID_HEIGHT):
+			var row = []
+			for x in range(GRID_WIDTH):
+				row.append(grid[x][y])
+			print(row)
 	else:
 		# Fallback to default grid
 		print("No level data found, using default grid")
@@ -138,6 +175,15 @@ func load_current_level():
 			theme_manager.set_theme_by_name("modern")
 		create_empty_grid()
 		fill_initial_grid()
+		initialized = true
+
+		# Debug: print a small snapshot of the fallback grid
+		print("[GameManager] Fallback grid snapshot:")
+		for y in range(GRID_HEIGHT):
+			var row = []
+			for x in range(GRID_WIDTH):
+				row.append(grid[x][y])
+			print(row)
 
 	emit_signal("level_loaded")
 
@@ -544,9 +590,12 @@ func use_move():
 	moves_left -= 1
 	emit_signal("moves_changed", moves_left)
 
+	print("[GameManager] use_move() called - moves_left now=", moves_left, ", score=", score, ", target=", target_score)
+
 	if moves_left <= 0 and score < target_score and not level_transitioning:
 		# Instead of immediately failing, mark a pending failure and wait for cascades to finish
 		pending_level_failed = true
+		print("[GameManager] pending_level_failed set = true")
 		# Store level failure state snapshot (may be updated if score reaches target during cascade)
 		last_level_won = false
 		last_level_score = score
@@ -731,6 +780,7 @@ func on_level_failed():
 		return
 
 	level_transitioning = true
+	print("[GameManager] on_level_failed() called - transitioning to LevelProgressScene")
 
 	# Wait for any board activity to finish before transitioning
 	while processing_moves:

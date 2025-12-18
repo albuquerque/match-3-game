@@ -1,0 +1,30 @@
+[gd_scene load_steps=2 format=3 uid="uid://aboutdialog"]
+
+[ext_resource path="res://scripts/AboutDialog.gd" type="Script" id="1"]
+
+[node name="AboutDialog" type="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource(1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Title" type="Label" parent="./VBoxContainer"]
+text = "About"
+horizontal_alignment = 1
+
+[node name="Content" type="Label" parent="./VBoxContainer"]
+text = "Match-3 Game\nVersion 1.0\nDeveloped with Godot 4.5"
+
+[node name="CloseButton" type="Button" parent="./VBoxContainer"]
+text = "Close"

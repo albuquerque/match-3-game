@@ -27,6 +27,13 @@ const BOOSTER_PRICES = {
 # Lives refill price (gems)
 const LIVES_REFILL_GEM_COST = 50
 
+var _panel_width = 300
+
+func _compute_responsive():
+	var vp = get_viewport().get_visible_rect().size
+	_panel_width = int(min(480, vp.x * 0.40))
+	return _panel_width
+
 func _ready():
 	visible = false
 
@@ -45,33 +52,43 @@ func _setup_shop_items():
 	for child in shop_items_container.get_children():
 		child.queue_free()
 
+	# Determine responsive sizes
+	var panel_width = _panel_width
+	var icon_font = int(clamp(panel_width * 0.12, 24, 72))
+	var name_font = int(clamp(panel_width * 0.07, 16, 28))
+	var desc_font = int(clamp(panel_width * 0.05, 12, 18))
+	var buy_button_width = int(clamp(panel_width * 0.28, 80, 180))
+
 	# Add lives refill option
-	_add_shop_item("Lives Refill", "❤️", "Refill all 5 lives", LIVES_REFILL_GEM_COST, "gems", "lives_refill")
+	_add_shop_item("Lives Refill", "❤️", "Refill all 5 lives", LIVES_REFILL_GEM_COST, "gems", "lives_refill", icon_font, name_font, desc_font, buy_button_width)
 
 	# Add booster items
-	_add_shop_item("Hammer", "🔨", "Destroy any tile", BOOSTER_PRICES["hammer"], "coins", "hammer")
-	_add_shop_item("Shuffle", "🔀", "Reorganize board", BOOSTER_PRICES["shuffle"], "coins", "shuffle")
-	_add_shop_item("Swap Tiles", "🔄", "Swap any 2 tiles", BOOSTER_PRICES["swap"], "coins", "swap")
-	_add_shop_item("Chain Reaction", "⚡", "Spreading explosion", BOOSTER_PRICES["chain_reaction"], "coins", "chain_reaction")
-	_add_shop_item("3x3 Bomb", "💣", "Destroy 3x3 area", BOOSTER_PRICES["bomb_3x3"], "coins", "bomb_3x3")
-	_add_shop_item("Line Blast", "📏", "Clear 3 rows or columns", BOOSTER_PRICES["line_blast"], "coins", "line_blast")
-	_add_shop_item("Row Clear", "↔️", "Clear entire row", BOOSTER_PRICES["row_clear"], "coins", "row_clear")
-	_add_shop_item("Column Clear", "↕️", "Clear entire column", BOOSTER_PRICES["column_clear"], "coins", "column_clear")
-	_add_shop_item("Extra Moves", "➕", "Add 10 moves instantly", BOOSTER_PRICES["extra_moves"], "coins", "extra_moves")
-	_add_shop_item("Tile Squasher", "💥", "Remove all tiles of same type", BOOSTER_PRICES["tile_squasher"], "coins", "tile_squasher")
+	_add_shop_item("Hammer", "🔨", "Destroy any tile", BOOSTER_PRICES["hammer"], "coins", "hammer", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("Shuffle", "🔀", "Reorganize board", BOOSTER_PRICES["shuffle"], "coins", "shuffle", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("Swap Tiles", "🔄", "Swap any 2 tiles", BOOSTER_PRICES["swap"], "coins", "swap", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("Chain Reaction", "⚡", "Spreading explosion", BOOSTER_PRICES["chain_reaction"], "coins", "chain_reaction", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("3x3 Bomb", "💣", "Destroy 3x3 area", BOOSTER_PRICES["bomb_3x3"], "coins", "bomb_3x3", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("Line Blast", "📏", "Clear 3 rows or columns", BOOSTER_PRICES["line_blast"], "coins", "line_blast", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("Row Clear", "↔️", "Clear entire row", BOOSTER_PRICES["row_clear"], "coins", "row_clear", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("Column Clear", "↕️", "Clear entire column", BOOSTER_PRICES["column_clear"], "coins", "column_clear", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("Extra Moves", "➕", "Add 10 moves instantly", BOOSTER_PRICES["extra_moves"], "coins", "extra_moves", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item("Tile Squasher", "💥", "Remove all tiles of same type", BOOSTER_PRICES["tile_squasher"], "coins", "tile_squasher", icon_font, name_font, desc_font, buy_button_width)
 
-func _add_shop_item(item_name: String, icon: String, description: String, cost: int, cost_type: String, item_id: String):
+func _add_shop_item(item_name: String, icon: String, description: String, cost: int, cost_type: String, item_id: String, icon_font: int=48, name_font: int=20, desc_font: int=14, buy_width: int=100):
 	"""Add a shop item to the container"""
 	var item_panel = PanelContainer.new()
+	item_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	item_panel.custom_minimum_size = Vector2(_panel_width - 16, 80)
 
 	var hbox = HBoxContainer.new()
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	item_panel.add_child(hbox)
 
 	# Icon
 	var icon_label = Label.new()
 	icon_label.text = icon
-	icon_label.add_theme_font_size_override("font_size", 48)
-	icon_label.custom_minimum_size = Vector2(60, 60)
+	icon_label.add_theme_font_size_override("font_size", icon_font)
+	icon_label.custom_minimum_size = Vector2(int(_panel_width * 0.16), 60)
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hbox.add_child(icon_label)
@@ -83,12 +100,12 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 
 	var name_label = Label.new()
 	name_label.text = item_name
-	name_label.add_theme_font_size_override("font_size", 20)
+	name_label.add_theme_font_size_override("font_size", name_font)
 	info_vbox.add_child(name_label)
 
 	var desc_label = Label.new()
 	desc_label.text = description
-	desc_label.add_theme_font_size_override("font_size", 14)
+	desc_label.add_theme_font_size_override("font_size", desc_font)
 	desc_label.modulate = Color(0.8, 0.8, 0.8)
 	info_vbox.add_child(desc_label)
 
@@ -98,7 +115,7 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 		if owned > 0:
 			var owned_label = Label.new()
 			owned_label.text = "Owned: %d" % owned
-			owned_label.add_theme_font_size_override("font_size", 12)
+			owned_label.add_theme_font_size_override("font_size", int(max(10, name_font * 0.6)))
 			owned_label.modulate = Color(0.5, 1.0, 0.5)
 			info_vbox.add_child(owned_label)
 
@@ -106,14 +123,34 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 	var buy_button = Button.new()
 	var cost_icon = "💰" if cost_type == "coins" else "💎"
 	buy_button.text = "Buy\n%d %s" % [cost, cost_icon]
-	buy_button.custom_minimum_size = Vector2(100, 60)
-	buy_button.pressed.connect(func(): _on_buy_pressed(item_id, cost, cost_type))
+	buy_button.custom_minimum_size = Vector2(buy_width, 60)
+	# Bind the purchase arguments to the callable so the signal receives them when pressed
+	var buy_callable = Callable(self, "_on_buy_pressed").bind(item_id, cost, cost_type)
+	buy_button.pressed.connect(buy_callable)
 	hbox.add_child(buy_button)
 
 	shop_items_container.add_child(item_panel)
 
 func show_shop():
 	"""Show the shop dialog"""
+	# compute responsive sizing
+	_compute_responsive()
+	# Ensure this Control is fullscreen so GameUI can animate it easily
+	if self is Control:
+		var vp = get_viewport().get_visible_rect().size
+		self.anchor_left = 0
+		self.anchor_top = 0
+		self.anchor_right = 1
+		self.anchor_bottom = 1
+		# offsets not required; GameUI will control slide position
+		# self.offset_left = 0
+		# self.offset_top = 0
+		# self.offset_right = 0
+		# self.offset_bottom = 0
+		# position = Vector2(0, 0)  # do not force position here; GameUI controls slide animation
+		self.size = vp
+		self.mouse_filter = Control.MOUSE_FILTER_STOP
+
 	visible = true
 	modulate = Color.TRANSPARENT
 
@@ -123,7 +160,7 @@ func show_shop():
 	var tween = create_tween()
 	tween.tween_property(self, "modulate", Color.WHITE, 0.3)
 
-	print("[Shop] Shop opened")
+	print("[Shop] Shop opened (responsive), panel_width=" + str(_panel_width))
 
 func _update_currency_display(_amount: int = 0):
 	"""Update the currency display in the shop"""
@@ -188,4 +225,3 @@ func _on_close_pressed():
 func _on_shop_close_complete():
 	visible = false
 	shop_closed.emit()
-

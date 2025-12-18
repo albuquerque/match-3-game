@@ -1,10 +1,10 @@
 [gd_scene load_steps=8 format=3 uid="uid://pu3wcj43djjh"]
 
-[ext_resource type="Script" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
-[ext_resource type="Script" path="res://scripts/GameUI.gd" id="2_4y7z1"]
-[ext_resource type="Script" path="res://scripts/ShopUI.gd" id="3_shopui"]
-[ext_resource type="Script" path="res://scripts/OutOfLivesDialog.gd" id="4_outoflivesdialog"]
-[ext_resource type="Script" path="res://scripts/RewardNotification.gd" id="5_rewardnotification"]
+[ext_resource type="Script" uid="uid://doc3oxaambqkj" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
+[ext_resource type="Script" uid="uid://clght4j2ys21n" path="res://scripts/GameUI.gd" id="2_4y7z1"]
+[ext_resource type="Script" uid="uid://b7r5vfqaywpue" path="res://scripts/ShopUI.gd" id="3_shopui"]
+[ext_resource type="Script" uid="uid://cbcf7sn408x2r" path="res://scripts/OutOfLivesDialog.gd" id="4_outoflivesdialog"]
+[ext_resource type="Script" uid="uid://daaqxkt41gscs" path="res://scripts/RewardNotification.gd" id="5_rewardnotification"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
 bg_color = Color(0.2, 0.2, 0.3, 0.8)
@@ -131,6 +131,27 @@ horizontal_alignment = 1
 [node name="TargetProgress" type="ProgressBar" parent="GameUI/VBoxContainer/TopPanel/TargetContainer"]
 layout_mode = 2
 
+[node name="MenuButton" type="TextureButton" parent="GameUI/VBoxContainer/TopPanel"]
+custom_minimum_size = Vector2(44, 44)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Icon" type="TextureRect" parent="GameUI/VBoxContainer/TopPanel/MenuButton"]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -12.0
+offset_top = -12.0
+offset_right = 12.0
+offset_bottom = 12.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch_mode = 2
+
 [node name="Spacer" type="Control" parent="GameUI/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
@@ -139,22 +160,8 @@ size_flags_vertical = 3
 layout_mode = 2
 size_flags_vertical = 0
 
-[node name="MenuButton" type="Button" parent="GameUI/VBoxContainer/BottomPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Menu"
-
-[node name="ShopButton" type="Button" parent="GameUI/VBoxContainer/BottomPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Shop 🛒"
-
-[node name="PauseButton" type="Button" parent="GameUI/VBoxContainer/BottomPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Pause"
-
 [node name="GameOverPanel" type="Panel" parent="GameUI"]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -191,6 +198,7 @@ layout_mode = 2
 text = "Restart"
 
 [node name="LevelCompletePanel" type="Panel" parent="GameUI"]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -566,15 +574,9 @@ script = ExtResource("3_shopui")
 
 [node name="Panel" type="Panel" parent="GameUI/ShopUI"]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -300.0
-offset_top = -400.0
-offset_right = 300.0
-offset_bottom = 400.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -724,3 +726,5 @@ layout_mode = 2
 text = "Awesome!"
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="GameUI/RewardNotification"]
+
+[node name="MainMenuPopup" type="PopupMenu" parent="GameUI"]
