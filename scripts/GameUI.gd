@@ -252,10 +252,27 @@ func _ready():
 			start_page.connect("booster_selected", Callable(self, "_on_startpage_booster_selected"))
 		if not start_page.is_connected("exchange_pressed", Callable(self, "_on_startpage_exchange_pressed")):
 			start_page.connect("exchange_pressed", Callable(self, "_on_startpage_exchange_pressed"))
+		# Connect new settings signal so StartPage can open settings
+		if start_page.has_signal("settings_pressed") and not start_page.is_connected("settings_pressed", Callable(self, "_on_startpage_settings_pressed")):
+			start_page.connect("settings_pressed", Callable(self, "_on_startpage_settings_pressed"))
 
 	# Check if player has lives
 	if RewardManager.get_lives() <= 0:
-		_show_out_of_lives_dialog()
+		# Hide the GameBoard entirely until lives are restored; ensure StartPage is visible and accessible
+		var board_node = get_node_or_null("../GameBoard")
+		if board_node:
+			board_node.visible = false
+		# Make sure StartPage is visible (it may already be)
+		if start_page:
+			start_page.visible = true
+
+		# Show out-of-lives dialog after a short delay to ensure all nodes are ready
+		print("[GameUI] No lives on startup - scheduling OutOfLives dialog")
+		var timer = get_tree().create_timer(0.3)
+		timer.timeout.connect(_show_out_of_lives_dialog)
+	else:
+		# Play menu music (will be switched to game music when level starts)
+		AudioManager.play_music("menu", 1.0)
 
 func load_booster_icons():
 	"""Load booster icons based on current theme"""
@@ -383,14 +400,19 @@ func _finish_hide_panel():
 		_panel_to_hide = null
 
 func _on_restart_pressed():
+	AudioManager.play_sfx("ui_click")
 	hide_panel(game_over_panel)
 	await get_tree().create_timer(0.3).timeout
 	restart_game()
 
 func _on_continue_pressed():
+	AudioManager.play_sfx("ui_click")
 	hide_panel(level_complete_panel)
 
 func _on_menu_pressed():
+	# Play UI click sound
+	AudioManager.play_sfx("ui_click")
+
 	# Show the popup menu anchored to the menu button
 	if main_menu_popup and menu_button:
 		main_menu_popup.set_position(menu_button.get_global_position())
@@ -493,14 +515,24 @@ func _on_item_purchased(item_type: String, cost_type: String, cost_amount: int):
 
 func _show_out_of_lives_dialog():
 	"""Show the out of lives dialog"""
+	print("[GameUI] _show_out_of_lives_dialog called")
 	if out_of_lives_dialog:
+		print("[GameUI] OutOfLivesDialog node exists")
+		# Bring dialog to front
+		if out_of_lives_dialog.get_parent():
+			out_of_lives_dialog.get_parent().move_child(out_of_lives_dialog, -1)
+
 		if out_of_lives_dialog.has_method("show_dialog"):
+			print("[GameUI] Calling show_dialog() method")
 			out_of_lives_dialog.show_dialog()
 		elif out_of_lives_dialog is Control:
+			print("[GameUI] Manually setting visible = true")
 			out_of_lives_dialog.visible = true
 		else:
 			print("[GameUI] OutOfLivesDialog exists but has no show_dialog")
-		print("[GameUI] Showing out of lives dialog")
+		print("[GameUI] Dialog visible state: ", out_of_lives_dialog.visible)
+	else:
+		print("[GameUI] ERROR: out_of_lives_dialog is null!")
 
 func _on_refill_requested(method: String):
 	"""Handle life refill from dialog"""
@@ -551,12 +583,14 @@ func _on_out_of_lives_closed():
 
 func _on_hammer_pressed():
 	"""Handle hammer button press"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("hammer") > 0:
 		activate_booster("hammer")
 		print("[GameUI] Hammer activated")
 
 func _on_shuffle_pressed():
 	"""Handle shuffle button press - immediately shuffles board"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("shuffle") > 0:
 		print("[GameUI] Shuffle activated")
 		var board = get_node("../GameBoard")
@@ -566,6 +600,7 @@ func _on_shuffle_pressed():
 
 func _on_swap_pressed():
 	"""Handle swap button press"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("swap") > 0:
 		activate_booster("swap")
 		swap_first_tile = null  # Reset swap state
@@ -573,18 +608,21 @@ func _on_swap_pressed():
 
 func _on_chain_reaction_pressed():
 	"""Handle chain reaction button press"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("chain_reaction") > 0:
 		activate_booster("chain_reaction")
 		print("[GameUI] Chain Reaction activated")
 
 func _on_bomb_3x3_pressed():
 	"""Handle 3x3 bomb button press"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("bomb_3x3") > 0:
 		activate_booster("bomb_3x3")
 		print("[GameUI] 3x3 Bomb activated")
 
 func _on_line_blast_pressed():
 	"""Handle line blast button press - need to choose direction first"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("line_blast") > 0:
 		# Show direction selector or default to horizontal for now
 		# For simplicity, we'll prompt in console and default to horizontal
@@ -594,18 +632,21 @@ func _on_line_blast_pressed():
 
 func _on_tile_squasher_pressed():
 	"""Handle tile squasher button press"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("tile_squasher") > 0:
 		activate_booster("tile_squasher")
 		print("[GameUI] Tile Squasher activated")
 
 func _on_row_clear_pressed():
 	"""Handle row clear button press"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("row_clear") > 0:
 		activate_booster("row_clear")
 		print("[GameUI] Row clear activated")
 
 func _on_column_clear_pressed():
 	"""Handle column clear button press"""
+	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("column_clear") > 0:
 		activate_booster("column_clear")
 		print("[GameUI] Column clear activated")
@@ -724,6 +765,9 @@ func _on_main_menu_item_selected(id: int):
 	This avoids match/else parsing issues and ensures we only set `visible` on Controls.
 	"""
 	print("[GameUI] Main menu item selected: ", id)
+
+	# Play UI click sound
+	AudioManager.play_sfx("ui_click")
 
 	if id == 0:
 		# Settings - slide-in side panel
@@ -993,6 +1037,18 @@ func _close_fullscreen_panel(panel: Control):
 
 func _on_startpage_start_pressed():
 	print("[GameUI] Start pressed on StartPage - initializing game")
+
+	# If player has no lives, show the out-of-lives dialog instead of starting
+	if RewardManager.get_lives() <= 0:
+		print("[GameUI] Player has no lives - showing OutOfLives dialog instead of starting level")
+		AudioManager.play_sfx("ui_click")
+		_show_out_of_lives_dialog()
+		return
+
+	# Play UI click sound and switch to game music
+	AudioManager.play_sfx("ui_click")
+	AudioManager.play_music("game", 1.0)
+
 	# Initialize game manager and then remove the StartPage
 	var gm = get_node_or_null("/root/GameManager")
 	if gm and gm.has_method("initialize_game"):
@@ -1014,9 +1070,8 @@ func _on_startpage_start_pressed():
 		# If GameManager reports initialized (level already loaded), create visual grid deferred
 		if board:
 			print("[GameUI] Deferring board layout and create_visual_grid() calls")
-			board.call_deferred("calculate_responsive_layout")
-			board.call_deferred("setup_background")
-			board.call_deferred("create_visual_grid")
+			# Use a safe deferred helper that checks method existence on the board
+			call_deferred("_deferred_setup_board", board)
 			print("[GameUI] Deferred create_visual_grid scheduled")
 			# Also print a small grid snapshot for diagnostics
 			for y in range(GameManager.GRID_HEIGHT):
@@ -1041,10 +1096,56 @@ func _on_game_manager_level_loaded():
 	var board = get_node_or_null("../GameBoard")
 	if board:
 		print("[GameUI] Deferred calls to create visual grid (level_loaded). Grid size=", GameManager.grid.size())
-		board.call_deferred("calculate_responsive_layout")
-		board.call_deferred("setup_background")
-		board.call_deferred("create_visual_grid")
+		_deferred_setup_board(board)
 		print("[GameUI] Deferred visual grid creation scheduled on level_loaded")
 	# Disconnect to avoid duplicate handling
 	if GameManager.is_connected("level_loaded", Callable(self, "_on_game_manager_level_loaded")):
 		GameManager.disconnect("level_loaded", Callable(self, "_on_game_manager_level_loaded"))
+
+func _deferred_setup_board(board):
+	# Robustly wait for the board script to be ready (methods available) before calling setup methods.
+	if not board:
+		print("[GameUI] _deferred_setup_board: board is null")
+		return
+
+	var attempts = 0
+	var max_attempts = 20  # ~1 second (20 * 0.05s)
+	while attempts < max_attempts and get_tree() != null:
+		# If the board already exposes the layout method, assume script is attached and ready
+		if board.has_method("calculate_responsive_layout") or board.has_method("create_visual_grid"):
+			break
+
+		# Otherwise wait a short time and retry
+		await get_tree().create_timer(0.05).timeout
+		attempts += 1
+
+	if attempts >= max_attempts:
+		print("[GameUI] Warning: Board script not ready after waiting; trying to call methods anyway")
+
+	# Safely call board setup methods if they exist
+	if board.has_method("calculate_responsive_layout"):
+		board.calculate_responsive_layout()
+	else:
+		print("[GameUI] Board has no method calculate_responsive_layout (timed out)")
+
+	if board.has_method("setup_background"):
+		board.setup_background()
+	else:
+		print("[GameUI] Board has no method setup_background (timed out)")
+
+	if board.has_method("create_visual_grid"):
+		board.create_visual_grid()
+	else:
+		print("[GameUI] Board has no method create_visual_grid (timed out)")
+func _on_startpage_settings_pressed():
+	# Show settings dialog if present
+	if settings_dialog and settings_dialog is Panel:
+		if settings_dialog.has_method("show_dialog"):
+			settings_dialog.show_dialog()
+		else:
+			settings_dialog.visible = true
+			settings_dialog.raise()
+	else:
+		# Fallback: present settings as fullscreen side (will instance scene)
+		_show_settings_side()
+		print("[GameUI] Settings dialog not found to open from StartPage; using fullscreen fallback")

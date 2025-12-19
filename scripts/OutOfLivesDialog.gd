@@ -24,12 +24,13 @@ func _ready():
 		wait_button.pressed.connect(_on_wait_pressed)
 
 	# Connect to AdMob signals
-	if AdMobManager:
-		AdMobManager.rewarded_ad_loaded.connect(_on_ad_loaded)
-		AdMobManager.user_earned_reward.connect(_on_ad_reward_earned)
+	var ad_manager = get_node_or_null("/root/AdMobManager")
+	if ad_manager:
+		ad_manager.rewarded_ad_loaded.connect(_on_ad_loaded)
+		ad_manager.user_earned_reward.connect(_on_ad_reward_earned)
 		print("[OutOfLivesDialog] Connected to AdMobManager signals")
-		print("[OutOfLivesDialog] AdMobManager initialized:", AdMobManager.is_initialized)
-		print("[OutOfLivesDialog] Ad ready:", AdMobManager.is_rewarded_ad_ready())
+		print("[OutOfLivesDialog] AdMobManager initialized:", ad_manager.is_initialized)
+		print("[OutOfLivesDialog] Ad ready:", ad_manager.is_rewarded_ad_ready())
 	else:
 		print("[OutOfLivesDialog] WARNING: AdMobManager not found!")
 
@@ -67,7 +68,8 @@ func _update_button_states():
 
 	# Update watch ad button based on ad availability
 	if watch_ad_button:
-		if AdMobManager and AdMobManager.is_rewarded_ad_ready():
+		var ad_manager = get_node_or_null("/root/AdMobManager")
+		if ad_manager and ad_manager.is_rewarded_ad_ready():
 			watch_ad_button.disabled = false
 			watch_ad_button.text = "Watch Ad (+1 ❤️)"
 		else:
@@ -89,7 +91,8 @@ func _on_watch_ad_pressed():
 	"""Player chose to watch an ad for a life"""
 	print("[OutOfLivesDialog] Player requesting to watch ad...")
 
-	if not AdMobManager:
+	var ad_manager = get_node_or_null("/root/AdMobManager")
+	if not ad_manager:
 		print("[OutOfLivesDialog] AdMobManager not available")
 		return
 
@@ -99,7 +102,7 @@ func _on_watch_ad_pressed():
 		watch_ad_button.text = "Loading..."
 
 	# Show rewarded ad - Don't await here, let the signal handle it
-	AdMobManager.show_rewarded_ad()
+	ad_manager.show_rewarded_ad()
 	print("[OutOfLivesDialog] Ad request sent to AdMobManager")
 
 
@@ -144,4 +147,3 @@ func _close_dialog():
 func _on_dialog_close_complete():
 	visible = false
 	dialog_closed.emit()
-

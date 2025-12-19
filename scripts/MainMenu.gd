@@ -13,7 +13,11 @@ func _ready():
 	# Animate title
 	animate_title()
 
+	# Play menu music
+	AudioManager.play_music("menu", 1.0)
+
 func _on_play_pressed():
+	AudioManager.play_sfx("ui_click")
 	get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
 
 func _on_settings_pressed():
