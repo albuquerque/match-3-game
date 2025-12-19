@@ -51,9 +51,9 @@ const BOARD_BACKGROUND_COLOR = Color(0.2, 0.2, 0.3, 0.8)
 @onready var background = $Background
 
 func _ready():
-	GameManager.connect("game_over", _on_game_over)
-	GameManager.connect("level_complete", _on_level_complete)
-	GameManager.connect("level_loaded", _on_level_loaded)
+	GameManager.connect("game_over", Callable(self, "_on_game_over"))
+	GameManager.connect("level_complete", Callable(self, "_on_level_complete"))
+	GameManager.connect("level_loaded", Callable(self, "_on_level_loaded"))
 
 	calculate_responsive_layout()
 	setup_background()
@@ -110,6 +110,13 @@ func setup_background():
 		grid_offset.y - 10
 	)
 
+func clear_tiles():
+	# Remove all Tile instances created by this board
+	for child in get_children():
+		if child and child.has_method("setup"):
+			# Likely a Tile instance - queue for deletion
+			child.queue_free()
+
 func create_visual_grid():
 	clear_tiles()
 	tiles.clear()
@@ -136,10 +143,207 @@ func create_visual_grid():
 			add_child(tile)
 			tiles[x].append(tile)
 
-func clear_tiles():
-	for child in get_children():
-		if child.has_method("setup"):  # Check if it's a Tile
-			child.queue_free()
+# Helper: visually highlight positions for special activations (single flash)
+func highlight_special_activation(positions: Array):
+	if positions == null or positions.size() == 0:
+		return
+	var tweens = []
+	for pos in positions:
+		if pos.x < 0 or pos.y < 0:
+			continue
+		if pos.x >= GameManager.GRID_WIDTH or pos.y >= GameManager.GRID_HEIGHT:
+			continue
+		var tile = tiles[int(pos.x)][int(pos.y)]
+		if tile:
+			var t = create_tween()
+			t.tween_property(tile, "modulate", Color(1,1,0.7,1), 0.06)
+			t.tween_property(tile, "modulate", Color.WHITE, 0.12)
+			tweens.append(t)
+
+	if tweens.size() > 0:
+		await tweens[0].finished
+
+# Destroy arbitrary tiles at given positions with animation and cleanup
+func animate_destroy_tiles(positions: Array):
+	if positions == null or positions.size() == 0:
+		return
+
+	var destroy_tweens = []
+	var tiles_to_free = []
+	var destroyed_positions = []
+
+	for pos in positions:
+		if pos.x < 0 or pos.y < 0:
+			continue
+		if pos.x >= GameManager.GRID_WIDTH or pos.y >= GameManager.GRID_HEIGHT:
+			continue
+		var tile = tiles[int(pos.x)][int(pos.y)]
+		if tile:
+			# prefer tile.animate_destroy() if provided
+			if tile.has_method("animate_destroy"):
+				var tw = tile.animate_destroy()
+				if tw:
+					destroy_tweens.append(tw)
+			else:
+				# fallback: simple fade out
+				var tw2 = create_tween()
+				tw2.tween_property(tile, "modulate", Color(1,1,1,0), 0.15)
+				destroy_tweens.append(tw2)
+			tiles_to_free.append(tile)
+			destroyed_positions.append(pos)
+
+	# Await tweens to finish (or short timeout)
+	if destroy_tweens.size() > 0:
+		for tw in destroy_tweens:
+			if tw != null:
+				await tw.finished
+	else:
+		if get_tree() != null:
+			await get_tree().create_timer(0.15).timeout
+
+	# Clear grid entries and free nodes
+	for i in range(tiles_to_free.size()):
+		var pos = destroyed_positions[i]
+		if pos.x >= 0 and pos.y >= 0:
+			# Only clear visual cell if it still points to the same instance
+			if tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
+				tiles[int(pos.x)][int(pos.y)] = null
+			# Update GameManager grid if not blocked
+			if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			# Safely free the tile
+			if not tiles_to_free[i].is_queued_for_deletion():
+				tiles_to_free[i].queue_free()
+
+	print("animate_destroy_tiles: destroyed ", tiles_to_free.size(), " tiles")
+
+func animate_destroy_matches(matches: Array):
+	if matches == null or matches.size() == 0:
+		return
+	await animate_destroy_tiles(matches)
+
+func animate_destroy_matches_except(matches: Array, skip_pos: Vector2):
+	if matches == null or matches.size() == 0:
+		return
+	var to_destroy = []
+	for m in matches:
+		var pos = m
+		if typeof(m) == TYPE_DICTIONARY and m.has("x") and m.has("y"):
+			pos = Vector2(float(m["x"]), float(m["y"]))
+		if pos == skip_pos:
+			continue
+		to_destroy.append(pos)
+	if to_destroy.size() > 0:
+		await animate_destroy_tiles(to_destroy)
+
+func animate_gravity():
+	var moved = GameManager.apply_gravity()
+	print("animate_gravity: apply_gravity returned -> ", moved)
+
+	var gravity_tweens = []
+	for x in range(GameManager.GRID_WIDTH):
+		var column_tiles = []
+		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
+			if not GameManager.is_cell_blocked(x, y) and tiles[x][y] != null:
+				column_tiles.append(tiles[x][y])
+
+		for y in range(GameManager.GRID_HEIGHT):
+			if GameManager.grid[x][y] == 0:
+				tiles[x][y] = null
+
+		var tile_index = 0
+		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
+			if GameManager.is_cell_blocked(x, y):
+				continue
+			var tile_type = GameManager.get_tile_at(Vector2(x, y))
+			if tile_type > 0 and tile_index < column_tiles.size():
+				var tile = column_tiles[tile_index]
+				tiles[x][y] = tile
+				tile.grid_position = Vector2(x, y)
+				tile.update_type(tile_type)
+				var target_pos = grid_to_world_position(Vector2(x, y))
+				if tile.position.distance_to(target_pos) > 1:
+					gravity_tweens.append(tile.animate_to_position(target_pos))
+				tile_index += 1
+
+	if gravity_tweens.size() > 0:
+		for tween in gravity_tweens:
+			if tween != null:
+				await tween.finished
+	else:
+		if get_tree() != null:
+			await get_tree().create_timer(0.01).timeout
+	print("animate_gravity: done")
+
+func animate_refill():
+	var new_tile_positions = GameManager.fill_empty_spaces()
+	var spawn_tweens = []
+	var scale_factor = tile_size / 64.0
+	for pos in new_tile_positions:
+		if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
+			if tiles[int(pos.x)][int(pos.y)] == null:
+				var tile = tile_scene.instantiate()
+				var tile_type = GameManager.get_tile_at(pos)
+				tile.setup(tile_type, pos, scale_factor)
+				tile.position = grid_to_world_position(Vector2(pos.x, -1))
+				tile.connect("tile_clicked", _on_tile_clicked)
+				tile.connect("tile_swiped", _on_tile_swiped)
+				add_child(tile)
+				tiles[int(pos.x)][int(pos.y)] = tile
+				var target_pos = grid_to_world_position(pos)
+				spawn_tweens.append(tile.animate_to_position(target_pos))
+				spawn_tweens.append(tile.animate_spawn())
+
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(x, y) and GameManager.grid[x][y] > 0:
+				if tiles[x][y] == null:
+					var tile = tile_scene.instantiate()
+					var ttype = GameManager.grid[x][y]
+					tile.setup(ttype, Vector2(x, y), scale_factor)
+					tile.position = grid_to_world_position(Vector2(x, -1))
+					tile.connect("tile_clicked", _on_tile_clicked)
+					tile.connect("tile_swiped", _on_tile_swiped)
+					add_child(tile)
+					tiles[x][y] = tile
+					var target_pos = grid_to_world_position(Vector2(x, y))
+					spawn_tweens.append(tile.animate_to_position(target_pos))
+					spawn_tweens.append(tile.animate_spawn())
+
+	if spawn_tweens.size() > 0:
+		await spawn_tweens[0].finished
+	else:
+		if get_tree() != null:
+			await get_tree().create_timer(0.3).timeout
+
+	print("GameManager.grid after refill:")
+	for y in range(GameManager.GRID_HEIGHT):
+		var row = []
+		for x in range(GameManager.GRID_WIDTH):
+			row.append(GameManager.grid[x][y])
+		print(row)
+
+func _on_game_over():
+	print("[GameBoard] Game Over")
+	# Cleanup or final actions on game over
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			var tile = tiles[x][y]
+			if tile:
+				tile.set_process_input(false)  # Disable input processing for tiles
+
+func _on_level_complete():
+	print("[GameBoard] Level Complete")
+	# Actions to perform on level completion, e.g. showing a summary, transitioning to next level, etc.
+
+func _on_level_loaded():
+	print("[GameBoard] Level Loaded")
+	# Reset or initialize anything specific to the new level
+	calculate_responsive_layout()
+	setup_background()
+
+	# Recreate the visual grid for the new level
+	create_visual_grid()
 
 func grid_to_world_position(grid_pos: Vector2) -> Vector2:
 	return Vector2(
@@ -220,7 +424,8 @@ func _on_tile_clicked(tile):
 				for btn in all_buttons:
 					if btn:
 						btn.modulate = Color.WHITE
-		return
+			# Return after handling booster action
+			return
 
 	# Check if clicked tile is a special tile (7, 8, or 9)
 	var tile_type = GameManager.get_tile_at(tile.grid_position)
@@ -230,7 +435,7 @@ func _on_tile_clicked(tile):
 		if selected_tile:
 			selected_tile.set_selected(false)
 			selected_tile = null
-		# Activate the special tile
+		# Activate the special tile with full visuals and cascades
 		await activate_special_tile(tile.grid_position)
 		return
 
@@ -301,6 +506,9 @@ func perform_swap(tile1, tile2):
 
 	# Perform swap in game logic
 	GameManager.swap_tiles(pos1, pos2)
+
+	# Play swap sound effect
+	AudioManager.play_sfx("tile_swap")
 
 	# Animate swap
 	var target_pos1 = grid_to_world_position(pos2)
@@ -434,6 +642,12 @@ func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 
 			if will_create_special:
 				print("Cascade match - Special tile will be created at: ", special_tile_pos)
+
+		# Play match sound effect (combo sound for cascades after first match)
+		if cascade_depth > 1:
+			AudioManager.play_sfx("combo")
+		else:
+			AudioManager.play_sfx("match")
 
 		if will_create_special and special_tile_pos.x >= 0 and special_tile_pos.y >= 0:
 			await animate_destroy_matches_except(matches, special_tile_pos)
@@ -579,402 +793,6 @@ func highlight_matches(matches: Array):
 		if tw != null:
 			await tw.finished
 
-
-func animate_destroy_matches(matches: Array):
-	print("animate_destroy_matches called with ", matches.size(), " matches")
-	var destroy_tweens = []
-	var tiles_to_free = []
-	var destroyed_positions = []
-
-	for match_pos in matches:
-		var tile = tiles[int(match_pos.x)][int(match_pos.y)]
-		if tile:
-			var tween = tile.animate_destroy()
-			if tween:
-				destroy_tweens.append(tween)
-			tiles_to_free.append(tile)
-			destroyed_positions.append(match_pos)
-
-	# Await all destroy tweens (if any), otherwise short timeout
-	if destroy_tweens.size() > 0:
-		for tween in destroy_tweens:
-			if tween != null:
-				await tween.finished
-	else:
-		if get_tree() != null:
-			await get_tree().create_timer(0.3).timeout
-
-	print("animate_destroy_matches: animations finished, clearing grid and freeing nodes")
-	# Now clear visual grid references and GameManager grid, then free tiles
-	for i in range(tiles_to_free.size()):
-		var pos = destroyed_positions[i]
-		if pos.x >= 0 and pos.y >= 0:
-			# Only clear visual cell if it still points to the same instance
-			if tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
-				tiles[int(pos.x)][int(pos.y)] = null
-			# Ensure GameManager grid reflects cleared tile (skip blocked cells)
-			if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
-			# Safely free the tile node if not already queued
-			if not tiles_to_free[i].is_queued_for_deletion():
-				tiles_to_free[i].queue_free()
-	print("animate_destroy_matches: done")
-
-
-func animate_destroy_matches_except(matches: Array, skip_pos: Vector2):
-	var destroy_tweens = []
-	var tiles_to_free = []
-	var destroyed_positions = []
-
-	for match_pos in matches:
-		if match_pos == skip_pos:
-			continue
-		var tile = tiles[int(match_pos.x)][int(match_pos.y)]
-		if tile:
-			var tween = tile.animate_destroy()
-			if tween:
-				destroy_tweens.append(tween)
-			tiles_to_free.append(tile)
-			destroyed_positions.append(match_pos)
-
-	# Await all destroy tweens
-	if destroy_tweens.size() > 0:
-		for tween in destroy_tweens:
-			if tween != null:
-				await tween.finished
-	else:
-		if get_tree() != null:
-			await get_tree().create_timer(0.2).timeout
-
-	for i in range(tiles_to_free.size()):
-		var pos = destroyed_positions[i]
-		if pos.x >= 0 and pos.y >= 0 and tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
-			tiles[int(pos.x)][int(pos.y)] = null
-			tiles_to_free[i].queue_free()
-
-
-func animate_destroy_tiles(positions: Array):
-	# Destroy tiles at the given positions with animation
-	var destroy_tweens = []
-	var tiles_to_free = []
-	var destroyed_positions = []
-
-	for pos in positions:
-		var tile = tiles[int(pos.x)][int(pos.y)]
-		if tile:
-			var tween = tile.animate_destroy()
-			if tween:
-				destroy_tweens.append(tween)
-			tiles_to_free.append(tile)
-			destroyed_positions.append(pos)
-
-	# Wait for animations to complete (or short timeout if none)
-	if destroy_tweens.size() > 0:
-		for tween in destroy_tweens:
-			if tween != null:
-				await tween.finished
-	else:
-		if get_tree() != null:
-			await get_tree().create_timer(0.3).timeout
-
-	print("animate_destroy_tiles: animations finished, clearing grid and freeing nodes")
-	# Now clear visual grid references and GameManager grid, then free tiles
-	for i in range(tiles_to_free.size()):
-		var pos = destroyed_positions[i]
-		if pos.x >= 0 and pos.y >= 0:
-			# Only clear visual cell if it still points to the same instance
-			if tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
-				tiles[int(pos.x)][int(pos.y)] = null
-			# Ensure GameManager grid reflects cleared tile (skip blocked cells)
-			if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
-			# Safely free the tile node if not already queued
-			if not tiles_to_free[i].is_queued_for_deletion():
-				tiles_to_free[i].queue_free()
-	print("animate_destroy_tiles: done")
-
-
-func activate_special_tile(pos: Vector2):
-	"""Activate a special arrow tile to clear row/column/both"""
-	print("activate_special_tile: start at ", pos)
-	var tile_type = GameManager.get_tile_at(pos)
-	print("Tile type at ", pos, " is ", tile_type)
-	GameManager.processing_moves = true
-	print("activate_special_tile: processing_moves = true")
-
-	# Collect positions to clear based on tile type
-	var positions_to_clear = []
-
-	if tile_type == GameManager.HORIZTONAL_ARROW:  # Horizontal arrow - clear row
-		for x in range(GameManager.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
-	elif tile_type == GameManager.VERTICAL_ARROW:  # Vertical arrow - clear column
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(int(pos.x), y):
-				positions_to_clear.append(Vector2(pos.x, y))
-	elif tile_type == GameManager.FOUR_WAY_ARROW:  # 4-way arrow - clear row and column
-		for x in range(GameManager.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(int(pos.x), y):
-				if not positions_to_clear.has(Vector2(pos.x, y)):
-					positions_to_clear.append(Vector2(pos.x, y))
-
-	print("Clearing ", positions_to_clear.size(), " tiles")
-
-	# Check for other special tiles in the positions to clear (chain reaction)
-	var special_tiles_to_activate = []
-	for clear_pos in positions_to_clear:
-		if clear_pos == pos:
-			continue
-
-		var check_tile_type = GameManager.get_tile_at(clear_pos)
-		if check_tile_type >= 7 and check_tile_type <= 9:
-			print("Found special tile at ", clear_pos, " type: ", check_tile_type, " - will chain activate")
-			special_tiles_to_activate.append({"pos": clear_pos, "type": check_tile_type})
-
-	# Highlight the tiles that will be cleared with a special effect
-	await highlight_special_activation(positions_to_clear)
-
-	# Destroy the tiles with animation
-	await animate_destroy_tiles(positions_to_clear)
-
-	# Clear tiles in GameManager grid
-	for clear_pos in positions_to_clear:
-		GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
-
-	# Use a move for activating special tile
-	GameManager.use_move()
-
-	# Add points for cleared tiles
-	var points = GameManager.calculate_points(positions_to_clear.size())
-	GameManager.add_score(points)
-
-	# Activate any special tiles that were hit (chain reaction)
-	if special_tiles_to_activate.size() > 0:
-		print("Chain activating ", special_tiles_to_activate.size(), " special tiles")
-		for special_tile_data in special_tiles_to_activate:
-			await activate_special_tile_chain(special_tile_data["pos"], special_tile_data["type"])
-
-	# Apply gravity and refill AFTER all chain reactions
-	print("activate_special_tile: applying gravity")
-	await animate_gravity()
-	print("activate_special_tile: gravity complete")
-	await animate_refill()
-	print("activate_special_tile: refill complete")
-
-	# Check for cascade matches after refill
-	await process_cascade()
-
-	GameManager.processing_moves = false
-	print("activate_special_tile: processing_moves = false")
-
-func activate_special_tile_chain(pos: Vector2, tile_type: int):
-	"""Activate a special tile as part of a chain"""
-	print("Chain-activating special tile type ", tile_type, " at ", pos)
-
-	var positions_to_clear = []
-
-	if tile_type == GameManager.HORIZTONAL_ARROW:
-		for x in range(GameManager.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
-	elif tile_type == GameManager.VERTICAL_ARROW:
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(int(pos.x), y):
-				positions_to_clear.append(Vector2(pos.x, y))
-	elif tile_type == GameManager.FOUR_WAY_ARROW:
-		for x in range(GameManager.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(int(pos.x), y):
-				if not positions_to_clear.has(Vector2(pos.x, y)):
-					positions_to_clear.append(Vector2(pos.x, y))
-
-	var special_tiles_to_activate = []
-	for clear_pos in positions_to_clear:
-		if clear_pos == pos:
-			continue
-
-		var check_tile_type = GameManager.get_tile_at(clear_pos)
-		if check_tile_type >= 7 and check_tile_type <= 9:
-			special_tiles_to_activate.append({"pos": clear_pos, "type": check_tile_type})
-
-	await highlight_special_activation(positions_to_clear)
-	await animate_destroy_tiles(positions_to_clear)
-
-	for clear_pos in positions_to_clear:
-		GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
-
-	var points = GameManager.calculate_points(positions_to_clear.size())
-	GameManager.add_score(points)
-
-	if special_tiles_to_activate.size() > 0:
-		for special_tile_info in special_tiles_to_activate:
-			await activate_special_tile_chain(special_tile_info["pos"], special_tile_info["type"])
-
-func highlight_special_activation(positions: Array):
-	# Flash the tiles that will be cleared by special tile activation
-	var highlight_tweens = []
-	for pos in positions:
-		var tile = tiles[int(pos.x)][int(pos.y)]
-		if tile:
-			var tween = create_tween()
-			tween.tween_property(tile, "modulate", Color.WHITE, 0.1)
-			tween.tween_property(tile, "modulate", Color.YELLOW, 0.1)
-			tween.tween_property(tile, "modulate", Color.WHITE, 0.1)
-			highlight_tweens.append(tween)
-
-	if highlight_tweens.size() > 0:
-		await highlight_tweens[0].finished
-
-func _on_game_over():
-	GameManager.processing_moves = true
-	# Show game over effects
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			if tiles[x][y]:
-				var tween = create_tween()
-				tween.tween_property(tiles[x][y], "modulate", Color.GRAY, 0.5)
-
-func _on_level_complete():
-	# Show level complete effects
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			if tiles[x][y]:
-				var tween = create_tween()
-				tween.tween_property(tiles[x][y], "modulate", Color.GOLD, 0.3)
-				tween.tween_property(tiles[x][y], "modulate", Color.WHITE, 0.3)
-
-func _on_level_loaded():
-	# Called when GameManager loads a level; recalc layout and create the visual grid
-	print("[GameBoard] _on_level_loaded() - creating visual grid for loaded level")
-	calculate_responsive_layout()
-	setup_background()
-	create_visual_grid()
-
-func restart_game():
-	GameManager.initialize_game()
-	calculate_responsive_layout()
-	setup_background()
-	create_visual_grid()
-
-func animate_gravity():
-	var moved = GameManager.apply_gravity()
-	print("animate_gravity: apply_gravity returned -> ", moved)
-
-	var gravity_tweens = []
-
-	for x in range(GameManager.GRID_WIDTH):
-		# Collect all existing non-null tiles in this column from BOTTOM TO TOP
-		var column_tiles = []
-		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
-			if not GameManager.is_cell_blocked(x, y) and tiles[x][y] != null:
-				column_tiles.append(tiles[x][y])
-
-		# Clear the visual tiles array for this column
-		for y in range(GameManager.GRID_HEIGHT):
-			if GameManager.grid[x][y] == 0:
-				tiles[x][y] = null
-
-		# Now redistribute tiles based on GameManager grid (after gravity has been applied)
-		var tile_index = 0
-		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
-			if GameManager.is_cell_blocked(x, y):
-				continue
-
-			var tile_type = GameManager.get_tile_at(Vector2(x, y))
-
-			if tile_type > 0 and tile_index < column_tiles.size():
-				var tile = column_tiles[tile_index]
-				tiles[x][y] = tile
-				tile.grid_position = Vector2(x, y)
-				tile.update_type(tile_type)
-
-				var target_pos = grid_to_world_position(Vector2(x, y))
-				if tile.position.distance_to(target_pos) > 1:
-					gravity_tweens.append(tile.animate_to_position(target_pos))
-
-				tile_index += 1
-
-	# Await all gravity tweens (or short timeout)
-	if gravity_tweens.size() > 0:
-		for tween in gravity_tweens:
-			if tween != null:
-				await tween.finished
-	else:
-		if get_tree() != null:
-			await get_tree().create_timer(0.01).timeout
-	print("animate_gravity: done")
-	print("GameManager.grid after gravity:")
-	for y in range(GameManager.GRID_HEIGHT):
-		var row = []
-		for x in range(GameManager.GRID_WIDTH):
-			row.append(GameManager.grid[x][y])
-		print(row)
-
-func animate_refill():
-	var new_tile_positions = GameManager.fill_empty_spaces()
-	var spawn_tweens = []
-
-	print("Refilling positions:", new_tile_positions)
-
-	var scale_factor = tile_size / 64.0
-
-	for pos in new_tile_positions:
-		if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
-			if tiles[int(pos.x)][int(pos.y)] == null:
-				var tile = tile_scene.instantiate()
-				var tile_type = GameManager.get_tile_at(pos)
-				tile.setup(tile_type, pos, scale_factor)
-				tile.position = grid_to_world_position(Vector2(pos.x, -1))
-				tile.connect("tile_clicked", _on_tile_clicked)
-				tile.connect("tile_swiped", _on_tile_swiped)
-				add_child(tile)
-				tiles[int(pos.x)][int(pos.y)] = tile
-				var target_pos = grid_to_world_position(pos)
-				spawn_tweens.append(tile.animate_to_position(target_pos))
-				spawn_tweens.append(tile.animate_spawn())
-
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(x, y) and GameManager.grid[x][y] > 0:
-				if tiles[x][y] == null:
-					print("[BUG] Visual grid still has null at:", x, y, " -- fixing!")
-					var tile = tile_scene.instantiate()
-					tile.setup(GameManager.grid[x][y], Vector2(x, y), scale_factor)
-					tile.position = grid_to_world_position(Vector2(x, -1))
-					tile.connect("tile_clicked", _on_tile_clicked)
-					tile.connect("tile_swiped", _on_tile_swiped)
-					add_child(tile)
-					tiles[x][y] = tile
-					var target_pos = grid_to_world_position(Vector2(x, y))
-					spawn_tweens.append(tile.animate_to_position(target_pos))
-					spawn_tweens.append(tile.animate_spawn())
-
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			if tiles[x][y] == null:
-				print("[BUG] Visual grid still has null at:", x, y)
-
-	if spawn_tweens.size() > 0:
-		await _await_tweens_with_timeout(spawn_tweens, 2.0)
-	else:
-		if get_tree() != null:
-			print("Refilling positions... Awaiting timer...")
-			await get_tree().create_timer(0.3).timeout
-			print("Refilling positions... Awaiting timer... END!")
-
-	print("GameManager.grid after refill:")
-	for y in range(GameManager.GRID_HEIGHT):
-		var row = []
-		for x in range(GameManager.GRID_WIDTH):
-			row.append(GameManager.grid[x][y])
-		print(row)
-
 # ============================================
 # Booster Activation Functions
 # ============================================
@@ -987,6 +805,9 @@ func activate_shuffle_booster():
 
 	print("[GameBoard] Activating shuffle booster")
 	GameManager.processing_moves = true
+
+	# Play shuffle booster sound
+	AudioManager.play_sfx("booster_shuffle")
 
 	# Shuffle until valid moves found
 	if GameManager.shuffle_until_moves_available():
@@ -1003,6 +824,9 @@ func activate_swap_booster(x1: int, y1: int, x2: int, y2: int):
 
 	print("[GameBoard] Activating swap booster: (", x1, ",", y1, ") <-> (", x2, ",", y2, ")")
 	GameManager.processing_moves = true
+
+	# Play swap booster sound
+	AudioManager.play_sfx("booster_swap")
 
 	# Check valid tiles
 	if GameManager.is_cell_blocked(x1, y1) or GameManager.is_cell_blocked(x2, y2):
@@ -1062,6 +886,9 @@ func activate_chain_reaction_booster(x: int, y: int):
 
 	print("[GameBoard] Activating chain reaction booster at (", x, ",", y, ")")
 	GameManager.processing_moves = true
+
+	# Play chain reaction booster sound
+	AudioManager.play_sfx("booster_chain")
 
 	if GameManager.is_cell_blocked(x, y):
 		print("[GameBoard] Cannot use chain reaction on blocked tile!")
@@ -1136,6 +963,9 @@ func activate_bomb_3x3_booster(x: int, y: int):
 	print("[GameBoard] Activating 3x3 bomb booster at (", x, ",", y, ")")
 	GameManager.processing_moves = true
 
+	# Play 3x3 bomb sound
+	AudioManager.play_sfx("booster_bomb_3x3")
+
 	if GameManager.is_cell_blocked(x, y):
 		print("[GameBoard] Cannot use bomb on blocked tile!")
 		GameManager.processing_moves = false
@@ -1170,8 +1000,6 @@ func activate_bomb_3x3_booster(x: int, y: int):
 	GameManager.processing_moves = false
 	print("[GameBoard] 3x3 bomb booster complete")
 
-var line_blast_mode = ""  # "horizontal" or "vertical"
-
 func activate_line_blast_booster(direction: String, center_x: int, center_y: int):
 	"""Activate line blast booster - clears 3 rows or 3 columns"""
 	if not RewardManager.use_booster("line_blast"):
@@ -1180,6 +1008,9 @@ func activate_line_blast_booster(direction: String, center_x: int, center_y: int
 
 	print("[GameBoard] Activating line blast booster: ", direction, " at (", center_x, ",", center_y, ")")
 	GameManager.processing_moves = true
+
+	# Play line blast sound
+	AudioManager.play_sfx("booster_line")
 
 	var positions_to_clear = []
 
@@ -1229,6 +1060,9 @@ func activate_hammer_booster(x: int, y: int):
 	print("[GameBoard] Activating hammer booster on tile (", x, ",", y, ")")
 	GameManager.processing_moves = true
 
+	# Play hammer sound
+	AudioManager.play_sfx("booster_hammer")
+
 	# Check if it's a valid tile (not blocked)
 	if GameManager.is_cell_blocked(x, y):
 		print("[GameBoard] Cannot use hammer on blocked tile!")
@@ -1263,6 +1097,9 @@ func activate_tile_squasher_booster(x: int, y: int):
 	print("[GameBoard] Activating tile squasher booster on tile (", x, ",", y, ")")
 	GameManager.processing_moves = true
 
+	# Play tile squasher sound
+	AudioManager.play_sfx("booster_tile_squasher")
+
 	# Check if it's a valid tile (not blocked)
 	if GameManager.is_cell_blocked(x, y):
 		print("[GameBoard] Cannot use tile squasher on blocked tile!")
@@ -1291,6 +1128,7 @@ func activate_tile_squasher_booster(x: int, y: int):
 
 	if positions_to_clear.size() > 0:
 		await highlight_special_activation(positions_to_clear)
+		# Use animate_destroy_tiles for arbitrary positions (matches var was incorrect)
 		await animate_destroy_tiles(positions_to_clear)
 
 		for pos in positions_to_clear:
@@ -1314,6 +1152,9 @@ func activate_row_clear_booster(row: int):
 
 	print("[GameBoard] Activating row clear booster on row ", row)
 	GameManager.processing_moves = true
+
+	# Play row clear sound
+	AudioManager.play_sfx("booster_row_clear")
 
 	var positions_to_clear = []
 	for x in range(GameManager.GRID_WIDTH):
@@ -1346,6 +1187,9 @@ func activate_column_clear_booster(column: int):
 	print("[GameBoard] Activating column clear booster on column ", column)
 	GameManager.processing_moves = true
 
+	# Play column clear sound
+	AudioManager.play_sfx("booster_column_clear")
+
 	var positions_to_clear = []
 	for y in range(GameManager.GRID_HEIGHT):
 		if not GameManager.is_cell_blocked(column, y):
@@ -1367,3 +1211,134 @@ func activate_column_clear_booster(column: int):
 
 	GameManager.processing_moves = false
 	print("[GameBoard] Column clear booster complete")
+
+# Activate a special tile with visuals and chain activations
+func activate_special_tile(pos: Vector2):
+	print("activate_special_tile: start at ", pos)
+	var tile_type = GameManager.get_tile_at(pos)
+	print("Tile type at ", pos, " is ", tile_type)
+	GameManager.processing_moves = true
+	print("activate_special_tile: processing_moves = true")
+
+	# Play general special activation sound
+	AudioManager.play_sfx("special_activate")
+
+	# Collect positions to clear based on tile type
+	var positions_to_clear = []
+
+	if tile_type == GameManager.HORIZTONAL_ARROW:
+		AudioManager.play_sfx("special_horiz")
+		for x in range(GameManager.GRID_WIDTH):
+			if not GameManager.is_cell_blocked(x, int(pos.y)):
+				positions_to_clear.append(Vector2(x, pos.y))
+	elif tile_type == GameManager.VERTICAL_ARROW:
+		AudioManager.play_sfx("special_vert")
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(int(pos.x), y):
+				positions_to_clear.append(Vector2(pos.x, y))
+	elif tile_type == GameManager.FOUR_WAY_ARROW:
+		AudioManager.play_sfx("special_fourway")
+		for x in range(GameManager.GRID_WIDTH):
+			if not GameManager.is_cell_blocked(x, int(pos.y)):
+				positions_to_clear.append(Vector2(x, pos.y))
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(int(pos.x), y):
+				if not positions_to_clear.has(Vector2(pos.x, y)):
+					positions_to_clear.append(Vector2(pos.x, y))
+
+	print("Clearing ", positions_to_clear.size(), " tiles")
+
+	# Check for other special tiles in the positions to clear (chain reaction)
+	var special_tiles_to_activate = []
+	for clear_pos in positions_to_clear:
+		if clear_pos == pos:
+			continue
+
+		var check_tile_type = GameManager.get_tile_at(clear_pos)
+		if check_tile_type >= 7 and check_tile_type <= 9:
+			special_tiles_to_activate.append({"pos": clear_pos, "type": check_tile_type})
+
+	# Highlight and destroy visually
+	await highlight_special_activation(positions_to_clear)
+	await animate_destroy_tiles(positions_to_clear)
+
+	# Clear tiles in GameManager grid
+	for clear_pos in positions_to_clear:
+		GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+
+	# Use a move for activating special tile
+	if GameManager.has_method("use_move"):
+		GameManager.use_move()
+
+	# Add points for cleared tiles
+	var points = GameManager.calculate_points(positions_to_clear.size())
+	GameManager.add_score(points)
+
+	# Activate any special tiles that were hit (chain reaction)
+	if special_tiles_to_activate.size() > 0:
+		for special_tile_info in special_tiles_to_activate:
+			AudioManager.play_sfx("booster_chain")
+			await activate_special_tile_chain(special_tile_info["pos"], special_tile_info["type"])
+
+	# Apply gravity and refill AFTER all chain reactions
+	print("activate_special_tile: applying gravity")
+	await animate_gravity()
+	print("activate_special_tile: gravity complete")
+	await animate_refill()
+	print("activate_special_tile: refill complete")
+
+	# Check for cascade matches after refill
+	await process_cascade()
+
+	GameManager.processing_moves = false
+	print("activate_special_tile: processing_moves = false")
+
+# Activate special tile as part of a chain reaction
+func activate_special_tile_chain(pos: Vector2, tile_type: int):
+	print("Chain-activating special tile type ", tile_type, " at ", pos)
+
+	var positions_to_clear = []
+
+	if tile_type == GameManager.HORIZTONAL_ARROW:
+		AudioManager.play_sfx("special_horiz")
+		for x in range(GameManager.GRID_WIDTH):
+			if not GameManager.is_cell_blocked(x, int(pos.y)):
+				positions_to_clear.append(Vector2(x, pos.y))
+	elif tile_type == GameManager.VERTICAL_ARROW:
+		AudioManager.play_sfx("special_vert")
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(int(pos.x), y):
+				positions_to_clear.append(Vector2(pos.x, y))
+	elif tile_type == GameManager.FOUR_WAY_ARROW:
+		AudioManager.play_sfx("special_fourway")
+		for x in range(GameManager.GRID_WIDTH):
+			if not GameManager.is_cell_blocked(x, int(pos.y)):
+				positions_to_clear.append(Vector2(x, pos.y))
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(int(pos.x), y):
+				if not positions_to_clear.has(Vector2(pos.x, y)):
+					positions_to_clear.append(Vector2(pos.x, y))
+
+	var special_tiles_to_activate = []
+	for clear_pos in positions_to_clear:
+		if clear_pos == pos:
+			continue
+
+		var check_tile_type = GameManager.get_tile_at(clear_pos)
+		if check_tile_type >= 7 and check_tile_type <= 9:
+			special_tiles_to_activate.append({"pos": clear_pos, "type": check_tile_type})
+
+	await highlight_special_activation(positions_to_clear)
+	await animate_destroy_tiles(positions_to_clear)
+
+	for clear_pos in positions_to_clear:
+		GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+
+	var points = GameManager.calculate_points(positions_to_clear.size())
+	GameManager.add_score(points)
+
+	if special_tiles_to_activate.size() > 0:
+		for special_tile_info in special_tiles_to_activate:
+			await activate_special_tile_chain(special_tile_info["pos"], special_tile_info["type"])
+
+	return

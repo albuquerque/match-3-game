@@ -24,8 +24,8 @@ config/icon="res://icon.svg"
 LevelManager="*res://scripts/LevelManager.gd"
 ThemeManager="*res://scripts/ThemeManager.gd"
 RewardManager="*res://scripts/RewardManager.gd"
-AdMobManager="*res://scripts/AdMobManager.gd"
 GameManager="*res://scripts/GameManager.gd"
+AudioManager="*res://scripts/AudioManager.gd"
 
 [display]
 
@@ -38,6 +38,14 @@ window/handheld/orientation=1
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/droid_admob/plugin.cfg")
+
+[match3]
+
+audio/music_volume=70
+audio/sfx_volume=80
+audio/music_enabled=false
+audio/sfx_enabled=false
+audio/muted=false
 
 [rendering]
 

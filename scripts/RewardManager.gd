@@ -46,6 +46,13 @@ var achievements_unlocked: Array = []
 var total_matches: int = 0
 var total_special_tiles_used: int = 0
 
+# Audio settings (persisted in player progress)
+var audio_music_volume: float = 0.7
+var audio_sfx_volume: float = 0.8
+var audio_music_enabled: bool = true
+var audio_sfx_enabled: bool = true
+var audio_muted: bool = false
+
 func _ready():
 	print("[RewardManager] Initializing...")
 	load_progress()
@@ -330,7 +337,14 @@ func save_progress():
 		"selected_theme": selected_theme,
 		"achievements_unlocked": achievements_unlocked,
 		"total_matches": total_matches,
-		"total_special_tiles_used": total_special_tiles_used
+		"total_special_tiles_used": total_special_tiles_used,
+		"audio": {
+			"music_volume": audio_music_volume,
+			"sfx_volume": audio_sfx_volume,
+			"music_enabled": audio_music_enabled,
+			"sfx_enabled": audio_sfx_enabled,
+			"muted": audio_muted
+		}
 	}
 
 	var file = FileAccess.open(SAVE_FILE_PATH, FileAccess.WRITE)
@@ -377,6 +391,14 @@ func load_progress():
 			total_matches = data.get("total_matches", 0)
 			total_special_tiles_used = data.get("total_special_tiles_used", 0)
 
+			# Load audio settings
+			var audio_data = data.get("audio", {})
+			audio_music_volume = audio_data.get("music_volume", audio_music_volume)
+			audio_sfx_volume = audio_data.get("sfx_volume", audio_sfx_volume)
+			audio_music_enabled = audio_data.get("music_enabled", audio_music_enabled)
+			audio_sfx_enabled = audio_data.get("sfx_enabled", audio_sfx_enabled)
+			audio_muted = audio_data.get("muted", audio_muted)
+
 			print("[RewardManager] Progress loaded successfully")
 		else:
 			print("[RewardManager] ERROR: Failed to parse save file")
@@ -419,3 +441,14 @@ func reset_progress():
 
 	print("[RewardManager] Progress reset!")
 
+func set_audio_muted(muted: bool):
+	audio_muted = muted
+	# If muted, disable both streams; if unmuted, restore enabled flags
+	if muted:
+		audio_music_enabled = false
+		audio_sfx_enabled = false
+	else:
+		# Default to true when unmuting unless stored otherwise
+		audio_music_enabled = true
+		audio_sfx_enabled = true
+	save_progress()
