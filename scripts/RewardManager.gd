@@ -36,6 +36,7 @@ var boosters = {
 # Progression data
 var daily_streak: int = 0
 var last_login_date: String = ""
+var last_daily_reward_claim: String = ""
 var total_stars: int = 0
 var levels_completed: int = 0
 var unlocked_themes: Array = ["legacy"]
@@ -248,37 +249,9 @@ func check_daily_login():
 		daily_streak = 1
 
 	last_login_date = today
-
-	# Grant daily reward
-	grant_daily_login_reward()
+	print("[RewardManager] Daily login streak: %d days" % daily_streak)
 	save_progress()
 
-func grant_daily_login_reward():
-	var day = daily_streak % 7
-	if day == 0:
-		day = 7
-
-	match day:
-		1:
-			add_coins(50)
-		2:
-			add_coins(75)
-		3:
-			add_coins(100)
-			add_gems(5)
-		4:
-			add_coins(125)
-		5:
-			add_coins(150)
-		6:
-			add_coins(175)
-		7:
-			add_coins(200)
-			add_gems(25)
-			add_booster("hammer", 1)
-			print("[RewardManager] Week completed! Bonus rewards granted!")
-
-	print("[RewardManager] Daily login reward (Day %d): Claimed!" % day)
 
 func _get_yesterday_date() -> String:
 	var unix_time = Time.get_unix_time_from_system()
@@ -331,6 +304,7 @@ func save_progress():
 		"boosters": boosters,
 		"daily_streak": daily_streak,
 		"last_login_date": last_login_date,
+		"last_daily_reward_claim": last_daily_reward_claim,
 		"total_stars": total_stars,
 		"levels_completed": levels_completed,
 		"unlocked_themes": unlocked_themes,
@@ -390,6 +364,7 @@ func load_progress():
 			achievements_unlocked = data.get("achievements_unlocked", [])
 			total_matches = data.get("total_matches", 0)
 			total_special_tiles_used = data.get("total_special_tiles_used", 0)
+			last_daily_reward_claim = data.get("last_daily_reward_claim", "")
 
 			# Load audio settings
 			var audio_data = data.get("audio", {})
@@ -424,6 +399,7 @@ func reset_progress():
 	}
 	daily_streak = 0
 	last_login_date = ""
+	last_daily_reward_claim = ""
 	total_stars = 0
 	levels_completed = 0
 	unlocked_themes = ["legacy"]

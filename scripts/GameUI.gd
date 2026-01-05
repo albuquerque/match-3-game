@@ -255,6 +255,9 @@ func _ready():
 		# Connect new settings signal so StartPage can open settings
 		if start_page.has_signal("settings_pressed") and not start_page.is_connected("settings_pressed", Callable(self, "_on_startpage_settings_pressed")):
 			start_page.connect("settings_pressed", Callable(self, "_on_startpage_settings_pressed"))
+		# Connect achievements signal
+		if start_page.has_signal("achievements_pressed") and not start_page.is_connected("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed")):
+			start_page.connect("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed"))
 
 	# Check if player has lives
 	if RewardManager.get_lives() <= 0:
@@ -1149,3 +1152,42 @@ func _on_startpage_settings_pressed():
 		# Fallback: present settings as fullscreen side (will instance scene)
 		_show_settings_side()
 		print("[GameUI] Settings dialog not found to open from StartPage; using fullscreen fallback")
+
+func _on_startpage_achievements_pressed():
+	# Show achievements page
+	_show_achievements_page()
+	print("[GameUI] Opening achievements page from StartPage")
+
+func _show_achievements_page():
+	# Load and instance the achievements page script
+	var achievements_script = load("res://scripts/AchievementsPage.gd")
+	if not achievements_script:
+		print("[GameUI] ERROR: Could not load AchievementsPage.gd")
+		return
+
+	var achievements_page = Control.new()
+	achievements_page.name = "AchievementsPage"
+	achievements_page.set_script(achievements_script)
+
+	# Make it fullscreen
+	achievements_page.anchor_right = 1.0
+	achievements_page.anchor_bottom = 1.0
+	achievements_page.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Connect back signal
+	achievements_page.connect("back_pressed", Callable(self, "_on_achievements_back_pressed"))
+
+	# Add to scene
+	add_child(achievements_page)
+
+	# Show the page
+	if achievements_page.has_method("show_page"):
+		achievements_page.show_page()
+
+	print("[GameUI] Achievements page created and shown")
+
+func _on_achievements_back_pressed():
+	var achievements_page = get_node_or_null("AchievementsPage")
+	if achievements_page:
+		achievements_page.queue_free()
+	print("[GameUI] Achievements page closed")

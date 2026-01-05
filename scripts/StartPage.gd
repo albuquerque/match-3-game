@@ -4,6 +4,7 @@ signal start_pressed
 signal booster_selected(booster_id: String)
 signal exchange_pressed
 signal settings_pressed
+signal achievements_pressed
 
 func _ready():
 	# Fullscreen anchors
@@ -146,13 +147,24 @@ func _ready():
 	# Update initial visual state
 	_update_mute_visual(top_mute, not muted)
 
-	# After creating actions_h and exchange_btn, add Settings button
+	# Create a second row for Settings and Achievements buttons
+	var settings_h = HBoxContainer.new()
+	settings_h.name = "SettingsH"
+	vbox.add_child(settings_h)
+
 	var settings_btn = Button.new()
 	settings_btn.name = "SettingsButton"
 	settings_btn.text = "Settings"
-	settings_btn.custom_minimum_size = Vector2(140, 48)
+	settings_btn.custom_minimum_size = Vector2(200, 48)
 	settings_btn.pressed.connect(Callable(self, "_on_settings_pressed"))
-	actions_h.add_child(settings_btn)
+	settings_h.add_child(settings_btn)
+
+	var achievements_btn = Button.new()
+	achievements_btn.name = "AchievementsButton"
+	achievements_btn.text = "🏆 Achievements"
+	achievements_btn.custom_minimum_size = Vector2(200, 48)
+	achievements_btn.pressed.connect(Callable(self, "_on_achievements_pressed"))
+	settings_h.add_child(achievements_btn)
 
 	# Check if player has lives and update UI accordingly (lives already retrieved above)
 	if lives <= 0:
@@ -195,6 +207,9 @@ func _on_exchange_pressed():
 
 func _on_settings_pressed():
 	emit_signal("settings_pressed")
+
+func _on_achievements_pressed():
+	emit_signal("achievements_pressed")
 
 func _on_mute_toggled(pressed: bool):
 	# pressed=true means muted -> set enabled=false
