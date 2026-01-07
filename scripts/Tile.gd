@@ -51,9 +51,16 @@ func setup(type: int, pos: Vector2, scale_factor: float = 1.0):
 	tile_scale = scale_factor
 
 	# Update collision shape size based on scale
-	if collision_shape and collision_shape.shape is CircleShape2D:
-		var circle_shape = collision_shape.shape as CircleShape2D
-		circle_shape.radius = (BASE_TILE_SIZE / 2) * tile_scale
+	if collision_shape:
+		if collision_shape.shape is CircleShape2D:
+			# Replace with RectangleShape2D for better match with rounded corners
+			var rect_shape = RectangleShape2D.new()
+			rect_shape.size = Vector2(BASE_TILE_SIZE * tile_scale, BASE_TILE_SIZE * tile_scale)
+			collision_shape.shape = rect_shape
+		elif collision_shape.shape is RectangleShape2D:
+			var rect_shape = collision_shape.shape as RectangleShape2D
+			rect_shape.size = Vector2(BASE_TILE_SIZE * tile_scale, BASE_TILE_SIZE * tile_scale)
+
 
 	# Call update_visual to set the correct sprite scale based on texture size
 	update_visual()
@@ -87,6 +94,9 @@ func update_visual():
 		sprite.scale = Vector2(64.0 / float(texture.get_width()), 64.0 / float(texture.get_height())) * tile_scale
 		sprite.modulate = Color.WHITE
 		print("[Tile.update_visual] Applied scale to sprite:", sprite.scale, "Texture size:", texture.get_width(), texture.get_height())
+
+		# Apply rounded corner shader
+		apply_rounded_corner_shader()
 	else:
 		if tile_type > COLORS.size():
 			sprite.modulate = Color.WHITE
@@ -111,6 +121,9 @@ func update_visual():
 		sprite.scale = Vector2(64.0 / float(texture.get_width()), 64.0 / float(texture.get_height())) * tile_scale
 		print("[Tile.update_visual] Fallback scale:", sprite.scale, "Texture size:", texture.get_width(), texture.get_height())
 
+		# Apply rounded corner shader
+		apply_rounded_corner_shader()
+
 	if selection_ring and not selection_ring.texture:
 		var ring_texture = create_ring_texture()
 		selection_ring.texture = ring_texture
@@ -122,6 +135,28 @@ func update_type(new_type: int):
 	tile_type = new_type
 	update_visual()
 	print("Tile updated. Sprite visible: ", sprite.visible if sprite else "no sprite", " Texture: ", sprite.texture if sprite else "no sprite", " Scale: ", sprite.scale if sprite else "no sprite")
+
+func apply_rounded_corner_shader():
+	"""Apply the rounded corner shader to the sprite"""
+	if not sprite:
+		print("[Tile] Cannot apply shader - sprite not ready")
+		return
+
+	var shader_path = "res://shaders/rounded_tile.gdshader"
+	if not ResourceLoader.exists(shader_path):
+		print("[Tile] Shader not found at: ", shader_path)
+		return
+
+	var shader = load(shader_path)
+	if not shader:
+		print("[Tile] Failed to load shader")
+		return
+
+	var material = ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("corner_radius", 0.25)  # Larger radius for more visible rounded corners
+	sprite.material = material
+	print("[Tile] Applied rounded corner shader to tile at ", grid_position)
 
 func create_ring_texture() -> ImageTexture:
 	var image = Image.create(64, 64, false, Image.FORMAT_RGBA8)

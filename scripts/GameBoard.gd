@@ -46,21 +46,53 @@ var tile_size: float
 var grid_offset: Vector2
 var board_margin: float = 20.0
 
-const BOARD_BACKGROUND_COLOR = Color(0.2, 0.2, 0.3, 0.8)
+# Board appearance configuration
+const BOARD_BACKGROUND_COLOR = Color(0.2, 0.2, 0.3, 0.7)  # Slightly translucent
+var border_color: Color = Color(0.9, 0.9, 1.0, 0.9)  # Configurable border color
+const BORDER_WIDTH = 3.0
+
+# Background image
+var background_image_path: String = ""  # Set this to enable background image
+var background_sprite = null  # TextureRect for the background image
 
 @onready var background = $Background
+var border_container: Node2D  # Container for all border lines
+var tile_area_overlay: Control = null  # Container for semi-transparent overlay pieces over tiles
 
 func _ready():
 	GameManager.connect("game_over", Callable(self, "_on_game_over"))
 	GameManager.connect("level_complete", Callable(self, "_on_level_complete"))
 	GameManager.connect("level_loaded", Callable(self, "_on_level_loaded"))
 
+	# Create border container
+	border_container = Node2D.new()
+	border_container.name = "BorderContainer"
+	add_child(border_container)
+
+	# ========== CUSTOMIZATION EXAMPLES ==========
+	# Uncomment and modify these lines to customize appearance:
+
+	# Set custom border color (RGBA values from 0.0 to 1.0)
+	# border_color = Color(1.0, 0.8, 0.2, 1.0)  # Gold/orange border
+	# border_color = Color(0.2, 0.8, 1.0, 1.0)  # Cyan border
+	# border_color = Color(1.0, 0.2, 0.8, 1.0)  # Pink border
+
+	# Set background image (put your image in textures/ folder)
+	background_image_path = "res://textures/background.jpg"
+	# background_image_path = "res://textures/splash_screen.png"  # Example using existing asset
+
+	# ============================================
+
 	calculate_responsive_layout()
 	setup_background()
+
+	# Setup background image AFTER layout is calculated
+	setup_background_image()
 
 	# Only create visual grid if GameManager has initialized a level; otherwise wait for level_loaded
 	if Engine.has_singleton("GameManager") and GameManager.initialized:
 		create_visual_grid()
+		draw_board_borders()
 	else:
 		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
 
@@ -96,7 +128,12 @@ func calculate_responsive_layout():
 	print("Grid offset: ", grid_offset)
 
 func setup_background():
-	# Create board background using dynamic sizing
+	# Hide the board background - we only want translucent tiles, not a background square
+	# The background image will show through the tiles instead
+	if background:
+		background.visible = false
+
+	# Keep the size/position calculations in case we need to re-enable it
 	var board_size = Vector2(
 		GameManager.GRID_WIDTH * tile_size + 20,
 		GameManager.GRID_HEIGHT * tile_size + 20
@@ -109,6 +146,144 @@ func setup_background():
 		grid_offset.x - 10,
 		grid_offset.y - 10
 	)
+
+	# Create semi-transparent overlay for the tile area
+	setup_tile_area_overlay()
+
+func setup_tile_area_overlay():
+	"""Create a semi-transparent overlay covering only the active tile area (within borders)"""
+	# Remove existing overlay if any
+	if tile_area_overlay:
+		tile_area_overlay.queue_free()
+		tile_area_overlay = null
+
+	# Create a container for the overlay pieces
+	tile_area_overlay = Control.new()
+	tile_area_overlay.name = "TileAreaOverlay"
+	tile_area_overlay.z_index = -50  # Above background image, behind tiles
+	tile_area_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Create individual semi-transparent rectangles for each active tile position
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(x, y):
+				var tile_overlay = ColorRect.new()
+				tile_overlay.color = Color(0.1, 0.15, 0.25, 0.5)  # Semi-transparent dark overlay (50% opacity)
+				tile_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+				# Position and size to match the tile
+				var left = x * tile_size + grid_offset.x
+				var top = y * tile_size + grid_offset.y
+				tile_overlay.position = Vector2(left, top)
+				tile_overlay.size = Vector2(tile_size, tile_size)
+
+				tile_area_overlay.add_child(tile_overlay)
+
+	# Add to parent (MainGame)
+	var parent = get_parent()
+	if parent:
+		parent.call_deferred("add_child", tile_area_overlay)
+		print("[GameBoard] Tile area overlay created with individual tile overlays")
+	else:
+		call_deferred("add_child", tile_area_overlay)
+		print("[GameBoard] Tile area overlay created (added to self)")
+
+func setup_background_image():
+	"""Setup a fullscreen background image behind the game board"""
+	print("[GameBoard] setup_background_image called with path: ", background_image_path)
+
+	# Remove existing background sprite if any
+	if background_sprite:
+		background_sprite.queue_free()
+		background_sprite = null
+
+	# If no background image path is set, skip
+	if background_image_path == "":
+		print("[GameBoard] No background image path set")
+		return
+
+	# Check if resource exists
+	if not ResourceLoader.exists(background_image_path):
+		print("[GameBoard] ERROR: Background image not found at: ", background_image_path)
+		print("[GameBoard] Please check that the file exists and the path is correct")
+		return
+
+	print("[GameBoard] Loading background image...")
+
+	# Create background using TextureRect (works better with Control nodes)
+	var background_rect = TextureRect.new()
+	background_rect.name = "BackgroundImage"
+
+	# Load the texture
+	var texture = load(background_image_path)
+	if not texture:
+		print("[GameBoard] ERROR: Failed to load texture from: ", background_image_path)
+		return
+
+	background_rect.texture = texture
+	background_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+
+	print("[GameBoard] Texture loaded, size: ", texture.get_size())
+
+	# Get viewport and screen size
+	var viewport = get_viewport()
+	if not viewport:
+		print("[GameBoard] ERROR: No viewport available")
+		return
+
+	var screen_size = viewport.get_visible_rect().size
+
+	print("[GameBoard] Screen size: ", screen_size)
+
+	# Set size to cover entire screen
+	background_rect.size = screen_size
+	background_rect.position = Vector2.ZERO
+	background_rect.z_index = -100  # Behind everything
+
+	print("[GameBoard] Background rect size: ", background_rect.size)
+	print("[GameBoard] Background rect position: ", background_rect.position)
+
+	# Store reference (update type)
+	if background_sprite:
+		background_sprite.queue_free()
+	background_sprite = background_rect
+
+	# Add to parent (MainGame) to render behind everything
+	# Use call_deferred because parent is busy during _ready()
+	var parent = get_parent()
+	if parent:
+		# Hide or make transparent the existing Background ColorRect in MainGame
+		var existing_bg = parent.get_node_or_null("Background")
+		if existing_bg and existing_bg is ColorRect:
+			# Make it invisible so our background image shows through
+			existing_bg.visible = false
+			print("[GameBoard] Hidden existing MainGame background to show image")
+
+		# Defer both add_child and move_child
+		parent.call_deferred("add_child", background_rect)
+		parent.call_deferred("move_child", background_rect, 0)
+		print("[GameBoard] Background will be added to parent (deferred): ", parent.name)
+	else:
+		# Fallback: add to self if no parent
+		call_deferred("add_child", background_rect)
+		call_deferred("move_child", background_rect, 0)
+		print("[GameBoard] Background will be added to self (deferred, no parent found)")
+
+	print("[GameBoard] Background image successfully loaded and will be added to scene!")
+	print("[GameBoard] Background z_index: ", background_rect.z_index)
+	print("[GameBoard] Background visible: ", background_rect.visible)
+
+func set_border_color(color: Color):
+	"""Set the color for the board borders"""
+	border_color = color
+	# Redraw borders with new color
+	draw_board_borders()
+
+func set_background_image(image_path: String):
+	"""Set a background image for the game board screen"""
+	background_image_path = image_path
+	setup_background_image()
 
 func clear_tiles():
 	# Remove all Tile instances created by this board
@@ -344,6 +519,7 @@ func _on_level_loaded():
 
 	# Recreate the visual grid for the new level
 	create_visual_grid()
+	draw_board_borders()
 
 func grid_to_world_position(grid_pos: Vector2) -> Vector2:
 	return Vector2(
@@ -1342,3 +1518,134 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 			await activate_special_tile_chain(special_tile_info["pos"], special_tile_info["type"])
 
 	return
+
+# Draw embossed borders around the active play area
+func draw_board_borders():
+	# Clear existing borders
+	if border_container:
+		for child in border_container.get_children():
+			child.queue_free()
+
+	# Simply draw borders around each edge of active tiles
+	draw_simple_borders()
+
+	print("[Border] Drew borders with ", border_container.get_child_count(), " elements")
+
+# Draw simple borders by checking each tile's edges
+func draw_simple_borders():
+	var corner_radius = BORDER_WIDTH * 6.0  # Large radius for very pronounced rounded corners
+
+	# For each active tile, check which edges need borders and draw them
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if GameManager.is_cell_blocked(x, y):
+				continue
+
+			# Calculate tile edges in world coordinates
+			var left = x * tile_size + grid_offset.x
+			var right = (x + 1) * tile_size + grid_offset.x
+			var top = y * tile_size + grid_offset.y
+			var bottom = (y + 1) * tile_size + grid_offset.y
+
+			# Check which edges need borders
+			var has_top = (y == 0 or GameManager.is_cell_blocked(x, y - 1))
+			var has_bottom = (y == GameManager.GRID_HEIGHT - 1 or GameManager.is_cell_blocked(x, y + 1))
+			var has_left = (x == 0 or GameManager.is_cell_blocked(x - 1, y))
+			var has_right = (x == GameManager.GRID_WIDTH - 1 or GameManager.is_cell_blocked(x + 1, y))
+
+			# Draw top border (shortened at corners)
+			if has_top:
+				var start_x = left + (corner_radius if has_left else 0)
+				var end_x = right - (corner_radius if has_right else 0)
+				if end_x > start_x:  # Only draw if there's space
+					draw_border_edge(Vector2(start_x, top), Vector2(end_x, top))
+
+			# Draw bottom border (shortened at corners)
+			if has_bottom:
+				var start_x = left + (corner_radius if has_left else 0)
+				var end_x = right - (corner_radius if has_right else 0)
+				if end_x > start_x:
+					draw_border_edge(Vector2(start_x, bottom), Vector2(end_x, bottom))
+
+			# Draw left border (shortened at corners)
+			if has_left:
+				var start_y = top + (corner_radius if has_top else 0)
+				var end_y = bottom - (corner_radius if has_bottom else 0)
+				if end_y > start_y:
+					draw_border_edge(Vector2(left, start_y), Vector2(left, end_y))
+
+			# Draw right border (shortened at corners)
+			if has_right:
+				var start_y = top + (corner_radius if has_top else 0)
+				var end_y = bottom - (corner_radius if has_bottom else 0)
+				if end_y > start_y:
+					draw_border_edge(Vector2(right, start_y), Vector2(right, end_y))
+
+			# Draw quarter-circle arcs at corners
+			if has_top and has_left:
+				draw_corner_arc(Vector2(left, top), "top_left", corner_radius)
+			if has_top and has_right:
+				draw_corner_arc(Vector2(right, top), "top_right", corner_radius)
+			if has_bottom and has_left:
+				draw_corner_arc(Vector2(left, bottom), "bottom_left", corner_radius)
+			if has_bottom and has_right:
+				draw_corner_arc(Vector2(right, bottom), "bottom_right", corner_radius)
+
+# Draw a single border edge
+func draw_border_edge(start: Vector2, end: Vector2):
+	var line = Line2D.new()
+	line.add_point(start)
+	line.add_point(end)
+	line.width = BORDER_WIDTH
+	line.default_color = border_color  # Use configurable color
+	line.antialiased = true
+	border_container.add_child(line)
+
+# Draw a quarter-circle arc at a corner
+func draw_corner_arc(corner_pos: Vector2, corner_type: String, radius: float):
+	var line = Line2D.new()
+	var num_segments = 8
+
+	# Determine the arc based on corner type
+	var start_angle = 0.0
+	var end_angle = 0.0
+
+	match corner_type:
+		"top_left":
+			# Arc from left side to top side
+			# Start at (corner_pos.x + radius, corner_pos.y) going to (corner_pos.x, corner_pos.y + radius)
+			# Center is at (corner_pos.x + radius, corner_pos.y + radius)
+			for i in range(num_segments + 1):
+				var t = float(i) / float(num_segments)
+				var angle = lerp(PI, PI * 1.5, t)  # 180° to 270°
+				var point = corner_pos + Vector2(radius, radius) + Vector2(cos(angle), sin(angle)) * radius
+				line.add_point(point)
+		"top_right":
+			# Arc from top side to right side
+			# Center is at (corner_pos.x - radius, corner_pos.y + radius)
+			for i in range(num_segments + 1):
+				var t = float(i) / float(num_segments)
+				var angle = lerp(PI * 1.5, PI * 2.0, t)  # 270° to 360°
+				var point = corner_pos + Vector2(-radius, radius) + Vector2(cos(angle), sin(angle)) * radius
+				line.add_point(point)
+		"bottom_left":
+			# Arc from bottom side to left side
+			# Center is at (corner_pos.x + radius, corner_pos.y - radius)
+			for i in range(num_segments + 1):
+				var t = float(i) / float(num_segments)
+				var angle = lerp(PI * 0.5, PI, t)  # 90° to 180°
+				var point = corner_pos + Vector2(radius, -radius) + Vector2(cos(angle), sin(angle)) * radius
+				line.add_point(point)
+		"bottom_right":
+			# Arc from right side to bottom side
+			# Center is at (corner_pos.x - radius, corner_pos.y - radius)
+			for i in range(num_segments + 1):
+				var t = float(i) / float(num_segments)
+				var angle = lerp(0.0, PI * 0.5, t)  # 0° to 90°
+				var point = corner_pos + Vector2(-radius, -radius) + Vector2(cos(angle), sin(angle)) * radius
+				line.add_point(point)
+
+	line.width = BORDER_WIDTH
+	line.default_color = border_color  # Use configurable color
+	line.antialiased = true
+	border_container.add_child(line)
