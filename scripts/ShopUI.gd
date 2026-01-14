@@ -119,11 +119,25 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 			owned_label.modulate = Color(0.5, 1.0, 0.5)
 			info_vbox.add_child(owned_label)
 
-	# Buy button
+	# Buy button - create with icon
 	var buy_button = Button.new()
-	var cost_icon = "💰" if cost_type == "coins" else "💎"
-	buy_button.text = "Buy\n%d %s" % [cost, cost_icon]
+	buy_button.text = "Buy\n%d" % cost
 	buy_button.custom_minimum_size = Vector2(buy_width, 60)
+
+	# Add icon to button (will be positioned by button's internal layout)
+	var cost_icon = TextureRect.new()
+	cost_icon.custom_minimum_size = Vector2(16, 16)
+	cost_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	cost_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if cost_type == "coins":
+		cost_icon.texture = ThemeManager.load_coin_icon()
+	else:
+		cost_icon.texture = ThemeManager.load_gem_icon()
+
+	# Note: Button doesn't support adding children cleanly in this way
+	# So we'll use a simple text-only approach for now
+	# TODO: Could create a custom button with icon later
+
 	# Bind the purchase arguments to the callable so the signal receives them when pressed
 	var buy_callable = Callable(self, "_on_buy_pressed").bind(item_id, cost, cost_type)
 	buy_button.pressed.connect(buy_callable)
@@ -165,9 +179,34 @@ func show_shop():
 func _update_currency_display(_amount: int = 0):
 	"""Update the currency display in the shop"""
 	if coins_label:
-		coins_label.text = "💰 %d" % RewardManager.get_coins()
+		# Hide old label and create icon display
+		var parent = coins_label.get_parent()
+		if parent:
+			var icon_display = parent.get_node_or_null("CoinsIconDisplay")
+			if not icon_display:
+				coins_label.visible = false
+				icon_display = ThemeManager.create_currency_display("coins", RewardManager.get_coins(), 20, 18, Color.WHITE)
+				icon_display.name = "CoinsIconDisplay"
+				parent.add_child(icon_display)
+			else:
+				var label = icon_display.get_child(1) as Label
+				if label:
+					label.text = str(RewardManager.get_coins())
+
 	if gems_label:
-		gems_label.text = "💎 %d" % RewardManager.get_gems()
+		# Hide old label and create icon display
+		var parent = gems_label.get_parent()
+		if parent:
+			var icon_display = parent.get_node_or_null("GemsIconDisplay")
+			if not icon_display:
+				gems_label.visible = false
+				icon_display = ThemeManager.create_currency_display("gems", RewardManager.get_gems(), 20, 18, Color.WHITE)
+				icon_display.name = "GemsIconDisplay"
+				parent.add_child(icon_display)
+			else:
+				var label = icon_display.get_child(1) as Label
+				if label:
+					label.text = str(RewardManager.get_gems())
 
 func _on_buy_pressed(item_id: String, cost: int, cost_type: String):
 	"""Handle purchase button press"""

@@ -35,27 +35,27 @@ func _display_reward(reward_data: Dictionary):
 	is_showing = true
 	visible = true
 
-	# Set reward text based on type
-	var icon_text = ""
+	# Set reward text and icon based on type
+	var icon_texture: Texture2D = null
 	match reward_data.type:
 		"coins":
-			icon_text = "💰"
+			icon_texture = ThemeManager.load_coin_icon()
 			reward_label.text = "+%d Coins" % reward_data.amount
 		"gems":
-			icon_text = "💎"
+			icon_texture = ThemeManager.load_gem_icon()
 			reward_label.text = "+%d Gems" % reward_data.amount
 		"lives":
-			icon_text = "❤️"
-			reward_label.text = "+%d Lives" % reward_data.amount
+			# Keep emoji for lives as we don't have an SVG
+			reward_label.text = "❤️ +%d Lives" % reward_data.amount
 		"booster":
-			icon_text = "🚀"
-			reward_label.text = "Booster Unlocked!"
+			# Keep emoji for booster as we don't have a generic SVG
+			reward_label.text = "🚀 Booster Unlocked!"
 		"stars":
-			icon_text = "⭐"
-			reward_label.text = "%d Stars!" % reward_data.amount
+			# Keep emoji for stars as we don't have an SVG
+			reward_label.text = "⭐ %d Stars!" % reward_data.amount
 		_:
-			icon_text = "🎁"
-			reward_label.text = "Reward!"
+			# Keep emoji for generic rewards
+			reward_label.text = "🎁 Reward!"
 
 	# Update description
 	if reward_data.description != "":
@@ -64,15 +64,35 @@ func _display_reward(reward_data: Dictionary):
 	else:
 		description_label.visible = false
 
-	# Create icon label
+	# Create icon
 	for child in icon_container.get_children():
 		child.queue_free()
 
-	var icon_label = Label.new()
-	icon_label.text = icon_text
-	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	icon_label.add_theme_font_size_override("font_size", 72)
-	icon_container.add_child(icon_label)
+	if icon_texture:
+		# Use TextureRect for SVG icons
+		var icon_rect = TextureRect.new()
+		icon_rect.texture = icon_texture
+		icon_rect.custom_minimum_size = Vector2(80, 80)
+		icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_container.add_child(icon_rect)
+	else:
+		# Use Label for emoji fallback (lives, boosters, stars)
+		var icon_label = Label.new()
+		var icon_text = ""
+		match reward_data.type:
+			"lives":
+				icon_text = "❤️"
+			"booster":
+				icon_text = "🚀"
+			"stars":
+				icon_text = "⭐"
+			_:
+				icon_text = "🎁"
+		icon_label.text = icon_text
+		icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_label.add_theme_font_size_override("font_size", 72)
+		icon_container.add_child(icon_label)
 
 	# Play animation
 	if animation_player.has_animation("show_reward"):

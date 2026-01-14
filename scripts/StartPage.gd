@@ -25,6 +25,9 @@ func _ready():
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bg)
 
+	# Get RewardManager reference for use later in the function
+	var rm = get_node_or_null('/root/RewardManager')
+
 	# Create a simple layout programmatically so the scene file isn't required here
 	var vbox = VBoxContainer.new()
 	vbox.name = "VBox"
@@ -50,16 +53,8 @@ func _ready():
 	lives_label.add_theme_font_size_override("font_size", 20)
 	vbox.add_child(lives_label)
 
-	# Update lives display
-	var rm = get_node_or_null('/root/RewardManager')
-	var lives = 0
-	if rm:
-		lives = rm.get_lives()
-	lives_label.text = "Lives: %d / %d" % [lives, rm.MAX_LIVES if rm else 5]
-	if lives <= 0:
-		lives_label.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
-	else:
-		lives_label.add_theme_color_override("font_color", Color(0.3, 1, 0.3))
+	# Hide lives display - no longer using lives system
+	lives_label.visible = false
 
 	# Description label below level button
 	var desc_label = Label.new()
@@ -166,23 +161,8 @@ func _ready():
 	achievements_btn.pressed.connect(Callable(self, "_on_achievements_pressed"))
 	settings_h.add_child(achievements_btn)
 
-	# Check if player has lives and update UI accordingly (lives already retrieved above)
-	if lives <= 0:
-		# No lives - change button text but keep it clickable so dialog can show
-		start_btn.text = "Out of Lives - Refill?"
-
-		# Add a message label to inform the user
-		var no_lives_label = Label.new()
-		no_lives_label.text = "Click the button above to refill your lives!"
-		no_lives_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		no_lives_label.add_theme_color_override("font_color", Color(1, 0.7, 0.3))
-		no_lives_label.add_theme_font_size_override("font_size", 16)
-		vbox.add_child(no_lives_label)
-		vbox.move_child(no_lives_label, 2)  # Place after description
-
-		print("[StartPage] No lives available - button will trigger refill dialog")
-	else:
-		print("[StartPage] Player has %d lives - Start button enabled" % lives)
+	# Lives system removed - no checks needed
+	print("[StartPage] Start button enabled - no lives restrictions")
 
 func set_level_info(level_number: int, description: String):
 	var btn = get_node_or_null("VBox/LevelButton")

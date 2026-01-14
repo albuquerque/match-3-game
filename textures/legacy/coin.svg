@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <!-- Coin gradients -->
+    <radialGradient id="coinGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFF7C2"/>
+      <stop offset="35%" stop-color="#FFD966"/>
+      <stop offset="65%" stop-color="#D4A935"/>
+      <stop offset="100%" stop-color="#A0781B"/>
+    </radialGradient>
+
+    <radialGradient id="rimGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFE691"/>
+      <stop offset="80%" stop-color="#C89C33"/>
+      <stop offset="100%" stop-color="#8C681B"/>
+    </radialGradient>
+
+    <!-- Flame gradients -->
+    <linearGradient id="bigFlame" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFE97F"/>
+      <stop offset="40%" stop-color="#FF9800"/>
+      <stop offset="80%" stop-color="#F4511E"/>
+      <stop offset="100%" stop-color="#BF360C"/>
+    </linearGradient>
+
+    <linearGradient id="smallFlame" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="40%" stop-color="#FFE082"/>
+      <stop offset="100%" stop-color="#FFB74D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Coin outer rim -->
+  <circle cx="256" cy="256" r="230" fill="url(#rimGradient)" stroke="#DDB757" stroke-width="12"/>
+
+  <!-- Coin inner face -->
+  <circle cx="256" cy="256" r="195" fill="url(#coinGradient)" stroke="#C5962D" stroke-width="6"/>
+
+  <!-- Decorative inner ring -->
+  <circle cx="256" cy="256" r="165" fill="none" stroke="#E8C463" stroke-width="10" stroke-dasharray="10 10"/>
+
+  <!-- Outer big flame (unified flame silhouette) -->
+  <path d="
+    M256 135
+    C225 185, 170 230, 200 300
+    C220 345, 260 360, 256 400
+    C300 350, 345 300, 325 240
+    C310 200, 270 180, 256 135Z"
+    fill="url(#bigFlame)"
+    stroke="#A33A00"
+    stroke-width="6"
+    stroke-linejoin="round" />
+
+  <!-- Inner flame highlight -->
+  <path d="
+    M256 200
+    C235 235, 215 260, 230 300
+    C242 330, 260 350, 256 370
+    C278 345, 295 320, 285 280
+    C275 245, 260 230, 256 200Z"
+    fill="url(#smallFlame)" />
+</svg>
+
