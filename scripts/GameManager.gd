@@ -58,7 +58,7 @@ var DEBUG_LOGGING = true
 var initialized = false
 
 func _ready():
-	print("[GameManager] _ready() - initializing. Current lives=", RewardManager.get_lives() if Engine.has_singleton("RewardManager") else "<no RewardManager>")
+	print("[GameManager] _ready() - initializing")
 	# Get the autoloaded LevelManager
 	level_manager = get_node_or_null("/root/LevelManager")
 	if not level_manager:
@@ -70,24 +70,18 @@ func _ready():
 		print("[GameManager] WARNING: ThemeManager not found as autoload!")
 
 	# Do NOT auto-initialize the game here. The UI will present a StartPage and call initialize_game() when the
-	# player explicitly starts the level so we don't consume a life automatically on app launch.
+	# player explicitly starts the level
 	# initialize_game()
 
 func initialize_game():
 	score = 0
-	level = 3
+	# Don't hardcode level - let load_current_level() set it from LevelManager
 	combo_count = 0
 	processing_moves = false
 	level_transitioning = false
 	# Do NOT set initialized here; set it after a level is actually loaded in load_current_level()
 
-	print("[GameManager] initialize_game() - lives=", RewardManager.get_lives(), ", current score=", score, ", moves_left=", moves_left)
-
-	# Check if player has lives
-	if RewardManager.get_lives() <= 0:
-		print("[GameManager] No lives available, aborting initialize_game()")
-		# The GameUI will handle showing the dialog
-		return
+	print("[GameManager] initialize_game() - current score=", score, ", moves_left=", moves_left)
 
 	# Load the first level and wait for it to finish so callers can rely on initialized
 	await load_current_level()
@@ -96,18 +90,15 @@ func initialize_game():
 	emit_signal("level_changed", level)
 	emit_signal("moves_changed", moves_left)
 
+	print("[GameManager] ✓ initialize_game() completed, initialized =", initialized, ", grid size =", grid.size())
+
 func load_current_level():
 	"""Load the current level from LevelManager"""
 	processing_moves = false  # Reset the processing flag when loading a level
 	score = 0  # Reset score for the new level
 	combo_count = 0  # Reset combo count
 
-	print("[GameManager] load_current_level() - attempting to consume a life. Current lives=", RewardManager.get_lives())
-	# Consume a life when starting a level
-	if not RewardManager.use_life():
-		print("[GameManager] use_life() returned false - not loading level")
-		# Don't load level if no lives
-		return
+	print("[GameManager] load_current_level() - loading level data")
 
 	# Ensure LevelManager is available and has loaded levels (wait briefly if needed)
 	if not level_manager or (level_manager and level_manager.levels.size() == 0):
@@ -130,6 +121,12 @@ func load_current_level():
 
 	if level_data:
 		print("[GameManager] Found level_data: level=", level_data.level_number)
+		print("[GameManager]   width=", level_data.width, ", height=", level_data.height)
+		print("[GameManager]   target_score=", level_data.target_score)
+		print("[GameManager]   moves=", level_data.moves)
+		print("[GameManager]   theme='", level_data.theme, "'")
+		print("[GameManager]   description='", level_data.description, "'")
+
 		GRID_WIDTH = level_data.width
 		GRID_HEIGHT = level_data.height
 		target_score = level_data.target_score
@@ -140,14 +137,14 @@ func load_current_level():
 		if theme_manager:
 			if level_data.theme != "" and level_data.theme != null:
 				theme_manager.set_theme_by_name(level_data.theme)
-				print("Applied theme: ", level_data.theme)
+				print("[GameManager] Applied theme from JSON: ", level_data.theme)
 			else:
 				# Default: use legacy for odd levels, modern for even levels
 				if level % 2 == 1:
 					theme_manager.set_theme_by_name("legacy")
 				else:
 					theme_manager.set_theme_by_name("modern")
-				print("Applied default theme for level ", level)
+				print("[GameManager] Applied default theme for level ", level, ": ", "legacy" if level % 2 == 1 else "modern")
 
 		create_empty_grid()
 		fill_grid_from_layout(level_data.grid_layout)
@@ -156,6 +153,7 @@ func load_current_level():
 		print("Grid size: ", GRID_WIDTH, "x", GRID_HEIGHT)
 		print("Target: ", target_score, " in ", moves_left, " moves")
 		initialized = true
+		print("[GameManager] ✓ Level loaded successfully, initialized = true")
 
 		# Debug: print a small snapshot of the grid to help UI select tiles
 		print("[GameManager] Grid snapshot after load:")
@@ -186,6 +184,7 @@ func load_current_level():
 			print(row)
 
 	emit_signal("level_loaded")
+	print("[GameManager] ✓ load_current_level() completed, initialized =", initialized)
 
 func create_empty_grid():
 	grid.clear()
@@ -290,6 +289,7 @@ func swap_tiles(pos1: Vector2, pos2: Vector2) -> bool:
 
 func find_matches() -> Array:
 	var matches = []
+	print("[FIND_MATCHES] Starting search...")
 
 	# Find horizontal matches
 	for y in range(GRID_HEIGHT):
@@ -305,6 +305,7 @@ func find_matches() -> Array:
 
 			if tile_type != current_type or x == GRID_WIDTH:
 				if x - match_start >= MIN_MATCH_SIZE and current_type > 0 and current_type < 7:
+					print("[FIND_MATCHES] Horizontal match found: y=", y, ", x from ", match_start, " to ", x-1, ", type=", current_type)
 					for i in range(match_start, x):
 						if not is_cell_blocked(i, y):
 							matches.append(Vector2(i, y))
@@ -325,6 +326,7 @@ func find_matches() -> Array:
 
 			if tile_type != current_type or y == GRID_HEIGHT:
 				if y - match_start >= MIN_MATCH_SIZE and current_type > 0 and current_type < 7:
+					print("[FIND_MATCHES] Vertical match found: x=", x, ", y from ", match_start, " to ", y-1, ", type=", current_type)
 					for i in range(match_start, y):
 						if not is_cell_blocked(x, i):
 							matches.append(Vector2(x, i))
@@ -348,7 +350,21 @@ func remove_duplicates(matches: Array) -> Array:
 	return unique_matches
 
 func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> int:
+	print("[SCORING] ========== remove_matches called ==========")
+	print("[SCORING] Input matches count: ", matches.size())
+	print("[SCORING] Swapped position: ", swapped_pos)
+	print("[SCORING] Current combo_count: ", combo_count)
+
+	# Log what's actually at each match position
+	for i in range(min(matches.size(), 10)):  # Limit to first 10 to avoid spam
+		var pos = matches[i]
+		var val = grid[int(pos.x)][int(pos.y)] if is_valid_position(pos) else -999
+		print("[SCORING]   Match[", i, "]: pos=", pos, " grid_value=", val, " blocked=", is_cell_blocked(pos.x, pos.y))
+
+	# Filter out any blocked cells from matches
 	matches = matches.filter(func(pos): return not is_cell_blocked(pos.x, pos.y))
+	print("[SCORING] After filtering blocked: ", matches.size(), " matches")
+
 	var tiles_removed = 0
 	var horizontal = false
 	var vertical = false
@@ -450,8 +466,10 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 			print("remove_matches: [safeguard] forced special tile type", special_tile_type, "at", swapped_pos)
 
 	var points = calculate_points(tiles_removed)
+	print("[SCORING] Removed ", tiles_removed, " tiles, combo_count = ", combo_count, ", points = ", points)
 	add_score(points)
 	combo_count += 1
+	print("[SCORING] New score: ", score, ", combo_count now: ", combo_count)
 
 	return tiles_removed
 
@@ -475,8 +493,14 @@ func activate_special_tile(pos: Vector2):
 
 func calculate_points(tiles_removed: int) -> int:
 	var base_points = tiles_removed * POINTS_PER_TILE
-	var combo_bonus = pow(COMBO_MULTIPLIER, combo_count - 1)
-	return int(base_points * combo_bonus)
+	# combo_count starts at 0 for first match, so use max(0, combo_count) to ensure:
+	# First match (combo=0): 1.5^0 = 1.0x
+	# Second match (combo=1): 1.5^1 = 1.5x
+	# Third match (combo=2): 1.5^2 = 2.25x
+	var combo_bonus = pow(COMBO_MULTIPLIER, max(0, combo_count))
+	var total_points = int(base_points * combo_bonus)
+	print("[SCORING] calculate_points: tiles=", tiles_removed, ", base=", base_points, ", combo_count=", combo_count, ", bonus=", combo_bonus, ", total=", total_points)
+	return total_points
 
 func apply_gravity() -> bool:
 	var moved = false
@@ -569,22 +593,10 @@ func add_score(points: int):
 			_attempt_level_complete()
 
 func advance_level():
-	# Try to advance to next level
-	if level_manager.advance_to_next_level():
-		level += 1
-		combo_count = 0
-
-		# Trigger level completion and transition to LevelProgressScene
-		on_level_complete()
-	else:
-		# No more levels - game complete!
-		print("All levels completed!")
-		last_level_won = true
-		last_level_score = score
-		last_level_target = target_score
-		last_level_number = level
-		last_level_moves_left = moves_left
-		on_level_complete()
+	# Called when level is complete - just trigger the level complete flow
+	# The level will be advanced later when user clicks Continue on the transition screen
+	combo_count = 0
+	on_level_complete()
 
 func use_move():
 	moves_left -= 1
@@ -836,16 +848,24 @@ func on_level_complete():
 	last_level_number = level
 	last_level_moves_left = moves_left
 
+	print("[GameManager] Level complete snapshot:")
+	print("[GameManager]   GameManager.level = ", level)
+	print("[GameManager]   last_level_number = ", last_level_number)
+	print("[GameManager]   LevelManager.current_level_index = ", level_manager.current_level_index if level_manager else "N/A")
+	print("[GameManager]   RewardManager.levels_completed (before) = ", RewardManager.levels_completed)
+
 	# Calculate stars based on performance (1-3 stars)
 	var stars = calculate_stars(score, target_score)
 	print("Level completed with %d stars!" % stars)
 
-	# Grant rewards through RewardManager
+	# Grant rewards through RewardManager to update levels_completed
 	RewardManager.grant_level_completion_reward(level, stars)
 
-	print("Transitioning to LevelProgressScene...")
-	if get_tree() != null:
-		get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
+	print("[GameManager]   RewardManager.levels_completed (after) = ", RewardManager.levels_completed)
+
+	# Emit signal to show reward dialog in GameUI
+	print("[GameManager] Emitting level_complete signal")
+	emit_signal("level_complete")
 
 	level_transitioning = false
 

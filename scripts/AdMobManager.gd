@@ -34,7 +34,34 @@ func _initialize_admob():
 		consent_ready.emit()
 		return
 
-	admob = AdMob.new()
+	# Check if DroidAdMob singleton exists (plugin loaded)
+	if not Engine.has_singleton("DroidAdMob"):
+		print("[AdMobManager] DroidAdMob plugin singleton not found - running in test mode")
+		print("[AdMobManager] Make sure the plugin is enabled in export settings")
+		is_initialized = false
+		consent_completed = true
+		consent_ready.emit()
+		return
+
+	# Load the AdMob wrapper class
+	var admob_class = load("res://addons/droid_admob/admob.gd")
+	if not admob_class:
+		print("[AdMobManager] Failed to load AdMob wrapper class - running in test mode")
+		is_initialized = false
+		consent_completed = true
+		consent_ready.emit()
+		return
+
+	admob = admob_class.new()
+
+	if not admob:
+		print("[AdMobManager] Failed to create AdMob instance - running in test mode")
+		is_initialized = false
+		consent_completed = true
+		consent_ready.emit()
+		return
+
+	print("[AdMobManager] AdMob plugin found and loaded successfully")
 
 	admob.consent_info_updated.connect(_on_consent_info_updated)
 	admob.consent_info_update_failed.connect(_on_consent_info_failed)
@@ -107,17 +134,23 @@ func load_rewarded_ad():
 func show_rewarded_ad(reward_callback: Callable = Callable()):
 	pending_reward_callback = reward_callback
 
+	print("[AdMobManager] show_rewarded_ad called")
+	print("[AdMobManager] is_initialized: ", is_initialized)
+	print("[AdMobManager] admob exists: ", admob != null)
+
 	if not is_initialized or not admob:
 		print("[AdMobManager] Test mode - simulating ad watch")
 		_start_test_ad_simulation()
 		return
 
+	print("[AdMobManager] is_rewarded_ad_loaded: ", is_rewarded_ad_loaded)
 	if is_rewarded_ad_loaded:
 		print("[AdMobManager] Showing rewarded ad...")
 		admob.show_rewarded()
 	else:
-		print("[AdMobManager] Rewarded ad not loaded yet")
+		print("[AdMobManager] Rewarded ad not loaded yet, trying to load...")
 		rewarded_ad_failed_to_show.emit("Ad not loaded")
+		load_rewarded_ad()  # Try to load for next time
 
 func is_rewarded_ad_ready() -> bool:
 	if not is_initialized or not admob:
@@ -151,11 +184,17 @@ func _on_ad_failed_to_show(error_message: String):
 
 func _on_user_earned_reward(reward_type: String, reward_amount: int):
 	print("[AdMobManager] User earned reward: ", reward_type, " x", reward_amount)
+	print("[AdMobManager] Emitting user_earned_reward signal...")
 	user_earned_reward.emit(reward_type, reward_amount)
+	print("[AdMobManager] Signal emitted")
 
 	if pending_reward_callback and pending_reward_callback.is_valid():
+		print("[AdMobManager] Calling pending callback...")
 		pending_reward_callback.call()
 		pending_reward_callback = Callable()
+		print("[AdMobManager] Callback called")
+	else:
+		print("[AdMobManager] No pending callback")
 
 func get_consent_status() -> int:
 	if admob:

@@ -68,6 +68,12 @@ class_name GameUI
 @onready var settings_dialog = get_node_or_null("SettingsDialog")
 @onready var about_dialog = get_node_or_null("AboutDialog")
 
+# Start page reference
+var start_page = null  # Will be set in _ready()
+
+# Level transition screen
+var level_transition = null  # Will be created in _ready()
+
 var is_paused = false
 var booster_mode_active = false
 var active_booster_type = ""
@@ -86,7 +92,7 @@ var _side_position = "right"  # current side where the panel will open from: "le
 
 func _ready():
 	# Debug: print initial global state to help diagnose inadvertent Game Over
-	print("[GameUI] _ready() — initial states: GameManager.score=", GameManager.score, ", moves_left=", GameManager.moves_left, ", target=", GameManager.target_score, ", RewardManager.lives=", RewardManager.get_lives())
+	print("[GameUI] _ready() — initial states: GameManager.score=", GameManager.score, ", moves_left=", GameManager.moves_left, ", target=", GameManager.target_score)
 
 	# Connect to RewardManager signals
 	RewardManager.connect("coins_changed", _on_coins_changed)
@@ -219,8 +225,20 @@ func _ready():
 	load_booster_icons()
 	update_booster_ui()
 
+	# Set LevelManager's current_level_index based on saved progress BEFORE showing start page
+	# This ensures the start page shows the correct level number
+	var level_manager = get_node_or_null("/root/LevelManager")
+	if level_manager:
+		# levels_completed tracks highest level finished
+		# Next level to play is at index levels_completed
+		# Example: levels_completed=0 → play index 0 (Level 1)
+		# Example: levels_completed=3 → play index 3 (Level 4)
+		var next_level_index = RewardManager.levels_completed
+		level_manager.current_level_index = next_level_index
+		print("[GameUI] _ready: Set level to index ", next_level_index, " (Level ", next_level_index + 1, ") based on levels_completed=", RewardManager.levels_completed)
+
 	# Show StartPage instead of immediately starting the level
-	var start_page = get_node_or_null("StartPage")
+	start_page = get_node_or_null("StartPage")
 	if not start_page:
 		# Try to instance the StartPage script as a Control
 		var sp = load("res://scripts/StartPage.gd")
@@ -256,26 +274,30 @@ func _ready():
 		if start_page.has_signal("settings_pressed") and not start_page.is_connected("settings_pressed", Callable(self, "_on_startpage_settings_pressed")):
 			start_page.connect("settings_pressed", Callable(self, "_on_startpage_settings_pressed"))
 		# Connect achievements signal
+	# Create LevelTransition screen
+	level_transition = get_node_or_null("LevelTransition")
+	if not level_transition:
+		var lt_script = load("res://scripts/LevelTransition.gd")
+		if lt_script:
+			level_transition = lt_script.new()
+			level_transition.name = "LevelTransition"
+			add_child(level_transition)
+			level_transition.visible = false
+			level_transition.z_index = 100  # On top of everything
+			print("[GameUI] Created LevelTransition screen")
+
+	if level_transition:
+		# Connect signals
+		if not level_transition.is_connected("continue_pressed", Callable(self, "_on_transition_continue")):
+			level_transition.connect("continue_pressed", Callable(self, "_on_transition_continue"))
+		if not level_transition.is_connected("rewards_claimed", Callable(self, "_on_transition_rewards_claimed")):
+			level_transition.connect("rewards_claimed", Callable(self, "_on_transition_rewards_claimed"))
+
 		if start_page.has_signal("achievements_pressed") and not start_page.is_connected("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed")):
 			start_page.connect("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed"))
 
-	# Check if player has lives
-	if RewardManager.get_lives() <= 0:
-		# Hide the GameBoard entirely until lives are restored; ensure StartPage is visible and accessible
-		var board_node = get_node_or_null("../GameBoard")
-		if board_node:
-			board_node.visible = false
-		# Make sure StartPage is visible (it may already be)
-		if start_page:
-			start_page.visible = true
-
-		# Show out-of-lives dialog after a short delay to ensure all nodes are ready
-		print("[GameUI] No lives on startup - scheduling OutOfLives dialog")
-		var timer = get_tree().create_timer(0.3)
-		timer.timeout.connect(_show_out_of_lives_dialog)
-	else:
-		# Play menu music (will be switched to game music when level starts)
-		AudioManager.play_music("menu", 1.0)
+	# Play menu music (will be switched to game music when level starts)
+	AudioManager.play_music("menu", 1.0)
 
 func load_booster_icons():
 	"""Load booster icons based on current theme"""
@@ -358,19 +380,145 @@ func _on_game_over():
 	print("[GameUI] _on_game_over() called - verifying state: moves_left=", GameManager.moves_left, ", score=", GameManager.score, ", target=", GameManager.target_score)
 	# Consider it a valid game over if no moves left and score < target
 	if GameManager.moves_left > 0 and GameManager.score < GameManager.target_score:
-		print("[GameUI] Ignoring game_over: moves remain or target not reached - false positive")
+		print("[GameUI] INVALID GAME OVER (still has moves). Ignoring.")
 		return
-	# Fallback: if score already >= target, treat as level complete instead
-	if GameManager.score >= GameManager.target_score:
-		print("[GameUI] Score >= target on game_over signal - routing to level complete")
-		_on_level_complete()
-		return
+
 	final_score_label.text = "Final Score: %d" % GameManager.score
 	show_panel(game_over_panel)
 
 func _on_level_complete():
-	level_complete_score.text = "Level %d Complete!\nScore: %d" % [GameManager.level - 1, GameManager.score]
+	print("[GameUI] Level complete! Score: %d, Target: %d" % [GameManager.score, GameManager.target_score])
+	print("[GameUI] GameManager.level = ", GameManager.level)
+	print("[GameUI] LevelManager.current_level_index = ", get_node_or_null("/root/LevelManager").current_level_index if get_node_or_null("/root/LevelManager") else "N/A")
+	print("[GameUI] RewardManager.levels_completed = ", RewardManager.levels_completed)
+
+	# Calculate rewards based on score
+	var base_coins = _calculate_level_coins()
+	var base_gems = _calculate_level_gems()
+
+	# Store rewards for potential multiplication
+	_pending_reward_coins = base_coins
+	_pending_reward_gems = base_gems
+	_reward_multiplied = false
+
+	# Hide the game board immediately
+	var board = get_node_or_null("../GameBoard")
+	if board:
+		board.visible = false
+		print("[GameUI] Hidden game board for transition")
+
+	# Check if there's a next level
+	var level_manager = get_node_or_null("/root/LevelManager")
+	var has_next_level = true
+	if level_manager:
+		# Peek ahead to see if there's a next level (don't advance yet)
+		var current_idx = level_manager.current_level_index
+		has_next_level = (current_idx + 1) < level_manager.levels.size()
+
+	# IMPORTANT: Use the level number that was just completed, not the current GameManager.level
+	# which might have been updated already
+	var completed_level_number = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
+
+	# Show the transition screen with rewards
+	if level_transition:
+		level_transition.show_transition(
+			completed_level_number,
+			GameManager.score,
+			base_coins,
+			base_gems,
+			has_next_level
+		)
+		print("[GameUI] Transition screen shown for level %d with rewards: %d coins, %d gems" % [completed_level_number, base_coins, base_gems])
+	else:
+		print("[GameUI] ERROR: LevelTransition not available, falling back to old flow")
+		# Fallback to old behavior
+		level_complete_score.text = "Level %d Complete!\nScore: %d\n\nRewards:\n%d Coins\n%d Gems" % [
+			GameManager.level,
+			GameManager.score,
+			base_coins,
+			base_gems
+		]
+		_show_level_complete_with_ad_option()
+
+func _calculate_level_coins() -> int:
+	# Base coins from score (1 coin per 100 points)
+	var score_coins = GameManager.score / 100
+	# Bonus for moves remaining (10 coins per move)
+	var moves_bonus = GameManager.moves_left * 10
+	return score_coins + moves_bonus
+
+func _calculate_level_gems() -> int:
+	# Gems are rarer - 1 gem per 500 points
+	var score_gems = GameManager.score / 500
+	# Bonus gem for completing with >50% moves remaining
+	var total_moves = 30  # Could get this from level data
+	if GameManager.moves_left > total_moves / 2:
+		score_gems += 1
+	return max(score_gems, 1)  # At least 1 gem per level
+
+func _show_level_complete_with_ad_option():
+	# Show level complete panel
 	show_panel(level_complete_panel)
+
+	# Find or create ad multiplier button
+	var ad_button = level_complete_panel.get_node_or_null("AdMultiplierButton")
+	if not ad_button:
+		# Create ad button if it doesn't exist
+		ad_button = Button.new()
+		ad_button.name = "AdMultiplierButton"
+		ad_button.text = "Watch Ad to 2x Rewards!"
+		ad_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		level_complete_panel.add_child(ad_button)
+		ad_button.pressed.connect(_on_ad_multiplier_pressed)
+
+	ad_button.visible = not _reward_multiplied
+	ad_button.disabled = false
+
+func _on_ad_multiplier_pressed():
+	print("[GameUI] Player wants to watch ad to multiply rewards")
+
+	# Disable the button while loading ad
+	var ad_button = level_complete_panel.get_node_or_null("AdMultiplierButton")
+	if ad_button:
+		ad_button.disabled = true
+		ad_button.text = "Loading ad..."
+
+	# Show rewarded ad
+	var ad_manager = get_node_or_null("/root/AdMobManager")
+	if ad_manager and ad_manager.has_method("show_rewarded_ad"):
+		ad_manager.show_rewarded_ad(Callable(self, "_on_reward_ad_completed"))
+	else:
+		print("[GameUI] AdMobManager not available, granting rewards directly")
+		_on_reward_ad_completed()
+
+func _on_reward_ad_completed():
+	print("[GameUI] Reward ad completed - multiplying rewards by 2x")
+
+	# Double the rewards
+	_pending_reward_coins *= 2
+	_pending_reward_gems *= 2
+	_reward_multiplied = true
+
+	# Update the display
+	level_complete_score.text = "Level %d Complete!\nScore: %d\n\n2X REWARDS!\n%d Coins\n%d Gems" % [
+		GameManager.level,
+		GameManager.score,
+		_pending_reward_coins,
+		_pending_reward_gems
+	]
+
+	# Hide the ad button
+	var ad_button = level_complete_panel.get_node_or_null("AdMultiplierButton")
+	if ad_button:
+		ad_button.visible = false
+
+	# Play reward sound
+	AudioManager.play_sfx("reward_earned")
+
+# Tracking variables for reward multiplication
+var _pending_reward_coins: int = 0
+var _pending_reward_gems: int = 0
+var _reward_multiplied: bool = false
 
 func show_panel(panel: Control):
 	# Make panel visible and modal (capture input) so underlying game board doesn't receive clicks
@@ -410,7 +558,90 @@ func _on_restart_pressed():
 
 func _on_continue_pressed():
 	AudioManager.play_sfx("ui_click")
+
+	# Grant the pending rewards
+	if _pending_reward_coins > 0 or _pending_reward_gems > 0:
+		RewardManager.add_coins(_pending_reward_coins)
+		RewardManager.add_gems(_pending_reward_gems)
+		print("[GameUI] Granted rewards: %d coins, %d gems" % [_pending_reward_coins, _pending_reward_gems])
+
+		# Show reward notification
+		if reward_notification:
+			reward_notification.show_reward("level_complete", _pending_reward_coins, "Level Complete!")
+
+		# Reset pending rewards
+		_pending_reward_coins = 0
+		_pending_reward_gems = 0
+		_reward_multiplied = false
+
 	hide_panel(level_complete_panel)
+
+	# Advance to next level
+	_advance_to_next_level()
+
+func _on_transition_rewards_claimed():
+	"""Called when rewards are claimed from the transition screen"""
+	print("[GameUI] Transition rewards claimed")
+	# Rewards are already granted in LevelTransition.gd
+	# Just log this for tracking
+
+func _on_transition_continue():
+	"""Called when player presses continue on the transition screen"""
+	print("[GameUI] Transition continue pressed")
+
+	# Advance to next level
+	_advance_to_next_level()
+
+func _advance_to_next_level():
+	print("[GameUI] Advancing to next level")
+
+	# Move to next level in LevelManager
+	var level_manager = get_node_or_null("/root/LevelManager")
+	if level_manager:
+		print("[GameUI] Before advance: current_level_index = ", level_manager.current_level_index, ", levels_completed = ", RewardManager.levels_completed)
+		var has_next = level_manager.advance_to_next_level()
+		print("[GameUI] After advance: current_level_index = ", level_manager.current_level_index, ", has_next = ", has_next)
+		if not has_next:
+			print("[GameUI] No more levels available")
+			# Could show a "game complete" screen here
+			return
+
+	# Reload the level in GameManager (but don't consume a life since lives are removed)
+	if GameManager:
+		# Reset GameManager state for new level
+		GameManager.level_transitioning = false
+		GameManager.initialized = false
+
+		# Load the new level
+		await GameManager.load_current_level()
+
+		print("[GameUI] Next level loaded: ", GameManager.level)
+
+	# Show start page for next level
+	show_start_page()
+
+func show_start_page():
+	"""Show the start page for the current level"""
+	print("[GameUI] Showing start page for level ", GameManager.level)
+
+	# Hide game board
+	var board = get_node_or_null("../GameBoard")
+	if board:
+		board.visible = false
+
+	# Hide transition screen if visible
+	if level_transition:
+		level_transition.visible = false
+
+	# Show start page
+	if start_page:
+		start_page.visible = true
+		# Update level info
+		var lm = get_node_or_null('/root/LevelManager')
+		if lm:
+			var lvl = lm.get_current_level()
+			if lvl and start_page.has_method('set_level_info'):
+				start_page.set_level_info(lvl.level_number, lvl.description)
 
 func _on_menu_pressed():
 	# Play UI click sound
@@ -449,37 +680,106 @@ func animate_low_moves_warning():
 # ============================================
 
 func update_currency_display():
-	coins_label.text = "💰 %d" % RewardManager.get_coins()
-	gems_label.text = "💎 %d" % RewardManager.get_gems()
+	# Instead of using emojis, we'll update the labels to show icon+text
+	# Note: For now keeping simple text, but could enhance with TextureRect icons
+	_update_coins_display(RewardManager.get_coins())
+	_update_gems_display(RewardManager.get_gems())
 
-	var lives = RewardManager.get_lives()
-	var max_lives = RewardManager.MAX_LIVES
-	lives_label.text = "❤️ %d/%d" % [lives, max_lives]
+	# Hide lives display - no longer using lives system
+	if lives_label:
+		lives_label.visible = false
+
+func _update_coins_display(amount: int):
+	"""Update coins label - replace with icon in parent container"""
+	if not coins_label:
+		return
+
+	# Get parent container
+	var parent = coins_label.get_parent()
+	if not parent:
+		coins_label.text = "%d" % amount
+		return
+
+	# Check if we already created icon display
+	var icon_display = parent.get_node_or_null("CoinsIconDisplay")
+	if not icon_display:
+		# Hide old label
+		coins_label.visible = false
+
+		# Create new display with icon
+		icon_display = ThemeManager.create_currency_display("coins", amount, 20, 18, Color.WHITE)
+		icon_display.name = "CoinsIconDisplay"
+		parent.add_child(icon_display)
+	else:
+		# Update existing display
+		var label = icon_display.get_child(1) as Label  # Icon is child 0, label is child 1
+		if label:
+			label.text = str(amount)
+
+func _update_gems_display(amount: int):
+	"""Update gems label - replace with icon in parent container"""
+	if not gems_label:
+		return
+
+	# Get parent container
+	var parent = gems_label.get_parent()
+	if not parent:
+		gems_label.text = "%d" % amount
+		return
+
+	# Check if we already created icon display
+	var icon_display = parent.get_node_or_null("GemsIconDisplay")
+	if not icon_display:
+		# Hide old label
+		gems_label.visible = false
+
+		# Create new display with icon
+		icon_display = ThemeManager.create_currency_display("gems", amount, 20, 18, Color.WHITE)
+		icon_display.name = "GemsIconDisplay"
+		parent.add_child(icon_display)
+	else:
+		# Update existing display
+		var label = icon_display.get_child(1) as Label  # Icon is child 0, label is child 1
+		if label:
+			label.text = str(amount)
 
 func _on_coins_changed(new_amount: int):
-	coins_label.text = "💰 %d" % new_amount
-	animate_currency_change(coins_label)
+	_update_coins_display(new_amount)
+	# Animate the icon display if it exists
+	var parent = coins_label.get_parent() if coins_label else null
+	if parent:
+		var icon_display = parent.get_node_or_null("CoinsIconDisplay")
+		if icon_display:
+			animate_currency_change(icon_display)
 
 func _on_gems_changed(new_amount: int):
-	gems_label.text = "💎 %d" % new_amount
-	animate_currency_change(gems_label)
+	_update_gems_display(new_amount)
+	# Animate the icon display if it exists
+	var parent = gems_label.get_parent() if gems_label else null
+	if parent:
+		var icon_display = parent.get_node_or_null("GemsIconDisplay")
+		if icon_display:
+			animate_currency_change(icon_display)
 
 func _on_lives_changed(new_amount: int):
-	var max_lives = RewardManager.MAX_LIVES
-	lives_label.text = "❤️ %d/%d" % [new_amount, max_lives]
-	animate_currency_change(lives_label)
+	# Lives system removed - keeping function for compatibility
+	pass
 
 func _on_booster_changed(booster_type: String, new_amount: int):
 	"""Handle booster count changes"""
 	print("[GameUI] Booster changed: ", booster_type, " = ", new_amount)
 	update_booster_ui()
 
-func animate_currency_change(label: Label):
+func animate_currency_change(control: Control):
+	"""Animate currency change - works with Label or HBoxContainer"""
+	if not control:
+		return
+
 	var tween = create_tween()
-	tween.tween_property(label, "scale", Vector2(1.3, 1.3), 0.15)
-	tween.tween_property(label, "scale", Vector2.ONE, 0.15)
-	tween.tween_property(label, "modulate", Color.YELLOW, 0.1)
-	tween.tween_property(label, "modulate", Color.WHITE, 0.2)
+	tween.tween_property(control, "scale", Vector2(1.3, 1.3), 0.15)
+	tween.tween_property(control, "scale", Vector2.ONE, 0.15)
+	tween.tween_property(control, "modulate", Color.YELLOW, 0.1)
+	tween.tween_property(control, "modulate", Color.WHITE, 0.2)
 
 # ============================================
 # Phase 2: Shop and Dialog Functions
@@ -541,12 +841,12 @@ func _on_refill_requested(method: String):
 	"""Handle life refill from dialog"""
 	print("[GameUI] Lives refilled via: %s" % method)
 
-	# Show success notification
-	if reward_notification:
-		if reward_notification.has_method("show_reward"):
-			reward_notification.show_reward("lives", RewardManager.get_lives(), "Lives restored!")
-		else:
-			print("[GameUI] reward_notification missing show_reward method")
+	# Don't show notification - it's annoying
+	# if reward_notification:
+	# 	if reward_notification.has_method("show_reward"):
+	# 		reward_notification.show_reward("lives", RewardManager.get_lives(), "Lives restored!")
+	# 	else:
+	# 		print("[GameUI] reward_notification missing show_reward method")
 
 	# If the game wasn't initialized because player had no lives when app launched,
 	# initialize/load the level now so the board appears immediately.
@@ -1041,26 +1341,42 @@ func _close_fullscreen_panel(panel: Control):
 func _on_startpage_start_pressed():
 	print("[GameUI] Start pressed on StartPage - initializing game")
 
-	# If player has no lives, show the out-of-lives dialog instead of starting
-	if RewardManager.get_lives() <= 0:
-		print("[GameUI] Player has no lives - showing OutOfLives dialog instead of starting level")
-		AudioManager.play_sfx("ui_click")
-		_show_out_of_lives_dialog()
-		return
-
 	# Play UI click sound and switch to game music
 	AudioManager.play_sfx("ui_click")
 	AudioManager.play_music("game", 1.0)
 
-	# Initialize game manager and then remove the StartPage
+	# Check if the game is already initialized (e.g., from advancing to next level)
+	if GameManager.initialized:
+		print("[GameUI] Game already initialized, just showing the board")
+
+		# Hide start page
+		if start_page:
+			start_page.visible = false
+
+		# Show game board
+		var board = get_node_or_null("../GameBoard")
+		if board:
+			board.visible = true
+
+		# Refresh UI to reflect loaded level and moves
+		update_display()
+		update_booster_ui()
+
+		return
+
+	# LevelManager's current_level_index is already set in _ready() based on saved progress
+	# No need to set it again here
+
+	# Initialize game manager and AWAIT completion since it's async
 	var gm = get_node_or_null("/root/GameManager")
 	if gm and gm.has_method("initialize_game"):
-		gm.initialize_game()
+		await gm.initialize_game()
 	elif typeof(GameManager) != TYPE_NIL and GameManager and GameManager.has_method("initialize_game"):
 		# Fallback to the global autoload name
-		GameManager.initialize_game()
+		await GameManager.initialize_game()
 	else:
 		print("[GameUI] ERROR: GameManager not found; cannot initialize game")
+		return
 
 	# Refresh UI to reflect loaded level and moves
 	update_display()
@@ -1088,10 +1404,15 @@ func _on_startpage_start_pressed():
 			GameManager.connect("level_loaded", Callable(self, "_on_game_manager_level_loaded"))
 			print("[GameUI] Connected to GameManager.level_loaded to create grid when ready")
 
-	var sp = get_node_or_null("StartPage")
-	if sp:
-		sp.visible = false
-		sp.queue_free()
+	# Hide start page (don't destroy it - we'll reuse it for next level)
+	if start_page:
+		start_page.visible = false
+		print("[GameUI] Start page hidden")
+
+	# Show the game board
+	if board:
+		board.visible = true
+		print("[GameUI] Game board is now visible")
 
 func _on_game_manager_level_loaded():
 	print("[GameUI] Received GameManager.level_loaded — creating visual grid")

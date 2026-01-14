@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+AdMobManager="*res://scripts/AdMobManager.gd"
 LevelManager="*res://scripts/LevelManager.gd"
 ThemeManager="*res://scripts/ThemeManager.gd"
 RewardManager="*res://scripts/RewardManager.gd"

@@ -201,6 +201,9 @@ func get_booster_count(booster_type: String) -> int:
 # ============================================
 
 func grant_level_completion_reward(level_number: int, stars: int):
+	print("[RewardManager] grant_level_completion_reward called with level_number=", level_number, ", stars=", stars)
+	print("[RewardManager] Current levels_completed=", levels_completed)
+
 	# Base coin reward
 	var coin_reward = 100 + (50 * level_number)
 	add_coins(coin_reward)
@@ -215,6 +218,7 @@ func grant_level_completion_reward(level_number: int, stars: int):
 	# Update progression
 	if level_number > levels_completed:
 		levels_completed = level_number
+		print("[RewardManager] Updated levels_completed to ", levels_completed)
 
 	total_stars += stars
 	save_progress()

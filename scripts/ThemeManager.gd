@@ -42,3 +42,55 @@ func theme_exists(theme_name: String) -> bool:
 	"""Check if a theme exists"""
 	return theme_name.to_lower() in theme_paths
 
+func get_coin_icon_path() -> String:
+	"""Get the coin icon SVG path for current theme"""
+	return theme_paths[current_theme] + "coin.svg"
+
+func get_gem_icon_path() -> String:
+	"""Get the gem icon SVG path for current theme"""
+	return theme_paths[current_theme] + "gem.svg"
+
+func load_coin_icon() -> Texture2D:
+	"""Load and return the coin icon texture"""
+	return load(get_coin_icon_path())
+
+func load_gem_icon() -> Texture2D:
+	"""Load and return the gem icon texture"""
+	return load(get_gem_icon_path())
+
+func create_currency_display(currency_type: String, amount: int, icon_size: int = 24, font_size: int = 24, color: Color = Color.WHITE) -> HBoxContainer:
+	"""
+	Create an HBoxContainer with currency icon and amount text
+	currency_type: 'coins' or 'gems'
+	amount: the number to display
+	icon_size: size of the icon in pixels
+	font_size: size of the text
+	color: color of the text
+	Returns: HBoxContainer with TextureRect (icon) and Label (amount)
+	"""
+	var container = HBoxContainer.new()
+	container.add_theme_constant_override("separation", 5)
+
+	# Create icon
+	var icon = TextureRect.new()
+	icon.custom_minimum_size = Vector2(icon_size, icon_size)
+	icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+
+	if currency_type == "coins":
+		icon.texture = load_coin_icon()
+	elif currency_type == "gems":
+		icon.texture = load_gem_icon()
+
+	container.add_child(icon)
+
+	# Create amount label
+	var label = Label.new()
+	label.text = str(amount)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+
+	container.add_child(label)
+
+	return container
+

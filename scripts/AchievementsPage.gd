@@ -408,15 +408,23 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 		reward_line.alignment = BoxContainer.ALIGNMENT_CENTER
 		rewards_vbox.add_child(reward_line)
 
-		var icon_label = Label.new()
-		if reward_type == "coins":
-			icon_label.text = "💰"
-		elif reward_type == "gems":
-			icon_label.text = "💎"
+		# Create icon based on reward type
+		if reward_type == "coins" or reward_type == "gems":
+			var icon_rect = TextureRect.new()
+			icon_rect.custom_minimum_size = Vector2(28, 28)
+			icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			if reward_type == "coins":
+				icon_rect.texture = ThemeManager.load_coin_icon()
+			else:
+				icon_rect.texture = ThemeManager.load_gem_icon()
+			reward_line.add_child(icon_rect)
 		else:
+			# Use emoji for stars
+			var icon_label = Label.new()
 			icon_label.text = "⭐"
-		icon_label.add_theme_font_size_override("font_size", 28)
-		reward_line.add_child(icon_label)
+			icon_label.add_theme_font_size_override("font_size", 28)
+			reward_line.add_child(icon_label)
 
 		var reward_text = Label.new()
 		reward_text.text = " %s x%d" % [name, amount]

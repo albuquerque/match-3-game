@@ -36,15 +36,21 @@ func load_all_levels():
 	# Try to load levels from JSON files in the levels directory
 	var level_files = get_level_files()
 
+	print("[LevelManager] Found ", level_files.size(), " level files")
+	for file in level_files:
+		print("[LevelManager]   - ", file)
+
 	if level_files.size() > 0:
 		for file_path in level_files:
 			var level_data = load_level_from_json(file_path)
 			if level_data:
 				levels.append(level_data)
-				print("Loaded level: ", level_data.level_number, " - ", level_data.description)
+				print("[LevelManager] Loaded level ", level_data.level_number, ": '", level_data.description, "' (theme: ", level_data.theme, ", target: ", level_data.target_score, ")")
+			else:
+				print("[LevelManager] ERROR: Failed to load level from ", file_path)
 	else:
 		# If no JSON files found, use built-in levels
-		print("No level JSON files found, using built-in levels")
+		print("[LevelManager] No level JSON files found, using built-in levels")
 		create_builtin_levels()
 
 	print("Loaded ", levels.size(), " levels")
@@ -287,9 +293,12 @@ func get_current_level() -> LevelData:
 
 func advance_to_next_level() -> bool:
 	"""Move to the next level, returns false if no more levels"""
+	print("[LevelManager] advance_to_next_level called. Current index: ", current_level_index)
 	if current_level_index < levels.size() - 1:
 		current_level_index += 1
+		print("[LevelManager] Advanced to index: ", current_level_index, " (Level ", current_level_index + 1, ")")
 		return true
+	print("[LevelManager] No more levels available")
 	return false
 
 func reset_to_first_level():
@@ -313,7 +322,9 @@ func is_cell_blocked(x: int, y: int) -> bool:
 
 func set_current_level(index: int):
 	if index >= 0 and index < levels.size():
+		print("[LevelManager] set_current_level: changing from ", current_level_index, " to ", index)
 		current_level_index = index
-		print("Current level set to", current_level_index)
+		print("[LevelManager] Current level set to index ", current_level_index, " (Level ", current_level_index + 1, ")")
 	else:
-		print("Invalid level index", index)
+		print("[LevelManager] ERROR: Invalid level index ", index)
+

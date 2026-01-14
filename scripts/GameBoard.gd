@@ -287,18 +287,30 @@ func set_background_image(image_path: String):
 
 func clear_tiles():
 	# Remove all Tile instances created by this board
+	# We need to collect them first to avoid modifying the array while iterating
+	var tiles_to_remove = []
 	for child in get_children():
 		if child and child.has_method("setup"):
-			# Likely a Tile instance - queue for deletion
-			child.queue_free()
+			# Likely a Tile instance
+			tiles_to_remove.append(child)
+
+	# Now remove them
+	for tile in tiles_to_remove:
+		remove_child(tile)
+		tile.queue_free()
+
+	print("[GameBoard] Cleared ", tiles_to_remove.size(), " tiles")
 
 func create_visual_grid():
 	clear_tiles()
 	tiles.clear()
 
+	print("[GameBoard] Creating visual grid for ", GameManager.GRID_WIDTH, "x", GameManager.GRID_HEIGHT, " board")
+
 	# Calculate scale factor for tiles based on dynamic tile size
 	var scale_factor = tile_size / 64.0  # 64 is the base tile size
 
+	var tiles_created = 0
 	for x in range(GameManager.GRID_WIDTH):
 		tiles.append([])
 		for y in range(GameManager.GRID_HEIGHT):
@@ -317,6 +329,9 @@ func create_visual_grid():
 
 			add_child(tile)
 			tiles[x].append(tile)
+			tiles_created += 1
+
+	print("[GameBoard] Created ", tiles_created, " tiles on the board")
 
 # Helper: visually highlight positions for special activations (single flash)
 func highlight_special_activation(positions: Array):
@@ -376,21 +391,20 @@ func animate_destroy_tiles(positions: Array):
 		if get_tree() != null:
 			await get_tree().create_timer(0.15).timeout
 
-	# Clear grid entries and free nodes
+	# Clear visual tiles and free nodes
 	for i in range(tiles_to_free.size()):
 		var pos = destroyed_positions[i]
 		if pos.x >= 0 and pos.y >= 0:
 			# Only clear visual cell if it still points to the same instance
 			if tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
 				tiles[int(pos.x)][int(pos.y)] = null
-			# Update GameManager grid if not blocked
-			if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			# NOTE: Do NOT clear GameManager.grid here! That's done by GameManager.remove_matches()
+			# The animation should only handle visual destruction, not game logic
 			# Safely free the tile
 			if not tiles_to_free[i].is_queued_for_deletion():
 				tiles_to_free[i].queue_free()
 
-	print("animate_destroy_tiles: destroyed ", tiles_to_free.size(), " tiles")
+	print("animate_destroy_tiles: destroyed ", tiles_to_free.size(), " visual tiles")
 
 func animate_destroy_matches(matches: Array):
 	if matches == null or matches.size() == 0:

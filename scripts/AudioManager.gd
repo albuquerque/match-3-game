@@ -146,6 +146,12 @@ func play_music(track_name: String, fade_duration: float = 1.0):
 	print("[AudioManager] Playing music: ", track_name)
 	current_track = track_name
 
+	# Enable looping for music streams
+	if stream is AudioStreamMP3:
+		stream.loop = true
+	elif stream is AudioStreamOggVorbis:
+		stream.loop = true
+
 	if fade_duration > 0 and current_music_player.playing:
 		# Crossfade to new track
 		_crossfade_to(stream, fade_duration)

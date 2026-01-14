@@ -72,11 +72,19 @@ match-3-game/
 
 ## Configuration Files
 
-### export_presets.cfg
-Android export configuration, permissions, plugin settings
-
 ### project.godot
 Godot project settings, autoload singletons
+
+**Important Autoloads (must be loaded in this order):**
+- `AdMobManager` - Ad integration (MUST be first for mobile ads)
+- `LevelManager` - Level configuration loading
+- `ThemeManager` - Visual theme management
+- `RewardManager` - Lives, coins, gems management
+- `GameManager` - Main game state, level loading
+- `AudioManager` - Sound and music management
+
+### export_presets.cfg
+Android export configuration, permissions, plugin settings
 
 ### android/build/build.gradle
 Android dependencies including AdMob SDK
@@ -134,6 +142,10 @@ Layout values:
 - Look for plugin initialization in logs
 
 ### Ads Not Working
+- Check logs for "AdMobManager not available - using test mode"
+  - If this appears, AdMobManager is not in autoload section of project.godot
+  - Verify autoload: Project > Project Settings > Autoload
+  - AdMobManager should be at path: `res://scripts/AdMobManager.gd`
 - Verify test mode fallback works (2-second delay)
 - Check device logs for "DroidAdMob" messages
 - Ensure Internet permission enabled
