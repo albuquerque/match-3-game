@@ -14,9 +14,9 @@ func _await_tweens_with_timeout(tweens: Array, timeout: float = 2.0) -> void:
 		if tween == null:
 			continue
 		finished_map[tween] = false
-		var local_tween = tween
-		# Connect finished to set flag
-		local_tween.finished.connect(func(): finished_map[local_tween] = true)
+		# Create a callable that sets the finished flag - use bind to avoid capture
+		var set_finished = func(t): finished_map[t] = true
+		tween.finished.connect(set_finished.bind(tween))
 
 	var start_time = 0
 	var attempts = 0
@@ -45,6 +45,15 @@ var tile_scene = preload("res://scenes/Tile.tscn")
 var tile_size: float
 var grid_offset: Vector2
 var board_margin: float = 20.0
+
+# Combo tracking
+var combo_chain_count: int = 0  # Tracks consecutive matches in a cascade
+var last_match_time: float = 0.0
+
+# Skip bonus hint
+var skip_bonus_label: Label = null
+var skip_bonus_active: bool = false
+const COMBO_TIMEOUT: float = 2.0  # Reset combo if no match for 2 seconds
 
 # Board appearance configuration
 const BOARD_BACKGROUND_COLOR = Color(0.2, 0.2, 0.3, 0.7)  # Slightly translucent
@@ -285,6 +294,29 @@ func set_background_image(image_path: String):
 	background_image_path = image_path
 	setup_background_image()
 
+func hide_tile_overlay():
+	"""Hide the tile area overlay"""
+	if tile_area_overlay and is_instance_valid(tile_area_overlay):
+		tile_area_overlay.visible = false
+		print("[GameBoard] Tile overlay hidden")
+
+	# Also hide the background ColorRect
+	if background:
+		background.visible = false
+		print("[GameBoard] Background ColorRect hidden")
+
+func show_tile_overlay():
+	"""Show the tile area overlay"""
+	if tile_area_overlay and is_instance_valid(tile_area_overlay):
+		tile_area_overlay.visible = true
+		print("[GameBoard] Tile overlay shown")
+
+	# Keep the background ColorRect hidden as it's not needed with the image background
+	# Only show if we don't have a background image
+	if background and background_image_path == "":
+		background.visible = false  # Keep hidden - we use tile overlays instead
+		print("[GameBoard] Background ColorRect remains hidden (using tile overlays)")
+
 func clear_tiles():
 	# Remove all Tile instances created by this board
 	# We need to collect them first to avoid modifying the array while iterating
@@ -306,6 +338,10 @@ func create_visual_grid():
 	tiles.clear()
 
 	print("[GameBoard] Creating visual grid for ", GameManager.GRID_WIDTH, "x", GameManager.GRID_HEIGHT, " board")
+
+	if GameManager.grid.size() == 0:
+		print("[GameBoard] ERROR: GameManager.grid is empty! Cannot create tiles.")
+		return
 
 	# Calculate scale factor for tiles based on dynamic tile size
 	var scale_factor = tile_size / 64.0  # 64 is the base tile size
@@ -337,6 +373,11 @@ func create_visual_grid():
 func highlight_special_activation(positions: Array):
 	if positions == null or positions.size() == 0:
 		return
+
+	# Play special tile sound
+	if positions.size() > 3:
+		AudioManager.play_sfx("special_tile")
+
 	var tweens = []
 	for pos in positions:
 		if pos.x < 0 or pos.y < 0:
@@ -345,13 +386,67 @@ func highlight_special_activation(positions: Array):
 			continue
 		var tile = tiles[int(pos.x)][int(pos.y)]
 		if tile:
+			# Flash animation
 			var t = create_tween()
-			t.tween_property(tile, "modulate", Color(1,1,0.7,1), 0.06)
+			t.tween_property(tile, "modulate", Color(2, 2, 1, 1), 0.06)
 			t.tween_property(tile, "modulate", Color.WHITE, 0.12)
 			tweens.append(t)
 
+			# Add radial particle burst for special tiles
+			_create_special_activation_particles(grid_to_world_position(pos))
+
 	if tweens.size() > 0:
 		await tweens[0].finished
+
+func _create_special_activation_particles(world_pos: Vector2):
+	"""Create radial particle burst for special tile activation"""
+	var particles = CPUParticles2D.new()
+	particles.name = "SpecialActivationParticles"
+	particles.position = world_pos
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 40  # Doubled from 20
+	particles.lifetime = 1.2  # Longer lifetime
+	particles.explosiveness = 1.0
+	particles.speed_scale = 2.0  # Faster
+
+	# Radial burst
+	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	particles.emission_sphere_radius = 10.0  # Larger emission area
+	particles.direction = Vector2(0, 0)
+	particles.spread = 180
+	particles.gravity = Vector2.ZERO
+	particles.initial_velocity_min = 150.0  # Faster burst
+	particles.initial_velocity_max = 350.0
+	particles.angular_velocity_min = -360  # More rotation
+	particles.angular_velocity_max = 360
+	particles.radial_accel_min = 80  # Stronger radial acceleration
+	particles.radial_accel_max = 150
+
+	# Larger, star-like particles
+	particles.scale_amount_min = 1.5  # Much larger
+	particles.scale_amount_max = 3.5
+
+	# Bright golden/white color with glow
+	var gradient = Gradient.new()
+	gradient.add_point(0.0, Color(1.5, 1.5, 0.8, 1))  # Bright golden start
+	gradient.add_point(0.3, Color(1.3, 1.3, 1.0, 1.0))  # Bright white
+	gradient.add_point(0.6, Color(1.0, 1.0, 0.8, 0.8))
+	gradient.add_point(1.0, Color(1, 1, 1, 0))  # Fade out
+	particles.color_ramp = gradient
+
+	# Add scale curve for more dynamic effect
+	var scale_curve = Curve.new()
+	scale_curve.add_point(Vector2(0, 1.3))  # Start big
+	scale_curve.add_point(Vector2(0.4, 1.0))
+	scale_curve.add_point(Vector2(0.8, 0.5))
+	scale_curve.add_point(Vector2(1, 0))
+	particles.scale_amount_curve = scale_curve
+
+	add_child(particles)
+
+	# Cleanup - use call_deferred to avoid lambda capture issues
+	get_tree().create_timer(1.5).timeout.connect(particles.queue_free)
 
 # Destroy arbitrary tiles at given positions with animation and cleanup
 func animate_destroy_tiles(positions: Array):
@@ -409,11 +504,68 @@ func animate_destroy_tiles(positions: Array):
 func animate_destroy_matches(matches: Array):
 	if matches == null or matches.size() == 0:
 		return
+
+	# Track combo chain
+	var current_time = Time.get_ticks_msec() / 1000.0
+	if current_time - last_match_time > COMBO_TIMEOUT:
+		combo_chain_count = 0  # Reset combo if too much time passed
+
+	combo_chain_count += 1
+	last_match_time = current_time
+
+	print("[GameBoard] Match! Size: ", matches.size(), ", Combo chain: ", combo_chain_count)
+
+	# Show combo text for most matches (only skip plain 3-tile first matches)
+	var should_show_combo = true
+	var combo_multiplier = combo_chain_count
+
+	# Only skip basic 3-tile matches on first move
+	if matches.size() == 3 and combo_chain_count == 1:
+		should_show_combo = false  # Skip plain 3-tile matches
+
+	# Always show for:
+	# - 4+ tile matches
+	# - Any cascade (combo_chain > 1)
+	# - Special tile activations
+
+	if should_show_combo:
+		_show_combo_text(matches.size(), matches, combo_multiplier)
+
+	# Screen shake for large matches or high combo chains
+	if matches.size() >= 5 or combo_chain_count >= 3:
+		var shake_intensity = max(matches.size() * 2, combo_chain_count * 3)
+		_apply_screen_shake(0.15, shake_intensity)
+
 	await animate_destroy_tiles(matches)
 
 func animate_destroy_matches_except(matches: Array, skip_pos: Vector2):
 	if matches == null or matches.size() == 0:
 		return
+
+	# Track combo chain (same as animate_destroy_matches)
+	var current_time = Time.get_ticks_msec() / 1000.0
+	if current_time - last_match_time > COMBO_TIMEOUT:
+		combo_chain_count = 0  # Reset combo if too much time passed
+
+	combo_chain_count += 1
+	last_match_time = current_time
+
+	print("[GameBoard] Match (creating special)! Size: ", matches.size(), ", Combo chain: ", combo_chain_count)
+
+	# Show combo text for this match (we're creating a special tile, that's impressive!)
+	var should_show_combo = true
+	var combo_multiplier = combo_chain_count
+
+	# Always show combo text when creating special tiles (it's always 4+ tiles)
+	if should_show_combo:
+		_show_combo_text(matches.size(), matches, combo_multiplier)
+
+	# Screen shake for large matches or high combo chains
+	if matches.size() >= 5 or combo_chain_count >= 3:
+		var shake_intensity = max(matches.size() * 2, combo_chain_count * 3)
+		_apply_screen_shake(0.15, shake_intensity)
+
+	# Destroy tiles except the skip position
 	var to_destroy = []
 	for m in matches:
 		var pos = m
@@ -512,6 +664,331 @@ func animate_refill():
 			row.append(GameManager.grid[x][y])
 		print(row)
 
+func _show_combo_text(match_count: int, positions: Array, combo_multiplier: int = 1):
+	"""Show floating combo text for impressive matches"""
+	if positions.size() == 0:
+		return
+
+	# Get screen/viewport center for positioning
+	var viewport = get_viewport()
+	if not viewport:
+		return
+
+	var screen_size = viewport.get_visible_rect().size
+	var screen_center = screen_size / 2.0
+
+	# Offset slightly up from center for better visibility
+	var text_position = screen_center - Vector2(0, 100)
+
+	# Create combo label
+	var combo_label = Label.new()
+	combo_label.z_index = 100
+	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	combo_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	# Determine combo message based on match size AND combo chain
+	var combo_text = ""
+	var combo_color = Color.WHITE
+
+	# High combo chains get priority
+	if combo_multiplier >= 5:
+		combo_text = "INCREDIBLE!"
+		combo_color = Color(1.0, 0.0, 1.0)  # Bright magenta
+	elif combo_multiplier >= 4:
+		combo_text = "AMAZING!"
+		combo_color = Color(1.0, 0.2, 1.0)  # Magenta
+	elif combo_multiplier >= 3:
+		combo_text = "SUPER!"
+		combo_color = Color(1.0, 0.5, 0.0)  # Orange
+	elif combo_multiplier >= 2:
+		combo_text = "COMBO!"
+		combo_color = Color(0.2, 1.0, 0.2)  # Green
+	# Otherwise, base on match size
+	elif match_count >= 7:
+		combo_text = "AMAZING!"
+		combo_color = Color(1.0, 0.2, 1.0)  # Magenta
+	elif match_count >= 6:
+		combo_text = "SUPER!"
+		combo_color = Color(1.0, 0.5, 0.0)  # Orange
+	elif match_count >= 5:
+		combo_text = "GREAT!"
+		combo_color = Color(0.2, 1.0, 0.2)  # Green
+	elif match_count >= 4:
+		combo_text = "GOOD!"
+		combo_color = Color(0.3, 0.7, 1.0)  # Blue
+	else:
+		combo_text = "NICE!"
+		combo_color = Color(0.5, 0.5, 1.0)  # Light blue
+
+	# Add combo multiplier to text if > 1
+	if combo_multiplier > 1:
+		combo_text = combo_text + " x" + str(combo_multiplier)
+
+	combo_label.text = combo_text
+
+	# Load and apply custom Bangers font for impactful display
+	ThemeManager.apply_bangers_font(combo_label, 72)
+
+	# Main text color
+	combo_label.add_theme_color_override("font_color", combo_color)
+
+	# Add black outline for contrast
+	combo_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))
+	combo_label.add_theme_constant_override("outline_size", 8)
+
+	# Add glow/shadow effect using shadow color
+	# Shadow is offset to create depth, with color matching the combo type
+	var shadow_color = combo_color
+	shadow_color.a = 0.6  # Semi-transparent for glow effect
+	combo_label.add_theme_color_override("font_shadow_color", shadow_color)
+	combo_label.add_theme_constant_override("shadow_offset_x", 0)
+	combo_label.add_theme_constant_override("shadow_offset_y", 0)
+	combo_label.add_theme_constant_override("shadow_outline_size", 20)  # Large shadow = glow
+
+	combo_label.modulate = Color(1, 1, 1, 0)
+
+	# Set fixed size for the label
+	var label_width = 600.0
+	var label_height = 100.0
+	combo_label.size = Vector2(label_width, label_height)
+	combo_label.custom_minimum_size = Vector2(label_width, label_height)
+
+	# Position at screen center (horizontally centered, vertically at text_position.y)
+	var centered_x = (screen_size.x - label_width) / 2.0
+	combo_label.position = Vector2(centered_x, text_position.y)
+
+	# Set pivot for scaling animation (center of label)
+	combo_label.pivot_offset = Vector2(label_width / 2.0, label_height / 2.0)
+
+	add_child(combo_label)
+
+	# Enhanced animation - dramatic pop-in with bounce and glow pulse
+	var tween = create_tween()
+
+	# Phase 1: Pop in (parallel - fade + scale + slight rotation)
+	tween.set_parallel(true)
+	tween.tween_property(combo_label, "modulate", Color.WHITE, 0.2)
+	tween.tween_property(combo_label, "scale", Vector2(1.4, 1.4), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(combo_label, "rotation_degrees", 5, 0.1)
+
+	# Phase 2: Settle down (sequential)
+	tween.set_parallel(false)
+	tween.tween_property(combo_label, "rotation_degrees", -3, 0.08)
+	tween.tween_property(combo_label, "rotation_degrees", 0, 0.08)
+	tween.tween_property(combo_label, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+	# Phase 3: Hold with subtle pulse (parallel)
+	tween.set_parallel(true)
+	var pulse_tween = tween.tween_property(combo_label, "scale", Vector2(1.05, 1.05), 0.3)
+	pulse_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	# Phase 4: Fade out with slight upward movement
+	tween.set_parallel(false)
+	tween.tween_property(combo_label, "scale", Vector2(1.0, 1.0), 0.2).set_delay(0.2)
+	tween.set_parallel(true)
+	tween.tween_property(combo_label, "modulate", Color(1, 1, 1, 0), 0.3)
+	tween.tween_property(combo_label, "position:y", combo_label.position.y - 30, 0.3)
+	tween.tween_property(combo_label, "scale", Vector2(1.2, 1.2), 0.3)
+
+	# Cleanup after animation
+	tween.finished.connect(combo_label.queue_free)
+
+func _apply_screen_shake(duration: float, intensity: float):
+	"""Apply screen shake effect for dramatic moments"""
+	var original_position = position
+	var shake_timer = 0.0
+	var shake_amount = intensity
+
+	while shake_timer < duration:
+		position = original_position + Vector2(
+			randf_range(-shake_amount, shake_amount),
+			randf_range(-shake_amount, shake_amount)
+		)
+		shake_timer += get_process_delta_time()
+		await get_tree().process_frame
+
+	# Reset to original position
+	position = original_position
+
+func _create_lightning_beam_horizontal(row: int, color: Color = Color.YELLOW):
+	"""Create a horizontal lightning beam effect across a row"""
+	print("[GameBoard] Creating horizontal lightning beam for row ", row, " with color ", color)
+
+	var beam = Line2D.new()
+	beam.name = "LightningBeamH"
+	beam.z_index = 100  # Increased from 50 to ensure it's on top
+	beam.visible = true  # Explicitly set visible
+
+	# Calculate start and end positions
+	var start_pos = grid_to_world_position(Vector2(0, row))
+	var end_pos = grid_to_world_position(Vector2(GameManager.GRID_WIDTH - 1, row))
+
+	print("[GameBoard] Beam start pos: ", start_pos, " end pos: ", end_pos)
+
+	# Add points for the lightning path
+	beam.add_point(Vector2(start_pos.x - tile_size/2, start_pos.y))
+
+	# Add zigzag points for lightning effect
+	var num_segments = 8
+	var segment_length = (end_pos.x - start_pos.x) / num_segments
+	for i in range(1, num_segments):
+		var x = start_pos.x + (i * segment_length)
+		var y = start_pos.y + randf_range(-tile_size * 0.3, tile_size * 0.3)
+		beam.add_point(Vector2(x, y))
+
+	beam.add_point(Vector2(end_pos.x + tile_size/2, end_pos.y))
+
+	print("[GameBoard] Beam has ", beam.get_point_count(), " points")
+
+	# Beam appearance - sleeker and thinner
+	beam.width = 12  # Reduced from 25
+	beam.default_color = color
+	beam.modulate = Color(1, 1, 1, 0)
+	beam.antialiased = true
+	beam.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	beam.end_cap_mode = Line2D.LINE_CAP_ROUND
+	beam.joint_mode = Line2D.LINE_JOINT_ROUND
+
+	add_child(beam)
+	print("[GameBoard] Beam added as child, parent: ", get_path())
+
+	# Animate the beam
+	var tween = create_tween()
+	tween.set_parallel(true)
+
+	# Flash in bright and wider
+	tween.tween_property(beam, "modulate", Color(3, 3, 3, 1), 0.05)  # Even brighter
+	tween.tween_property(beam, "width", 20, 0.05)  # Reduced from 40
+
+	tween.set_parallel(false)
+
+	# Pulse effect - moderate width
+	tween.tween_property(beam, "width", 15, 0.1)  # Reduced from 30
+	tween.tween_property(beam, "width", 18, 0.1)  # Reduced from 35
+
+	# Fade out
+	tween.tween_property(beam, "modulate", Color(1, 1, 1, 0), 0.2)
+
+	# Cleanup - connect directly to queue_free
+	tween.finished.connect(beam.queue_free)
+
+	return tween
+
+func _create_lightning_beam_vertical(col: int, color: Color = Color.CYAN):
+	"""Create a vertical lightning beam effect down a column"""
+	print("[GameBoard] Creating vertical lightning beam for column ", col, " with color ", color)
+
+	var beam = Line2D.new()
+	beam.name = "LightningBeamV"
+	beam.z_index = 100  # Increased from 50 to ensure it's on top
+	beam.visible = true  # Explicitly set visible
+
+	# Calculate start and end positions
+	var start_pos = grid_to_world_position(Vector2(col, 0))
+	var end_pos = grid_to_world_position(Vector2(col, GameManager.GRID_HEIGHT - 1))
+
+	print("[GameBoard] Beam start pos: ", start_pos, " end pos: ", end_pos)
+
+	# Add points for the lightning path
+	beam.add_point(Vector2(start_pos.x, start_pos.y - tile_size/2))
+
+	# Add zigzag points for lightning effect
+	var num_segments = 8
+	var segment_length = (end_pos.y - start_pos.y) / num_segments
+	for i in range(1, num_segments):
+		var x = start_pos.x + randf_range(-tile_size * 0.3, tile_size * 0.3)
+		var y = start_pos.y + (i * segment_length)
+		beam.add_point(Vector2(x, y))
+
+	beam.add_point(Vector2(end_pos.x, end_pos.y + tile_size/2))
+
+	print("[GameBoard] Beam has ", beam.get_point_count(), " points")
+
+	# Beam appearance - sleeker and thinner
+	beam.width = 12  # Reduced from 25
+	beam.default_color = color
+	beam.modulate = Color(1, 1, 1, 0)
+	beam.antialiased = true
+	beam.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	beam.end_cap_mode = Line2D.LINE_CAP_ROUND
+	beam.joint_mode = Line2D.LINE_JOINT_ROUND
+
+	add_child(beam)
+	print("[GameBoard] Beam added as child, parent: ", get_path())
+
+	# Animate the beam
+	var tween = create_tween()
+	tween.set_parallel(true)
+
+	# Flash in bright and wider
+	tween.tween_property(beam, "modulate", Color(3, 3, 3, 1), 0.05)  # Even brighter
+	tween.tween_property(beam, "width", 20, 0.05)  # Reduced from 40
+
+	tween.set_parallel(false)
+
+	# Pulse effect - moderate width
+	tween.tween_property(beam, "width", 15, 0.1)  # Reduced from 30
+	tween.tween_property(beam, "width", 18, 0.1)  # Reduced from 35
+
+	# Fade out
+	tween.tween_property(beam, "modulate", Color(1, 1, 1, 0), 0.2)
+
+	# Cleanup - connect directly to queue_free
+	tween.finished.connect(beam.queue_free)
+
+	return tween
+
+func _create_row_clear_effect(row: int):
+	"""Create visual effect for clearing an entire row"""
+	print("[GameBoard] Creating row clear lightning effect for row ", row)
+
+	# Create multiple lightning beams with slight offset for more impact
+	_create_lightning_beam_horizontal(row, Color(1.0, 1.0, 0.3))  # Yellow
+	await get_tree().create_timer(0.02).timeout
+	_create_lightning_beam_horizontal(row, Color(1.0, 0.8, 0.0))  # Orange-yellow
+
+	# Add particles along the row
+	for x in range(GameManager.GRID_WIDTH):
+		if not GameManager.is_cell_blocked(x, row):
+			var pos = grid_to_world_position(Vector2(x, row))
+			_create_impact_particles(pos, Color.YELLOW)
+
+func _create_column_clear_effect(col: int):
+	"""Create visual effect for clearing an entire column"""
+	print("[GameBoard] Creating column clear lightning effect for column ", col)
+
+	# Create multiple lightning beams with slight offset for more impact
+	_create_lightning_beam_vertical(col, Color(0.3, 0.8, 1.0))  # Cyan
+	await get_tree().create_timer(0.02).timeout
+	_create_lightning_beam_vertical(col, Color(0.5, 1.0, 1.0))  # Bright cyan
+
+	# Add particles along the column
+	for y in range(GameManager.GRID_HEIGHT):
+		if not GameManager.is_cell_blocked(col, y):
+			var pos = grid_to_world_position(Vector2(col, y))
+			_create_impact_particles(pos, Color.CYAN)
+
+func _create_impact_particles(pos: Vector2, color: Color):
+	"""Create small impact particles at a position"""
+	var particles = CPUParticles2D.new()
+	particles.position = pos
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 8
+	particles.lifetime = 0.4
+	particles.explosiveness = 1.0
+	particles.spread = 180
+	particles.initial_velocity_min = 50
+	particles.initial_velocity_max = 100
+	particles.scale_amount_min = 0.8
+	particles.scale_amount_max = 1.5
+	particles.color = color
+
+	add_child(particles)
+
+	# Cleanup - connect directly to queue_free
+	get_tree().create_timer(0.6).timeout.connect(particles.queue_free)
+
 func _on_game_over():
 	print("[GameBoard] Game Over")
 	# Cleanup or final actions on game over
@@ -527,6 +1004,7 @@ func _on_level_complete():
 
 func _on_level_loaded():
 	print("[GameBoard] Level Loaded")
+
 	# Reset or initialize anything specific to the new level
 	calculate_responsive_layout()
 	setup_background()
@@ -547,11 +1025,90 @@ func world_to_grid_position(world_pos: Vector2) -> Vector2:
 		int((world_pos.y - grid_offset.y) / tile_size)
 	)
 
+func update_tile_visual(grid_pos: Vector2, new_type: int):
+	"""Update a tile's visual appearance to match a new type
+	Used for bonus moves conversion"""
+	if grid_pos.x < 0 or grid_pos.x >= GameManager.GRID_WIDTH:
+		return
+	if grid_pos.y < 0 or grid_pos.y >= GameManager.GRID_HEIGHT:
+		return
+
+	var tile = tiles[int(grid_pos.x)][int(grid_pos.y)]
+	if not tile:
+		return
+
+	# Update the tile's texture to match the new type
+	if tile.has_method("update_type"):
+		tile.update_type(new_type)
+
+		# Add a flash effect to draw attention
+		var tween = create_tween()
+		tween.tween_property(tile, "modulate", Color(3, 3, 1, 1), 0.1)
+		tween.tween_property(tile, "modulate", Color.WHITE, 0.2)
+
+		# Play transformation sound
+		AudioManager.play_sfx("special_create")
+
+		print("[GameBoard] Updated tile at %s to type %d (special)" % [grid_pos, new_type])
+
+func show_skip_bonus_hint():
+	"""Show 'Tap to Skip' message during bonus phase"""
+	if skip_bonus_label:
+		skip_bonus_label.visible = true
+		skip_bonus_active = true
+		return
+
+	# Create skip hint label
+	skip_bonus_label = Label.new()
+	skip_bonus_label.name = "SkipBonusLabel"
+	skip_bonus_label.text = "TAP TO SKIP ⏩"
+	skip_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	skip_bonus_label.add_theme_font_size_override("font_size", 32)
+	skip_bonus_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.3, 1.0))  # Yellow
+
+	# Position below the board
+	var viewport_size = get_viewport().get_visible_rect().size
+	var board_bottom = grid_offset.y + (tile_size * GameManager.GRID_HEIGHT)
+	skip_bonus_label.position = Vector2(viewport_size.x / 2 - 150, board_bottom + 20)
+	skip_bonus_label.custom_minimum_size = Vector2(300, 60)
+
+	add_child(skip_bonus_label)
+	skip_bonus_active = true
+
+	# Create pulsing animation
+	var tween = create_tween()
+	tween.set_loops()
+	tween.tween_property(skip_bonus_label, "modulate:a", 0.5, 0.5)
+	tween.tween_property(skip_bonus_label, "modulate:a", 1.0, 0.5)
+
+	print("[GameBoard] Showing skip bonus hint")
+
+func hide_skip_bonus_hint():
+	"""Hide 'Tap to Skip' message"""
+	if skip_bonus_label:
+		skip_bonus_label.visible = false
+	skip_bonus_active = false
+	print("[GameBoard] Hiding skip bonus hint")
+
+func _input(event):
+	"""Handle input for skipping bonus animation"""
+	if skip_bonus_active and (event is InputEventScreenTouch or event is InputEventMouseButton):
+		if event.pressed:
+			print("[GameBoard] Screen tapped during bonus - requesting skip")
+			GameManager.skip_bonus_animation()
+			hide_skip_bonus_hint()
+			# Consume the event to prevent it from propagating to other input handlers
+			get_viewport().set_input_as_handled()
+
 func _on_tile_clicked(tile):
 	print("GameBoard received tile_clicked signal from tile at ", tile.grid_position)
 
 	if GameManager.processing_moves:
 		print("GameBoard: Move processing blocked")
+		return
+
+	if GameManager.level_transitioning:
+		print("GameBoard: Level transitioning, clicks blocked")
 		return
 
 	# Check if a booster is active
@@ -657,6 +1214,10 @@ func _on_tile_swiped(tile, direction: Vector2):
 
 	if GameManager.processing_moves:
 		print("GameBoard: Move processing blocked")
+		return
+
+	if GameManager.level_transitioning:
+		print("GameBoard: Level transitioning, swipes blocked")
 		return
 
 	# Clear any existing selection when swiping
@@ -1225,6 +1786,20 @@ func activate_line_blast_booster(direction: String, center_x: int, center_y: int
 	print("[GameBoard] Line blast will destroy ", positions_to_clear.size(), " tiles")
 
 	if positions_to_clear.size() > 0:
+		# Create lightning beam effects for each row or column
+		if direction == "horizontal":
+			for row_offset in range(-1, 2):
+				var target_y = center_y + row_offset
+				if target_y >= 0 and target_y < GameManager.GRID_HEIGHT:
+					_create_lightning_beam_horizontal(target_y, Color(1.0, 0.9, 0.2))
+					await get_tree().create_timer(0.05).timeout
+		elif direction == "vertical":
+			for col_offset in range(-1, 2):
+				var target_x = center_x + col_offset
+				if target_x >= 0 and target_x < GameManager.GRID_WIDTH:
+					_create_lightning_beam_vertical(target_x, Color(0.4, 0.9, 1.0))
+					await get_tree().create_timer(0.05).timeout
+
 		await highlight_special_activation(positions_to_clear)
 		await animate_destroy_tiles(positions_to_clear)
 
@@ -1352,6 +1927,9 @@ func activate_row_clear_booster(row: int):
 			positions_to_clear.append(Vector2(x, row))
 
 	if positions_to_clear.size() > 0:
+		# Create lightning beam effect across the row
+		await _create_row_clear_effect(row)
+
 		await highlight_special_activation(positions_to_clear)
 		await animate_destroy_tiles(positions_to_clear)
 
@@ -1386,6 +1964,9 @@ func activate_column_clear_booster(column: int):
 			positions_to_clear.append(Vector2(column, y))
 
 	if positions_to_clear.size() > 0:
+		# Create lightning beam effect down the column
+		await _create_column_clear_effect(column)
+
 		await highlight_special_activation(positions_to_clear)
 		await animate_destroy_tiles(positions_to_clear)
 
@@ -1418,16 +1999,35 @@ func activate_special_tile(pos: Vector2):
 
 	if tile_type == GameManager.HORIZTONAL_ARROW:
 		AudioManager.play_sfx("special_horiz")
+		# Create horizontal lightning beam
+		print("[GameBoard] Creating lightning for horizontal arrow at row ", int(pos.y))
+		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.9, 0.3))
+		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
+
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
 				positions_to_clear.append(Vector2(x, pos.y))
+
 	elif tile_type == GameManager.VERTICAL_ARROW:
 		AudioManager.play_sfx("special_vert")
+		# Create vertical lightning beam
+		print("[GameBoard] Creating lightning for vertical arrow at column ", int(pos.x))
+		_create_lightning_beam_vertical(int(pos.x), Color(0.4, 0.9, 1.0))
+		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
+
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
 				positions_to_clear.append(Vector2(pos.x, y))
+
 	elif tile_type == GameManager.FOUR_WAY_ARROW:
 		AudioManager.play_sfx("special_fourway")
+		# Create both horizontal and vertical lightning beams with slight delay
+		print("[GameBoard] Creating cross lightning for four-way arrow at ", pos)
+		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.5, 1.0))  # Magenta
+		await get_tree().create_timer(0.05).timeout
+		_create_lightning_beam_vertical(int(pos.x), Color(1.0, 0.5, 1.0))  # Magenta
+		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
+
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
 				positions_to_clear.append(Vector2(x, pos.y))
@@ -1491,16 +2091,32 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 
 	if tile_type == GameManager.HORIZTONAL_ARROW:
 		AudioManager.play_sfx("special_horiz")
+		# Create horizontal lightning beam
+		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.9, 0.3))
+		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
+
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
 				positions_to_clear.append(Vector2(x, pos.y))
+
 	elif tile_type == GameManager.VERTICAL_ARROW:
 		AudioManager.play_sfx("special_vert")
+		# Create vertical lightning beam
+		_create_lightning_beam_vertical(int(pos.x), Color(0.4, 0.9, 1.0))
+		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
+
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
 				positions_to_clear.append(Vector2(pos.x, y))
+
 	elif tile_type == GameManager.FOUR_WAY_ARROW:
 		AudioManager.play_sfx("special_fourway")
+		# Create both horizontal and vertical lightning beams with slight delay
+		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.5, 1.0))  # Magenta
+		await get_tree().create_timer(0.05).timeout
+		_create_lightning_beam_vertical(int(pos.x), Color(1.0, 0.5, 1.0))  # Magenta
+		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
+
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
 				positions_to_clear.append(Vector2(x, pos.y))

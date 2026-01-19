@@ -167,7 +167,7 @@ func _update_toggle_visual(toggle_btn: TextureButton, enabled: bool):
 			cross.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			cross.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			cross.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
-			cross.add_theme_font_size_override("font_size", 24)
+			ThemeManager.apply_bangers_font(cross, 24)
 			cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			cross.anchor_left = 0
 			cross.anchor_top = 0

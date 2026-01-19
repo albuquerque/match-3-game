@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1280" viewBox="0 0 720 1280">
+  <!-- Safe margins -->
+  <rect x="36" y="0" width="648" height="1280" fill="none" stroke="#ffa500" stroke-dasharray="6,4" stroke-width="2" />
+  <!-- Top title safe area -->
+  <rect x="0" y="30" width="720" height="80" fill="none" stroke="#ff4500" stroke-width="2" stroke-dasharray="4,4" />
+  <!-- Level interactive area radius (65px) -->
+  <!-- Level markers -->
+  <g font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#ffffff" stroke="#000000" stroke-width="0.6">
+    <circle cx="360" cy="180" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="360" y="180" text-anchor="middle" dy="5">L1</text>
+
+    <circle cx="240" cy="250" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="240" y="250" text-anchor="middle" dy="5">L2</text>
+
+    <circle cx="480" cy="320" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="480" y="320" text-anchor="middle" dy="5">L3</text>
+
+    <circle cx="360" cy="390" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="360" y="390" text-anchor="middle" dy="5">L4</text>
+
+    <circle cx="200" cy="460" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="200" y="460" text-anchor="middle" dy="5">L5</text>
+
+    <circle cx="520" cy="530" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="520" y="530" text-anchor="middle" dy="5">L6</text>
+
+    <circle cx="360" cy="600" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="360" y="600" text-anchor="middle" dy="5">L7</text>
+
+    <circle cx="220" cy="670" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="220" y="670" text-anchor="middle" dy="5">L8</text>
+
+    <circle cx="500" cy="670" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="500" y="670" text-anchor="middle" dy="5">L9</text>
+
+    <circle cx="360" cy="740" r="65" fill="none" stroke="#00aaff" stroke-dasharray="4,4" />
+    <text x="360" y="740" text-anchor="middle" dy="5">L10</text>
+
+    <!-- Next chapter button area -->
+    <rect x="360" y="810" width="1" height="1" fill="none" />
+    <circle cx="360" cy="810" r="80" fill="none" stroke="#00ff66" stroke-dasharray="6,3" />
+    <text x="360" y="810" text-anchor="middle" dy="5" fill="#00ff66">Next</text>
+  </g>
+
+  <!-- Faint path suggestion (visual guide only) -->
+  <path d="M360,180 C300,210 260,240 240,250 S420,320 480,320 S360,390 360,390 S260,460 200,460 S440,530 520,530 S360,600 360,600 S260,670 220,670 S420,670 500,670 S360,740 360,740"
+        fill="none" stroke="#999999" stroke-width="2" stroke-dasharray="8,6" opacity="0.6"/>
+</svg>

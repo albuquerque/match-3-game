@@ -39,13 +39,75 @@ var last_login_date: String = ""
 var last_daily_reward_claim: String = ""
 var total_stars: int = 0
 var levels_completed: int = 0
+var level_stars: Dictionary = {}  # {"level_1": 3, "level_2": 2, ...}
 var unlocked_themes: Array = ["legacy"]
 var selected_theme: String = "legacy"
+var unlocked_gallery_images: Array = []  # Array of unlocked image IDs
 
 # Achievement tracking
 var achievements_unlocked: Array = []
 var total_matches: int = 0
 var total_special_tiles_used: int = 0
+var total_boosters_used: int = 0
+var total_score_earned: int = 0
+var total_gems_earned: int = 0
+var total_coins_earned: int = 0
+var max_combo_reached: int = 0
+var total_tiles_cleared: int = 0
+var perfect_levels: int = 0  # Levels completed with 3 stars
+
+# New achievement types tracking
+var achievements_progress = {
+	# Match-based achievements (expanded tiers)
+	"matches_100": {"progress": 0, "target": 100, "claimed": false},
+	"matches_500": {"progress": 0, "target": 500, "claimed": false},
+	"matches_1000": {"progress": 0, "target": 1000, "claimed": false},
+	"matches_2500": {"progress": 0, "target": 2500, "claimed": false},
+	"matches_5000": {"progress": 0, "target": 5000, "claimed": false},
+	"matches_10000": {"progress": 0, "target": 10000, "claimed": false},
+
+	# Level-based achievements (expanded tiers)
+	"levels_10": {"progress": 0, "target": 10, "claimed": false},
+	"levels_25": {"progress": 0, "target": 25, "claimed": false},
+	"levels_50": {"progress": 0, "target": 50, "claimed": false},
+	"levels_100": {"progress": 0, "target": 100, "claimed": false},
+	"levels_250": {"progress": 0, "target": 250, "claimed": false},
+	"levels_500": {"progress": 0, "target": 500, "claimed": false},
+
+	# Star-based achievements (expanded tiers)
+	"stars_10": {"progress": 0, "target": 10, "claimed": false},
+	"stars_25": {"progress": 0, "target": 25, "claimed": false},
+	"stars_50": {"progress": 0, "target": 50, "claimed": false},
+	"stars_100": {"progress": 0, "target": 100, "claimed": false},
+	"stars_250": {"progress": 0, "target": 250, "claimed": false},
+	"stars_500": {"progress": 0, "target": 500, "claimed": false},
+
+	# Special achievements (expanded and enhanced)
+	"booster_explorer": {"progress": 0, "target": 5, "claimed": false},
+	"perfect_streak": {"progress": 0, "target": 3, "claimed": false},
+	"combo_master": {"progress": 0, "target": 10, "claimed": false},
+	"score_hunter": {"progress": 0, "target": 100000, "claimed": false},
+	"score_legend": {"progress": 0, "target": 1000000, "claimed": false},
+	"combo_god": {"progress": 0, "target": 20, "claimed": false},
+	"perfect_master": {"progress": 0, "target": 10, "claimed": false},
+	"booster_addict": {"progress": 0, "target": 100, "claimed": false},
+
+	# Weekly challenges (reset weekly)
+	"weekly_matches": {"progress": 0, "target": 100, "claimed": false, "weekly": true},
+	"weekly_levels": {"progress": 0, "target": 10, "claimed": false, "weekly": true},
+	"weekly_perfect": {"progress": 0, "target": 5, "claimed": false, "weekly": true},
+	"weekly_streak": {"progress": 0, "target": 7, "claimed": false, "weekly": true},
+
+	# Monthly milestones (reset monthly)
+	"monthly_dedication": {"progress": 0, "target": 20, "claimed": false, "monthly": true},
+	"monthly_scorer": {"progress": 0, "target": 50000, "claimed": false, "monthly": true},
+	"monthly_collector": {"progress": 0, "target": 25, "claimed": false, "monthly": true},
+
+	# Seasonal events (special limited-time)
+	"christmas_spirit": {"progress": 0, "target": 1, "claimed": false, "seasonal": true},
+	"easter_joy": {"progress": 0, "target": 20, "claimed": false, "seasonal": true},
+	"harvest_blessing": {"progress": 0, "target": 1000, "claimed": false, "seasonal": true},
+}
 
 # Audio settings (persisted in player progress)
 var audio_music_volume: float = 0.7
@@ -67,6 +129,9 @@ func _ready():
 
 	# Check daily login streak
 	check_daily_login()
+
+	# Check for weekly/monthly resets for renewed engagement
+	check_weekly_monthly_resets()
 
 	print("[RewardManager] Initialized - Coins: %d, Gems: %d, Lives: %d" % [coins, gems, lives])
 
@@ -184,6 +249,10 @@ func use_booster(booster_type: String) -> bool:
 	if boosters.has(booster_type) and boosters[booster_type] > 0:
 		boosters[booster_type] -= 1
 		booster_changed.emit(booster_type, boosters[booster_type])
+
+		# Track achievement for booster usage
+		track_booster_used(booster_type)
+
 		save_progress()
 		print("[RewardManager] Used %s. Remaining: %d" % [booster_type, boosters[booster_type]])
 		return true
@@ -214,6 +283,35 @@ func grant_level_completion_reward(level_number: int, stars: int):
 		if first_time:
 			add_gems(5)
 			print("[RewardManager] Bonus gems for first 3-star completion!")
+
+	# Check if this level unlocks a gallery image
+	print("[RewardManager] Checking gallery unlock for level ", level_number)
+
+	# Define gallery unlock levels directly here to avoid static function issues
+	var gallery_levels = {
+		2: {"id": "image_01", "name": "Victory"},
+		4: {"id": "image_02", "name": "Celebration"},
+		6: {"id": "image_03", "name": "Achievement"},
+		8: {"id": "image_04", "name": "Glory"},
+		10: {"id": "image_05", "name": "Champion"},
+		12: {"id": "image_06", "name": "Master"},
+		14: {"id": "image_07", "name": "Legend"},
+		16: {"id": "image_08", "name": "Hero"},
+		18: {"id": "image_09", "name": "Elite"},
+		20: {"id": "image_10", "name": "Ultimate"}
+	}
+
+	if gallery_levels.has(level_number):
+		var image_info = gallery_levels[level_number]
+		var image_id = image_info.get("id", "")
+		var image_name = image_info.get("name", "")
+		print("[RewardManager] Level ", level_number, " unlocks gallery image: ", image_name)
+		if unlock_gallery_image(image_id):
+			print("[RewardManager] ✨ Gallery image unlocked: %s" % image_name)
+		else:
+			print("[RewardManager] Image was already unlocked: ", image_id)
+	else:
+		print("[RewardManager] No gallery image configured for level ", level_number)
 
 	# Update progression
 	if level_number > levels_completed:
@@ -296,6 +394,37 @@ func unlock_achievement(achievement_id: String):
 		# TODO: Show achievement notification
 
 # ============================================
+# Gallery System
+# ============================================
+
+func unlock_gallery_image(image_id: String):
+	"""Unlock a gallery image by its ID"""
+	if not unlocked_gallery_images.has(image_id):
+		unlocked_gallery_images.append(image_id)
+		save_progress()
+		print("[RewardManager] Gallery image unlocked: %s" % image_id)
+		return true
+	return false
+
+func is_gallery_image_unlocked(image_id: String) -> bool:
+	"""Check if a gallery image is unlocked"""
+	return unlocked_gallery_images.has(image_id)
+
+func get_unlocked_gallery_images() -> Array:
+	"""Get all unlocked gallery image IDs"""
+	return unlocked_gallery_images.duplicate()
+
+func get_unlock_progress() -> Dictionary:
+	"""Get the total gallery unlock progress"""
+	# Hardcoded total gallery images (can be moved to config later)
+	var total_images = 10  # One image every 2 levels: levels 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
+	return {
+		"unlocked": unlocked_gallery_images.size(),
+		"total": total_images,
+		"percentage": float(unlocked_gallery_images.size()) / float(total_images) * 100.0
+	}
+
+# ============================================
 # Save/Load System
 # ============================================
 
@@ -311,11 +440,22 @@ func save_progress():
 		"last_daily_reward_claim": last_daily_reward_claim,
 		"total_stars": total_stars,
 		"levels_completed": levels_completed,
+		"level_stars": level_stars,  # Individual star ratings per level
 		"unlocked_themes": unlocked_themes,
 		"selected_theme": selected_theme,
+		"unlocked_gallery_images": unlocked_gallery_images,
 		"achievements_unlocked": achievements_unlocked,
 		"total_matches": total_matches,
 		"total_special_tiles_used": total_special_tiles_used,
+		# New achievement tracking data
+		"total_boosters_used": total_boosters_used,
+		"total_score_earned": total_score_earned,
+		"total_gems_earned": total_gems_earned,
+		"total_coins_earned": total_coins_earned,
+		"max_combo_reached": max_combo_reached,
+		"total_tiles_cleared": total_tiles_cleared,
+		"perfect_levels": perfect_levels,
+		"achievements_progress": achievements_progress,
 		"audio": {
 			"music_volume": audio_music_volume,
 			"sfx_volume": audio_sfx_volume,
@@ -341,6 +481,22 @@ func load_progress():
 		gems = 50
 		lives = MAX_LIVES
 		last_life_regen_time = Time.get_unix_time_from_system()
+
+		# Give starter boosters so players can try them out
+		boosters = {
+			"hammer": 3,
+			"shuffle": 2,
+			"swap": 2,
+			"chain_reaction": 1,
+			"bomb_3x3": 1,
+			"line_blast": 1,
+			"row_clear": 0,
+			"column_clear": 0,
+			"extra_moves": 2,
+			"tile_squasher": 0
+		}
+		print("[RewardManager] Starter boosters granted: ", boosters)
+
 		save_progress()
 		return
 
@@ -363,12 +519,24 @@ func load_progress():
 			last_login_date = data.get("last_login_date", "")
 			total_stars = data.get("total_stars", 0)
 			levels_completed = data.get("levels_completed", 0)
+			level_stars = data.get("level_stars", {})  # Load individual level stars
 			unlocked_themes = data.get("unlocked_themes", ["legacy"])
 			selected_theme = data.get("selected_theme", "legacy")
+			unlocked_gallery_images = data.get("unlocked_gallery_images", [])
 			achievements_unlocked = data.get("achievements_unlocked", [])
 			total_matches = data.get("total_matches", 0)
 			total_special_tiles_used = data.get("total_special_tiles_used", 0)
 			last_daily_reward_claim = data.get("last_daily_reward_claim", "")
+
+			# Load new achievement tracking data
+			total_boosters_used = data.get("total_boosters_used", 0)
+			total_score_earned = data.get("total_score_earned", 0)
+			total_gems_earned = data.get("total_gems_earned", 0)
+			total_coins_earned = data.get("total_coins_earned", 0)
+			max_combo_reached = data.get("max_combo_reached", 0)
+			total_tiles_cleared = data.get("total_tiles_cleared", 0)
+			perfect_levels = data.get("perfect_levels", 0)
+			achievements_progress = data.get("achievements_progress", achievements_progress)
 
 			# Load audio settings
 			var audio_data = data.get("audio", {})
@@ -389,18 +557,21 @@ func reset_progress():
 	gems = 50
 	lives = MAX_LIVES
 	last_life_regen_time = Time.get_unix_time_from_system()
+
+	# Give starter boosters so players can try them out
 	boosters = {
-		"hammer": 0,
-		"shuffle": 0,
-		"swap": 0,
-		"chain_reaction": 0,
-		"bomb_3x3": 0,
-		"line_blast": 0,
+		"hammer": 3,
+		"shuffle": 2,
+		"swap": 2,
+		"chain_reaction": 1,
+		"bomb_3x3": 1,
+		"line_blast": 1,
 		"row_clear": 0,
 		"column_clear": 0,
-		"extra_moves": 0,
+		"extra_moves": 2,
 		"tile_squasher": 0
 	}
+
 	daily_streak = 0
 	last_login_date = ""
 	last_daily_reward_claim = ""
@@ -412,6 +583,66 @@ func reset_progress():
 	total_matches = 0
 	total_special_tiles_used = 0
 
+	# Reset new achievement tracking
+	total_boosters_used = 0
+	total_score_earned = 0
+	total_gems_earned = 0
+	total_coins_earned = 0
+	max_combo_reached = 0
+	total_tiles_cleared = 0
+	perfect_levels = 0
+	achievements_progress = {
+		# Match-based achievements (expanded tiers)
+		"matches_100": {"progress": 0, "target": 100, "claimed": false},
+		"matches_500": {"progress": 0, "target": 500, "claimed": false},
+		"matches_1000": {"progress": 0, "target": 1000, "claimed": false},
+		"matches_2500": {"progress": 0, "target": 2500, "claimed": false},
+		"matches_5000": {"progress": 0, "target": 5000, "claimed": false},
+		"matches_10000": {"progress": 0, "target": 10000, "claimed": false},
+
+		# Level-based achievements (expanded tiers)
+		"levels_10": {"progress": 0, "target": 10, "claimed": false},
+		"levels_25": {"progress": 0, "target": 25, "claimed": false},
+		"levels_50": {"progress": 0, "target": 50, "claimed": false},
+		"levels_100": {"progress": 0, "target": 100, "claimed": false},
+		"levels_250": {"progress": 0, "target": 250, "claimed": false},
+		"levels_500": {"progress": 0, "target": 500, "claimed": false},
+
+		# Star-based achievements (expanded tiers)
+		"stars_10": {"progress": 0, "target": 10, "claimed": false},
+		"stars_25": {"progress": 0, "target": 25, "claimed": false},
+		"stars_50": {"progress": 0, "target": 50, "claimed": false},
+		"stars_100": {"progress": 0, "target": 100, "claimed": false},
+		"stars_250": {"progress": 0, "target": 250, "claimed": false},
+		"stars_500": {"progress": 0, "target": 500, "claimed": false},
+
+		# Special achievements (expanded and enhanced)
+		"booster_explorer": {"progress": 0, "target": 5, "claimed": false},
+		"perfect_streak": {"progress": 0, "target": 3, "claimed": false},
+		"combo_master": {"progress": 0, "target": 10, "claimed": false},
+		"score_hunter": {"progress": 0, "target": 100000, "claimed": false},
+		"score_legend": {"progress": 0, "target": 1000000, "claimed": false},
+		"combo_god": {"progress": 0, "target": 20, "claimed": false},
+		"perfect_master": {"progress": 0, "target": 10, "claimed": false},
+		"booster_addict": {"progress": 0, "target": 100, "claimed": false},
+
+		# Weekly challenges (reset weekly)
+		"weekly_matches": {"progress": 0, "target": 100, "claimed": false, "weekly": true},
+		"weekly_levels": {"progress": 0, "target": 10, "claimed": false, "weekly": true},
+		"weekly_perfect": {"progress": 0, "target": 5, "claimed": false, "weekly": true},
+		"weekly_streak": {"progress": 0, "target": 7, "claimed": false, "weekly": true},
+
+		# Monthly milestones (reset monthly)
+		"monthly_dedication": {"progress": 0, "target": 20, "claimed": false, "monthly": true},
+		"monthly_scorer": {"progress": 0, "target": 50000, "claimed": false, "monthly": true},
+		"monthly_collector": {"progress": 0, "target": 25, "claimed": false, "monthly": true},
+
+		# Seasonal events (special limited-time)
+		"christmas_spirit": {"progress": 0, "target": 1, "claimed": false, "seasonal": true},
+		"easter_joy": {"progress": 0, "target": 20, "claimed": false, "seasonal": true},
+		"harvest_blessing": {"progress": 0, "target": 1000, "claimed": false, "seasonal": true},
+	}
+
 	save_progress()
 
 	# Emit all signals to update UI
@@ -419,7 +650,11 @@ func reset_progress():
 	gems_changed.emit(gems)
 	lives_changed.emit(lives)
 
-	print("[RewardManager] Progress reset!")
+	# Emit booster changed signals for all boosters
+	for booster_type in boosters.keys():
+		booster_changed.emit(booster_type, boosters[booster_type])
+
+	print("[RewardManager] Progress reset with starter boosters!")
 
 func set_audio_muted(muted: bool):
 	audio_muted = muted
@@ -431,4 +666,329 @@ func set_audio_muted(muted: bool):
 		# Default to true when unmuting unless stored otherwise
 		audio_music_enabled = true
 		audio_sfx_enabled = true
+	save_progress()
+
+# ============================================================================
+# ACHIEVEMENT TRACKING SYSTEM
+# ============================================================================
+
+
+
+func track_tiles_cleared(count: int):
+	"""Called when tiles are cleared"""
+	total_tiles_cleared += count
+
+func _update_achievement_progress(achievement_id: String, current_value: int):
+	"""Update progress for a specific achievement"""
+	if achievement_id in achievements_progress:
+		var achievement = achievements_progress[achievement_id]
+		achievement["progress"] = current_value
+
+		# Check if achievement is newly completed
+		if current_value >= achievement["target"] and not achievement["claimed"]:
+			print("[RewardManager] Achievement unlocked: %s (%d/%d)" % [achievement_id, current_value, achievement["target"]])
+
+func _check_perfect_streak():
+	"""Check for perfect streak achievement (3 levels in a row with 3 stars)"""
+	# This would need more complex tracking - for now, simplified
+	if perfect_levels >= 3:
+		_update_achievement_progress("perfect_streak", perfect_levels)
+
+func get_achievement_progress(achievement_id: String) -> Dictionary:
+	"""Get progress for a specific achievement"""
+	if achievement_id in achievements_progress:
+		return achievements_progress[achievement_id]
+	return {"progress": 0, "target": 1, "claimed": false}
+
+func claim_achievement_reward(achievement_id: String) -> Dictionary:
+	"""Claim reward for completed achievement"""
+	if not achievement_id in achievements_progress:
+		return {"success": false, "reason": "Achievement not found"}
+
+	var achievement = achievements_progress[achievement_id]
+	if achievement["progress"] < achievement["target"]:
+		return {"success": false, "reason": "Achievement not completed"}
+
+	if achievement["claimed"]:
+		return {"success": false, "reason": "Already claimed"}
+
+	# Calculate reward based on achievement difficulty
+	var reward = _get_achievement_reward(achievement_id)
+
+	# Grant reward
+	add_coins(reward["coins"])
+	add_gems(reward["gems"])
+
+	# Mark as claimed
+	achievement["claimed"] = true
+	save_progress()
+
+	return {"success": true, "coins": reward["coins"], "gems": reward["gems"]}
+
+func _get_achievement_reward(achievement_id: String) -> Dictionary:
+	"""Get reward amounts for specific achievements"""
+	var rewards = {
+		# Match-based rewards (escalating)
+		"matches_100": {"coins": 100, "gems": 1},
+		"matches_500": {"coins": 300, "gems": 3},
+		"matches_1000": {"coins": 500, "gems": 5},
+		"matches_2500": {"coins": 800, "gems": 8},
+		"matches_5000": {"coins": 1200, "gems": 12},
+		"matches_10000": {"coins": 2000, "gems": 20},
+
+		# Level-based rewards (escalating)
+		"levels_10": {"coins": 200, "gems": 2},
+		"levels_25": {"coins": 500, "gems": 5},
+		"levels_50": {"coins": 1000, "gems": 10},
+		"levels_100": {"coins": 1500, "gems": 15},
+		"levels_250": {"coins": 2500, "gems": 25},
+		"levels_500": {"coins": 4000, "gems": 40},
+
+		# Star-based rewards (escalating)
+		"stars_10": {"coins": 150, "gems": 2},
+		"stars_25": {"coins": 400, "gems": 4},
+		"stars_50": {"coins": 800, "gems": 8},
+		"stars_100": {"coins": 1200, "gems": 12},
+		"stars_250": {"coins": 2000, "gems": 20},
+		"stars_500": {"coins": 3500, "gems": 35},
+
+		# Special achievements (high-value)
+		"booster_explorer": {"coins": 300, "gems": 5},
+		"perfect_streak": {"coins": 500, "gems": 10},
+		"combo_master": {"coins": 250, "gems": 3},
+		"score_hunter": {"coins": 600, "gems": 8},
+		"score_legend": {"coins": 1200, "gems": 20},
+		"combo_god": {"coins": 800, "gems": 15},
+		"perfect_master": {"coins": 1000, "gems": 20},
+		"booster_addict": {"coins": 400, "gems": 8},
+
+		# Weekly challenges (renewable, medium rewards)
+		"weekly_matches": {"coins": 200, "gems": 3},
+		"weekly_levels": {"coins": 250, "gems": 4},
+		"weekly_perfect": {"coins": 300, "gems": 5},
+		"weekly_streak": {"coins": 150, "gems": 2},
+
+		# Monthly milestones (high rewards, exclusive)
+		"monthly_dedication": {"coins": 500, "gems": 10},
+		"monthly_scorer": {"coins": 600, "gems": 12},
+		"monthly_collector": {"coins": 400, "gems": 8},
+
+		# Seasonal events (special limited rewards)
+		"christmas_spirit": {"coins": 300, "gems": 5},
+		"easter_joy": {"coins": 400, "gems": 8},
+		"harvest_blessing": {"coins": 350, "gems": 6},
+	}
+
+	if achievement_id in rewards:
+		return rewards[achievement_id]
+	return {"coins": 50, "gems": 1}  # Default reward
+
+# ============================================================================
+# WEEKLY/MONTHLY RESET SYSTEM FOR RENEWED ENGAGEMENT
+# ============================================================================
+
+func check_weekly_monthly_resets():
+	"""Check if we need to reset weekly/monthly achievements"""
+	var current_time = Time.get_datetime_dict_from_system()
+	var current_week = get_week_of_year(current_time)
+	var current_month = current_time["month"]
+
+	# Check for weekly resets (every Monday)
+	var last_week_check = get_meta("last_weekly_reset", 0)
+	if current_week != last_week_check:
+		reset_weekly_achievements()
+		set_meta("last_weekly_reset", current_week)
+		print("[RewardManager] Weekly achievements reset!")
+
+	# Check for monthly resets (1st of each month)
+	var last_month_check = get_meta("last_monthly_reset", 0)
+	if current_month != last_month_check:
+		reset_monthly_achievements()
+		set_meta("last_monthly_reset", current_month)
+		print("[RewardManager] Monthly achievements reset!")
+
+func reset_weekly_achievements():
+	"""Reset all weekly achievements for new engagement"""
+	var weekly_achievements = ["weekly_matches", "weekly_levels", "weekly_perfect", "weekly_streak"]
+	for achievement_id in weekly_achievements:
+		if achievement_id in achievements_progress:
+			achievements_progress[achievement_id]["progress"] = 0
+			achievements_progress[achievement_id]["claimed"] = false
+	save_progress()
+
+func reset_monthly_achievements():
+	"""Reset all monthly achievements for new engagement"""
+	var monthly_achievements = ["monthly_dedication", "monthly_scorer", "monthly_collector"]
+	for achievement_id in monthly_achievements:
+		if achievement_id in achievements_progress:
+			achievements_progress[achievement_id]["progress"] = 0
+			achievements_progress[achievement_id]["claimed"] = false
+	save_progress()
+
+func get_week_of_year(datetime: Dictionary) -> int:
+	"""Calculate week of year (1-52)"""
+	var day_of_year = get_day_of_year(datetime)
+	return int((day_of_year - 1) / 7) + 1
+
+func get_day_of_year(datetime: Dictionary) -> int:
+	"""Calculate day of year (1-365/366)"""
+	var days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+	# Check for leap year
+	var year = datetime["year"]
+	if (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0):
+		days_in_month[1] = 29
+
+	var day_of_year = datetime["day"]
+	for i in range(datetime["month"] - 1):
+		day_of_year += days_in_month[i]
+
+	return day_of_year
+
+# ============================================================================
+# ENHANCED TRACKING FOR NEW ACHIEVEMENT TYPES
+# ============================================================================
+
+func track_weekly_progress(activity_type: String, amount: int = 1):
+	"""Track weekly achievement progress"""
+	var weekly_mapping = {
+		"matches": "weekly_matches",
+		"levels": "weekly_levels",
+		"perfect": "weekly_perfect",
+		"streak": "weekly_streak"
+	}
+
+	if activity_type in weekly_mapping:
+		var achievement_id = weekly_mapping[activity_type]
+		if achievement_id in achievements_progress:
+			var achievement = achievements_progress[achievement_id]
+			achievement["progress"] = min(achievement["progress"] + amount, achievement["target"])
+			print("[RewardManager] Weekly progress: %s (%d/%d)" % [achievement_id, achievement["progress"], achievement["target"]])
+
+func track_monthly_progress(activity_type: String, amount: int = 1):
+	"""Track monthly achievement progress"""
+	var monthly_mapping = {
+		"play_days": "monthly_dedication",
+		"score": "monthly_scorer",
+		"stars": "monthly_collector"
+	}
+
+	if activity_type in monthly_mapping:
+		var achievement_id = monthly_mapping[activity_type]
+		if achievement_id in achievements_progress:
+			var achievement = achievements_progress[achievement_id]
+			achievement["progress"] = min(achievement["progress"] + amount, achievement["target"])
+			print("[RewardManager] Monthly progress: %s (%d/%d)" % [achievement_id, achievement["progress"], achievement["target"]])
+
+func track_seasonal_progress(season: String, progress_type: String = "participation"):
+	"""Track seasonal achievement progress"""
+	var current_season = get_current_season()
+	if current_season == season:
+		var seasonal_achievements = {
+			"winter": "christmas_spirit",
+			"spring": "easter_joy",
+			"autumn": "harvest_blessing"
+		}
+
+		if season in seasonal_achievements:
+			var achievement_id = seasonal_achievements[season]
+			if achievement_id in achievements_progress:
+				achievements_progress[achievement_id]["progress"] = 1
+				print("[RewardManager] Seasonal progress: %s activated!" % achievement_id)
+
+func get_current_season() -> String:
+	"""Determine current season based on date"""
+	var current_time = Time.get_datetime_dict_from_system()
+	var month = current_time["month"]
+
+	if month in [12, 1, 2]:
+		return "winter"
+	elif month in [3, 4, 5]:
+		return "spring"
+	elif month in [6, 7, 8]:
+		return "summer"
+	else:
+		return "autumn"
+
+# Enhanced tracking integration
+func track_match_made():
+	"""Enhanced match tracking with weekly/monthly progress"""
+	total_matches += 1
+	_update_achievement_progress("matches_100", total_matches)
+	_update_achievement_progress("matches_500", total_matches)
+	_update_achievement_progress("matches_1000", total_matches)
+	_update_achievement_progress("matches_2500", total_matches)
+	_update_achievement_progress("matches_5000", total_matches)
+	_update_achievement_progress("matches_10000", total_matches)
+
+	# Track weekly progress
+	track_weekly_progress("matches", 1)
+
+	save_progress()
+
+func track_level_completed(level: int, stars: int, score: int):
+	"""Enhanced level completion tracking"""
+	levels_completed = max(levels_completed, level)
+	total_score_earned += score
+
+	# Track stars
+	if stars == 3:
+		perfect_levels += 1
+		_check_perfect_streak()
+		# Track weekly perfect levels
+		track_weekly_progress("perfect", 1)
+
+	# Update level-based achievements (all tiers)
+	_update_achievement_progress("levels_10", levels_completed)
+	_update_achievement_progress("levels_25", levels_completed)
+	_update_achievement_progress("levels_50", levels_completed)
+	_update_achievement_progress("levels_100", levels_completed)
+	_update_achievement_progress("levels_250", levels_completed)
+	_update_achievement_progress("levels_500", levels_completed)
+
+	# Update star-based achievements (all tiers)
+	_update_achievement_progress("stars_10", total_stars)
+	_update_achievement_progress("stars_25", total_stars)
+	_update_achievement_progress("stars_50", total_stars)
+	_update_achievement_progress("stars_100", total_stars)
+	_update_achievement_progress("stars_250", total_stars)
+	_update_achievement_progress("stars_500", total_stars)
+
+	# Update score achievements
+	_update_achievement_progress("score_hunter", total_score_earned)
+	_update_achievement_progress("score_legend", total_score_earned)
+
+	# Track weekly/monthly progress
+	track_weekly_progress("levels", 1)
+	track_monthly_progress("score", score)
+	track_monthly_progress("stars", stars)
+
+	save_progress()
+
+func track_combo_reached(combo: int):
+	"""Enhanced combo tracking"""
+	max_combo_reached = max(max_combo_reached, combo)
+	_update_achievement_progress("combo_master", max_combo_reached)
+	_update_achievement_progress("combo_god", max_combo_reached)
+
+func track_booster_used(booster_type: String):
+	"""Enhanced booster usage tracking"""
+	total_boosters_used += 1
+	_update_achievement_progress("booster_addict", total_boosters_used)
+
+	# Track different booster types used
+	var unique_boosters_used = []
+	for key in achievements_progress.keys():
+		if "booster_type_" in key:
+			if achievements_progress[key]["progress"] > 0:
+				unique_boosters_used.append(key)
+
+	# Track this specific booster type
+	var booster_key = "booster_type_" + booster_type
+	if not booster_key in achievements_progress:
+		achievements_progress[booster_key] = {"progress": 0, "target": 1, "claimed": false}
+	achievements_progress[booster_key]["progress"] = 1
+
+	# Update booster explorer achievement (use 5 different types)
+	_update_achievement_progress("booster_explorer", unique_boosters_used.size())
 	save_progress()
