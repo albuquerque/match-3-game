@@ -94,3 +94,33 @@ func create_currency_display(currency_type: String, amount: int, icon_size: int 
 
 	return container
 
+# ========================================
+# Font Management
+# ========================================
+
+# Cached Bangers font resource for performance
+var _bangers_font = null
+
+func get_bangers_font():
+	"""Get the Bangers font resource (cached for performance)"""
+	if _bangers_font == null:
+		_bangers_font = load("res://fonts/Bangers/Bangers-Regular.ttf")
+		if _bangers_font:
+			print("[ThemeManager] Loaded Bangers font successfully")
+		else:
+			print("[ThemeManager] WARNING: Failed to load Bangers font!")
+	return _bangers_font
+
+func apply_bangers_font(label: Label, font_size: int = 24):
+	"""Apply Bangers font to a label with the specified size"""
+	var font = get_bangers_font()
+	if font:
+		label.add_theme_font_override("font", font)
+	label.add_theme_font_size_override("font_size", font_size)
+
+func apply_bangers_font_to_button(button: Button, font_size: int = 20):
+	"""Apply Bangers font to a button with the specified size"""
+	var font = get_bangers_font()
+	if font:
+		button.add_theme_font_override("font", font)
+	button.add_theme_font_size_override("font_size", font_size)

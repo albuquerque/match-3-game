@@ -5,6 +5,7 @@ signal booster_selected(booster_id: String)
 signal exchange_pressed
 signal settings_pressed
 signal achievements_pressed
+signal map_pressed
 
 func _ready():
 	# Fullscreen anchors
@@ -41,7 +42,7 @@ func _ready():
 	var level_label = Button.new()
 	level_label.name = "LevelButton"
 	level_label.text = "Level: --"
-	level_label.add_theme_font_size_override("font_size", 36)
+	ThemeManager.apply_bangers_font_to_button(level_label, 36)
 	# Clicking the level button starts the level
 	level_label.pressed.connect(Callable(self, "_on_start_pressed"))
 	vbox.add_child(level_label)
@@ -50,7 +51,7 @@ func _ready():
 	var lives_label = Label.new()
 	lives_label.name = "LivesLabel"
 	lives_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lives_label.add_theme_font_size_override("font_size", 20)
+	ThemeManager.apply_bangers_font(lives_label, 20)
 	vbox.add_child(lives_label)
 
 	# Hide lives display - no longer using lives system
@@ -61,7 +62,7 @@ func _ready():
 	desc_label.name = "LevelDescription"
 	desc_label.text = ""
 	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_label.add_theme_font_size_override("font_size", 18)
+	ThemeManager.apply_bangers_font(desc_label, 18)
 	vbox.add_child(desc_label)
 
 	var actions_h = HBoxContainer.new()
@@ -72,6 +73,7 @@ func _ready():
 	start_btn.name = "StartButton"
 	start_btn.text = "Start Level"
 	start_btn.custom_minimum_size = Vector2(200, 64)
+	ThemeManager.apply_bangers_font_to_button(start_btn, 24)
 	start_btn.pressed.connect(Callable(self, "_on_start_pressed"))
 	actions_h.add_child(start_btn)
 
@@ -79,6 +81,7 @@ func _ready():
 	exchange_btn.name = "ExchangeButton"
 	exchange_btn.text = "Exchange Gems"
 	exchange_btn.custom_minimum_size = Vector2(200, 64)
+	ThemeManager.apply_bangers_font_to_button(exchange_btn, 20)
 	exchange_btn.pressed.connect(Callable(self, "_on_exchange_pressed"))
 	actions_h.add_child(exchange_btn)
 
@@ -142,22 +145,33 @@ func _ready():
 	# Update initial visual state
 	_update_mute_visual(top_mute, not muted)
 
-	# Create a second row for Settings and Achievements buttons
+	# Create a second row for navigation buttons
 	var settings_h = HBoxContainer.new()
 	settings_h.name = "SettingsH"
+	settings_h.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(settings_h)
 
 	var settings_btn = Button.new()
 	settings_btn.name = "SettingsButton"
-	settings_btn.text = "Settings"
-	settings_btn.custom_minimum_size = Vector2(200, 48)
+	settings_btn.text = "⚙️ Settings"
+	settings_btn.custom_minimum_size = Vector2(150, 48)
+	ThemeManager.apply_bangers_font_to_button(settings_btn, 16)
 	settings_btn.pressed.connect(Callable(self, "_on_settings_pressed"))
 	settings_h.add_child(settings_btn)
+
+	var map_btn = Button.new()
+	map_btn.name = "MapButton"
+	map_btn.text = "🗺️ Map"
+	map_btn.custom_minimum_size = Vector2(150, 48)
+	ThemeManager.apply_bangers_font_to_button(map_btn, 16)
+	map_btn.pressed.connect(Callable(self, "_on_map_pressed"))
+	settings_h.add_child(map_btn)
 
 	var achievements_btn = Button.new()
 	achievements_btn.name = "AchievementsButton"
 	achievements_btn.text = "🏆 Achievements"
-	achievements_btn.custom_minimum_size = Vector2(200, 48)
+	achievements_btn.custom_minimum_size = Vector2(150, 48)
+	ThemeManager.apply_bangers_font_to_button(achievements_btn, 16)
 	achievements_btn.pressed.connect(Callable(self, "_on_achievements_pressed"))
 	settings_h.add_child(achievements_btn)
 
@@ -187,6 +201,9 @@ func _on_exchange_pressed():
 
 func _on_settings_pressed():
 	emit_signal("settings_pressed")
+
+func _on_map_pressed():
+	emit_signal("map_pressed")
 
 func _on_achievements_pressed():
 	emit_signal("achievements_pressed")
@@ -242,7 +259,7 @@ func _update_mute_visual(mute_btn: TextureButton, enabled: bool):
 			cross.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			cross.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			cross.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
-			cross.add_theme_font_size_override("font_size", 28)
+			ThemeManager.apply_bangers_font(cross, 28)
 			cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			cross.anchor_left = 0
 			cross.anchor_top = 0

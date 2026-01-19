@@ -27,6 +27,7 @@ ThemeManager="*res://scripts/ThemeManager.gd"
 RewardManager="*res://scripts/RewardManager.gd"
 GameManager="*res://scripts/GameManager.gd"
 AudioManager="*res://scripts/AudioManager.gd"
+StarRatingManager="*res://scripts/StarRatingManager.gd"
 
 [display]
 

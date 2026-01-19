@@ -87,7 +87,7 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 	# Icon
 	var icon_label = Label.new()
 	icon_label.text = icon
-	icon_label.add_theme_font_size_override("font_size", icon_font)
+	ThemeManager.apply_bangers_font(icon_label, icon_font)
 	icon_label.custom_minimum_size = Vector2(int(_panel_width * 0.16), 60)
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -100,12 +100,12 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 
 	var name_label = Label.new()
 	name_label.text = item_name
-	name_label.add_theme_font_size_override("font_size", name_font)
+	ThemeManager.apply_bangers_font(name_label, name_font)
 	info_vbox.add_child(name_label)
 
 	var desc_label = Label.new()
 	desc_label.text = description
-	desc_label.add_theme_font_size_override("font_size", desc_font)
+	ThemeManager.apply_bangers_font(desc_label, desc_font)
 	desc_label.modulate = Color(0.8, 0.8, 0.8)
 	info_vbox.add_child(desc_label)
 
@@ -115,7 +115,7 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 		if owned > 0:
 			var owned_label = Label.new()
 			owned_label.text = "Owned: %d" % owned
-			owned_label.add_theme_font_size_override("font_size", int(max(10, name_font * 0.6)))
+			ThemeManager.apply_bangers_font(owned_label, int(max(10, name_font * 0.6)))
 			owned_label.modulate = Color(0.5, 1.0, 0.5)
 			info_vbox.add_child(owned_label)
 

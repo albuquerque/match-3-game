@@ -66,7 +66,9 @@ func get_level_files() -> Array:
 
 		while file_name != "":
 			if not dir.current_is_dir() and file_name.ends_with(".json"):
-				level_files.append("res://levels/" + file_name)
+				# Skip world_map.json as it's not a game level
+				if file_name != "world_map.json":
+					level_files.append("res://levels/" + file_name)
 			file_name = dir.get_next()
 
 		dir.list_dir_end()
@@ -291,6 +293,10 @@ func get_current_level() -> LevelData:
 	"""Get the current level data"""
 	return get_level(current_level_index)
 
+func get_current_level_data() -> LevelData:
+	"""Get the current level data (alias for get_current_level)"""
+	return get_current_level()
+
 func advance_to_next_level() -> bool:
 	"""Move to the next level, returns false if no more levels"""
 	print("[LevelManager] advance_to_next_level called. Current index: ", current_level_index)
@@ -327,4 +333,3 @@ func set_current_level(index: int):
 		print("[LevelManager] Current level set to index ", current_level_index, " (Level ", current_level_index + 1, ")")
 	else:
 		print("[LevelManager] ERROR: Invalid level index ", index)
-

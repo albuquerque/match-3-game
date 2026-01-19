@@ -57,6 +57,23 @@ var DEBUG_LOGGING = true
 # Flag to check if the game manager has been initialized
 var initialized = false
 
+# Booster selection system
+var available_boosters: Array = []  # Boosters available for current level
+
+# Booster tier definitions (for random selection)
+const BOOSTER_TIERS = {
+	"common": ["hammer", "shuffle", "swap"],
+	"uncommon": ["chain_reaction", "bomb_3x3", "line_blast"],
+	"rare": ["row_clear", "column_clear", "tile_squasher", "extra_moves"]
+}
+
+# Booster selection weights (probability distribution)
+const TIER_WEIGHTS = {
+	"common": 0.60,      # 60% chance
+	"uncommon": 0.30,    # 30% chance
+	"rare": 0.10         # 10% chance
+}
+
 func _ready():
 	print("[GameManager] _ready() - initializing")
 	# Get the autoloaded LevelManager
@@ -183,8 +200,73 @@ func load_current_level():
 				row.append(grid[x][y])
 			print(row)
 
+	# Select random boosters for this level BEFORE emitting level_loaded
+	# This ensures the UI can display them when it receives the signal
+	select_level_boosters()
+
 	emit_signal("level_loaded")
 	print("[GameManager] ✓ load_current_level() completed, initialized =", initialized)
+
+
+func select_level_boosters():
+	"""Select 3-5 random boosters for the current level based on tier weights"""
+	var rng = RandomNumberGenerator.new()
+	# Use level number as seed for consistent selection per level
+	rng.seed = hash(level)
+
+	# Determine how many boosters to offer (3-5)
+	var booster_count = rng.randi_range(3, 5)
+
+	available_boosters.clear()
+	var selected_set = {}  # Track selected to avoid duplicates
+
+	print("[GameManager] Selecting %d boosters for level %d" % [booster_count, level])
+
+	# Selection strategy:
+	# - Always include at least 1 common booster
+	# - Remaining slots based on weighted probability
+
+	# First, guarantee 1 common booster
+	var common_list = BOOSTER_TIERS["common"].duplicate()
+	common_list.shuffle()
+	var first_common = common_list[0]
+	available_boosters.append(first_common)
+	selected_set[first_common] = true
+	print("[GameManager]   Guaranteed common: %s" % first_common)
+
+	# Fill remaining slots with weighted random selection
+	var attempts = 0
+	var max_attempts = 50  # Prevent infinite loop
+
+	while available_boosters.size() < booster_count and attempts < max_attempts:
+		attempts += 1
+
+		# Roll for tier based on weights
+		var roll = rng.randf()
+		var tier = ""
+
+		if roll < TIER_WEIGHTS["rare"]:
+			tier = "rare"
+		elif roll < (TIER_WEIGHTS["rare"] + TIER_WEIGHTS["uncommon"]):
+			tier = "uncommon"
+		else:
+			tier = "common"
+
+		# Select random booster from tier
+		var tier_boosters = BOOSTER_TIERS[tier].duplicate()
+		tier_boosters.shuffle()
+
+		# Find first non-selected booster from this tier
+		for booster in tier_boosters:
+			if not selected_set.has(booster):
+				available_boosters.append(booster)
+				selected_set[booster] = true
+				print("[GameManager]   Selected %s: %s" % [tier, booster])
+				break
+
+	print("[GameManager] Final booster selection for level %d: " % level, available_boosters)
+
+	return available_boosters
 
 func create_empty_grid():
 	grid.clear()
@@ -470,6 +552,12 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 	add_score(points)
 	combo_count += 1
 	print("[SCORING] New score: ", score, ", combo_count now: ", combo_count)
+
+	# Track achievements
+	if tiles_removed > 0:
+		RewardManager.track_match_made()
+		RewardManager.track_tiles_cleared(tiles_removed)
+	RewardManager.track_combo_reached(combo_count)
 
 	return tiles_removed
 
@@ -811,9 +899,11 @@ func on_level_failed():
 	last_level_number = level
 	last_level_moves_left = 0
 
-	print("Level failed, transitioning to LevelProgressScene...")
-	if get_tree() != null:
-		get_tree().change_scene_to_file("res://scenes/LevelProgressScene.tscn")
+	print("[GameManager] Level failed - emitting game_over signal")
+	print("[GameManager]   Score: %d, Target: %d, Moves left: %d" % [score, target_score, moves_left])
+
+	# Emit game_over signal to show the enhanced game over screen
+	emit_signal("game_over")
 
 	level_transitioning = false
 
@@ -841,12 +931,26 @@ func on_level_complete():
 	if get_tree() != null:
 		await get_tree().create_timer(0.2).timeout
 
+	# Set transitioning flag to prevent any further gameplay
+	level_transitioning = true
+
+	# Store original moves_left before bonus conversion
+	var original_moves_left = moves_left
+
+	# Bonus: Convert remaining moves to special tiles (like "Sugar Crush")
+	if moves_left > 0:
+		print("[GameManager] 🎉 BONUS! Converting %d remaining moves to special tiles!" % moves_left)
+		await _convert_remaining_moves_to_bonus(moves_left)
+		# Consume all remaining moves
+		moves_left = 0
+		emit_signal("moves_changed", moves_left)
+
 	# Ensure final level score snapshot is stored
 	last_level_won = true
 	last_level_score = score
 	last_level_target = target_score
 	last_level_number = level
-	last_level_moves_left = moves_left
+	last_level_moves_left = original_moves_left  # Use original count for star calculation
 
 	print("[GameManager] Level complete snapshot:")
 	print("[GameManager]   GameManager.level = ", level)
@@ -854,23 +958,150 @@ func on_level_complete():
 	print("[GameManager]   LevelManager.current_level_index = ", level_manager.current_level_index if level_manager else "N/A")
 	print("[GameManager]   RewardManager.levels_completed (before) = ", RewardManager.levels_completed)
 
-	# Calculate stars based on performance (1-3 stars)
-	var stars = calculate_stars(score, target_score)
-	print("Level completed with %d stars!" % stars)
+	# Calculate stars based on performance using StarRatingManager
+	# Note: Final score includes bonus points from remaining moves conversion
+	var level_data = level_manager.get_level(level_manager.current_level_index)
+	var total_moves = level_data.moves if level_data else 20
+	var moves_used = total_moves - original_moves_left  # Use original count
+	var stars = StarRatingManager.calculate_stars(score, target_score, moves_used, total_moves)
+	print("[GameManager] Level completed with %d stars! (Score: %d, Target: %d, Moves: %d/%d)" % [stars, score, target_score, moves_used, total_moves])
+	if original_moves_left > 0:
+		print("[GameManager] Note: Score includes bonus from %d remaining moves" % original_moves_left)
+
+	# Save star rating (only if better than previous)
+	StarRatingManager.save_level_stars(level, stars)
 
 	# Grant rewards through RewardManager to update levels_completed
 	RewardManager.grant_level_completion_reward(level, stars)
 
+	# Track achievements for level completion
+	RewardManager.track_level_completed(level, stars, score)
+
 	print("[GameManager]   RewardManager.levels_completed (after) = ", RewardManager.levels_completed)
+	print("[GameManager]   Total stars collected: ", StarRatingManager.get_total_stars())
 
 	# Emit signal to show reward dialog in GameUI
 	print("[GameManager] Emitting level_complete signal")
 	emit_signal("level_complete")
 
-	level_transitioning = false
+	# Keep level_transitioning = true to prevent further gameplay
+	# This will be reset when the next level loads or game restarts
+	# DO NOT set to false here!
+
+var bonus_skipped = false  # Flag to track if player skipped bonus animation
+
+func _convert_remaining_moves_to_bonus(remaining_moves: int):
+	"""Convert remaining moves into special tiles and activate them for bonus points
+	This creates a fun visual celebration similar to Candy Crush's 'Sugar Crush'
+	Player can tap to skip and instantly calculate all bonus points"""
+
+	# Lock player input during bonus phase
+	processing_moves = true
+	bonus_skipped = false
+
+	# Get GameBoard reference
+	var game_board = get_node_or_null("/root/MainGame/GameBoard")
+	if not game_board:
+		print("[GameManager] GameBoard not found, skipping bonus conversion")
+		processing_moves = false
+		return
+
+	# Show "Tap to Skip" message
+	if game_board.has_method("show_skip_bonus_hint"):
+		game_board.show_skip_bonus_hint()
+
+	var bonus_points = 0
+
+	# Convert each remaining move into a special tile
+	for i in range(remaining_moves):
+		# Check if player skipped
+		if bonus_skipped:
+			print("[GameManager] ⏩ Bonus skipped! Calculating remaining points instantly...")
+			# Calculate remaining bonus points instantly
+			for j in range(i, remaining_moves):
+				var instant_bonus = 100 * (j + 1)
+				bonus_points += instant_bonus
+				add_score(instant_bonus)
+			print("[GameManager] 🌟 Instant bonus added: %d points" % (bonus_points - (100 * i * (i + 1) / 2)))
+			break
+
+		# Find random active tile position
+		var random_pos = _get_random_active_tile_position()
+		if random_pos == Vector2(-1, -1):
+			break  # No more active tiles
+
+		# Decide which special tile to create based on move number
+		var special_type = FOUR_WAY_ARROW  # Most powerful for bonus
+
+		# Create special tile at this position
+		grid[int(random_pos.x)][int(random_pos.y)] = special_type
+
+		# Update visual tile if GameBoard has it
+		if game_board.has_method("update_tile_visual"):
+			game_board.update_tile_visual(random_pos, special_type)
+
+		# Small delay between conversions for visual effect
+		await get_tree().create_timer(0.1).timeout
+
+		# Activate the special tile immediately
+		if game_board.has_method("activate_special_tile"):
+			await game_board.activate_special_tile(random_pos)
+
+		# Calculate bonus points (each remaining move is worth progressively more)
+		var move_bonus = 100 * (i + 1)  # 100, 200, 300, etc.
+		bonus_points += move_bonus
+		add_score(move_bonus)
+
+		print("[GameManager] Bonus move %d/%d: Created special tile at %s, +%d points" % [i+1, remaining_moves, random_pos, move_bonus])
+
+	# Hide skip hint
+	if game_board.has_method("hide_skip_bonus_hint"):
+		game_board.hide_skip_bonus_hint()
+
+	if bonus_points > 0:
+		print("[GameManager] 🌟 Bonus complete! Total bonus points: %d" % bonus_points)
+
+	# If bonus was skipped, add a small delay to ensure board state settles
+	if bonus_skipped:
+		print("[GameManager] Bonus was skipped - adding settling delay before showing rewards")
+		await get_tree().create_timer(0.5).timeout  # Increased from 0.3 to 0.5
+
+		# Ensure board is hidden and stays hidden
+		if game_board:
+			game_board.visible = false
+			print("[GameManager] After skip delay: board.visible = ", game_board.visible)
+
+	# Release processing lock
+	processing_moves = false
+	print("[GameManager] _convert_remaining_moves_to_bonus finished, processing_moves = false")
+	print("[GameManager] About to return to on_level_complete() to emit level_complete signal")
+
+func skip_bonus_animation():
+	"""Called when player taps to skip bonus animation"""
+	if not bonus_skipped:
+		bonus_skipped = true
+		print("[GameManager] Player requested to skip bonus animation")
+
+func _get_random_active_tile_position() -> Vector2:
+	"""Get a random active (non-blocked, non-empty) tile position"""
+	var active_positions = []
+
+	for x in range(GRID_WIDTH):
+		for y in range(GRID_HEIGHT):
+			if not is_cell_blocked(x, y) and grid[x][y] > 0 and grid[x][y] < 7:
+				# Active tile (not blocked, not empty, not already special)
+				active_positions.append(Vector2(x, y))
+
+	if active_positions.size() == 0:
+		return Vector2(-1, -1)
+
+	# Return random position
+	var random_index = randi() % active_positions.size()
+	return active_positions[random_index]
 
 func calculate_stars(final_score: int, target: int) -> int:
-	"""Calculate star rating (1-3) based on score performance"""
+	"""DEPRECATED: Use StarRatingManager.calculate_stars() instead
+	Calculate star rating (1-3) based on score performance"""
 	var performance_ratio = float(final_score) / float(target)
 
 	if performance_ratio >= 2.0:

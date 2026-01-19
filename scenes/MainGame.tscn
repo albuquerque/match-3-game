@@ -160,42 +160,6 @@ size_flags_vertical = 3
 layout_mode = 2
 size_flags_vertical = 0
 
-[node name="GameOverPanel" type="Panel" parent="GameUI"]
-visible = false
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -150.0
-offset_right = 200.0
-offset_bottom = 150.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="VBoxContainer" type="VBoxContainer" parent="GameUI/GameOverPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="GameOverLabel" type="Label" parent="GameUI/GameOverPanel/VBoxContainer"]
-layout_mode = 2
-text = "Game Over!"
-horizontal_alignment = 1
-
-[node name="FinalScoreLabel" type="Label" parent="GameUI/GameOverPanel/VBoxContainer"]
-layout_mode = 2
-text = "Final Score: 0"
-horizontal_alignment = 1
-
-[node name="RestartButton" type="Button" parent="GameUI/GameOverPanel/VBoxContainer"]
-layout_mode = 2
-text = "Restart"
 
 [node name="LevelCompletePanel" type="Panel" parent="GameUI"]
 visible = false

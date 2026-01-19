@@ -251,7 +251,7 @@ func get_swipe_direction(swipe_vector: Vector2) -> Vector2:
 
 func _on_mouse_entered():
 	print("Mouse entered tile at ", grid_position)
-	if not is_falling and not GameManager.processing_moves and sprite:
+	if not is_falling and not GameManager.processing_moves and sprite and sprite.texture:
 		# Store the base scale (calculated by update_visual based on texture size)
 		var base_scale = Vector2(64.0 / float(sprite.texture.get_width()), 64.0 / float(sprite.texture.get_height())) * tile_scale
 		var tween = create_tween()
@@ -262,7 +262,7 @@ func _on_mouse_entered():
 
 func _on_mouse_exited():
 	print("Mouse exited tile at ", grid_position)
-	if not is_falling and sprite:
+	if not is_falling and sprite and sprite.texture:
 		# Restore the correct base scale (calculated by update_visual based on texture size)
 		var base_scale = Vector2(64.0 / float(sprite.texture.get_width()), 64.0 / float(sprite.texture.get_height())) * tile_scale
 		var tween = create_tween()
@@ -323,13 +323,81 @@ func animate_destroy() -> Tween:
 	if is_queued_for_deletion() or not is_inside_tree():
 		return null
 
+	# Create particle effect for tile destruction
+	_create_destruction_particles()
+
+	# Play destruction sound effect
+	AudioManager.play_sfx("tile_match")
+
 	var tween = create_tween()
 	if sprite:
-		tween.parallel().tween_property(sprite, "scale", Vector2.ZERO, 0.3)
-		tween.parallel().tween_property(sprite, "rotation", PI * 2, 0.3)
-	tween.parallel().tween_property(self, "modulate", Color.TRANSPARENT, 0.3)
+		# Get the current scale as base
+		var current_scale = sprite.scale
+
+		# Pop and shrink effect - scale relative to current scale
+		tween.parallel().tween_property(sprite, "scale", current_scale * 1.3, 0.1)
+		tween.parallel().tween_property(sprite, "scale", Vector2.ZERO, 0.2).set_delay(0.1)
+		tween.parallel().tween_property(sprite, "rotation", PI * 1.5, 0.3)
+
+	# Fade out with color shift
+	tween.parallel().tween_property(self, "modulate", Color(2, 2, 2, 0), 0.3)
+
 	# Don't call queue_free here - let GameBoard handle it after the animation completes
 	return tween
+
+func _create_destruction_particles():
+	"""Create particle effect when tile is destroyed"""
+	if not is_inside_tree():
+		return
+
+	# Create CPUParticles2D for the explosion effect
+	var particles = CPUParticles2D.new()
+	particles.name = "DestructionParticles"
+	particles.position = Vector2.ZERO
+	particles.emitting = true
+	particles.one_shot = true
+	particles.explosiveness = 0.9  # More explosive
+	particles.amount = 25  # Increased from 12
+	particles.lifetime = 0.8  # Longer lifetime
+	particles.speed_scale = 2.5  # Faster movement
+
+	# Particle properties
+	particles.direction = Vector2(0, -1)
+	particles.spread = 180
+	particles.gravity = Vector2(0, 300)  # More gravity for dramatic arc
+	particles.initial_velocity_min = 120.0  # Faster
+	particles.initial_velocity_max = 250.0  # Much faster
+	particles.angular_velocity_min = -540  # More rotation
+	particles.angular_velocity_max = 540
+	particles.scale_amount_min = 1.0  # Much larger particles
+	particles.scale_amount_max = 2.5
+
+	# Color based on tile type - brighter
+	var particle_color = COLORS[tile_type - 1] if tile_type > 0 and tile_type <= COLORS.size() else Color.WHITE
+	# Make colors brighter for more impact
+	particle_color = particle_color * 1.3
+	particles.color = particle_color
+
+	# Create gradient for fade out with glow effect
+	var gradient = Gradient.new()
+	gradient.add_point(0.0, particle_color * 1.5)  # Start bright
+	gradient.add_point(0.3, particle_color * 1.2)  # Stay bright
+	gradient.add_point(0.7, particle_color * 0.8)
+	gradient.add_point(1.0, Color(particle_color.r, particle_color.g, particle_color.b, 0))
+	particles.color_ramp = gradient
+
+	# Scale gradient - start bigger, end smaller
+	var scale_curve = Curve.new()
+	scale_curve.add_point(Vector2(0, 1.2))  # Start big
+	scale_curve.add_point(Vector2(0.3, 1.0))
+	scale_curve.add_point(Vector2(0.7, 0.6))
+	scale_curve.add_point(Vector2(1, 0))
+	particles.scale_amount_curve = scale_curve
+
+	add_child(particles)
+
+	# Auto-cleanup after particles finish - connect directly to queue_free
+	get_tree().create_timer(1.2).timeout.connect(particles.queue_free)
 
 func animate_spawn() -> Tween:
 	if is_queued_for_deletion() or not is_inside_tree():
@@ -343,8 +411,16 @@ func animate_spawn() -> Tween:
 	if sprite and sprite.texture:
 		# Calculate the correct target scale based on texture size
 		var target_scale = Vector2(64.0 / float(sprite.texture.get_width()), 64.0 / float(sprite.texture.get_height())) * tile_scale
-		# Animate to the correct scale
-		tween.tween_property(sprite, "scale", target_scale, 0.4)
+
+		# Bouncy spawn with overshoot effect
+		tween.tween_property(sprite, "scale", target_scale * 1.3, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(sprite, "scale", target_scale, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+
+		# Add slight rotation wiggle
+		tween.parallel().tween_property(sprite, "rotation", 0.1, 0.1)
+		tween.tween_property(sprite, "rotation", -0.1, 0.1)
+		tween.tween_property(sprite, "rotation", 0.0, 0.1)
+
 	tween.tween_callback(func(): is_falling = false)
 	return tween
 
