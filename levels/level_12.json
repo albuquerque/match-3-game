@@ -1,0 +1,10 @@
+{
+  "level": 12,
+  "width": 8,
+  "height": 6,
+  "target_score": 6060,
+  "moves": 35,
+  "description": "Test your matching skills!",
+  "theme": "candy",
+  "layout": "0 0 0 X 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 X 0 0 0\n0 0 0 X 0 0 0 0\n0 X 0 0 0 0 0 0\nX 0 0 0 0 0 0 0"
+}

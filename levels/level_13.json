@@ -1,0 +1,10 @@
+{
+  "level": 13,
+  "width": 7,
+  "height": 7,
+  "target_score": 7280,
+  "moves": 38,
+  "description": "A puzzling challenge!",
+  "theme": "classic",
+  "layout": "0 0 0 0 0 X X\nX 0 0 0 0 X 0\nX 0 0 0 0 X 0\n0 0 0 0 0 0 0\nX 0 0 0 0 0 0\n0 0 X 0 0 0 X\n0 0 0 0 0 0 0"
+}

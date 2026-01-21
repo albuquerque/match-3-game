@@ -4,27 +4,31 @@ class_name GameBoard
 signal move_completed
 signal board_idle
 
+# Map to track tween finished flags (avoids closure/lambda capture issues)
+var _tween_finished_flags := {}
+
 # Helper: await multiple tweens with timeout to avoid hanging if a tween never finishes
 func _await_tweens_with_timeout(tweens: Array, timeout: float = 2.0) -> void:
 	if tweens == null or tweens.size() == 0:
 		return
 
-	var finished_map = {}
+	# Initialize flags and connect each tween's finished to a local handler
 	for tween in tweens:
 		if tween == null:
 			continue
-		finished_map[tween] = false
-		# Create a callable that sets the finished flag - use bind to avoid capture
-		var set_finished = func(t): finished_map[t] = true
-		tween.finished.connect(set_finished.bind(tween))
+		_tween_finished_flags[tween] = false
+		# Connect using Callable bound to the tween instance (avoids anonymous lambda captures)
+		if tween.is_connected("finished", Callable(self, "_on_tween_finished").bind(tween)) == false:
+			tween.finished.connect(Callable(self, "_on_tween_finished").bind(tween))
 
-	var start_time = 0
 	var attempts = 0
 	var max_attempts = int(timeout / 0.05)
 	while true:
 		var all_done = true
-		for t in finished_map.keys():
-			if not finished_map[t]:
+		for t in tweens:
+			if t == null:
+				continue
+			if not _tween_finished_flags.has(t) or not _tween_finished_flags[t]:
 				all_done = false
 				break
 		if all_done:
@@ -37,2245 +41,390 @@ func _await_tweens_with_timeout(tweens: Array, timeout: float = 2.0) -> void:
 		attempts += 1
 		await get_tree().create_timer(0.05).timeout
 
+	# Cleanup flags and disconnect handlers
+	for tween in tweens:
+		if tween == null:
+			continue
+		if _tween_finished_flags.has(tween):
+			_tween_finished_flags.erase(tween)
+
+# Handler called by tweens when they finish (bound with the tween instance)
+func _on_tween_finished(tween):
+	if _tween_finished_flags.has(tween):
+		_tween_finished_flags[tween] = true
+
 var tiles = []
 var selected_tile = null
 var tile_scene = preload("res://scenes/Tile.tscn")
 
-# Dynamic sizing variables
-var tile_size: float
-var grid_offset: Vector2
-var board_margin: float = 20.0
-
-# Combo tracking
-var combo_chain_count: int = 0  # Tracks consecutive matches in a cascade
-var last_match_time: float = 0.0
-
-# Skip bonus hint
-var skip_bonus_label: Label = null
-var skip_bonus_active: bool = false
-const COMBO_TIMEOUT: float = 2.0  # Reset combo if no match for 2 seconds
-
-# Board appearance configuration
-const BOARD_BACKGROUND_COLOR = Color(0.2, 0.2, 0.3, 0.7)  # Slightly translucent
-var border_color: Color = Color(0.9, 0.9, 1.0, 0.9)  # Configurable border color
-const BORDER_WIDTH = 3.0
-
-# Background image
-var background_image_path: String = ""  # Set this to enable background image
-var background_sprite = null  # TextureRect for the background image
-
-@onready var background = $Background
-var border_container: Node2D  # Container for all border lines
-var tile_area_overlay: Control = null  # Container for semi-transparent overlay pieces over tiles
-
-func _ready():
-	GameManager.connect("game_over", Callable(self, "_on_game_over"))
-	GameManager.connect("level_complete", Callable(self, "_on_level_complete"))
-	GameManager.connect("level_loaded", Callable(self, "_on_level_loaded"))
-
-	# Create border container
-	border_container = Node2D.new()
-	border_container.name = "BorderContainer"
-	add_child(border_container)
-
-	# ========== CUSTOMIZATION EXAMPLES ==========
-	# Uncomment and modify these lines to customize appearance:
-
-	# Set custom border color (RGBA values from 0.0 to 1.0)
-	# border_color = Color(1.0, 0.8, 0.2, 1.0)  # Gold/orange border
-	# border_color = Color(0.2, 0.8, 1.0, 1.0)  # Cyan border
-	# border_color = Color(1.0, 0.2, 0.8, 1.0)  # Pink border
-
-	# Set background image (put your image in textures/ folder)
-	background_image_path = "res://textures/background.jpg"
-	# background_image_path = "res://textures/splash_screen.png"  # Example using existing asset
-
-	# ============================================
-
-	calculate_responsive_layout()
-	setup_background()
-
-	# Setup background image AFTER layout is calculated
-	setup_background_image()
-
-	# Only create visual grid if GameManager has initialized a level; otherwise wait for level_loaded
-	if Engine.has_singleton("GameManager") and GameManager.initialized:
-		create_visual_grid()
-		draw_board_borders()
-	else:
-		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
-
-func calculate_responsive_layout():
-	var viewport = get_viewport()
-	var screen_size = viewport.get_visible_rect().size
-
-	# Calculate available space for the game board
-	var ui_top_space = 180.0  # Space for UI at top
-	var ui_bottom_space = 100.0  # Space for UI at bottom
-	var available_width = screen_size.x - (board_margin * 2)
-	var available_height = screen_size.y - ui_top_space - ui_bottom_space - (board_margin * 2)
-
-	# Calculate tile size based on available space
-	var max_tile_size_width = available_width / GameManager.GRID_WIDTH
-	var max_tile_size_height = available_height / GameManager.GRID_HEIGHT
-	tile_size = min(max_tile_size_width, max_tile_size_height)
-
-	# Ensure minimum tile size for playability
-	tile_size = max(tile_size, 50.0)
-
-	# Calculate grid offset to center the board
-	var total_grid_width = GameManager.GRID_WIDTH * tile_size
-	var total_grid_height = GameManager.GRID_HEIGHT * tile_size
-
-	grid_offset = Vector2(
-		(screen_size.x - total_grid_width) / 2,
-		ui_top_space + (available_height - total_grid_height) / 2
-	)
-
-	print("Screen size: ", screen_size)
-	print("Calculated tile size: ", tile_size)
-	print("Grid offset: ", grid_offset)
-
-func setup_background():
-	# Hide the board background - we only want translucent tiles, not a background square
-	# The background image will show through the tiles instead
-	if background:
-		background.visible = false
-
-	# Keep the size/position calculations in case we need to re-enable it
-	var board_size = Vector2(
-		GameManager.GRID_WIDTH * tile_size + 20,
-		GameManager.GRID_HEIGHT * tile_size + 20
-	)
-
-	background.color = BOARD_BACKGROUND_COLOR
-	background.size = board_size
-	# Center the background properly - tiles start at grid_offset, so background should be offset by half the padding
-	background.position = Vector2(
-		grid_offset.x - 10,
-		grid_offset.y - 10
-	)
-
-	# Create semi-transparent overlay for the tile area
-	setup_tile_area_overlay()
-
-func setup_tile_area_overlay():
-	"""Create a semi-transparent overlay covering only the active tile area (within borders)"""
-	# Remove existing overlay if any
-	if tile_area_overlay:
-		tile_area_overlay.queue_free()
-		tile_area_overlay = null
-
-	# Create a container for the overlay pieces
-	tile_area_overlay = Control.new()
-	tile_area_overlay.name = "TileAreaOverlay"
-	tile_area_overlay.z_index = -50  # Above background image, behind tiles
-	tile_area_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	# Create individual semi-transparent rectangles for each active tile position
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(x, y):
-				var tile_overlay = ColorRect.new()
-				tile_overlay.color = Color(0.1, 0.15, 0.25, 0.5)  # Semi-transparent dark overlay (50% opacity)
-				tile_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-				# Position and size to match the tile
-				var left = x * tile_size + grid_offset.x
-				var top = y * tile_size + grid_offset.y
-				tile_overlay.position = Vector2(left, top)
-				tile_overlay.size = Vector2(tile_size, tile_size)
-
-				tile_area_overlay.add_child(tile_overlay)
-
-	# Add to parent (MainGame)
-	var parent = get_parent()
-	if parent:
-		parent.call_deferred("add_child", tile_area_overlay)
-		print("[GameBoard] Tile area overlay created with individual tile overlays")
-	else:
-		call_deferred("add_child", tile_area_overlay)
-		print("[GameBoard] Tile area overlay created (added to self)")
-
-func setup_background_image():
-	"""Setup a fullscreen background image behind the game board"""
-	print("[GameBoard] setup_background_image called with path: ", background_image_path)
-
-	# Remove existing background sprite if any
-	if background_sprite:
-		background_sprite.queue_free()
-		background_sprite = null
-
-	# If no background image path is set, skip
-	if background_image_path == "":
-		print("[GameBoard] No background image path set")
-		return
-
-	# Check if resource exists
-	if not ResourceLoader.exists(background_image_path):
-		print("[GameBoard] ERROR: Background image not found at: ", background_image_path)
-		print("[GameBoard] Please check that the file exists and the path is correct")
-		return
-
-	print("[GameBoard] Loading background image...")
-
-	# Create background using TextureRect (works better with Control nodes)
-	var background_rect = TextureRect.new()
-	background_rect.name = "BackgroundImage"
-
-	# Load the texture
-	var texture = load(background_image_path)
-	if not texture:
-		print("[GameBoard] ERROR: Failed to load texture from: ", background_image_path)
-		return
-
-	background_rect.texture = texture
-	background_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	background_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-
-	print("[GameBoard] Texture loaded, size: ", texture.get_size())
-
-	# Get viewport and screen size
-	var viewport = get_viewport()
-	if not viewport:
-		print("[GameBoard] ERROR: No viewport available")
-		return
-
-	var screen_size = viewport.get_visible_rect().size
-
-	print("[GameBoard] Screen size: ", screen_size)
-
-	# Set size to cover entire screen
-	background_rect.size = screen_size
-	background_rect.position = Vector2.ZERO
-	background_rect.z_index = -100  # Behind everything
-
-	print("[GameBoard] Background rect size: ", background_rect.size)
-	print("[GameBoard] Background rect position: ", background_rect.position)
-
-	# Store reference (update type)
-	if background_sprite:
-		background_sprite.queue_free()
-	background_sprite = background_rect
-
-	# Add to parent (MainGame) to render behind everything
-	# Use call_deferred because parent is busy during _ready()
-	var parent = get_parent()
-	if parent:
-		# Hide or make transparent the existing Background ColorRect in MainGame
-		var existing_bg = parent.get_node_or_null("Background")
-		if existing_bg and existing_bg is ColorRect:
-			# Make it invisible so our background image shows through
-			existing_bg.visible = false
-			print("[GameBoard] Hidden existing MainGame background to show image")
-
-		# Defer both add_child and move_child
-		parent.call_deferred("add_child", background_rect)
-		parent.call_deferred("move_child", background_rect, 0)
-		print("[GameBoard] Background will be added to parent (deferred): ", parent.name)
-	else:
-		# Fallback: add to self if no parent
-		call_deferred("add_child", background_rect)
-		call_deferred("move_child", background_rect, 0)
-		print("[GameBoard] Background will be added to self (deferred, no parent found)")
-
-	print("[GameBoard] Background image successfully loaded and will be added to scene!")
-	print("[GameBoard] Background z_index: ", background_rect.z_index)
-	print("[GameBoard] Background visible: ", background_rect.visible)
-
-func set_border_color(color: Color):
-	"""Set the color for the board borders"""
-	border_color = color
-	# Redraw borders with new color
-	draw_board_borders()
-
-func set_background_image(image_path: String):
-	"""Set a background image for the game board screen"""
-	background_image_path = image_path
-	setup_background_image()
-
-func hide_tile_overlay():
-	"""Hide the tile area overlay"""
-	if tile_area_overlay and is_instance_valid(tile_area_overlay):
-		tile_area_overlay.visible = false
-		print("[GameBoard] Tile overlay hidden")
-
-	# Also hide the background ColorRect
-	if background:
-		background.visible = false
-		print("[GameBoard] Background ColorRect hidden")
-
-func show_tile_overlay():
-	"""Show the tile area overlay"""
-	if tile_area_overlay and is_instance_valid(tile_area_overlay):
-		tile_area_overlay.visible = true
-		print("[GameBoard] Tile overlay shown")
-
-	# Keep the background ColorRect hidden as it's not needed with the image background
-	# Only show if we don't have a background image
-	if background and background_image_path == "":
-		background.visible = false  # Keep hidden - we use tile overlays instead
-		print("[GameBoard] Background ColorRect remains hidden (using tile overlays)")
-
-func clear_tiles():
-	# Remove all Tile instances created by this board
-	# We need to collect them first to avoid modifying the array while iterating
-	var tiles_to_remove = []
-	for child in get_children():
-		if child and child.has_method("setup"):
-			# Likely a Tile instance
-			tiles_to_remove.append(child)
-
-	# Now remove them
-	for tile in tiles_to_remove:
-		remove_child(tile)
-		tile.queue_free()
-
-	print("[GameBoard] Cleared ", tiles_to_remove.size(), " tiles")
-
-func create_visual_grid():
-	clear_tiles()
-	tiles.clear()
-
-	print("[GameBoard] Creating visual grid for ", GameManager.GRID_WIDTH, "x", GameManager.GRID_HEIGHT, " board")
-
-	if GameManager.grid.size() == 0:
-		print("[GameBoard] ERROR: GameManager.grid is empty! Cannot create tiles.")
-		return
-
-	# Calculate scale factor for tiles based on dynamic tile size
-	var scale_factor = tile_size / 64.0  # 64 is the base tile size
-
-	var tiles_created = 0
-	for x in range(GameManager.GRID_WIDTH):
-		tiles.append([])
-		for y in range(GameManager.GRID_HEIGHT):
-			var tile_type = GameManager.get_tile_at(Vector2(x, y))
-
-			# Skip blocked cells (-1)
-			if tile_type == -1:
-				tiles[x].append(null)
-				continue
-
-			var tile = tile_scene.instantiate()
-			tile.setup(tile_type, Vector2(x, y), scale_factor)
-			tile.position = grid_to_world_position(Vector2(x, y))
-			tile.connect("tile_clicked", _on_tile_clicked)
-			tile.connect("tile_swiped", _on_tile_swiped)
-
-			add_child(tile)
-			tiles[x].append(tile)
-			tiles_created += 1
-
-	print("[GameBoard] Created ", tiles_created, " tiles on the board")
-
-# Helper: visually highlight positions for special activations (single flash)
-func highlight_special_activation(positions: Array):
-	if positions == null or positions.size() == 0:
-		return
-
-	# Play special tile sound
-	if positions.size() > 3:
-		AudioManager.play_sfx("special_tile")
-
-	var tweens = []
-	for pos in positions:
-		if pos.x < 0 or pos.y < 0:
-			continue
-		if pos.x >= GameManager.GRID_WIDTH or pos.y >= GameManager.GRID_HEIGHT:
-			continue
-		var tile = tiles[int(pos.x)][int(pos.y)]
-		if tile:
-			# Flash animation
-			var t = create_tween()
-			t.tween_property(tile, "modulate", Color(2, 2, 1, 1), 0.06)
-			t.tween_property(tile, "modulate", Color.WHITE, 0.12)
-			tweens.append(t)
-
-			# Add radial particle burst for special tiles
-			_create_special_activation_particles(grid_to_world_position(pos))
-
-	if tweens.size() > 0:
-		await tweens[0].finished
-
-func _create_special_activation_particles(world_pos: Vector2):
-	"""Create radial particle burst for special tile activation"""
-	var particles = CPUParticles2D.new()
-	particles.name = "SpecialActivationParticles"
-	particles.position = world_pos
-	particles.emitting = true
-	particles.one_shot = true
-	particles.amount = 40  # Doubled from 20
-	particles.lifetime = 1.2  # Longer lifetime
-	particles.explosiveness = 1.0
-	particles.speed_scale = 2.0  # Faster
-
-	# Radial burst
-	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	particles.emission_sphere_radius = 10.0  # Larger emission area
-	particles.direction = Vector2(0, 0)
-	particles.spread = 180
-	particles.gravity = Vector2.ZERO
-	particles.initial_velocity_min = 150.0  # Faster burst
-	particles.initial_velocity_max = 350.0
-	particles.angular_velocity_min = -360  # More rotation
-	particles.angular_velocity_max = 360
-	particles.radial_accel_min = 80  # Stronger radial acceleration
-	particles.radial_accel_max = 150
-
-	# Larger, star-like particles
-	particles.scale_amount_min = 1.5  # Much larger
-	particles.scale_amount_max = 3.5
-
-	# Bright golden/white color with glow
-	var gradient = Gradient.new()
-	gradient.add_point(0.0, Color(1.5, 1.5, 0.8, 1))  # Bright golden start
-	gradient.add_point(0.3, Color(1.3, 1.3, 1.0, 1.0))  # Bright white
-	gradient.add_point(0.6, Color(1.0, 1.0, 0.8, 0.8))
-	gradient.add_point(1.0, Color(1, 1, 1, 0))  # Fade out
-	particles.color_ramp = gradient
-
-	# Add scale curve for more dynamic effect
-	var scale_curve = Curve.new()
-	scale_curve.add_point(Vector2(0, 1.3))  # Start big
-	scale_curve.add_point(Vector2(0.4, 1.0))
-	scale_curve.add_point(Vector2(0.8, 0.5))
-	scale_curve.add_point(Vector2(1, 0))
-	particles.scale_amount_curve = scale_curve
-
-	add_child(particles)
-
-	# Cleanup - use call_deferred to avoid lambda capture issues
-	get_tree().create_timer(1.5).timeout.connect(particles.queue_free)
-
-# Destroy arbitrary tiles at given positions with animation and cleanup
-func animate_destroy_tiles(positions: Array):
-	if positions == null or positions.size() == 0:
-		return
-
-	var destroy_tweens = []
-	var tiles_to_free = []
-	var destroyed_positions = []
-
-	for pos in positions:
-		if pos.x < 0 or pos.y < 0:
-			continue
-		if pos.x >= GameManager.GRID_WIDTH or pos.y >= GameManager.GRID_HEIGHT:
-			continue
-		var tile = tiles[int(pos.x)][int(pos.y)]
-		if tile:
-			# prefer tile.animate_destroy() if provided
-			if tile.has_method("animate_destroy"):
-				var tw = tile.animate_destroy()
-				if tw:
-					destroy_tweens.append(tw)
-			else:
-				# fallback: simple fade out
-				var tw2 = create_tween()
-				tw2.tween_property(tile, "modulate", Color(1,1,1,0), 0.15)
-				destroy_tweens.append(tw2)
-			tiles_to_free.append(tile)
-			destroyed_positions.append(pos)
-
-	# Await tweens to finish (or short timeout)
-	if destroy_tweens.size() > 0:
-		for tw in destroy_tweens:
-			if tw != null:
-				await tw.finished
-	else:
-		if get_tree() != null:
-			await get_tree().create_timer(0.15).timeout
-
-	# Clear visual tiles and free nodes
-	for i in range(tiles_to_free.size()):
-		var pos = destroyed_positions[i]
-		if pos.x >= 0 and pos.y >= 0:
-			# Only clear visual cell if it still points to the same instance
-			if tiles[int(pos.x)][int(pos.y)] == tiles_to_free[i]:
-				tiles[int(pos.x)][int(pos.y)] = null
-			# NOTE: Do NOT clear GameManager.grid here! That's done by GameManager.remove_matches()
-			# The animation should only handle visual destruction, not game logic
-			# Safely free the tile
-			if not tiles_to_free[i].is_queued_for_deletion():
-				tiles_to_free[i].queue_free()
-
-	print("animate_destroy_tiles: destroyed ", tiles_to_free.size(), " visual tiles")
-
-func animate_destroy_matches(matches: Array):
-	if matches == null or matches.size() == 0:
-		return
-
-	# Track combo chain
-	var current_time = Time.get_ticks_msec() / 1000.0
-	if current_time - last_match_time > COMBO_TIMEOUT:
-		combo_chain_count = 0  # Reset combo if too much time passed
-
-	combo_chain_count += 1
-	last_match_time = current_time
-
-	print("[GameBoard] Match! Size: ", matches.size(), ", Combo chain: ", combo_chain_count)
-
-	# Show combo text for most matches (only skip plain 3-tile first matches)
-	var should_show_combo = true
-	var combo_multiplier = combo_chain_count
-
-	# Only skip basic 3-tile matches on first move
-	if matches.size() == 3 and combo_chain_count == 1:
-		should_show_combo = false  # Skip plain 3-tile matches
-
-	# Always show for:
-	# - 4+ tile matches
-	# - Any cascade (combo_chain > 1)
-	# - Special tile activations
-
-	if should_show_combo:
-		_show_combo_text(matches.size(), matches, combo_multiplier)
-
-	# Screen shake for large matches or high combo chains
-	if matches.size() >= 5 or combo_chain_count >= 3:
-		var shake_intensity = max(matches.size() * 2, combo_chain_count * 3)
-		_apply_screen_shake(0.15, shake_intensity)
-
-	await animate_destroy_tiles(matches)
-
-func animate_destroy_matches_except(matches: Array, skip_pos: Vector2):
-	if matches == null or matches.size() == 0:
-		return
-
-	# Track combo chain (same as animate_destroy_matches)
-	var current_time = Time.get_ticks_msec() / 1000.0
-	if current_time - last_match_time > COMBO_TIMEOUT:
-		combo_chain_count = 0  # Reset combo if too much time passed
-
-	combo_chain_count += 1
-	last_match_time = current_time
-
-	print("[GameBoard] Match (creating special)! Size: ", matches.size(), ", Combo chain: ", combo_chain_count)
-
-	# Show combo text for this match (we're creating a special tile, that's impressive!)
-	var should_show_combo = true
-	var combo_multiplier = combo_chain_count
-
-	# Always show combo text when creating special tiles (it's always 4+ tiles)
-	if should_show_combo:
-		_show_combo_text(matches.size(), matches, combo_multiplier)
-
-	# Screen shake for large matches or high combo chains
-	if matches.size() >= 5 or combo_chain_count >= 3:
-		var shake_intensity = max(matches.size() * 2, combo_chain_count * 3)
-		_apply_screen_shake(0.15, shake_intensity)
-
-	# Destroy tiles except the skip position
-	var to_destroy = []
-	for m in matches:
-		var pos = m
-		if typeof(m) == TYPE_DICTIONARY and m.has("x") and m.has("y"):
-			pos = Vector2(float(m["x"]), float(m["y"]))
-		if pos == skip_pos:
-			continue
-		to_destroy.append(pos)
-	if to_destroy.size() > 0:
-		await animate_destroy_tiles(to_destroy)
-
-func animate_gravity():
-	var moved = GameManager.apply_gravity()
-	print("animate_gravity: apply_gravity returned -> ", moved)
-
-	var gravity_tweens = []
-	for x in range(GameManager.GRID_WIDTH):
-		var column_tiles = []
-		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
-			if not GameManager.is_cell_blocked(x, y) and tiles[x][y] != null:
-				column_tiles.append(tiles[x][y])
-
-		for y in range(GameManager.GRID_HEIGHT):
-			if GameManager.grid[x][y] == 0:
-				tiles[x][y] = null
-
-		var tile_index = 0
-		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
-			if GameManager.is_cell_blocked(x, y):
-				continue
-			var tile_type = GameManager.get_tile_at(Vector2(x, y))
-			if tile_type > 0 and tile_index < column_tiles.size():
-				var tile = column_tiles[tile_index]
-				tiles[x][y] = tile
-				tile.grid_position = Vector2(x, y)
-				tile.update_type(tile_type)
-				var target_pos = grid_to_world_position(Vector2(x, y))
-				if tile.position.distance_to(target_pos) > 1:
-					gravity_tweens.append(tile.animate_to_position(target_pos))
-				tile_index += 1
-
-	if gravity_tweens.size() > 0:
-		for tween in gravity_tweens:
-			if tween != null:
-				await tween.finished
-	else:
-		if get_tree() != null:
-			await get_tree().create_timer(0.01).timeout
-	print("animate_gravity: done")
-
-func animate_refill():
-	var new_tile_positions = GameManager.fill_empty_spaces()
-	var spawn_tweens = []
-	var scale_factor = tile_size / 64.0
-	for pos in new_tile_positions:
-		if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
-			if tiles[int(pos.x)][int(pos.y)] == null:
-				var tile = tile_scene.instantiate()
-				var tile_type = GameManager.get_tile_at(pos)
-				tile.setup(tile_type, pos, scale_factor)
-				tile.position = grid_to_world_position(Vector2(pos.x, -1))
-				tile.connect("tile_clicked", _on_tile_clicked)
-				tile.connect("tile_swiped", _on_tile_swiped)
-				add_child(tile)
-				tiles[int(pos.x)][int(pos.y)] = tile
-				var target_pos = grid_to_world_position(pos)
-				spawn_tweens.append(tile.animate_to_position(target_pos))
-				spawn_tweens.append(tile.animate_spawn())
-
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(x, y) and GameManager.grid[x][y] > 0:
-				if tiles[x][y] == null:
-					var tile = tile_scene.instantiate()
-					var ttype = GameManager.grid[x][y]
-					tile.setup(ttype, Vector2(x, y), scale_factor)
-					tile.position = grid_to_world_position(Vector2(x, -1))
-					tile.connect("tile_clicked", _on_tile_clicked)
-					tile.connect("tile_swiped", _on_tile_swiped)
-					add_child(tile)
-					tiles[x][y] = tile
-					var target_pos = grid_to_world_position(Vector2(x, y))
-					spawn_tweens.append(tile.animate_to_position(target_pos))
-					spawn_tweens.append(tile.animate_spawn())
-
-	if spawn_tweens.size() > 0:
-		await spawn_tweens[0].finished
-	else:
-		if get_tree() != null:
-			await get_tree().create_timer(0.3).timeout
-
-	print("GameManager.grid after refill:")
-	for y in range(GameManager.GRID_HEIGHT):
-		var row = []
-		for x in range(GameManager.GRID_WIDTH):
-			row.append(GameManager.grid[x][y])
-		print(row)
-
-func _show_combo_text(match_count: int, positions: Array, combo_multiplier: int = 1):
-	"""Show floating combo text for impressive matches"""
-	if positions.size() == 0:
-		return
-
-	# Get screen/viewport center for positioning
-	var viewport = get_viewport()
-	if not viewport:
-		return
-
-	var screen_size = viewport.get_visible_rect().size
-	var screen_center = screen_size / 2.0
-
-	# Offset slightly up from center for better visibility
-	var text_position = screen_center - Vector2(0, 100)
-
-	# Create combo label
-	var combo_label = Label.new()
-	combo_label.z_index = 100
-	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	combo_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-	# Determine combo message based on match size AND combo chain
-	var combo_text = ""
-	var combo_color = Color.WHITE
-
-	# High combo chains get priority
-	if combo_multiplier >= 5:
-		combo_text = "INCREDIBLE!"
-		combo_color = Color(1.0, 0.0, 1.0)  # Bright magenta
-	elif combo_multiplier >= 4:
-		combo_text = "AMAZING!"
-		combo_color = Color(1.0, 0.2, 1.0)  # Magenta
-	elif combo_multiplier >= 3:
-		combo_text = "SUPER!"
-		combo_color = Color(1.0, 0.5, 0.0)  # Orange
-	elif combo_multiplier >= 2:
-		combo_text = "COMBO!"
-		combo_color = Color(0.2, 1.0, 0.2)  # Green
-	# Otherwise, base on match size
-	elif match_count >= 7:
-		combo_text = "AMAZING!"
-		combo_color = Color(1.0, 0.2, 1.0)  # Magenta
-	elif match_count >= 6:
-		combo_text = "SUPER!"
-		combo_color = Color(1.0, 0.5, 0.0)  # Orange
-	elif match_count >= 5:
-		combo_text = "GREAT!"
-		combo_color = Color(0.2, 1.0, 0.2)  # Green
-	elif match_count >= 4:
-		combo_text = "GOOD!"
-		combo_color = Color(0.3, 0.7, 1.0)  # Blue
-	else:
-		combo_text = "NICE!"
-		combo_color = Color(0.5, 0.5, 1.0)  # Light blue
-
-	# Add combo multiplier to text if > 1
-	if combo_multiplier > 1:
-		combo_text = combo_text + " x" + str(combo_multiplier)
-
-	combo_label.text = combo_text
-
-	# Load and apply custom Bangers font for impactful display
-	ThemeManager.apply_bangers_font(combo_label, 72)
-
-	# Main text color
-	combo_label.add_theme_color_override("font_color", combo_color)
-
-	# Add black outline for contrast
-	combo_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))
-	combo_label.add_theme_constant_override("outline_size", 8)
-
-	# Add glow/shadow effect using shadow color
-	# Shadow is offset to create depth, with color matching the combo type
-	var shadow_color = combo_color
-	shadow_color.a = 0.6  # Semi-transparent for glow effect
-	combo_label.add_theme_color_override("font_shadow_color", shadow_color)
-	combo_label.add_theme_constant_override("shadow_offset_x", 0)
-	combo_label.add_theme_constant_override("shadow_offset_y", 0)
-	combo_label.add_theme_constant_override("shadow_outline_size", 20)  # Large shadow = glow
-
-	combo_label.modulate = Color(1, 1, 1, 0)
-
-	# Set fixed size for the label
-	var label_width = 600.0
-	var label_height = 100.0
-	combo_label.size = Vector2(label_width, label_height)
-	combo_label.custom_minimum_size = Vector2(label_width, label_height)
-
-	# Position at screen center (horizontally centered, vertically at text_position.y)
-	var centered_x = (screen_size.x - label_width) / 2.0
-	combo_label.position = Vector2(centered_x, text_position.y)
-
-	# Set pivot for scaling animation (center of label)
-	combo_label.pivot_offset = Vector2(label_width / 2.0, label_height / 2.0)
-
-	add_child(combo_label)
-
-	# Enhanced animation - dramatic pop-in with bounce and glow pulse
-	var tween = create_tween()
-
-	# Phase 1: Pop in (parallel - fade + scale + slight rotation)
-	tween.set_parallel(true)
-	tween.tween_property(combo_label, "modulate", Color.WHITE, 0.2)
-	tween.tween_property(combo_label, "scale", Vector2(1.4, 1.4), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(combo_label, "rotation_degrees", 5, 0.1)
-
-	# Phase 2: Settle down (sequential)
-	tween.set_parallel(false)
-	tween.tween_property(combo_label, "rotation_degrees", -3, 0.08)
-	tween.tween_property(combo_label, "rotation_degrees", 0, 0.08)
-	tween.tween_property(combo_label, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-
-	# Phase 3: Hold with subtle pulse (parallel)
-	tween.set_parallel(true)
-	var pulse_tween = tween.tween_property(combo_label, "scale", Vector2(1.05, 1.05), 0.3)
-	pulse_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-	# Phase 4: Fade out with slight upward movement
-	tween.set_parallel(false)
-	tween.tween_property(combo_label, "scale", Vector2(1.0, 1.0), 0.2).set_delay(0.2)
-	tween.set_parallel(true)
-	tween.tween_property(combo_label, "modulate", Color(1, 1, 1, 0), 0.3)
-	tween.tween_property(combo_label, "position:y", combo_label.position.y - 30, 0.3)
-	tween.tween_property(combo_label, "scale", Vector2(1.2, 1.2), 0.3)
-
-	# Cleanup after animation
-	tween.finished.connect(combo_label.queue_free)
-
-func _apply_screen_shake(duration: float, intensity: float):
-	"""Apply screen shake effect for dramatic moments"""
-	var original_position = position
-	var shake_timer = 0.0
-	var shake_amount = intensity
-
-	while shake_timer < duration:
-		position = original_position + Vector2(
-			randf_range(-shake_amount, shake_amount),
-			randf_range(-shake_amount, shake_amount)
-		)
-		shake_timer += get_process_delta_time()
-		await get_tree().process_frame
-
-	# Reset to original position
-	position = original_position
-
-func _create_lightning_beam_horizontal(row: int, color: Color = Color.YELLOW):
-	"""Create a horizontal lightning beam effect across a row"""
-	print("[GameBoard] Creating horizontal lightning beam for row ", row, " with color ", color)
-
-	var beam = Line2D.new()
-	beam.name = "LightningBeamH"
-	beam.z_index = 100  # Increased from 50 to ensure it's on top
-	beam.visible = true  # Explicitly set visible
-
-	# Calculate start and end positions
-	var start_pos = grid_to_world_position(Vector2(0, row))
-	var end_pos = grid_to_world_position(Vector2(GameManager.GRID_WIDTH - 1, row))
-
-	print("[GameBoard] Beam start pos: ", start_pos, " end pos: ", end_pos)
-
-	# Add points for the lightning path
-	beam.add_point(Vector2(start_pos.x - tile_size/2, start_pos.y))
-
-	# Add zigzag points for lightning effect
-	var num_segments = 8
-	var segment_length = (end_pos.x - start_pos.x) / num_segments
-	for i in range(1, num_segments):
-		var x = start_pos.x + (i * segment_length)
-		var y = start_pos.y + randf_range(-tile_size * 0.3, tile_size * 0.3)
-		beam.add_point(Vector2(x, y))
-
-	beam.add_point(Vector2(end_pos.x + tile_size/2, end_pos.y))
-
-	print("[GameBoard] Beam has ", beam.get_point_count(), " points")
-
-	# Beam appearance - sleeker and thinner
-	beam.width = 12  # Reduced from 25
-	beam.default_color = color
-	beam.modulate = Color(1, 1, 1, 0)
-	beam.antialiased = true
-	beam.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	beam.end_cap_mode = Line2D.LINE_CAP_ROUND
-	beam.joint_mode = Line2D.LINE_JOINT_ROUND
-
-	add_child(beam)
-	print("[GameBoard] Beam added as child, parent: ", get_path())
-
-	# Animate the beam
-	var tween = create_tween()
-	tween.set_parallel(true)
-
-	# Flash in bright and wider
-	tween.tween_property(beam, "modulate", Color(3, 3, 3, 1), 0.05)  # Even brighter
-	tween.tween_property(beam, "width", 20, 0.05)  # Reduced from 40
-
-	tween.set_parallel(false)
-
-	# Pulse effect - moderate width
-	tween.tween_property(beam, "width", 15, 0.1)  # Reduced from 30
-	tween.tween_property(beam, "width", 18, 0.1)  # Reduced from 35
-
-	# Fade out
-	tween.tween_property(beam, "modulate", Color(1, 1, 1, 0), 0.2)
-
-	# Cleanup - connect directly to queue_free
-	tween.finished.connect(beam.queue_free)
-
-	return tween
-
-func _create_lightning_beam_vertical(col: int, color: Color = Color.CYAN):
-	"""Create a vertical lightning beam effect down a column"""
-	print("[GameBoard] Creating vertical lightning beam for column ", col, " with color ", color)
-
-	var beam = Line2D.new()
-	beam.name = "LightningBeamV"
-	beam.z_index = 100  # Increased from 50 to ensure it's on top
-	beam.visible = true  # Explicitly set visible
-
-	# Calculate start and end positions
-	var start_pos = grid_to_world_position(Vector2(col, 0))
-	var end_pos = grid_to_world_position(Vector2(col, GameManager.GRID_HEIGHT - 1))
-
-	print("[GameBoard] Beam start pos: ", start_pos, " end pos: ", end_pos)
-
-	# Add points for the lightning path
-	beam.add_point(Vector2(start_pos.x, start_pos.y - tile_size/2))
-
-	# Add zigzag points for lightning effect
-	var num_segments = 8
-	var segment_length = (end_pos.y - start_pos.y) / num_segments
-	for i in range(1, num_segments):
-		var x = start_pos.x + randf_range(-tile_size * 0.3, tile_size * 0.3)
-		var y = start_pos.y + (i * segment_length)
-		beam.add_point(Vector2(x, y))
-
-	beam.add_point(Vector2(end_pos.x, end_pos.y + tile_size/2))
-
-	print("[GameBoard] Beam has ", beam.get_point_count(), " points")
-
-	# Beam appearance - sleeker and thinner
-	beam.width = 12  # Reduced from 25
-	beam.default_color = color
-	beam.modulate = Color(1, 1, 1, 0)
-	beam.antialiased = true
-	beam.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	beam.end_cap_mode = Line2D.LINE_CAP_ROUND
-	beam.joint_mode = Line2D.LINE_JOINT_ROUND
-
-	add_child(beam)
-	print("[GameBoard] Beam added as child, parent: ", get_path())
-
-	# Animate the beam
-	var tween = create_tween()
-	tween.set_parallel(true)
-
-	# Flash in bright and wider
-	tween.tween_property(beam, "modulate", Color(3, 3, 3, 1), 0.05)  # Even brighter
-	tween.tween_property(beam, "width", 20, 0.05)  # Reduced from 40
-
-	tween.set_parallel(false)
-
-	# Pulse effect - moderate width
-	tween.tween_property(beam, "width", 15, 0.1)  # Reduced from 30
-	tween.tween_property(beam, "width", 18, 0.1)  # Reduced from 35
-
-	# Fade out
-	tween.tween_property(beam, "modulate", Color(1, 1, 1, 0), 0.2)
-
-	# Cleanup - connect directly to queue_free
-	tween.finished.connect(beam.queue_free)
-
-	return tween
-
-func _create_row_clear_effect(row: int):
-	"""Create visual effect for clearing an entire row"""
-	print("[GameBoard] Creating row clear lightning effect for row ", row)
-
-	# Create multiple lightning beams with slight offset for more impact
-	_create_lightning_beam_horizontal(row, Color(1.0, 1.0, 0.3))  # Yellow
-	await get_tree().create_timer(0.02).timeout
-	_create_lightning_beam_horizontal(row, Color(1.0, 0.8, 0.0))  # Orange-yellow
-
-	# Add particles along the row
-	for x in range(GameManager.GRID_WIDTH):
-		if not GameManager.is_cell_blocked(x, row):
-			var pos = grid_to_world_position(Vector2(x, row))
-			_create_impact_particles(pos, Color.YELLOW)
-
-func _create_column_clear_effect(col: int):
-	"""Create visual effect for clearing an entire column"""
-	print("[GameBoard] Creating column clear lightning effect for column ", col)
-
-	# Create multiple lightning beams with slight offset for more impact
-	_create_lightning_beam_vertical(col, Color(0.3, 0.8, 1.0))  # Cyan
-	await get_tree().create_timer(0.02).timeout
-	_create_lightning_beam_vertical(col, Color(0.5, 1.0, 1.0))  # Bright cyan
-
-	# Add particles along the column
-	for y in range(GameManager.GRID_HEIGHT):
-		if not GameManager.is_cell_blocked(col, y):
-			var pos = grid_to_world_position(Vector2(col, y))
-			_create_impact_particles(pos, Color.CYAN)
-
-func _create_impact_particles(pos: Vector2, color: Color):
-	"""Create small impact particles at a position"""
-	var particles = CPUParticles2D.new()
-	particles.position = pos
-	particles.emitting = true
-	particles.one_shot = true
-	particles.amount = 8
-	particles.lifetime = 0.4
-	particles.explosiveness = 1.0
-	particles.spread = 180
-	particles.initial_velocity_min = 50
-	particles.initial_velocity_max = 100
-	particles.scale_amount_min = 0.8
-	particles.scale_amount_max = 1.5
-	particles.color = color
-
-	add_child(particles)
-
-	# Cleanup - connect directly to queue_free
-	get_tree().create_timer(0.6).timeout.connect(particles.queue_free)
-
-func _on_game_over():
-	print("[GameBoard] Game Over")
-	# Cleanup or final actions on game over
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			var tile = tiles[x][y]
-			if tile:
-				tile.set_process_input(false)  # Disable input processing for tiles
-
-func _on_level_complete():
-	print("[GameBoard] Level Complete")
-	# Actions to perform on level completion, e.g. showing a summary, transitioning to next level, etc.
-
-func _on_level_loaded():
-	print("[GameBoard] Level Loaded")
-
-	# Reset or initialize anything specific to the new level
-	calculate_responsive_layout()
-	setup_background()
-
-	# Recreate the visual grid for the new level
-	create_visual_grid()
-	draw_board_borders()
-
+# Queues/state for collectible spawning
+var collectible_spawn_queue: Array = []
+var _just_collected_columns: Array = []
+
+# Provide basic layout variables in case calculate_responsive_layout hasn't run yet
+var tile_size: float = 64.0
+var grid_offset: Vector2 = Vector2.ZERO
+
+# Convert a grid coordinate (Vector2) to world/screen position for tile placement
 func grid_to_world_position(grid_pos: Vector2) -> Vector2:
+	# Center the position inside the tile
 	return Vector2(
-		grid_pos.x * tile_size + grid_offset.x + tile_size/2,
-		grid_pos.y * tile_size + grid_offset.y + tile_size/2
+		grid_pos.x * tile_size + grid_offset.x + tile_size * 0.5,
+		grid_pos.y * tile_size + grid_offset.y + tile_size * 0.5
 	)
 
-func world_to_grid_position(world_pos: Vector2) -> Vector2:
-	return Vector2(
-		int((world_pos.x - grid_offset.x) / tile_size),
-		int((world_pos.y - grid_offset.y) / tile_size)
-	)
-
-func update_tile_visual(grid_pos: Vector2, new_type: int):
-	"""Update a tile's visual appearance to match a new type
-	Used for bonus moves conversion"""
-	if grid_pos.x < 0 or grid_pos.x >= GameManager.GRID_WIDTH:
+# Enqueue a column for collectible spawn (idempotent)
+func queue_collectible_spawn(column: int) -> void:
+	if column == null:
 		return
-	if grid_pos.y < 0 or grid_pos.y >= GameManager.GRID_HEIGHT:
-		return
+	if not collectible_spawn_queue.has(column):
+		collectible_spawn_queue.append(column)
 
-	var tile = tiles[int(grid_pos.x)][int(grid_pos.y)]
-	if not tile:
-		return
+# Process cascades until no more matches - safe minimal implementation
+func process_cascade(start_pos = null) -> void:
+	# Keep processing until no matches remain
+	while true:
+		var matches = []
+		# Require GameManager.find_matches to exist; otherwise we can't continue
+		if not (GameManager and GameManager.has_method("find_matches")):
+			print("[GameBoard] process_cascade: no GameManager.find_matches available; aborting cascade")
+			break
+		matches = GameManager.find_matches()
 
-	# Update the tile's texture to match the new type
-	if tile.has_method("update_type"):
-		tile.update_type(new_type)
+		if matches == null or matches.size() == 0:
+			break
 
-		# Add a flash effect to draw attention
-		var tween = create_tween()
-		tween.tween_property(tile, "modulate", Color(3, 3, 1, 1), 0.1)
-		tween.tween_property(tile, "modulate", Color.WHITE, 0.2)
+		# Visual highlight and destroy
+		await highlight_matches(matches)
+		await animate_destroy_tiles(matches)
 
-		# Play transformation sound
-		AudioManager.play_sfx("special_create")
+		# Clear logical grid for matches (GameManager should handle scoring and logic normally)
+		for m in matches:
+			if GameManager and GameManager.grid and m.x >= 0 and m.y >= 0:
+				GameManager.grid[int(m.x)][int(m.y)] = 0
 
-		print("[GameBoard] Updated tile at %s to type %d (special)" % [grid_pos, new_type])
+		# Award points if GameManager supports it
+		if GameManager and GameManager.has_method("calculate_points") and GameManager.has_method("add_score"):
+			var pts = GameManager.calculate_points(matches.size())
+			GameManager.add_score(pts)
 
-func show_skip_bonus_hint():
-	"""Show 'Tap to Skip' message during bonus phase"""
-	if skip_bonus_label:
-		skip_bonus_label.visible = true
-		skip_bonus_active = true
-		return
+		# Gravity/refill
+		await animate_gravity()
+		await animate_refill()
 
-	# Create skip hint label
-	skip_bonus_label = Label.new()
-	skip_bonus_label.name = "SkipBonusLabel"
-	skip_bonus_label.text = "TAP TO SKIP ⏩"
-	skip_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	skip_bonus_label.add_theme_font_size_override("font_size", 32)
-	skip_bonus_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.3, 1.0))  # Yellow
+		# small guard delay
+		if get_tree() != null:
+			await get_tree().create_timer(0.06).timeout
 
-	# Position below the board
-	var viewport_size = get_viewport().get_visible_rect().size
-	var board_bottom = grid_offset.y + (tile_size * GameManager.GRID_HEIGHT)
-	skip_bonus_label.position = Vector2(viewport_size.x / 2 - 150, board_bottom + 20)
-	skip_bonus_label.custom_minimum_size = Vector2(300, 60)
+	# cascade finished
+	return
 
-	add_child(skip_bonus_label)
-	skip_bonus_active = true
-
-	# Create pulsing animation
-	var tween = create_tween()
-	tween.set_loops()
-	tween.tween_property(skip_bonus_label, "modulate:a", 0.5, 0.5)
-	tween.tween_property(skip_bonus_label, "modulate:a", 1.0, 0.5)
-
-	print("[GameBoard] Showing skip bonus hint")
-
-func hide_skip_bonus_hint():
-	"""Hide 'Tap to Skip' message"""
-	if skip_bonus_label:
-		skip_bonus_label.visible = false
-	skip_bonus_active = false
-	print("[GameBoard] Hiding skip bonus hint")
-
-func _input(event):
-	"""Handle input for skipping bonus animation"""
-	if skip_bonus_active and (event is InputEventScreenTouch or event is InputEventMouseButton):
-		if event.pressed:
-			print("[GameBoard] Screen tapped during bonus - requesting skip")
-			GameManager.skip_bonus_animation()
-			hide_skip_bonus_hint()
-			# Consume the event to prevent it from propagating to other input handlers
-			get_viewport().set_input_as_handled()
-
-func _on_tile_clicked(tile):
-	print("GameBoard received tile_clicked signal from tile at ", tile.grid_position)
-
-	if GameManager.processing_moves:
-		print("GameBoard: Move processing blocked")
+# Perform visual + logical swap between two tile nodes (used by swipe/click)
+func perform_swap(tile_a, tile_b) -> void:
+	if tile_a == null or tile_b == null:
 		return
 
-	if GameManager.level_transitioning:
-		print("GameBoard: Level transitioning, clicks blocked")
+	# Logical positions
+	var pos_a = tile_a.grid_position
+	var pos_b = tile_b.grid_position
+
+	# Delegate to GameManager swap if available
+	if GameManager and GameManager.has_method("swap_tiles"):
+		GameManager.swap_tiles(pos_a, pos_b)
+	else:
+		# fallback: swap logical grid values
+		var tmp = GameManager.grid[int(pos_a.x)][int(pos_a.y)]
+		GameManager.grid[int(pos_a.x)][int(pos_a.y)] = GameManager.grid[int(pos_b.x)][int(pos_b.y)]
+		GameManager.grid[int(pos_b.x)][int(pos_b.y)] = tmp
+
+	# Animate visually
+	var world_a = grid_to_world_position(pos_a)
+	var world_b = grid_to_world_position(pos_b)
+	var tlist = []
+	if tile_a.has_method("animate_swap_to"):
+		var ta = tile_a.animate_swap_to(world_b)
+		if ta: tlist.append(ta)
+	if tile_b.has_method("animate_swap_to"):
+		var tb = tile_b.animate_swap_to(world_a)
+		if tb: tlist.append(tb)
+	if tlist.size() > 0:
+		await _await_tweens_with_timeout(tlist, 1.6)
+
+	# Update tiles array references
+	if tiles.size() > int(pos_a.x) and tiles[int(pos_a.x)].size() > int(pos_a.y):
+		tiles[int(pos_a.x)][int(pos_a.y)] = tile_b
+	if tiles.size() > int(pos_b.x) and tiles[int(pos_b.x)].size() > int(pos_b.y):
+		tiles[int(pos_b.x)][int(pos_b.y)] = tile_a
+
+	# Update node grid positions
+	tile_a.grid_position = pos_b
+	tile_b.grid_position = pos_a
+
+	# Emit move completed so higher-level systems can react
+	emit_signal("move_completed")
+
+# Default higher-level tile click handler if GameManager doesn't provide one
+func _handle_tile_click(tile) -> void:
+	# If GameManager provides logic, prefer it
+	if GameManager and GameManager.has_method("handle_tile_click"):
+		GameManager.call("handle_tile_click", tile)
 		return
 
-	# Check if a booster is active
-	var game_ui = get_node_or_null("../GameUI")
-	# Only access GameUI-specific properties if the node is actually the GameUI scripted object
-	if game_ui and game_ui is GameUI:
-		if game_ui.booster_mode_active:
-			var booster_type = game_ui.active_booster_type
-
-			if booster_type == "shuffle":
-				# Shuffle doesn't need tile selection - handled in button press
-				pass
-			elif booster_type == "swap":
-				# Swap needs 2 tiles
-				if game_ui.swap_first_tile == null:
-					# First tile selected
-					game_ui.swap_first_tile = tile.grid_position
-					tile.set_selected(true)
-					print("[GameBoard] Swap first tile selected: ", tile.grid_position, " - select second tile")
-					return  # Don't reset booster mode yet
-				else:
-					# Second tile selected
-					var first_pos = game_ui.swap_first_tile
-					var second_pos = tile.grid_position
-
-					# Deselect first tile
-					var first_tile = tiles[int(first_pos.x)][int(first_pos.y)]
-					if first_tile:
-						first_tile.set_selected(false)
-
-					await activate_swap_booster(int(first_pos.x), int(first_pos.y),
-										int(second_pos.x), int(second_pos.y))
-					game_ui.swap_first_tile = null
-			elif booster_type == "hammer":
-				await activate_hammer_booster(int(tile.grid_position.x), int(tile.grid_position.y))
-			elif booster_type == "chain_reaction":
-				await activate_chain_reaction_booster(int(tile.grid_position.x), int(tile.grid_position.y))
-			elif booster_type == "bomb_3x3":
-				await activate_bomb_3x3_booster(int(tile.grid_position.x), int(tile.grid_position.y))
-			elif booster_type == "line_blast":
-				await activate_line_blast_booster(game_ui.line_blast_direction,
-										int(tile.grid_position.x), int(tile.grid_position.y))
-			elif booster_type == "tile_squasher":
-				await activate_tile_squasher_booster(int(tile.grid_position.x), int(tile.grid_position.y))
-			elif booster_type == "row_clear":
-				await activate_row_clear_booster(int(tile.grid_position.y))
-			elif booster_type == "column_clear":
-				await activate_column_clear_booster(int(tile.grid_position.x))
-
-			# Reset booster mode (unless swap waiting for second tile)
-			if not (booster_type == "swap" and game_ui.swap_first_tile != null):
-				game_ui.booster_mode_active = false
-				game_ui.active_booster_type = ""
-				game_ui.update_booster_ui()
-
-				# Reset all button colors
-				var all_buttons = [game_ui.hammer_button, game_ui.shuffle_button, game_ui.swap_button,
-									   game_ui.chain_reaction_button, game_ui.bomb_3x3_button, game_ui.line_blast_button,
-									   game_ui.tile_squasher_button, game_ui.row_clear_button, game_ui.column_clear_button]
-				for btn in all_buttons:
-					if btn:
-						btn.modulate = Color.WHITE
-			# Return after handling booster action
-			return
-
-	# Check if clicked tile is a special tile (7, 8, or 9)
-	var tile_type = GameManager.get_tile_at(tile.grid_position)
-	if tile_type >= 7 and tile_type <= 9:
-		print("Special tile activated at ", tile.grid_position, " type: ", tile_type)
-		# Clear any existing selection
-		if selected_tile:
-			selected_tile.set_selected(false)
-			selected_tile = null
-		# Activate the special tile with full visuals and cascades
-		await activate_special_tile(tile.grid_position)
+	# Basic selection logic (same as earlier inline behavior)
+	if GameManager.processing_moves or (GameManager.has_method("level_transitioning") and GameManager.level_transitioning):
 		return
 
 	if selected_tile == null:
-		# First selection
-		print("GameBoard: Selecting first tile at ", tile.grid_position)
 		selected_tile = tile
 		tile.set_selected(true)
-	elif selected_tile == tile:
-		# Deselect same tile
-		print("GameBoard: Deselecting tile at ", tile.grid_position)
-		tile.set_selected(false)
-		selected_tile = null
 	else:
-		# Try to swap tiles
-		print("GameBoard: Attempting to swap tiles ", selected_tile.grid_position, " and ", tile.grid_position)
-		if GameManager.can_swap(selected_tile.grid_position, tile.grid_position):
-			print("GameBoard: Swap allowed, performing swap")
-			await perform_swap(selected_tile, tile)
-		else:
-			print("GameBoard: Swap not allowed, selecting new tile")
-			# Select new tile
+		if selected_tile == tile:
 			selected_tile.set_selected(false)
-			selected_tile = tile
-			tile.set_selected(true)
-
-func _on_tile_swiped(tile, direction: Vector2):
-	print("GameBoard received tile_swiped signal from tile at ", tile.grid_position, " direction: ", direction)
-
-	if GameManager.processing_moves:
-		print("GameBoard: Move processing blocked")
-		return
-
-	if GameManager.level_transitioning:
-		print("GameBoard: Level transitioning, swipes blocked")
-		return
-
-	# Clear any existing selection when swiping
-	if selected_tile:
-		selected_tile.set_selected(false)
-		selected_tile = null
-
-	# Calculate the target tile position based on swipe direction
-	var target_pos = tile.grid_position + direction
-
-	# Check if target position is valid
-	if not GameManager.is_valid_position(target_pos):
-		print("GameBoard: Swipe target out of bounds or blocked")
-		return
-
-	# Get the target tile
-	var target_tile = tiles[int(target_pos.x)][int(target_pos.y)]
-	if not target_tile:
-		print("GameBoard: No tile at target position (blocked cell)")
-		return
-
-	# Perform the swap directly
-	print("GameBoard: Swipe swap from ", tile.grid_position, " to ", target_pos)
-	await perform_swap(tile, target_tile)
-
-func perform_swap(tile1, tile2):
-	GameManager.processing_moves = true
-	print("perform_swap: processing_moves = true")
-
-	# Clear selections
-	tile1.set_selected(false)
-	tile2.set_selected(false)
-	selected_tile = null
-
-	var pos1 = tile1.grid_position
-	var pos2 = tile2.grid_position
-
-	# Perform swap in game logic
-	GameManager.swap_tiles(pos1, pos2)
-
-	# Play swap sound effect
-	AudioManager.play_sfx("tile_swap")
-
-	# Animate swap
-	var target_pos1 = grid_to_world_position(pos2)
-	var target_pos2 = grid_to_world_position(pos1)
-
-	var tween1 = tile1.animate_swap_to(target_pos1)
-	var tween2 = tile2.animate_swap_to(target_pos2)
-
-	# Update grid references
-	tiles[pos1.x][pos1.y] = tile2
-	tiles[pos2.x][pos2.y] = tile1
-	tile1.grid_position = pos2
-	tile2.grid_position = pos1
-
-	# Wait for both swap tweens to finish to avoid racing visual/logic
-	if tween1 != null:
-		await tween1.finished
-	if tween2 != null:
-		await tween2.finished
-
-	# Check for matches
-	var matches = GameManager.find_matches()
-	if matches.size() > 0:
-		GameManager.use_move()
-
-		# Award points for the first match
-		var points = GameManager.calculate_points(matches.size())
-		GameManager.add_score(points)
-
-		# Determine which swapped position is part of the match
-		var swap_pos_in_match = Vector2(-1, -1)
-		if pos1 in matches:
-			swap_pos_in_match = pos1
-		elif pos2 in matches:
-			swap_pos_in_match = pos2
+			selected_tile = null
 		else:
-			# If neither swapped tile is in the matches, check for a 4+ / T/L match and use that position
-			var fallback_pos = find_special_tile_position_in_matches(matches)
-			if fallback_pos.x >= 0 and fallback_pos.y >= 0:
-				swap_pos_in_match = fallback_pos
-
-		await process_cascade(swap_pos_in_match)
-		GameManager.processing_moves = false
-		print("perform_swap: processing_moves = false (from cascade end)")
-		emit_signal("move_completed")
-		return
-	else:
-		GameManager.swap_tiles(pos1, pos2)
-
-		var revert_tween1 = tile1.animate_swap_to(target_pos2)
-		var revert_tween2 = tile2.animate_swap_to(target_pos1)
-
-		tiles[pos1.x][pos1.y] = tile1
-		tiles[pos2.x][pos2.y] = tile2
-		tile1.grid_position = pos1
-		tile2.grid_position = pos2
-
-		if revert_tween1 != null:
-			await revert_tween1.finished
-		if revert_tween2 != null:
-			await revert_tween2.finished
-
-	GameManager.processing_moves = false
-	print("perform_swap: processing_moves = false")
-	emit_signal("move_completed")
-
-
-func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
-	var is_first_match = initial_swap_pos.x >= 0
-	var cascade_depth = 0
-	var cascade_error = null
-	print("=== Starting cascade process ===")
-	while true:
-		cascade_depth += 1
-		if cascade_depth > 20:
-			print("[ERROR] Cascade depth exceeded limit! Breaking loop.")
-			break
-		var matches = GameManager.find_matches()
-		print("Found ", matches.size(), " matches in cascade")
-		print("Grid after match check:")
-		for y in range(GameManager.GRID_HEIGHT):
-			var row = []
-			for x in range(GameManager.GRID_WIDTH):
-				row.append(GameManager.grid[x][y])
-			print(row)
-		print("Matches found:", matches)
-		if matches.size() == 0:
-			break
-
-		await highlight_matches(matches)
-
-		# For first match, use the swap position. For cascade matches, find the best position
-		var special_tile_pos = null
-		var will_create_special = false
-
-		if is_first_match and initial_swap_pos.x >= 0 and initial_swap_pos.y >= 0:
-			# Use the swap position for the first match
-			var matches_on_same_row = 0
-			var matches_on_same_col = 0
-			for match_pos in matches:
-				if match_pos.y == initial_swap_pos.y:
-					matches_on_same_row += 1
-				if match_pos.x == initial_swap_pos.x:
-					matches_on_same_col += 1
-
-			var has_horizontal = matches_on_same_row >= 3
-			var has_vertical = matches_on_same_col >= 3
-			var is_t_or_l_shape = has_horizontal and has_vertical
-			var is_long_line = matches_on_same_row >= 4 or matches_on_same_col >= 4
-
-			will_create_special = is_t_or_l_shape or is_long_line
-			if will_create_special:
-				special_tile_pos = initial_swap_pos
+			# If adjacent, swap
+			var can_swap = false
+			if GameManager and GameManager.has_method("can_swap"):
+				can_swap = GameManager.call("can_swap", selected_tile.grid_position, tile.grid_position)
 			else:
-				# If swapped tile wasn't in the 4+/T but the overall matches include one,
-				# choose a fallback position from the matches so a special tile is created.
-				var fallback = find_special_tile_position_in_matches(matches)
-				if fallback.x >= 0 and fallback.y >= 0:
-					will_create_special = true
-					special_tile_pos = fallback
-					print("First-match fallback: creating special at ", special_tile_pos)
+				# fallback: adjacency test
+				var d = selected_tile.grid_position - tile.grid_position
+				can_swap = (abs(d.x) + abs(d.y)) == 1
 
-			print("First match - Row: ", matches_on_same_row, " Col: ", matches_on_same_col,
-				  " T/L: ", is_t_or_l_shape, " Long: ", is_long_line, " Special: ", will_create_special)
+			if can_swap:
+				perform_swap(selected_tile, tile)
+			else:
+				selected_tile.set_selected(false)
+				selected_tile = tile
+				tile.set_selected(true)
 
-			is_first_match = false
-		else:
-			# For cascade matches, detect T/L shapes or 4+ lines anywhere in the matches
-			special_tile_pos = find_special_tile_position_in_matches(matches)
-			will_create_special = special_tile_pos != null
+# Default swipe handler if GameManager doesn't provide one
+func _handle_tile_swipe(tile, dir: Vector2) -> void:
+	if GameManager and GameManager.has_method("handle_tile_swipe"):
+		GameManager.call("handle_tile_swipe", tile, dir)
+		return
 
-			if will_create_special:
-				print("Cascade match - Special tile will be created at: ", special_tile_pos)
+	# Default: attempt to swap with neighboring tile
+	var target_pos = tile.grid_position + dir
+	if not GameManager.is_valid_position(target_pos):
+		return
+	var target = tiles[int(target_pos.x)][int(target_pos.y)]
+	if not target:
+		return
+	perform_swap(tile, target)
 
-		# Play match sound effect (combo sound for cascades after first match)
-		if cascade_depth > 1:
-			AudioManager.play_sfx("combo")
-		else:
-			AudioManager.play_sfx("match")
+# Minimal highlight_matches: play a tiny flash for each matched tile; used during cascades
+func highlight_matches(matches: Array) -> void:
+	if matches == null or matches.size() == 0:
+		return
+	# Try to animate each tile if possible, otherwise just wait briefly
+	var tweens = []
+	for pos in matches:
+		if pos.x < 0 or pos.y < 0:
+			continue
+		if pos.x >= tiles.size() or pos.y >= (tiles[int(pos.x)].size() if tiles.size() > int(pos.x) else 0):
+			continue
+		var tnode = tiles[int(pos.x)][int(pos.y)]
+		if tnode and tnode.has_method("animate_match_highlight"):
+			var tw = tnode.animate_match_highlight()
+			if tw:
+				tweens.append(tw)
 
-		if will_create_special and special_tile_pos.x >= 0 and special_tile_pos.y >= 0:
-			await animate_destroy_matches_except(matches, special_tile_pos)
-			GameManager.remove_matches(matches, special_tile_pos)
-		else:
-			print("Destroying ", matches.size(), " matched tiles")
-			await animate_destroy_matches(matches)
-			GameManager.remove_matches(matches)
+	if tweens.size() > 0:
+		await _await_tweens_with_timeout(tweens, 1.0)
+	else:
+		# fallback pause for visual consistency
+		if get_tree() != null:
+			await get_tree().create_timer(0.08).timeout
 
-		# Apply gravity
-		print("Applying gravity...")
-		await animate_gravity()
-		print("Gravity complete")
+# Minimal animate_destroy_tiles implementation: fades out visual tiles and frees them
+func animate_destroy_tiles(positions: Array) -> void:
+	if positions == null or positions.size() == 0:
+		return
+	var tweens = []
+	var nodes_to_free = []
+	for pos in positions:
+		if pos.x < 0 or pos.y < 0:
+			continue
+		var ix = int(pos.x)
+		var iy = int(pos.y)
+		if ix < 0 or iy < 0:
+			continue
+		if ix >= tiles.size():
+			continue
+		if iy >= tiles[ix].size():
+			continue
+		var node = tiles[ix][iy]
+		if node:
+			# prefer node-provided animation
+			if node.has_method("animate_destroy"):
+				var tw = node.animate_destroy()
+				if tw:
+					tweens.append(tw)
+			else:
+				var tw2 = create_tween()
+				tw2.tween_property(node, "modulate", Color(1,1,1,0), 0.12)
+				tweens.append(tw2)
+			nodes_to_free.append({"node": node, "x": ix, "y": iy})
 
-		# Fill empty spaces
-		print("Refilling empty spaces...")
-		await animate_refill()
-		print("Refill complete")
-		print("Grid after refill:")
-		for y in range(GameManager.GRID_HEIGHT):
-			var row = []
-			for x in range(GameManager.GRID_WIDTH):
-				row.append(GameManager.grid[x][y])
-			print(row)
-	# Always reset processing_moves and combo, even if an error occurred
-	GameManager.processing_moves = false
-	GameManager.reset_combo()
-	print("=== Cascade process complete ===")
-	# Short buffer to ensure all last tweens/deferred calls have finished before marking board idle
+	if tweens.size() > 0:
+		await _await_tweens_with_timeout(tweens, 1.5)
+	else:
+		if get_tree() != null:
+			await get_tree().create_timer(0.06).timeout
+
+	# Clear tile references and free nodes
+	for item in nodes_to_free:
+		var n = item["node"]
+		var x = item["x"]
+		var y = item["y"]
+		if is_instance_valid(n) and not n.is_queued_for_deletion():
+			n.queue_free()
+		if x < tiles.size() and y < tiles[x].size():
+			tiles[x][y] = null
+
+# Minimal animate_gravity: call GameManager.apply_gravity() if available and wait for visuals
+func animate_gravity() -> void:
+	if GameManager and GameManager.has_method("apply_gravity"):
+		var moved = GameManager.apply_gravity()
+		print("[GameBoard] animate_gravity: GameManager.apply_gravity -> ", moved)
+	else:
+		print("[GameBoard] animate_gravity: GameManager.apply_gravity not available; skipping logical gravity")
+	# small visual pause to allow repositioning
 	if get_tree() != null:
-		await get_tree().create_timer(0.2).timeout
-	if not GameManager.has_possible_moves():
-		print("No valid moves detected! Auto-shuffling...")
-		await get_tree().create_timer(1.0).timeout
-		await perform_auto_shuffle()
+		await get_tree().create_timer(0.06).timeout
 
-func perform_auto_shuffle():
-	"""Perform an automatic board shuffle with visual feedback"""
-	# Show shuffle message/animation
-	print("Performing auto-shuffle animation...")
-
-	# Shuffle in GameManager until valid moves are found
-	if GameManager.shuffle_until_moves_available():
-		# Animate the shuffle visually
-		await animate_shuffle()
-		print("Board shuffled successfully with valid moves")
+# Minimal animate_refill: call GameManager.fill_empty_spaces() if available and spawn visual tiles conservatively
+func animate_refill() -> void:
+	var new_positions = []
+	if GameManager and GameManager.has_method("fill_empty_spaces"):
+		new_positions = GameManager.fill_empty_spaces()
+		print("[GameBoard] animate_refill: GameManager.fill_empty_spaces returned ", new_positions)
 	else:
-		print("ERROR: Could not find valid board configuration")
+		# Nothing to refill
+		if get_tree() != null:
+			await get_tree().create_timer(0.08).timeout
+			return
 
-func animate_shuffle():
-	"""Animate the tiles shuffling on screen"""
-	# Create a shake/shuffle effect for all tiles
-	var shuffle_tweens = []
+	# Try to create basic visuals for positions if tile_scene is valid
+	var tweens = []
+	var scale_factor = tile_size / 64.0
+	for p in new_positions:
+		var x = int(p.x)
+		var y = int(p.y)
+		if x < 0 or y < 0 or x >= GameManager.GRID_WIDTH or y >= GameManager.GRID_HEIGHT:
+			continue
+		if tiles.size() <= x:
+			# ensure inner array exists
+			while tiles.size() <= x:
+				tiles.append([])
+		if tiles[x].size() <= y:
+			while tiles[x].size() <= y:
+				tiles[x].append(null)
+		if tiles[x][y] == null:
+			var tnode = tile_scene.instantiate()
+			tnode.setup(GameManager.get_tile_at(Vector2(x,y)), Vector2(x,y), scale_factor)
+			tnode.position = grid_to_world_position(Vector2(x, -1))
+			tnode.connect("tile_clicked", Callable(self, "_on_tile_clicked"))
+			tnode.connect("tile_swiped", Callable(self, "_on_tile_swiped"))
+			add_child(tnode)
+			tnode.z_index = 0
+			tiles[x][y] = tnode
+			var tgt = grid_to_world_position(Vector2(x, y))
+			if tnode.has_method("animate_to_position"):
+				var tw = tnode.animate_to_position(tgt)
+				if tw:
+					tweens.append(tw)
 
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			var tile = tiles[x][y]
-			if tile and not GameManager.is_cell_blocked(x, y):
-				# Update tile type to match new grid state
-				var new_type = GameManager.get_tile_at(Vector2(x, y))
-				tile.update_type(new_type)
-
-				# Create a shake effect
-				var original_pos = tile.position
-				var tween = create_tween()
-				tween.set_parallel(true)
-				tween.tween_property(tile, "position", original_pos + Vector2(randf_range(-10, 10), randf_range(-10, 10)), 0.1)
-				tween.tween_property(tile, "rotation", randf_range(-0.2, 0.2), 0.1)
-				tween.set_parallel(false)
-				tween.tween_property(tile, "position", original_pos, 0.2)
-				tween.tween_property(tile, "rotation", 0.0, 0.1)
-				shuffle_tweens.append(tween)
-
-	# Wait for shuffle animation to complete
-	if shuffle_tweens.size() > 0:
-		await shuffle_tweens[0].finished
+	if tweens.size() > 0:
+		await _await_tweens_with_timeout(tweens, 2.0)
 	else:
-		await get_tree().create_timer(0.3).timeout
+		if get_tree() != null:
+			await get_tree().create_timer(0.06).timeout
 
-func find_special_tile_position_in_matches(matches: Array) -> Vector2:
-	"""Find if there's a T/L shape or 4+ line match in the matches, return the position for the special tile"""
-	if matches.size() < 4:
-		return Vector2(-1, -1)  # Need at least 4 tiles for a special tile
-
-	# First, check for T/L shapes (intersection of 3+ horizontal and 3+ vertical)
-	for test_pos in matches:
-		var matches_on_same_row = 0
-		var matches_on_same_col = 0
-
-		for match_pos in matches:
-			if match_pos.y == test_pos.y:
-				matches_on_same_row += 1
-			if match_pos.x == test_pos.x:
-				matches_on_same_col += 1
-
-		# Check for T/L shape (3+ in both directions)
-		if matches_on_same_row >= 3 and matches_on_same_col >= 3:
-			print("Found T/L shape at ", test_pos, " - Row: ", matches_on_same_row, " Col: ", matches_on_same_col)
-			return test_pos
-
-	# Check for 4+ in a line (horizontal or vertical)
-	# Group by rows
-	var rows_dict = {}
-	for match_pos in matches:
-		if not rows_dict.has(match_pos.y):
-			rows_dict[match_pos.y] = []
-		rows_dict[match_pos.y].append(match_pos)
-
-	for row_y in rows_dict:
-		var row_matches = rows_dict[row_y]
-		if row_matches.size() >= 4:
-			# Pick the middle tile from this row for the special tile
-			print("Found 4+ horizontal line at row ", row_y, " with ", row_matches.size(), " tiles")
-			var mid = int(row_matches.size() / 2)
-			return row_matches[mid]
-
-	# Group by columns
-	var cols_dict = {}
-	for match_pos in matches:
-		if not cols_dict.has(match_pos.x):
-			cols_dict[match_pos.x] = []
-		cols_dict[match_pos.x].append(match_pos)
-	for col_x in cols_dict:
-		var col_matches = cols_dict[col_x]
-		if col_matches.size() >= 4:
-			# Pick the middle tile from this column for the special tile
-			print("Found 4+ vertical line at col ", col_x, " with ", col_matches.size(), " tiles")
-			var midc = int(col_matches.size() / 2)
-			return col_matches[midc]
-	return Vector2(-1, -1)  # No special tile pattern found
-
-func highlight_matches(matches: Array):
-	var highlight_tweens = []
-	for match_pos in matches:
-		var tile = tiles[int(match_pos.x)][int(match_pos.y)]
-		if tile:
-			var tween = tile.animate_match_highlight()
-			if tween != null:
-				highlight_tweens.append(tween)
-
-	# Await all highlight tweens to finish
-	for tw in highlight_tweens:
-		if tw != null:
-			await tw.finished
-
-# ============================================
-# Booster Activation Functions
-# ============================================
-
-func activate_shuffle_booster():
-	"""Activate shuffle booster - reorganizes entire board"""
-	if not RewardManager.use_booster("shuffle"):
-		print("[GameBoard] No shuffle boosters available!")
+# Calculate responsive layout for the board and set tile_size and grid_offset
+func calculate_responsive_layout() -> void:
+	var viewport = get_viewport()
+	if not viewport:
 		return
-
-	print("[GameBoard] Activating shuffle booster")
-	GameManager.processing_moves = true
-
-	# Play shuffle booster sound
-	AudioManager.play_sfx("booster_shuffle")
-
-	# Shuffle until valid moves found
-	if GameManager.shuffle_until_moves_available():
-		await animate_shuffle()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] Shuffle booster complete")
-
-func activate_swap_booster(x1: int, y1: int, x2: int, y2: int):
-	"""Activate swap booster - swap any two tiles without adjacency requirement"""
-	if not RewardManager.use_booster("swap"):
-		print("[GameBoard] No swap boosters available!")
-		return
-
-	print("[GameBoard] Activating swap booster: (", x1, ",", y1, ") <-> (", x2, ",", y2, ")")
-	GameManager.processing_moves = true
-
-	# Play swap booster sound
-	AudioManager.play_sfx("booster_swap")
-
-	# Check valid tiles
-	if GameManager.is_cell_blocked(x1, y1) or GameManager.is_cell_blocked(x2, y2):
-		print("[GameBoard] Cannot swap blocked tiles!")
-		GameManager.processing_moves = false
-		return
-
-	# Get tile references
-	var tile1 = tiles[x1][y1]
-	var tile2 = tiles[x2][y2]
-
-	if not tile1 or not tile2:
-		print("[GameBoard] Invalid tiles for swap!")
-		GameManager.processing_moves = false
-		return
-
-	# Swap in GameManager grid
-	var temp = GameManager.grid[x1][y1]
-	GameManager.grid[x1][y1] = GameManager.grid[x2][y2]
-	GameManager.grid[x2][y2] = temp
-
-	# Animate swap
-	var pos1 = grid_to_world_position(Vector2(x1, y1))
-	var pos2 = grid_to_world_position(Vector2(x2, y2))
-
-	var tween1 = tile1.animate_swap_to(pos2)
-	var tween2 = tile2.animate_swap_to(pos1)
-
-	# Update grid references
-	tiles[x1][y1] = tile2
-	tiles[x2][y2] = tile1
-	tile1.grid_position = Vector2(x2, y2)
-	tile2.grid_position = Vector2(x1, y1)
-
-	# Update tile types
-	tile1.update_type(GameManager.grid[x2][y2])
-	tile2.update_type(GameManager.grid[x1][y1])
-
-	if tween1:
-		await tween1.finished
-	if tween2:
-		await tween2.finished
-
-	# Check for matches after swap
-	var matches = GameManager.find_matches()
-	if matches.size() > 0:
-		await process_cascade()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] Swap booster complete")
-
-func activate_chain_reaction_booster(x: int, y: int):
-	"""Activate chain reaction booster - spreading explosion from selected tile"""
-	if not RewardManager.use_booster("chain_reaction"):
-		print("[GameBoard] No chain reaction boosters available!")
-		return
-
-	print("[GameBoard] Activating chain reaction booster at (", x, ",", y, ")")
-	GameManager.processing_moves = true
-
-	# Play chain reaction booster sound
-	AudioManager.play_sfx("booster_chain")
-
-	if GameManager.is_cell_blocked(x, y):
-		print("[GameBoard] Cannot use chain reaction on blocked tile!")
-		GameManager.processing_moves = false
-		return
-
-	# Wave 1: Center tile
-	var wave1 = [Vector2(x, y)]
-	await highlight_special_activation(wave1)
-	await animate_destroy_tiles(wave1)
-	for pos in wave1:
-		GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-	await get_tree().create_timer(0.3).timeout
-
-	# Wave 2: Adjacent tiles (4 directions)
-	var wave2 = []
-	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
-	for dir in directions:
-		var nx = x + int(dir.x)
-		var ny = y + int(dir.y)
-		if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
-			if not GameManager.is_cell_blocked(nx, ny) and GameManager.grid[nx][ny] > 0:
-				wave2.append(Vector2(nx, ny))
-
-	# Declare wave3 here so it's in scope for the total calculation later
-	var wave3 = []
-
-	if wave2.size() > 0:
-		await highlight_special_activation(wave2)
-		await animate_destroy_tiles(wave2)
-		for pos in wave2:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-		await get_tree().create_timer(0.3).timeout
-
-		# Wave 3: Their adjacent tiles
-		for pos in wave2:
-			for dir in directions:
-				var nx = int(pos.x) + int(dir.x)
-				var ny = int(pos.y) + int(dir.y)
-				if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
-					if not GameManager.is_cell_blocked(nx, ny) and GameManager.grid[nx][ny] > 0:
-						var vec = Vector2(nx, ny)
-						if not wave3.has(vec):
-							wave3.append(vec)
-
-		if wave3.size() > 0:
-			await highlight_special_activation(wave3)
-			await animate_destroy_tiles(wave3)
-			for pos in wave3:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-	# Calculate total score
-	var total_destroyed = wave1.size() + wave2.size() + wave3.size()
-	var points = GameManager.calculate_points(total_destroyed)
-	GameManager.add_score(points)
-
-	await animate_gravity()
-	await animate_refill()
-	await process_cascade()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] Chain reaction booster complete - destroyed ", total_destroyed, " tiles")
-
-func activate_bomb_3x3_booster(x: int, y: int):
-	"""Activate 3x3 bomb booster - destroys 3x3 area around selected tile"""
-	if not RewardManager.use_booster("bomb_3x3"):
-		print("[GameBoard] No 3x3 bomb boosters available!")
-		return
-
-	print("[GameBoard] Activating 3x3 bomb booster at (", x, ",", y, ")")
-	GameManager.processing_moves = true
-
-	# Play 3x3 bomb sound
-	AudioManager.play_sfx("booster_bomb_3x3")
-
-	if GameManager.is_cell_blocked(x, y):
-		print("[GameBoard] Cannot use bomb on blocked tile!")
-		GameManager.processing_moves = false
-		return
-
-	# Collect 3x3 area
-	var positions_to_clear = []
-	for dx in range(-1, 2):
-		for dy in range(-1, 2):
-			var nx = x + dx
-			var ny = y + dy
-			if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
-				if not GameManager.is_cell_blocked(nx, ny):
-					positions_to_clear.append(Vector2(nx, ny))
-
-	print("[GameBoard] 3x3 Bomb will destroy ", positions_to_clear.size(), " tiles")
-
-	if positions_to_clear.size() > 0:
-		await highlight_special_activation(positions_to_clear)
-		await animate_destroy_tiles(positions_to_clear)
-
-		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
-
-		await animate_gravity()
-		await animate_refill()
-		await process_cascade()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] 3x3 bomb booster complete")
-
-func activate_line_blast_booster(direction: String, center_x: int, center_y: int):
-	"""Activate line blast booster - clears 3 rows or 3 columns"""
-	if not RewardManager.use_booster("line_blast"):
-		print("[GameBoard] No line blast boosters available!")
-		return
-
-	print("[GameBoard] Activating line blast booster: ", direction, " at (", center_x, ",", center_y, ")")
-	GameManager.processing_moves = true
-
-	# Play line blast sound
-	AudioManager.play_sfx("booster_line")
-
-	var positions_to_clear = []
-
-	if direction == "horizontal":
-		# Clear 3 rows centered on center_y
-		for row_offset in range(-1, 2):
-			var target_y = center_y + row_offset
-			if target_y >= 0 and target_y < GameManager.GRID_HEIGHT:
-				for x in range(GameManager.GRID_WIDTH):
-					if not GameManager.is_cell_blocked(x, target_y):
-						positions_to_clear.append(Vector2(x, target_y))
-
-	elif direction == "vertical":
-		# Clear 3 columns centered on center_x
-		for col_offset in range(-1, 2):
-			var target_x = center_x + col_offset
-			if target_x >= 0 and target_x < GameManager.GRID_WIDTH:
-				for y in range(GameManager.GRID_HEIGHT):
-					if not GameManager.is_cell_blocked(target_x, y):
-						positions_to_clear.append(Vector2(target_x, y))
-
-	print("[GameBoard] Line blast will destroy ", positions_to_clear.size(), " tiles")
-
-	if positions_to_clear.size() > 0:
-		# Create lightning beam effects for each row or column
-		if direction == "horizontal":
-			for row_offset in range(-1, 2):
-				var target_y = center_y + row_offset
-				if target_y >= 0 and target_y < GameManager.GRID_HEIGHT:
-					_create_lightning_beam_horizontal(target_y, Color(1.0, 0.9, 0.2))
-					await get_tree().create_timer(0.05).timeout
-		elif direction == "vertical":
-			for col_offset in range(-1, 2):
-				var target_x = center_x + col_offset
-				if target_x >= 0 and target_x < GameManager.GRID_WIDTH:
-					_create_lightning_beam_vertical(target_x, Color(0.4, 0.9, 1.0))
-					await get_tree().create_timer(0.05).timeout
-
-		await highlight_special_activation(positions_to_clear)
-		await animate_destroy_tiles(positions_to_clear)
-
-		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
-
-		await animate_gravity()
-		await animate_refill()
-		await process_cascade()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] Line blast booster complete")
-
-func activate_hammer_booster(x: int, y: int):
-	"""Activate hammer booster on a single tile"""
-	if not RewardManager.use_booster("hammer"):
-		print("[GameBoard] No hammer boosters available!")
-		return
-
-	print("[GameBoard] Activating hammer booster on tile (", x, ",", y, ")")
-	GameManager.processing_moves = true
-
-	# Play hammer sound
-	AudioManager.play_sfx("booster_hammer")
-
-	# Check if it's a valid tile (not blocked)
-	if GameManager.is_cell_blocked(x, y):
-		print("[GameBoard] Cannot use hammer on blocked tile!")
-		GameManager.processing_moves = false
-		return
-
-	var positions_to_clear = [Vector2(x, y)]
-
-	if positions_to_clear.size() > 0:
-		await highlight_special_activation(positions_to_clear)
-		await animate_destroy_tiles(positions_to_clear)
-
-		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
-
-		await animate_gravity()
-		await animate_refill()
-		await process_cascade()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] Hammer booster complete")
-
-func activate_tile_squasher_booster(x: int, y: int):
-	"""Activate tile squasher booster - removes all tiles of the same type as selected"""
-	if not RewardManager.use_booster("tile_squasher"):
-		print("[GameBoard] No tile squasher boosters available!")
-		return
-
-	print("[GameBoard] Activating tile squasher booster on tile (", x, ",", y, ")")
-	GameManager.processing_moves = true
-
-	# Play tile squasher sound
-	AudioManager.play_sfx("booster_tile_squasher")
-
-	# Check if it's a valid tile (not blocked)
-	if GameManager.is_cell_blocked(x, y):
-		print("[GameBoard] Cannot use tile squasher on blocked tile!")
-		GameManager.processing_moves = false
-		return
-
-	# Get the tile type at the selected position
-	var target_type = GameManager.get_tile_at(Vector2(x, y))
-
-	# Skip special tiles (types 7, 8, 9)
-	if target_type >= 7:
-		print("[GameBoard] Cannot use tile squasher on special tiles!")
-		GameManager.processing_moves = false
-		return
-
-	# Find all tiles of the same type
-	var positions_to_clear = []
-	for grid_x in range(GameManager.GRID_WIDTH):
-		for grid_y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(grid_x, grid_y):
-				var tile_type = GameManager.get_tile_at(Vector2(grid_x, grid_y))
-				if tile_type == target_type:
-					positions_to_clear.append(Vector2(grid_x, grid_y))
-
-	print("[GameBoard] Tile squasher will destroy ", positions_to_clear.size(), " tiles of type ", target_type)
-
-	if positions_to_clear.size() > 0:
-		await highlight_special_activation(positions_to_clear)
-		# Use animate_destroy_tiles for arbitrary positions (matches var was incorrect)
-		await animate_destroy_tiles(positions_to_clear)
-
-		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
-
-		await animate_gravity()
-		await animate_refill()
-		await process_cascade()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] Tile squasher booster complete")
-
-func activate_row_clear_booster(row: int):
-	"""Activate row clear booster on specified row"""
-	if not RewardManager.use_booster("row_clear"):
-		print("[GameBoard] No row clear boosters available!")
-		return
-
-	print("[GameBoard] Activating row clear booster on row ", row)
-	GameManager.processing_moves = true
-
-	# Play row clear sound
-	AudioManager.play_sfx("booster_row_clear")
-
-	var positions_to_clear = []
-	for x in range(GameManager.GRID_WIDTH):
-		if not GameManager.is_cell_blocked(x, row):
-			positions_to_clear.append(Vector2(x, row))
-
-	if positions_to_clear.size() > 0:
-		# Create lightning beam effect across the row
-		await _create_row_clear_effect(row)
-
-		await highlight_special_activation(positions_to_clear)
-		await animate_destroy_tiles(positions_to_clear)
-
-		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
-
-		await animate_gravity()
-		await animate_refill()
-		await process_cascade()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] Row clear booster complete")
-
-func activate_column_clear_booster(column: int):
-	"""Activate column clear booster on specified column"""
-	if not RewardManager.use_booster("column_clear"):
-		print("[GameBoard] No column clear boosters available!")
-		return
-
-	print("[GameBoard] Activating column clear booster on column ", column)
-	GameManager.processing_moves = true
-
-	# Play column clear sound
-	AudioManager.play_sfx("booster_column_clear")
-
-	var positions_to_clear = []
-	for y in range(GameManager.GRID_HEIGHT):
-		if not GameManager.is_cell_blocked(column, y):
-			positions_to_clear.append(Vector2(column, y))
-
-	if positions_to_clear.size() > 0:
-		# Create lightning beam effect down the column
-		await _create_column_clear_effect(column)
-
-		await highlight_special_activation(positions_to_clear)
-		await animate_destroy_tiles(positions_to_clear)
-
-		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
-
-		await animate_gravity()
-		await animate_refill()
-		await process_cascade()
-
-	GameManager.processing_moves = false
-	print("[GameBoard] Column clear booster complete")
-
-# Activate a special tile with visuals and chain activations
-func activate_special_tile(pos: Vector2):
-	print("activate_special_tile: start at ", pos)
-	var tile_type = GameManager.get_tile_at(pos)
-	print("Tile type at ", pos, " is ", tile_type)
-	GameManager.processing_moves = true
-	print("activate_special_tile: processing_moves = true")
-
-	# Play general special activation sound
-	AudioManager.play_sfx("special_activate")
-
-	# Collect positions to clear based on tile type
-	var positions_to_clear = []
-
-	if tile_type == GameManager.HORIZTONAL_ARROW:
-		AudioManager.play_sfx("special_horiz")
-		# Create horizontal lightning beam
-		print("[GameBoard] Creating lightning for horizontal arrow at row ", int(pos.y))
-		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.9, 0.3))
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
-
-		for x in range(GameManager.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
-
-	elif tile_type == GameManager.VERTICAL_ARROW:
-		AudioManager.play_sfx("special_vert")
-		# Create vertical lightning beam
-		print("[GameBoard] Creating lightning for vertical arrow at column ", int(pos.x))
-		_create_lightning_beam_vertical(int(pos.x), Color(0.4, 0.9, 1.0))
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
-
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(int(pos.x), y):
-				positions_to_clear.append(Vector2(pos.x, y))
-
-	elif tile_type == GameManager.FOUR_WAY_ARROW:
-		AudioManager.play_sfx("special_fourway")
-		# Create both horizontal and vertical lightning beams with slight delay
-		print("[GameBoard] Creating cross lightning for four-way arrow at ", pos)
-		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.5, 1.0))  # Magenta
-		await get_tree().create_timer(0.05).timeout
-		_create_lightning_beam_vertical(int(pos.x), Color(1.0, 0.5, 1.0))  # Magenta
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
-
-		for x in range(GameManager.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(int(pos.x), y):
-				if not positions_to_clear.has(Vector2(pos.x, y)):
-					positions_to_clear.append(Vector2(pos.x, y))
-
-	print("Clearing ", positions_to_clear.size(), " tiles")
-
-	# Check for other special tiles in the positions to clear (chain reaction)
-	var special_tiles_to_activate = []
-	for clear_pos in positions_to_clear:
-		if clear_pos == pos:
-			continue
-
-		var check_tile_type = GameManager.get_tile_at(clear_pos)
-		if check_tile_type >= 7 and check_tile_type <= 9:
-			special_tiles_to_activate.append({"pos": clear_pos, "type": check_tile_type})
-
-	# Highlight and destroy visually
-	await highlight_special_activation(positions_to_clear)
-	await animate_destroy_tiles(positions_to_clear)
-
-	# Clear tiles in GameManager grid
-	for clear_pos in positions_to_clear:
-		GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
-
-	# Use a move for activating special tile
-	if GameManager.has_method("use_move"):
-		GameManager.use_move()
-
-	# Add points for cleared tiles
-	var points = GameManager.calculate_points(positions_to_clear.size())
-	GameManager.add_score(points)
-
-	# Activate any special tiles that were hit (chain reaction)
-	if special_tiles_to_activate.size() > 0:
-		for special_tile_info in special_tiles_to_activate:
-			AudioManager.play_sfx("booster_chain")
-			await activate_special_tile_chain(special_tile_info["pos"], special_tile_info["type"])
-
-	# Apply gravity and refill AFTER all chain reactions
-	print("activate_special_tile: applying gravity")
-	await animate_gravity()
-	print("activate_special_tile: gravity complete")
-	await animate_refill()
-	print("activate_special_tile: refill complete")
-
-	# Check for cascade matches after refill
-	await process_cascade()
-
-	GameManager.processing_moves = false
-	print("activate_special_tile: processing_moves = false")
-
-# Activate special tile as part of a chain reaction
-func activate_special_tile_chain(pos: Vector2, tile_type: int):
-	print("Chain-activating special tile type ", tile_type, " at ", pos)
-
-	var positions_to_clear = []
-
-	if tile_type == GameManager.HORIZTONAL_ARROW:
-		AudioManager.play_sfx("special_horiz")
-		# Create horizontal lightning beam
-		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.9, 0.3))
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
-
-		for x in range(GameManager.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
-
-	elif tile_type == GameManager.VERTICAL_ARROW:
-		AudioManager.play_sfx("special_vert")
-		# Create vertical lightning beam
-		_create_lightning_beam_vertical(int(pos.x), Color(0.4, 0.9, 1.0))
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
-
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(int(pos.x), y):
-				positions_to_clear.append(Vector2(pos.x, y))
-
-	elif tile_type == GameManager.FOUR_WAY_ARROW:
-		AudioManager.play_sfx("special_fourway")
-		# Create both horizontal and vertical lightning beams with slight delay
-		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.5, 1.0))  # Magenta
-		await get_tree().create_timer(0.05).timeout
-		_create_lightning_beam_vertical(int(pos.x), Color(1.0, 0.5, 1.0))  # Magenta
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
-
-		for x in range(GameManager.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(int(pos.x), y):
-				if not positions_to_clear.has(Vector2(pos.x, y)):
-					positions_to_clear.append(Vector2(pos.x, y))
-
-	var special_tiles_to_activate = []
-	for clear_pos in positions_to_clear:
-		if clear_pos == pos:
-			continue
-
-		var check_tile_type = GameManager.get_tile_at(clear_pos)
-		if check_tile_type >= 7 and check_tile_type <= 9:
-			special_tiles_to_activate.append({"pos": clear_pos, "type": check_tile_type})
-
-	await highlight_special_activation(positions_to_clear)
-	await animate_destroy_tiles(positions_to_clear)
-
-	for clear_pos in positions_to_clear:
-		GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
-
-	var points = GameManager.calculate_points(positions_to_clear.size())
-	GameManager.add_score(points)
-
-	if special_tiles_to_activate.size() > 0:
-		for special_tile_info in special_tiles_to_activate:
-			await activate_special_tile_chain(special_tile_info["pos"], special_tile_info["type"])
-
-	return
-
-# Draw embossed borders around the active play area
-func draw_board_borders():
-	# Clear existing borders
-	if border_container:
-		for child in border_container.get_children():
+	var screen_size = viewport.get_visible_rect().size
+	# Reserve some UI space; these can be tuned later
+	var ui_top_space = 140.0
+	var ui_bottom_space = 100.0
+	var available_width = max(100.0, screen_size.x - 40.0)
+	var available_height = max(100.0, screen_size.y - ui_top_space - ui_bottom_space - 40.0)
+	# Use GameManager grid dimensions if available
+	var gw = 8
+	var gh = 8
+	if Engine.has_singleton("GameManager"):
+		# Try to read constants from GameManager if present (use typeof guard to avoid errors)
+		if typeof(GameManager.GRID_WIDTH) != TYPE_NIL:
+			gw = GameManager.GRID_WIDTH
+		if typeof(GameManager.GRID_HEIGHT) != TYPE_NIL:
+			gh = GameManager.GRID_HEIGHT
+	# Compute tile size to fit
+	var max_tile_w = available_width / float(gw)
+	var max_tile_h = available_height / float(gh)
+	tile_size = clamp(min(max_tile_w, max_tile_h), 40.0, 200.0)
+	# Center grid
+	var total_w = gw * tile_size
+	var total_h = gh * tile_size
+	grid_offset = Vector2((screen_size.x - total_w) / 2.0, ui_top_space + (available_height - total_h) / 2.0)
+	print("[GameBoard] calculate_responsive_layout -> tile_size:", tile_size, " grid_offset:", grid_offset)
+
+# Setup a simple background ColorRect (if not already present) and hide it if we prefer image backgrounds
+func setup_background() -> void:
+	# If a background node named 'BoardBackground' exists, reuse it
+	var bg = get_node_or_null("BoardBackground")
+	if not bg:
+		bg = ColorRect.new()
+		bg.name = "BoardBackground"
+		bg.color = Color(0, 0, 0, 0.35)
+		add_child(bg)
+		bg.z_index = -50
+	# Set size & position to cover computed board area
+	var board_w = GameManager.GRID_WIDTH * tile_size
+	var board_h = GameManager.GRID_HEIGHT * tile_size
+	bg.rect_position = Vector2(grid_offset.x - 10, grid_offset.y - 10)
+	bg.rect_size = Vector2(board_w + 20, board_h + 20)
+	bg.visible = true
+	print("[GameBoard] setup_background created/updated BoardBackground")
+
+# Create the visual tile grid based on GameManager.grid
+func create_visual_grid() -> void:
+	# Clear any existing tiles created by this board
+	for child in get_children():
+		if child and child != get_node_or_null("BoardBackground") and child.has_method("setup"):
 			child.queue_free()
+	# Reset tiles array
+	tiles.clear()
 
-	# Simply draw borders around each edge of active tiles
-	draw_simple_borders()
+	if not Engine.has_singleton("GameManager"):
+		print("[GameBoard] create_visual_grid: No GameManager singleton available")
+		return
+	# Validate grid
+	if GameManager == null or GameManager.grid == null:
+		print("[GameBoard] create_visual_grid: GameManager.grid not available")
+		return
 
-	print("[Border] Drew borders with ", border_container.get_child_count(), " elements")
-
-# Draw simple borders by checking each tile's edges
-func draw_simple_borders():
-	var corner_radius = BORDER_WIDTH * 6.0  # Large radius for very pronounced rounded corners
-
-	# For each active tile, check which edges need borders and draw them
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			if GameManager.is_cell_blocked(x, y):
+	var gw = GameManager.GRID_WIDTH
+	var gh = GameManager.GRID_HEIGHT
+	var scale_factor = tile_size / 64.0
+	var created = 0
+	for x in range(gw):
+		tiles.append([])
+		for y in range(gh):
+			var ttype = GameManager.get_tile_at(Vector2(x, y))
+			if ttype == -1:
+				tiles[x].append(null)
 				continue
-
-			# Calculate tile edges in world coordinates
-			var left = x * tile_size + grid_offset.x
-			var right = (x + 1) * tile_size + grid_offset.x
-			var top = y * tile_size + grid_offset.y
-			var bottom = (y + 1) * tile_size + grid_offset.y
-
-			# Check which edges need borders
-			var has_top = (y == 0 or GameManager.is_cell_blocked(x, y - 1))
-			var has_bottom = (y == GameManager.GRID_HEIGHT - 1 or GameManager.is_cell_blocked(x, y + 1))
-			var has_left = (x == 0 or GameManager.is_cell_blocked(x - 1, y))
-			var has_right = (x == GameManager.GRID_WIDTH - 1 or GameManager.is_cell_blocked(x + 1, y))
-
-			# Draw top border (shortened at corners)
-			if has_top:
-				var start_x = left + (corner_radius if has_left else 0)
-				var end_x = right - (corner_radius if has_right else 0)
-				if end_x > start_x:  # Only draw if there's space
-					draw_border_edge(Vector2(start_x, top), Vector2(end_x, top))
-
-			# Draw bottom border (shortened at corners)
-			if has_bottom:
-				var start_x = left + (corner_radius if has_left else 0)
-				var end_x = right - (corner_radius if has_right else 0)
-				if end_x > start_x:
-					draw_border_edge(Vector2(start_x, bottom), Vector2(end_x, bottom))
-
-			# Draw left border (shortened at corners)
-			if has_left:
-				var start_y = top + (corner_radius if has_top else 0)
-				var end_y = bottom - (corner_radius if has_bottom else 0)
-				if end_y > start_y:
-					draw_border_edge(Vector2(left, start_y), Vector2(left, end_y))
-
-			# Draw right border (shortened at corners)
-			if has_right:
-				var start_y = top + (corner_radius if has_top else 0)
-				var end_y = bottom - (corner_radius if has_bottom else 0)
-				if end_y > start_y:
-					draw_border_edge(Vector2(right, start_y), Vector2(right, end_y))
-
-			# Draw quarter-circle arcs at corners
-			if has_top and has_left:
-				draw_corner_arc(Vector2(left, top), "top_left", corner_radius)
-			if has_top and has_right:
-				draw_corner_arc(Vector2(right, top), "top_right", corner_radius)
-			if has_bottom and has_left:
-				draw_corner_arc(Vector2(left, bottom), "bottom_left", corner_radius)
-			if has_bottom and has_right:
-				draw_corner_arc(Vector2(right, bottom), "bottom_right", corner_radius)
-
-# Draw a single border edge
-func draw_border_edge(start: Vector2, end: Vector2):
-	var line = Line2D.new()
-	line.add_point(start)
-	line.add_point(end)
-	line.width = BORDER_WIDTH
-	line.default_color = border_color  # Use configurable color
-	line.antialiased = true
-	border_container.add_child(line)
-
-# Draw a quarter-circle arc at a corner
-func draw_corner_arc(corner_pos: Vector2, corner_type: String, radius: float):
-	var line = Line2D.new()
-	var num_segments = 8
-
-	# Determine the arc based on corner type
-	var start_angle = 0.0
-	var end_angle = 0.0
-
-	match corner_type:
-		"top_left":
-			# Arc from left side to top side
-			# Start at (corner_pos.x + radius, corner_pos.y) going to (corner_pos.x, corner_pos.y + radius)
-			# Center is at (corner_pos.x + radius, corner_pos.y + radius)
-			for i in range(num_segments + 1):
-				var t = float(i) / float(num_segments)
-				var angle = lerp(PI, PI * 1.5, t)  # 180° to 270°
-				var point = corner_pos + Vector2(radius, radius) + Vector2(cos(angle), sin(angle)) * radius
-				line.add_point(point)
-		"top_right":
-			# Arc from top side to right side
-			# Center is at (corner_pos.x - radius, corner_pos.y + radius)
-			for i in range(num_segments + 1):
-				var t = float(i) / float(num_segments)
-				var angle = lerp(PI * 1.5, PI * 2.0, t)  # 270° to 360°
-				var point = corner_pos + Vector2(-radius, radius) + Vector2(cos(angle), sin(angle)) * radius
-				line.add_point(point)
-		"bottom_left":
-			# Arc from bottom side to left side
-			# Center is at (corner_pos.x + radius, corner_pos.y - radius)
-			for i in range(num_segments + 1):
-				var t = float(i) / float(num_segments)
-				var angle = lerp(PI * 0.5, PI, t)  # 90° to 180°
-				var point = corner_pos + Vector2(radius, -radius) + Vector2(cos(angle), sin(angle)) * radius
-				line.add_point(point)
-		"bottom_right":
-			# Arc from right side to bottom side
-			# Center is at (corner_pos.x - radius, corner_pos.y - radius)
-			for i in range(num_segments + 1):
-				var t = float(i) / float(num_segments)
-				var angle = lerp(0.0, PI * 0.5, t)  # 0° to 90°
-				var point = corner_pos + Vector2(-radius, -radius) + Vector2(cos(angle), sin(angle)) * radius
-				line.add_point(point)
-
-	line.width = BORDER_WIDTH
-	line.default_color = border_color  # Use configurable color
-	line.antialiased = true
-	border_container.add_child(line)
+			var node = tile_scene.instantiate()
+			node.setup(ttype, Vector2(x, y), scale_factor)
+			node.position = grid_to_world_position(Vector2(x, y))
+			node.connect("tile_clicked", Callable(self, "_on_tile_clicked"))
+			node.connect("tile_swiped", Callable(self, "_on_tile_swiped"))
+			add_child(node)
+			node.z_index = 0
+			tiles[x].append(node)
+			created += 1
+	print("[GameBoard] create_visual_grid: created ", created, " tiles")

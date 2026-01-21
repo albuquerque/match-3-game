@@ -8,15 +8,15 @@
   "description": "Collect the coins!",
   "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
   "objectives": {
-	"score": 8000,
-	"collectibles": 10,
-	"clear_obstacles": false,
-	"transform_all": false
+    "score": 8000,
+    "collectibles": 10,
+    "clear_obstacles": false,
+    "transform_all": false
   },
   "collectibles": {
-	"enabled": true,
-	"types": ["coin"],
-	"required": 10,
-	"spawn_rate": 0.4
+    "enabled": true,
+    "types": ["coin"],
+    "required": 10,
+    "spawn_rate": 0.4
   }
 }

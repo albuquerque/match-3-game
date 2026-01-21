@@ -1,0 +1,10 @@
+{
+  "level": 16,
+  "width": 7,
+  "height": 7,
+  "target_score": 5270,
+  "moves": 45,
+  "description": "Can you beat this level?",
+  "theme": "retro",
+  "layout": "0 0 X 0 0 0 0\n0 0 0 0 0 0 0\n0 0 0 0 0 0 0\n0 0 0 X 0 0 0\n0 0 0 0 0 0 0\n0 0 0 0 0 X 0\n0 0 0 0 X 0 0"
+}

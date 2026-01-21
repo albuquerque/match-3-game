@@ -1,0 +1,17 @@
+{
+  "level": 53,
+  "width": 8,
+  "height": 8,
+  "target_score": 9000,
+  "moves": 25,
+  "theme": "modern",
+  "description": "Gravity reversed!",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "objectives": {
+    "score": 9000,
+    "collectibles": 0,
+    "clear_obstacles": false,
+    "transform_all": false
+  },
+  "gravity_direction": "up"
+}

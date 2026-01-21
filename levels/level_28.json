@@ -1,0 +1,10 @@
+{
+  "level": 28,
+  "width": 8,
+  "height": 7,
+  "target_score": 10954,
+  "moves": 39,
+  "description": "A tricky challenge awaits!",
+  "theme": "legacy",
+  "layout": "X 0 0 0 0 X X 0\n0 0 X 0 X 0 X X\n0 X X 0 0 X 0 0\nX X 0 0 X 0 X 0\n0 0 X X 0 0 0 X\nX X X 0 0 0 0 0\n0 X X 0 0 0 0 X"
+}

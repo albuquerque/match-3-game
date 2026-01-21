@@ -1,0 +1,10 @@
+{
+  "level": 36,
+  "width": 9,
+  "height": 10,
+  "target_score": 14762,
+  "moves": 31,
+  "description": "A puzzling challenge!",
+  "theme": "ocean",
+  "layout": "X 0 0 0 0 0 0 0 X\n0 X 0 0 0 0 0 X 0\n0 0 0 0 0 X 0 X 0\nX X 0 0 0 0 0 0 0\n0 X 0 0 0 X X 0 0\n0 X 0 X 0 0 0 X 0\n0 0 X 0 0 0 X 0 0\n0 X 0 0 0 0 0 X X\n0 X 0 X 0 0 0 0 0\nX 0 0 0 0 0 0 0 X"
+}

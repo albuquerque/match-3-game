@@ -1,0 +1,10 @@
+{
+  "level": 27,
+  "width": 7,
+  "height": 7,
+  "target_score": 9371,
+  "moves": 37,
+  "description": "Navigate the obstacles!",
+  "theme": "ocean",
+  "layout": "0 X X 0 X 0 X\nX X 0 X 0 0 0\n0 0 X 0 X X X\nX 0 X 0 0 0 X\nX X 0 0 X 0 X\nX X 0 0 X 0 0\nX X X 0 0 X X"
+}

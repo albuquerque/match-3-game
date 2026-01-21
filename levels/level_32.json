@@ -1,0 +1,10 @@
+{
+  "level": 32,
+  "width": 8,
+  "height": 9,
+  "target_score": 9848,
+  "moves": 32,
+  "description": "Can you beat this level?",
+  "theme": "ocean",
+  "layout": "X 0 X 0 0 X X X\n0 0 X X X 0 0 X\n0 0 0 X 0 0 X 0\nX 0 0 0 0 X 0 0\n0 X X X 0 0 X 0\nX 0 0 X 0 X 0 0\n0 0 X 0 X 0 0 0\nX 0 0 0 X X 0 0\n0 X X 0 0 0 X X"
+}

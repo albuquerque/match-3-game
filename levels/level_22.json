@@ -1,0 +1,10 @@
+{
+  "level": 22,
+  "width": 7,
+  "height": 9,
+  "target_score": 10449,
+  "moves": 36,
+  "description": "Match gems to reach the target!",
+  "theme": "retro",
+  "layout": "X X 0 X X 0 X\n0 0 0 0 0 X X\n0 0 X 0 0 X 0\n0 0 X X 0 X X\nX 0 X 0 X X 0\n0 X X X 0 0 X\nX 0 0 0 X X X\nX X X 0 X 0 0\nX 0 X X 0 0 0"
+}

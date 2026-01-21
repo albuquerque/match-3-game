@@ -1,0 +1,10 @@
+{
+  "level": 33,
+  "width": 8,
+  "height": 8,
+  "target_score": 9345,
+  "moves": 37,
+  "description": "Navigate the obstacles!",
+  "theme": "space",
+  "layout": "X X 0 X 0 0 X 0\n0 X 0 X 0 0 0 0\nX X 0 0 0 X X 0\n0 X 0 0 0 X 0 X\n0 X 0 0 0 0 0 X\n0 X 0 X X 0 X 0\n0 0 0 X 0 X 0 X\nX X X X 0 0 X 0"
+}

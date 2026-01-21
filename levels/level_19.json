@@ -1,0 +1,10 @@
+{
+  "level": 19,
+  "width": 8,
+  "height": 8,
+  "target_score": 7700,
+  "moves": 35,
+  "description": "Master this puzzle!",
+  "theme": "legacy",
+  "layout": "0 0 0 0 0 X 0 0\n0 X 0 X 0 0 0 0\n0 X 0 0 X 0 0 0\n0 0 0 0 X 0 0 0\nX 0 0 0 0 X 0 0\n0 0 0 0 0 0 0 0\nX 0 0 0 0 X 0 0\n0 0 0 0 X 0 0 0"
+}

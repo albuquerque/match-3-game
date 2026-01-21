@@ -30,8 +30,36 @@ func get_theme_name() -> String:
 	return current_theme
 
 func get_tile_texture_path(tile_type: int) -> String:
-	"""Get the texture path for a tile based on current theme"""
+	"""Get the texture path for a tile based on current theme. Handles special tile ids."""
 	var base_path = theme_paths[current_theme]
+
+	# Collectible
+	if tile_type == GameManager.COLLECTIBLE_TILE:
+		# coin asset for tiles
+		return base_path + "coin.svg"
+
+	# Obstacles
+	if tile_type >= GameManager.OBSTACLE_BASE and tile_type < GameManager.TRANSFORMABLE_BASE:
+		match tile_type:
+			GameManager.OBSTACLE_CRATE_SOFT:
+				return base_path + "obstacle_crate_soft.png"
+			GameManager.OBSTACLE_CRATE_HARD:
+				return base_path + "obstacle_crate_hard.png"
+			GameManager.OBSTACLE_ROCK_HARD:
+				return base_path + "obstacle_rock.png"
+			GameManager.OBSTACLE_ICE:
+				return base_path + "obstacle_ice.png"
+			GameManager.OBSTACLE_CHAINED:
+				return base_path + "obstacle_chained.png"
+			_:
+				return base_path + "obstacle_crate_soft.png"
+
+	# Transformables (use themed tile image prefix)
+	if tile_type >= GameManager.TRANSFORMABLE_BASE:
+		# For transformables we map to a generic themed tile image that the Tile will further customize
+		return base_path + "transformable_%d.png" % (tile_type - GameManager.TRANSFORMABLE_BASE)
+
+	# Default tile textures
 	return base_path + "tile_%d.png" % tile_type
 
 func get_current_theme_path() -> String:

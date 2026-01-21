@@ -1,0 +1,10 @@
+{
+  "level": 50,
+  "width": 8,
+  "height": 10,
+  "target_score": 13727,
+  "moves": 32,
+  "description": "Clear the board strategically!",
+  "theme": "retro",
+  "layout": "X 0 0 0 0 0 0 X\n0 X 0 X 0 0 0 0\n0 0 0 0 X 0 0 X\nX 0 X 0 0 X X 0\n0 0 X 0 X 0 X X\nX 0 X 0 X X 0 0\n0 0 X 0 0 X X X\n0 0 0 0 0 0 X X\n0 X X X 0 0 0 0\nX 0 0 0 0 0 0 X"
+}

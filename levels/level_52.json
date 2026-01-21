@@ -1,0 +1,24 @@
+{
+  "level": 52,
+  "width": 8,
+  "height": 8,
+  "target_score": 10000,
+  "moves": 30,
+  "theme": "legacy",
+  "description": "Break through the crates!",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "objectives": {
+    "score": 10000,
+    "collectibles": 0,
+    "clear_obstacles": true,
+    "transform_all": false
+  },
+  "obstacles": [
+    {"type": "crate_soft", "position": [2, 3], "hits": 1},
+    {"type": "crate_soft", "position": [5, 3], "hits": 1},
+    {"type": "rock_hard", "position": [3, 4], "hits": 3},
+    {"type": "rock_hard", "position": [4, 4], "hits": 3},
+    {"type": "crate_soft", "position": [2, 5], "hits": 1},
+    {"type": "crate_soft", "position": [5, 5], "hits": 1}
+  ]
+}

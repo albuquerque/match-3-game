@@ -95,9 +95,8 @@ func load_level_from_json(file_path: String) -> LevelData:
 		return null
 
 	var data = json.get_data()
-	var layout_lines = data["layout"].split("\n")
 
-	# Parse the layout correctly: each line is a Y row, we need to convert to [x][y] format
+	# Parse layout - handle both string and array formats
 	var width = data["width"]
 	var height = data["height"]
 	var grid_layout = []
@@ -108,22 +107,45 @@ func load_level_from_json(file_path: String) -> LevelData:
 		for y in range(height):
 			grid_layout[x].append(0)
 
-	# Parse each line (Y row) and fill the grid
-	for y in range(min(layout_lines.size(), height)):
-		var line = layout_lines[y].strip_edges()
-		var cells = line.split(" ")
+	# Check layout format
+	var layout_data = data["layout"]
+	if typeof(layout_data) == TYPE_STRING:
+		# Old format: single string with newlines and spaces
+		# Example: "X 0 0 0\n0 0 0 0\n0 0 0 0"
+		var layout_lines = layout_data.split("\n")
+		for y in range(min(layout_lines.size(), height)):
+			var line = layout_lines[y].strip_edges()
+			var cells = line.split(" ")
 
-		for x in range(min(cells.size(), width)):
-			var cell_value = cells[x].strip_edges()
+			for x in range(min(cells.size(), width)):
+				var cell_value = cells[x].strip_edges()
 
-			if cell_value == "X" or cell_value == "x":
-				grid_layout[x][y] = -1  # Blocked cell
-			elif cell_value == "." or cell_value == "_":
-				grid_layout[x][y] = 0  # Empty cell
-			elif cell_value.is_valid_int():
-				grid_layout[x][y] = int(cell_value)
-			else:
-				grid_layout[x][y] = 0  # Default to empty
+				if cell_value == "X" or cell_value == "x":
+					grid_layout[x][y] = -1  # Blocked cell
+				elif cell_value == "." or cell_value == "_":
+					grid_layout[x][y] = 0  # Empty cell
+				elif cell_value.is_valid_int():
+					grid_layout[x][y] = int(cell_value)
+				else:
+					grid_layout[x][y] = 0  # Default to empty
+
+	elif typeof(layout_data) == TYPE_ARRAY:
+		# New format: array of strings without spaces
+		# Example: ["X000", "0000", "0000"]
+		for y in range(min(layout_data.size(), height)):
+			var row_str = layout_data[y]
+
+			for x in range(min(row_str.length(), width)):
+				var cell_char = row_str[x]
+
+				if cell_char == "X" or cell_char == "x":
+					grid_layout[x][y] = -1  # Blocked cell
+				elif cell_char == "." or cell_char == "_":
+					grid_layout[x][y] = 0  # Empty cell
+				elif cell_char.is_valid_int():
+					grid_layout[x][y] = int(cell_char)
+				else:
+					grid_layout[x][y] = 0  # Default to empty
 
 	# Extract theme if present
 	var theme = data.get("theme", "")

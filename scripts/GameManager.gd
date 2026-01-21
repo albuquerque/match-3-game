@@ -16,6 +16,20 @@ const HORIZTONAL_ARROW = 7
 const VERTICAL_ARROW = 8
 const FOUR_WAY_ARROW = 9
 
+# Special tile type IDs (non-matchable special tiles)
+const COLLECTIBLE_TILE = 99
+
+# Obstacle tile IDs (reserve 200-299)
+const OBSTACLE_BASE = 200
+const OBSTACLE_CRATE_SOFT = OBSTACLE_BASE + 1
+const OBSTACLE_CRATE_HARD = OBSTACLE_BASE + 2
+const OBSTACLE_ROCK_HARD = OBSTACLE_BASE + 3
+const OBSTACLE_ICE = OBSTACLE_BASE + 4
+const OBSTACLE_CHAINED = OBSTACLE_BASE + 5
+
+# Transformable tile base (300-399)
+const TRANSFORMABLE_BASE = 300
+
 # Scoring
 const POINTS_PER_TILE = 100
 const COMBO_MULTIPLIER = 1.5
@@ -73,6 +87,39 @@ const TIER_WEIGHTS = {
 	"uncommon": 0.30,    # 30% chance
 	"rare": 0.10         # 10% chance
 }
+
+# Advanced mechanics - Collectibles
+var collectibles_enabled: bool = false
+var collectibles_required: int = 0
+var collectibles_collected: int = 0
+var collectible_types: Array = ["coin"]  # Array of collectible type strings
+var collectibles_spawn_rate: float = 0.3
+# Collectibles are now represented as special Tile entries (GameManager.COLLECTIBLE_TILE) in the grid
+
+# Advanced mechanics - Obstacles
+var obstacles_enabled: bool = false
+var active_obstacles: Array = []  # Array of obstacle configuration dictionaries for GameBoard to spawn
+var obstacles_must_clear_all: bool = false
+
+# Advanced mechanics - Transformables
+var transformables_enabled: bool = false
+var transformable_type: String = "flower"
+var transformable_states: int = 2
+var transformable_positions: Array = []  # Array of Vector2 positions
+var transformables_must_transform_all: bool = false
+
+# Advanced mechanics - Gravity
+var gravity_direction: String = "down"  # "down", "up", "left", "right"
+
+# Helper methods for special tile types
+func is_collectible_tile(tile_type: int) -> bool:
+	return tile_type == COLLECTIBLE_TILE
+
+func is_obstacle_tile(tile_type: int) -> bool:
+	return tile_type >= OBSTACLE_BASE and tile_type < TRANSFORMABLE_BASE
+
+func is_transformable_tile(tile_type: int) -> bool:
+	return tile_type >= TRANSFORMABLE_BASE
 
 func _ready():
 	print("[GameManager] _ready() - initializing")
@@ -165,6 +212,9 @@ func load_current_level():
 
 		create_empty_grid()
 		fill_grid_from_layout(level_data.grid_layout)
+
+		# Load advanced mechanics from level JSON file
+		load_advanced_mechanics(level_data.level_number)
 
 		print("Loaded level ", level, ": ", level_data.description)
 		print("Grid size: ", GRID_WIDTH, "x", GRID_HEIGHT)
@@ -267,6 +317,86 @@ func select_level_boosters():
 	print("[GameManager] Final booster selection for level %d: " % level, available_boosters)
 
 	return available_boosters
+
+func load_advanced_mechanics(level_num: int):
+	"""Load advanced mechanics configuration from level JSON file"""
+	# Reset all advanced mechanics
+	collectibles_enabled = false
+	collectibles_required = 0
+	collectibles_collected = 0
+
+	obstacles_enabled = false
+	active_obstacles.clear()
+	obstacles_must_clear_all = false
+
+	transformables_enabled = false
+	transformable_positions.clear()
+	transformables_must_transform_all = false
+
+	gravity_direction = "down"
+
+	# Load the JSON file to get advanced mechanics data
+	var file_path = "res://levels/level_%02d.json" % level_num
+	var file = FileAccess.open(file_path, FileAccess.READ)
+	if not file:
+		# No advanced mechanics if file doesn't exist
+		return
+
+	var json_text = file.get_as_text()
+	file.close()
+
+	var json = JSON.new()
+	var error = json.parse(json_text)
+	if error != OK:
+		print("[GameManager] Failed to parse JSON for advanced mechanics")
+		return
+
+	var data = json.get_data()
+
+	# Load collectibles configuration
+	if data.has("collectibles") and data.collectibles != null:
+		var coll_config = data.collectibles
+		if coll_config.get("enabled", false):
+			collectibles_enabled = true
+			collectibles_required = coll_config.get("required", 10)
+			collectible_types = coll_config.get("types", ["coin"])
+			collectibles_spawn_rate = coll_config.get("spawn_rate", 0.3)
+			print("[GameManager] Collectibles enabled: types=%s, required=%d, spawn_rate=%.2f" % [collectible_types, collectibles_required, collectibles_spawn_rate])
+
+	# Load obstacles configuration
+	if data.has("obstacles") and data.obstacles != null:
+		var obstacles_config = data.obstacles
+		if typeof(obstacles_config) == TYPE_ARRAY and obstacles_config.size() > 0:
+			obstacles_enabled = true
+			# Store obstacle configurations for GameBoard to spawn
+			active_obstacles = obstacles_config.duplicate()
+			print("[GameManager] Obstacles enabled: %d obstacles to create" % obstacles_config.size())
+
+	# Load transformables configuration
+	if data.has("transformables") and data.transformables != null:
+		var trans_config = data.transformables
+		if trans_config.get("enabled", false):
+			transformables_enabled = true
+			transformable_type = trans_config.get("type", "flower")
+			transformable_states = trans_config.get("states", ["bud", "bloom"]).size()
+			transformable_positions.clear()
+			var positions = trans_config.get("positions", [])
+			for pos_array in positions:
+				if typeof(pos_array) == TYPE_ARRAY and pos_array.size() >= 2:
+					transformable_positions.append(Vector2(pos_array[0], pos_array[1]))
+			print("[GameManager] Transformables enabled: type=%s, positions=%d" % [transformable_type, transformable_positions.size()])
+
+	# Load gravity direction
+	if data.has("gravity_direction"):
+		gravity_direction = data.gravity_direction
+		if gravity_direction != "down":
+			print("[GameManager] Reverse gravity enabled: direction=%s" % gravity_direction)
+
+	# Load objectives
+	if data.has("objectives") and data.objectives != null:
+		var objectives = data.objectives
+		obstacles_must_clear_all = objectives.get("clear_obstacles", false)
+		transformables_must_transform_all = objectives.get("transform_all", false)
 
 func create_empty_grid():
 	grid.clear()
@@ -601,6 +731,34 @@ func apply_gravity() -> bool:
 				col.append(grid[x][y])
 			print("col[", x, "] = ", col)
 
+	# Apply gravity based on direction
+	match gravity_direction:
+		"down":
+			moved = apply_gravity_down()
+		"up":
+			moved = apply_gravity_up()
+		"left":
+			moved = apply_gravity_left()
+		"right":
+			moved = apply_gravity_right()
+		_:
+			moved = apply_gravity_down()
+
+	if DEBUG_LOGGING:
+		print("apply_gravity: END — grid snapshot after gravity:")
+		for x in range(GRID_WIDTH):
+			var col = []
+			for y in range(GRID_HEIGHT):
+				col.append(grid[x][y])
+			print("col[", x, "] = ", col)
+		print("apply_gravity: moved = ", moved)
+
+	return moved
+
+func apply_gravity_down() -> bool:
+	"""Standard downward gravity"""
+	var moved = false
+
 	for x in range(GRID_WIDTH):
 		# Start from the bottom and work upward
 		var write_pos = GRID_HEIGHT - 1
@@ -633,14 +791,121 @@ func apply_gravity() -> bool:
 				while write_pos >= 0 and is_cell_blocked(x, write_pos):
 					write_pos -= 1
 
-	if DEBUG_LOGGING:
-		print("apply_gravity: END — grid snapshot after gravity:")
-		for x in range(GRID_WIDTH):
-			var col = []
-			for y in range(GRID_HEIGHT):
-				col.append(grid[x][y])
-			print("col[", x, "] = ", col)
-		print("apply_gravity: moved = ", moved)
+	return moved
+
+func apply_gravity_up() -> bool:
+	"""Upward gravity (tiles fall up)"""
+	var moved = false
+
+	for x in range(GRID_WIDTH):
+		# Start from the top and work downward
+		var write_pos = 0
+
+		# Find the highest available (non-blocked) position
+		while write_pos < GRID_HEIGHT and is_cell_blocked(x, write_pos):
+			write_pos += 1
+
+		if write_pos >= GRID_HEIGHT:
+			continue  # Entire column blocked
+
+		# Scan from top to bottom, moving tiles up to fill gaps
+		for read_pos in range(0, GRID_HEIGHT):
+			# Skip blocked cells
+			if is_cell_blocked(x, read_pos):
+				continue
+
+			# If we find a tile
+			var tile = grid[x][read_pos]
+			if tile > 0:
+				if read_pos != write_pos:
+					grid[x][write_pos] = tile
+					grid[x][read_pos] = 0
+					moved = true
+
+				# Move write position down for next tile
+				write_pos += 1
+
+				# Skip any blocked cells in write position
+				while write_pos < GRID_HEIGHT and is_cell_blocked(x, write_pos):
+					write_pos += 1
+
+	return moved
+
+func apply_gravity_left() -> bool:
+	"""Leftward gravity (tiles fall left)"""
+	var moved = false
+
+	for y in range(GRID_HEIGHT):
+		# Start from the left and work rightward
+		var write_pos = 0
+
+		# Find the leftmost available (non-blocked) position
+		while write_pos < GRID_WIDTH and is_cell_blocked(write_pos, y):
+			write_pos += 1
+
+		if write_pos >= GRID_WIDTH:
+			continue  # Entire row blocked
+
+		# Scan from left to right, moving tiles left to fill gaps
+		for read_pos in range(0, GRID_WIDTH):
+			# Skip blocked cells
+			if is_cell_blocked(read_pos, y):
+				continue
+
+			# If we find a tile
+			var tile = grid[read_pos][y]
+			if tile > 0:
+				if read_pos != write_pos:
+					grid[write_pos][y] = tile
+					grid[read_pos][y] = 0
+					moved = true
+
+				# Move write position right for next tile
+				write_pos += 1
+
+				# Skip any blocked cells in write position
+				while write_pos < GRID_WIDTH and is_cell_blocked(write_pos, y):
+					write_pos += 1
+
+	return moved
+
+func apply_gravity_right() -> bool:
+	"""Rightward gravity (tiles fall right)"""
+	var moved = false
+
+	for y in range(GRID_HEIGHT):
+		# Start from the right and work leftward
+		var write_pos = GRID_WIDTH - 1
+
+		# Find the rightmost available (non-blocked) position
+		while write_pos >= 0 and is_cell_blocked(write_pos, y):
+			write_pos -= 1
+
+		if write_pos < 0:
+			continue  # Entire row blocked
+
+		# Scan from right to left, moving tiles right to fill gaps
+		# Scan from right to left, moving tiles right to fill gaps
+		for read_pos in range(GRID_WIDTH - 1, -1, -1):
+			# Skip blocked cells
+			if is_cell_blocked(read_pos, y):
+				continue
+
+			# If we find a tile
+			var tile = grid[read_pos][y]
+			if tile > 0:
+				if read_pos != write_pos:
+					grid[write_pos][y] = tile
+					grid[read_pos][y] = 0
+					moved = true
+
+				# Move write position left for next tile
+				write_pos -= 1
+
+				# Skip any blocked cells in write position
+				while write_pos >= 0 and is_cell_blocked(write_pos, y):
+					write_pos -= 1
+
 
 	return moved
 
@@ -662,11 +927,11 @@ func add_score(points: int):
 	score += points
 	emit_signal("score_changed", score)
 
-	# If a failure was pending but the score reached the target during a cascade, cancel failure
-	if score >= target_score and pending_level_failed:
+	# If a failure was pending but all win conditions are met during a cascade, cancel failure
+	if check_win_condition() and pending_level_failed:
 		pending_level_failed = false
 
-	if score >= target_score and not level_transitioning:
+	if check_win_condition() and not level_transitioning:
 		# Store level completion state
 		last_level_won = true
 		last_level_score = score
@@ -692,7 +957,7 @@ func use_move():
 
 	print("[GameManager] use_move() called - moves_left now=", moves_left, ", score=", score, ", target=", target_score)
 
-	if moves_left <= 0 and score < target_score and not level_transitioning:
+	if moves_left <= 0 and not check_win_condition() and not level_transitioning:
 		# Instead of immediately failing, mark a pending failure and wait for cascades to finish
 		pending_level_failed = true
 		print("[GameManager] pending_level_failed set = true")
@@ -822,6 +1087,47 @@ func would_create_match_after_swap(pos1: Vector2, pos2: Vector2) -> bool:
 
 	return has_match
 
+func check_win_condition() -> bool:
+	"""Check if all level objectives are completed"""
+	# First check if score target is reached
+	if score < target_score:
+		return false
+
+	# Check collectible objectives
+	if collectibles_enabled and collectibles_required > 0:
+		if collectibles_collected < collectibles_required:
+			print("[GameManager] Win condition not met: Collectibles %d/%d" % [collectibles_collected, collectibles_required])
+			return false
+
+	# Check obstacle objectives
+	if obstacles_enabled and obstacles_must_clear_all:
+		var obstacles_remaining = 0
+		# Count remaining obstacles by checking GameBoard's active obstacles
+		var game_board = get_node_or_null("/root/MainGame/GameBoard")
+		if game_board and "active_obstacles" in game_board:
+			obstacles_remaining = game_board.active_obstacles.size()
+
+		if obstacles_remaining > 0:
+			print("[GameManager] Win condition not met: %d obstacles remaining" % obstacles_remaining)
+			return false
+
+	# Check transformable objectives
+	if transformables_enabled and transformables_must_transform_all:
+		var untransformed = 0
+		# Count untransformed items by checking GameBoard's active transformables
+		var game_board = get_node_or_null("/root/MainGame/GameBoard")
+		if game_board and "active_transformables" in game_board:
+			for transformable in game_board.active_transformables:
+				if transformable.has_method("is_fully_transformed") and not transformable.is_fully_transformed():
+					untransformed += 1
+
+		if untransformed > 0:
+			print("[GameManager] Win condition not met: %d transformables not completed" % untransformed)
+			return false
+
+	print("[GameManager] ✓ All win conditions met!")
+	return true
+
 func _attempt_level_complete():
 	# Wait until no board activity (swaps/cascades/refills) are in progress
 	# If another transition is already in progress, cancel
@@ -854,7 +1160,7 @@ func _attempt_level_failed():
 	while processing_moves:
 		await get_tree().create_timer(0.1).timeout
 		# If level completed while waiting, cancel failure
-		if score >= target_score or level_transitioning:
+		if check_win_condition() or level_transitioning:
 			pending_level_failed = false
 			return
 
@@ -862,8 +1168,8 @@ func _attempt_level_failed():
 	if get_tree() != null:
 		await get_tree().create_timer(0.2).timeout
 
-	# If the score reached target during the wait, cancel failure
-	if score >= target_score:
+	# If the win condition is met during the wait, cancel failure
+	if check_win_condition():
 		pending_level_failed = false
 		# Trigger completion flow
 		if not level_transitioning:
@@ -1116,3 +1422,33 @@ func calculate_stars(final_score: int, target: int) -> int:
 	else:
 		# Below target = 0 stars (shouldn't happen as level completes when target reached)
 		return 1
+
+# Watchdog for stuck processing_moves
+var processing_moves_start_ms: int = 0
+const PROCESSING_MOVES_TIMEOUT_MS: int = 12000  # 12s
+
+func _process(delta):
+	# Monitor processing_moves and set/reset start timestamp
+	if processing_moves and processing_moves_start_ms == 0:
+		# Use Time.get_ticks_msec() (engine tick ms) instead of OS.get_unix_time_msec()
+		processing_moves_start_ms = Time.get_ticks_msec()
+	elif not processing_moves and processing_moves_start_ms != 0:
+		processing_moves_start_ms = 0
+
+	# If stuck too long, force-reset and log details
+	if processing_moves and processing_moves_start_ms != 0:
+		var elapsed = Time.get_ticks_msec() - processing_moves_start_ms
+		if elapsed > PROCESSING_MOVES_TIMEOUT_MS:
+			print("[GameManager][WATCHDOG] processing_moves stuck for ", elapsed, "ms. Forcing reset.")
+			# Attempt a safe reset: clear flag and notify UI/Board
+			processing_moves = false
+			processing_moves_start_ms = 0
+			# Reset combo to a safe state
+			combo_count = 0
+			# Notify main UI/board to re-sync
+			var board = get_node_or_null("/root/MainGame/GameBoard")
+			if board and board.has_method("create_visual_grid"):
+				print("[GameManager][WATCHDOG] Recreating visual grid to recover from stuck state")
+				board.create_visual_grid()
+			# Also emit a debug signal so UI can show an error message if needed
+			emit_signal("game_over")

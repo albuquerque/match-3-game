@@ -1,0 +1,10 @@
+{
+  "level": 23,
+  "width": 7,
+  "height": 7,
+  "target_score": 11522,
+  "moves": 36,
+  "description": "Match gems to reach the target!",
+  "theme": "ocean",
+  "layout": "X 0 X X X 0 X\nX X 0 0 X 0 0\n0 0 0 0 X X 0\n0 X 0 0 X 0 X\n0 0 X X X 0 0\n0 X 0 0 X 0 0\nX 0 0 X X X X"
+}

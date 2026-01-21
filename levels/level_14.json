@@ -1,0 +1,10 @@
+{
+  "level": 14,
+  "width": 6,
+  "height": 8,
+  "target_score": 5854,
+  "moves": 39,
+  "description": "Reach the goal efficiently!",
+  "theme": "ocean",
+  "layout": "0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 X X 0 0 0\n0 0 0 0 0 0"
+}

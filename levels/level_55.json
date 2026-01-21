@@ -1,0 +1,28 @@
+{
+  "level": 55,
+  "width": 8,
+  "height": 8,
+  "target_score": 12000,
+  "moves": 35,
+  "theme": "modern",
+  "description": "Ultimate Challenge!",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 X X 0 X X 0\n0 0 0 X X X 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 X X X 0 0\n0 0 X X 0 X X 0\n0 0 0 0 0 0 0 0",
+  "objectives": {
+    "score": 12000,
+    "collectibles": 5,
+    "clear_obstacles": true,
+    "transform_all": false
+  },
+  "collectibles": {
+    "enabled": true,
+    "types": ["coin"],
+    "required": 5,
+    "spawn_rate": 0.3
+  },
+  "obstacles": [
+    {"type": "crate_soft", "position": [0, 2], "hits": 1},
+    {"type": "rock_hard", "position": [3, 3], "hits": 3},
+    {"type": "rock_hard", "position": [4, 3], "hits": 3},
+    {"type": "crate_soft", "position": [7, 2], "hits": 1}
+  ]
+}

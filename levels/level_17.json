@@ -1,0 +1,10 @@
+{
+  "level": 17,
+  "width": 7,
+  "height": 7,
+  "target_score": 7486,
+  "moves": 39,
+  "description": "Reach the goal efficiently!",
+  "theme": "modern",
+  "layout": "0 0 0 0 0 0 0\n0 0 X 0 X 0 0\n0 0 0 0 0 0 X\n0 0 0 0 0 0 0\n0 0 0 0 0 0 X\n0 0 0 0 0 0 0\n0 0 X 0 0 0 X"
+}
