@@ -3,12 +3,27 @@ class_name Tile
 
 signal tile_clicked(tile)
 signal tile_swiped(tile, direction)
+signal collectible_collected(tile, collectible_type)
+signal unmovable_destroyed(tile)
 
 var tile_type: int = 0
 var grid_position: Vector2 = Vector2.ZERO
 var is_selected: bool = false
 var is_falling: bool = false
 var tile_scale: float = 1.0  # Dynamic scale factor
+
+# New mechanics properties (do NOT create new classes; keep on Tile)
+var is_collectible: bool = false
+var collectible_type: String = ""
+var collectible_collected_flag: bool = false
+
+var is_unmovable: bool = false
+var unmovable_hits: int = 0  # number of hits required to destroy
+var unmovable_max_hits: int = 0  # saved for visuals
+
+# Rope/chain anchor (optional) - if set, this tile will move toward anchor when released
+var rope_anchor: Vector2 = Vector2(-1, -1)
+var rope_attached: bool = false
 
 # Swipe detection variables
 var swipe_start_pos: Vector2 = Vector2.ZERO
@@ -74,7 +89,7 @@ func update_visual():
 		call_deferred("update_visual")
 		return
 
-	if tile_type <= 0:
+	if tile_type <= 0 and not is_collectible and not is_unmovable:
 		visible = false
 		return
 
@@ -85,6 +100,32 @@ func update_visual():
 	var theme_manager = get_node_or_null("/root/ThemeManager")
 	if theme_manager:
 		texture_path = theme_manager.get_tile_texture_path(tile_type)
+
+	# If this tile is marked as a collectible, prefer collectible texture
+	if is_collectible:
+		var theme_name = "legacy"
+		if theme_manager and theme_manager.has_method("get_theme_name"):
+			theme_name = theme_manager.get_theme_name()
+
+		# Try SVG first, then PNG
+		var coll_path = "res://textures/%s/%s.svg" % [theme_name, collectible_type]
+		if not ResourceLoader.exists(coll_path):
+			coll_path = "res://textures/%s/%s.png" % [theme_name, collectible_type]
+		if not ResourceLoader.exists(coll_path):
+			# Fallback to root textures folder
+			coll_path = "res://textures/%s.svg" % collectible_type
+		if not ResourceLoader.exists(coll_path):
+			coll_path = "res://textures/%s.png" % collectible_type
+
+		if ResourceLoader.exists(coll_path):
+			texture_path = coll_path
+			print("[Tile] Using collectible texture: ", texture_path)
+
+	# For unmovable tiles, allow special texture based on hits left
+	if is_unmovable and unmovable_max_hits > 0:
+		var um_path = "res://textures/unmovable_hits_%d.png" % unmovable_hits
+		if ResourceLoader.exists(um_path):
+			texture_path = um_path
 
 	if ResourceLoader.exists(texture_path):
 		var texture = load(texture_path)
@@ -124,10 +165,73 @@ func update_visual():
 		# Apply rounded corner shader
 		apply_rounded_corner_shader()
 
+	# Visual hint for selection ring
 	if selection_ring and not selection_ring.texture:
 		var ring_texture = create_ring_texture()
 		selection_ring.texture = ring_texture
 		selection_ring.scale = Vector2(tile_scale, tile_scale)
+
+	# Additional visual indicators for collectible or unmovable
+	if is_collectible:
+		# Slight tint to indicate collectible
+		sprite.modulate = Color(1, 0.95, 0.7)
+	elif is_unmovable:
+		# Show a greyed/tough look depending on remaining hits
+		var strength = clamp(float(unmovable_hits) / max(float(unmovable_max_hits), 1.0), 0.0, 1.0)
+		sprite.modulate = Color(0.9 - 0.3 * (1.0 - strength), 0.9 - 0.3 * (1.0 - strength), 1.0 - 0.4 * (1.0 - strength))
+
+# New helper methods for mechanics (no new classes)
+func configure_collectible(c_type: String) -> void:
+	is_collectible = true
+	collectible_type = c_type
+	collectible_collected_flag = false
+	# update visual immediately
+	update_visual()
+
+func configure_unmovable(hits: int) -> void:
+	is_unmovable = true
+	unmovable_hits = hits
+	unmovable_max_hits = hits
+	update_visual()
+
+func take_hit(amount: int = 1) -> bool:
+	"""Apply a hit to unmovable tile. Returns true if destroyed."""
+	if not is_unmovable:
+		return false
+	unmovable_hits = max(0, unmovable_hits - amount)
+	update_visual()
+	if unmovable_hits <= 0:
+		is_unmovable = false
+		unmovable_max_hits = 0
+		emit_signal("unmovable_destroyed", self)
+		return true
+	return false
+
+func mark_collected() -> void:
+	if not is_collectible or collectible_collected_flag:
+		return
+	collectible_collected_flag = true
+	is_collectible = false
+	# Play collection effect
+	_create_collection_particles()
+	emit_signal("collectible_collected", self, collectible_type)
+	# update visual so it won't render as collectible
+	update_visual()
+
+func _create_collection_particles():
+	# small visual feedback for collectible collection
+	var p = CPUParticles2D.new()
+	p.amount = 12
+	p.one_shot = true
+	p.lifetime = 0.8
+	p.speed_scale = 1.4
+	p.gravity = Vector2(0, 200)
+	p.scale_amount_min = 0.8
+	p.scale_amount_max = 1.6
+	p.color = Color(1, 0.9, 0.5)
+	add_child(p)
+	p.emitting = true
+	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
 
 func update_type(new_type: int):
 	"""Update the tile to a new type and refresh its visual appearance"""

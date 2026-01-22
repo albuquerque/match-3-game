@@ -1,0 +1,14 @@
+{
+  "level_number": 53,
+  "title": "Level 53",
+  "description": "Collect 1 coin!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 18250,
+  "max_moves": 51,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "X X X X C X X X\nX X X X 0 X X X\nX X X X 0 X X X\nX X X X 0 X X X\n0 0 0 0 0 0 0 0\nX X X X 0 X X X\nX X X X 0 X X X\nX X X X 0 X X X",
+  "collectible_target": 1,
+  "collectible_type": "coin"
+}

@@ -10,8 +10,10 @@ class LevelData:
 	var moves: int
 	var description: String
 	var theme: String = ""  # Theme name for this level
+	var collectible_target: int = 0  # Number of collectibles to collect (0 = score-based level)
+	var collectible_type: String = "coin"  # Type of collectible (coin, gem, star, etc.)
 
-	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = ""):
+	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = "", coll_target: int = 0, coll_type: String = "coin"):
 		level_number = num
 		grid_layout = layout
 		width = w
@@ -20,6 +22,8 @@ class LevelData:
 		moves = mv
 		description = desc
 		theme = thm
+		collectible_target = coll_target
+		collectible_type = coll_type
 
 var levels: Array[LevelData] = []
 var current_level_index: int = 0
@@ -45,7 +49,8 @@ func load_all_levels():
 			var level_data = load_level_from_json(file_path)
 			if level_data:
 				levels.append(level_data)
-				print("[LevelManager] Loaded level ", level_data.level_number, ": '", level_data.description, "' (theme: ", level_data.theme, ", target: ", level_data.target_score, ")")
+				var level_type = "COLLECTIBLE (%d coins)" % level_data.collectible_target if level_data.collectible_target > 0 else "SCORE"
+				print("[LevelManager] Loaded level ", level_data.level_number, ": '", level_data.description, "' (theme: ", level_data.theme, ", target: ", level_data.target_score, ", type: ", level_type, ")")
 			else:
 				print("[LevelManager] ERROR: Failed to load level from ", file_path)
 	else:
@@ -95,48 +100,24 @@ func load_level_from_json(file_path: String) -> LevelData:
 		return null
 
 	var data = json.get_data()
-	var layout_lines = data["layout"].split("\n")
 
-	# Parse the layout correctly: each line is a Y row, we need to convert to [x][y] format
-	var width = data["width"]
-	var height = data["height"]
-	var grid_layout = []
+	# Use the generic parser that supports string/array/flat formats
+	var width = data.get("grid_width", data.get("width", 8))
+	var height = data.get("grid_height", data.get("height", 8))
+	var parsed = parse_layout(data.get("layout", ""), width, height)
 
-	# Initialize the grid with proper dimensions [x][y]
-	for x in range(width):
-		grid_layout.append([])
-		for y in range(height):
-			grid_layout[x].append(0)
-
-	# Parse each line (Y row) and fill the grid
-	for y in range(min(layout_lines.size(), height)):
-		var line = layout_lines[y].strip_edges()
-		var cells = line.split(" ")
-
-		for x in range(min(cells.size(), width)):
-			var cell_value = cells[x].strip_edges()
-
-			if cell_value == "X" or cell_value == "x":
-				grid_layout[x][y] = -1  # Blocked cell
-			elif cell_value == "." or cell_value == "_":
-				grid_layout[x][y] = 0  # Empty cell
-			elif cell_value.is_valid_int():
-				grid_layout[x][y] = int(cell_value)
-			else:
-				grid_layout[x][y] = 0  # Default to empty
-
-	# Extract theme if present
-	var theme = data.get("theme", "")
-
+	# Build LevelData with parsed layout (parsed may contain ints or single-char strings)
 	return LevelData.new(
-		data["level"],
-		grid_layout,
-		data["width"],
-		data["height"],
-		data["target_score"],
-		data["moves"],
-		data["description"],
-		theme
+		data.get("level_number", data.get("level", 0)),
+		parsed,
+		width,
+		height,
+		data.get("target_score", data.get("target", data.get("target_score", 1000))),
+		data.get("max_moves", data.get("moves", 20)),
+		data.get("description", ""),
+		data.get("theme", ""),
+		data.get("collectible_target", 0),  # Load collectible target from JSON
+		data.get("collectible_type", "coin")  # Load collectible type from JSON (default: coin)
 	)
 
 func parse_layout(layout_data, width: int, height: int) -> Array:
@@ -158,9 +139,16 @@ func parse_layout(layout_data, width: int, height: int) -> Array:
 	return []
 
 func parse_string_layout(layout_str: String, width: int, height: int) -> Array:
-	"""Parse layout from string format"""
+	"""Parse layout from string format. Supports compact no-separator strings and newline/space separated formats."""
 	var parsed = []
 	var lines = layout_str.strip_edges().split("\n")
+
+	# Normalize lines: if the entire layout is one long string equal to width*height, split into rows
+	if lines.size() == 1 and lines[0].length() == width * height:
+		var compact = lines[0]
+		lines = []
+		for r in range(height):
+			lines.append(compact.substr(r * width, width))
 
 	for x in range(width):
 		parsed.append([])
@@ -169,23 +157,33 @@ func parse_string_layout(layout_str: String, width: int, height: int) -> Array:
 
 	for y in range(min(lines.size(), height)):
 		var line = lines[y].strip_edges()
-		# Support both space and comma separation
+		# If line contains separators, split by comma or space
 		var values = []
 		if "," in line:
 			values = line.split(",")
-		else:
+		elif " " in line:
 			values = line.split(" ")
+		else:
+			# No separators - treat each character as a cell token
+			values = []
+			for i in range(min(line.length(), width)):
+				values.append(line.substr(i, 1))
 
 		for x in range(min(values.size(), width)):
 			var val_str = values[x].strip_edges()
+			# Recognize blocked or empty markers and integers; otherwise store token as-is
 			if val_str == "X" or val_str == "x":
-				parsed[x][y] = -1  # Blocked cell
+				parsed[x][y] = -1
 			elif val_str == "." or val_str == "_":
-				parsed[x][y] = 0  # Empty cell
+				parsed[x][y] = 0
 			elif val_str.is_valid_int():
 				parsed[x][y] = int(val_str)
 			else:
-				parsed[x][y] = 0
+				# Keep single-character tokens like 'C','U','H' as strings
+				if val_str.length() == 1:
+					parsed[x][y] = val_str
+				else:
+					parsed[x][y] = 0
 
 	return parsed
 

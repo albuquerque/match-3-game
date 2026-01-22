@@ -363,11 +363,54 @@ func create_visual_grid():
 			tile.connect("tile_clicked", _on_tile_clicked)
 			tile.connect("tile_swiped", _on_tile_swiped)
 
+			# Check if this is a collectible tile (type 10)
+			if tile_type == GameManager.COLLECTIBLE:
+				if tile.has_method("configure_collectible"):
+					tile.configure_collectible(GameManager.collectible_type)
+					print("[GameBoard] Configured tile at (", x, ",", y, ") as collectible: ", GameManager.collectible_type)
+
 			add_child(tile)
 			tiles[x].append(tile)
 			tiles_created += 1
 
 	print("[GameBoard] Created ", tiles_created, " tiles on the board")
+
+# Collectible spawning and handling
+func spawn_collectible_visual(x: int, y: int, coll_type: String = "coin"):
+	"""Spawn a visual collectible at the given grid position"""
+	if x < 0 or x >= GameManager.GRID_WIDTH or y < 0 or y >= GameManager.GRID_HEIGHT:
+		return
+
+	# Check if there's already a tile at this position
+	var existing_tile = tiles[x][y] if x < tiles.size() and y < tiles[x].size() else null
+	if existing_tile:
+		# Configure existing tile as collectible
+		if existing_tile.has_method("configure_collectible"):
+			existing_tile.configure_collectible(coll_type)
+			print("[GameBoard] Configured existing tile at (", x, ",", y, ") as collectible:", coll_type)
+	else:
+		# Create new collectible tile
+		var scale_factor = tile_size / 64.0
+		var tile = tile_scene.instantiate()
+		tile.setup(0, Vector2(x, y), scale_factor)  # Use type 0 for collectible
+		tile.position = grid_to_world_position(Vector2(x, y))
+		tile.connect("tile_clicked", _on_tile_clicked)
+		tile.connect("tile_swiped", _on_tile_swiped)
+
+		# Configure as collectible
+		if tile.has_method("configure_collectible"):
+			tile.configure_collectible(coll_type)
+
+		add_child(tile)
+
+		# Update tiles array
+		while tiles.size() <= x:
+			tiles.append([])
+		while tiles[x].size() <= y:
+			tiles[x].append(null)
+		tiles[x][y] = tile
+
+		print("[GameBoard] Spawned new collectible at (", x, ",", y, ") type:", coll_type)
 
 # Helper: visually highlight positions for special activations (single flash)
 func highlight_special_activation(positions: Array):
@@ -614,7 +657,131 @@ func animate_gravity():
 	else:
 		if get_tree() != null:
 			await get_tree().create_timer(0.01).timeout
+
+	# Check if any collectibles reached the bottom row
+	_check_collectibles_at_bottom()
+
 	print("animate_gravity: done")
+
+func _check_collectibles_at_bottom():
+	"""Check if any collectibles have reached the bottom row and collect them"""
+	var bottom_row = GameManager.GRID_HEIGHT - 1
+	var collectibles_to_remove = []
+
+	for x in range(GameManager.GRID_WIDTH):
+		if GameManager.is_cell_blocked(x, bottom_row):
+			continue
+
+		var tile = tiles[x][bottom_row]
+		if tile and tile.is_collectible and not tile.collectible_collected_flag:
+			print("[GameBoard] Collectible reached bottom at (", x, ",", bottom_row, ")")
+			collectibles_to_remove.append({"tile": tile, "pos": Vector2(x, bottom_row)})
+
+	# If no collectibles to collect, return immediately
+	if collectibles_to_remove.size() == 0:
+		return
+
+	# Collect each collectible with animation
+	for item in collectibles_to_remove:
+		var tile = item["tile"]
+		var pos = item["pos"]
+
+		# Store collectible type before we potentially free the tile
+		var collectible_type = tile.collectible_type if tile else "coin"
+
+		# Mark as collected
+		if tile and tile.has_method("mark_collected"):
+			tile.mark_collected()
+
+		# Play collection sound
+		if AudioManager and AudioManager.has_method("play_sfx"):
+			AudioManager.play_sfx("coin_collect")
+
+		# Create collection particles
+		var particles = CPUParticles2D.new()
+		particles.name = "CollectionParticles"
+		particles.position = tile.position if tile else grid_to_world_position(pos)
+		particles.emitting = true
+		particles.one_shot = true
+		particles.amount = 30
+		particles.lifetime = 0.8
+		particles.explosiveness = 1.0
+
+		# Star burst effect
+		particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+		particles.emission_sphere_radius = 10.0
+		particles.direction = Vector2(0, -1)
+		particles.spread = 180
+		particles.gravity = Vector2(0, 200)
+		particles.initial_velocity_min = 100.0
+		particles.initial_velocity_max = 250.0
+		particles.scale_amount_min = 2.0
+		particles.scale_amount_max = 4.0
+
+		# Golden color
+		var gradient = Gradient.new()
+		gradient.add_point(0.0, Color(1.0, 0.9, 0.2, 1))
+		gradient.add_point(0.5, Color(1.0, 0.8, 0.0, 1))
+		gradient.add_point(1.0, Color(1, 1, 1, 0))
+		particles.color_ramp = gradient
+
+		add_child(particles)
+
+		# Animate tile flying to UI (top-right corner where collectible counter would be)
+		if tile and is_instance_valid(tile):
+			var viewport = get_viewport()
+			var screen_size = viewport.get_visible_rect().size if viewport else Vector2(720, 1280)
+			var target_pos = Vector2(screen_size.x - 100, 100)  # Top-right corner
+
+			var tween = create_tween()
+			tween.set_parallel(true)
+			# Fly to target with bounce
+			tween.tween_property(tile, "global_position", target_pos, 0.6).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BACK)
+			tween.tween_property(tile, "scale", Vector2(0.5, 0.5), 0.6)
+			tween.tween_property(tile, "modulate:a", 0.0, 0.4).set_delay(0.2)
+
+			# Cleanup particles after animation
+			get_tree().create_timer(1.0).timeout.connect(particles.queue_free)
+
+			await tween.finished
+		else:
+			# If tile was already freed, just wait a bit for particles
+			await get_tree().create_timer(0.6).timeout
+			particles.queue_free()
+
+		# Remove from grid immediately
+		tiles[int(pos.x)][int(pos.y)] = null
+		GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		# Only free the tile if it's still valid (might have been freed elsewhere)
+		if tile and is_instance_valid(tile):
+			tile.queue_free()
+		else:
+			print("[GameBoard] Tile already freed at (", pos.x, ",", pos.y, ")")
+
+		# Notify GameManager (without waiting for its gravity)
+		if GameManager.has_method("collectible_landed_at"):
+			# Don't await - we'll handle gravity ourselves
+			GameManager.collectible_landed_at(pos, collectible_type)
+
+		print("[GameBoard] Collected collectible with animation")
+
+	# After all collectibles are collected, apply gravity and refill immediately
+	# BUT: If level completion is pending, skip this to avoid race conditions
+	if GameManager.pending_level_complete or GameManager.level_transitioning:
+		print("[GameBoard] Level completion pending/transitioning - skipping post-collection cascade")
+		return
+
+	print("[GameBoard] Applying gravity after collectible collection")
+	await animate_gravity()
+	await animate_refill()
+
+	# Check for new matches after refill
+	var new_matches = GameManager.find_matches()
+	if new_matches.size() > 0:
+		await process_cascade()
+
+
 
 func animate_refill():
 	var new_tile_positions = GameManager.fill_empty_spaces()
@@ -625,7 +792,21 @@ func animate_refill():
 			if tiles[int(pos.x)][int(pos.y)] == null:
 				var tile = tile_scene.instantiate()
 				var tile_type = GameManager.get_tile_at(pos)
-				tile.setup(tile_type, pos, scale_factor)
+
+				# Check if this is a collectible tile
+				var is_collectible = (tile_type == GameManager.COLLECTIBLE)
+
+				if is_collectible:
+					# Setup as collectible - use type 0 for visual (collectibles don't match)
+					tile.setup(0, pos, scale_factor)
+					# Configure as collectible after setup
+					if tile.has_method("configure_collectible"):
+						tile.configure_collectible(GameManager.collectible_type)
+						print("[GameBoard] Spawned collectible at (", pos.x, ",", pos.y, ") type: ", GameManager.collectible_type)
+				else:
+					# Regular tile setup
+					tile.setup(tile_type, pos, scale_factor)
+
 				tile.position = grid_to_world_position(Vector2(pos.x, -1))
 				tile.connect("tile_clicked", _on_tile_clicked)
 				tile.connect("tile_swiped", _on_tile_swiped)
@@ -641,7 +822,20 @@ func animate_refill():
 				if tiles[x][y] == null:
 					var tile = tile_scene.instantiate()
 					var ttype = GameManager.grid[x][y]
-					tile.setup(ttype, Vector2(x, y), scale_factor)
+
+					# Check if this is a collectible tile
+					var is_collectible = (ttype == GameManager.COLLECTIBLE)
+
+					if is_collectible:
+						# Setup as collectible
+						tile.setup(0, Vector2(x, y), scale_factor)
+						if tile.has_method("configure_collectible"):
+							tile.configure_collectible(GameManager.collectible_type)
+							print("[GameBoard] Spawned collectible at (", x, ",", y, ") type: ", GameManager.collectible_type)
+					else:
+						# Regular tile
+						tile.setup(ttype, Vector2(x, y), scale_factor)
+
 					tile.position = grid_to_world_position(Vector2(x, -1))
 					tile.connect("tile_clicked", _on_tile_clicked)
 					tile.connect("tile_swiped", _on_tile_swiped)
@@ -1012,6 +1206,13 @@ func _on_level_loaded():
 	# Recreate the visual grid for the new level
 	create_visual_grid()
 	draw_board_borders()
+
+
+func _spawn_level_collectibles():
+	"""Deferred call to spawn collectibles after grid is ready"""
+	if GameManager.has_method("spawn_collectibles_for_targets"):
+		GameManager.spawn_collectibles_for_targets()
+		print("[GameBoard] Spawned collectibles for level")
 
 func grid_to_world_position(grid_pos: Vector2) -> Vector2:
 	return Vector2(
@@ -2006,7 +2207,10 @@ func activate_special_tile(pos: Vector2):
 
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
+				var tile_at_pos = GameManager.get_tile_at(Vector2(x, pos.y))
+				# Skip collectibles - they should not be destroyed by special tiles
+				if tile_at_pos != GameManager.COLLECTIBLE:
+					positions_to_clear.append(Vector2(x, pos.y))
 
 	elif tile_type == GameManager.VERTICAL_ARROW:
 		AudioManager.play_sfx("special_vert")
@@ -2017,7 +2221,10 @@ func activate_special_tile(pos: Vector2):
 
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
-				positions_to_clear.append(Vector2(pos.x, y))
+				var tile_at_pos = GameManager.get_tile_at(Vector2(pos.x, y))
+				# Skip collectibles - they should not be destroyed by special tiles
+				if tile_at_pos != GameManager.COLLECTIBLE:
+					positions_to_clear.append(Vector2(pos.x, y))
 
 	elif tile_type == GameManager.FOUR_WAY_ARROW:
 		AudioManager.play_sfx("special_fourway")
@@ -2030,11 +2237,17 @@ func activate_special_tile(pos: Vector2):
 
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
+				var tile_at_pos = GameManager.get_tile_at(Vector2(x, pos.y))
+				# Skip collectibles - they should not be destroyed by special tiles
+				if tile_at_pos != GameManager.COLLECTIBLE:
+					positions_to_clear.append(Vector2(x, pos.y))
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
-				if not positions_to_clear.has(Vector2(pos.x, y)):
-					positions_to_clear.append(Vector2(pos.x, y))
+				var tile_at_pos = GameManager.get_tile_at(Vector2(pos.x, y))
+				# Skip collectibles - they should not be destroyed by special tiles
+				if tile_at_pos != GameManager.COLLECTIBLE:
+					if not positions_to_clear.has(Vector2(pos.x, y)):
+						positions_to_clear.append(Vector2(pos.x, y))
 
 	print("Clearing ", positions_to_clear.size(), " tiles")
 
@@ -2097,7 +2310,10 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
+				var tile_at_pos = GameManager.get_tile_at(Vector2(x, pos.y))
+				# Skip collectibles - they should not be destroyed by special tiles
+				if tile_at_pos != GameManager.COLLECTIBLE:
+					positions_to_clear.append(Vector2(x, pos.y))
 
 	elif tile_type == GameManager.VERTICAL_ARROW:
 		AudioManager.play_sfx("special_vert")
@@ -2107,7 +2323,10 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
-				positions_to_clear.append(Vector2(pos.x, y))
+				var tile_at_pos = GameManager.get_tile_at(Vector2(pos.x, y))
+				# Skip collectibles - they should not be destroyed by special tiles
+				if tile_at_pos != GameManager.COLLECTIBLE:
+					positions_to_clear.append(Vector2(pos.x, y))
 
 	elif tile_type == GameManager.FOUR_WAY_ARROW:
 		AudioManager.play_sfx("special_fourway")
@@ -2119,11 +2338,17 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				positions_to_clear.append(Vector2(x, pos.y))
+				var tile_at_pos = GameManager.get_tile_at(Vector2(x, pos.y))
+				# Skip collectibles - they should not be destroyed by special tiles
+				if tile_at_pos != GameManager.COLLECTIBLE:
+					positions_to_clear.append(Vector2(x, pos.y))
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
-				if not positions_to_clear.has(Vector2(pos.x, y)):
-					positions_to_clear.append(Vector2(pos.x, y))
+				var tile_at_pos = GameManager.get_tile_at(Vector2(pos.x, y))
+				# Skip collectibles - they should not be destroyed by special tiles
+				if tile_at_pos != GameManager.COLLECTIBLE:
+					if not positions_to_clear.has(Vector2(pos.x, y)):
+						positions_to_clear.append(Vector2(pos.x, y))
 
 	var special_tiles_to_activate = []
 	for clear_pos in positions_to_clear:

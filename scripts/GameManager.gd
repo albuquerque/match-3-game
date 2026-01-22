@@ -6,6 +6,7 @@ signal moves_changed(moves_left)
 signal game_over
 signal level_complete
 signal level_loaded
+signal collectibles_changed(collected, target)
 
 # Game configuration
 var GRID_WIDTH = 8
@@ -15,6 +16,7 @@ const MIN_MATCH_SIZE = 3
 const HORIZTONAL_ARROW = 7
 const VERTICAL_ARROW = 8
 const FOUR_WAY_ARROW = 9
+const COLLECTIBLE = 10  # Special type for collectibles - won't match with regular tiles
 
 # Scoring
 const POINTS_PER_TILE = 100
@@ -28,6 +30,11 @@ var target_score = 10000
 var grid = []
 var combo_count = 0
 var processing_moves = false
+
+# Collectible tracking
+var collectibles_collected = 0
+var collectible_target = 0  # 0 = score-based level, >0 = collectible-based level
+var collectible_type: String = "coin"  # Type of collectible for current level
 
 # Level system
 var level_manager: Node = null
@@ -59,6 +66,10 @@ var initialized = false
 
 # Booster selection system
 var available_boosters: Array = []  # Boosters available for current level
+
+# Collectibles & special layout markers
+var collectible_positions: Array = []
+var unmovable_map: Dictionary = {}
 
 # Booster tier definitions (for random selection)
 const BOOSTER_TIERS = {
@@ -149,6 +160,16 @@ func load_current_level():
 		target_score = level_data.target_score
 		moves_left = level_data.moves
 		level = level_data.level_number
+
+		# Load collectible target (0 = score-based level)
+		collectible_target = level_data.collectible_target if "collectible_target" in level_data else 0
+		collectible_type = level_data.collectible_type if "collectible_type" in level_data else "coin"
+		collectibles_collected = 0
+		if collectible_target > 0:
+			print("[GameManager]   collectible_target=", collectible_target, " (collectible-based level)")
+			print("[GameManager]   collectible_type='", collectible_type, "'")
+		else:
+			print("[GameManager]   Score-based level (no collectible target)")
 
 		# Set theme if specified in level data
 		if theme_manager:
@@ -276,21 +297,53 @@ func create_empty_grid():
 			grid[x].append(0)
 
 func fill_grid_from_layout(layout: Array):
-	"""Fill the grid based on level layout (-1 = blocked, 0 = random tile)"""
+	"""Fill the grid based on level layout. Supports layout entries as ints (-1,0,N) or single-char tokens like 'C','U','H'."""
+	# Clear helper structures
+	collectible_positions.clear()
+	unmovable_map.clear()
+
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
 			var cell_value = layout[x][y]
 
+			# Normalize string tokens if present
+			if typeof(cell_value) == TYPE_STRING:
+				# Single-char tokens expected
+				var token = cell_value
+				if token == "X" or token == "x":
+					grid[x][y] = -1
+					continue
+				elif token == "0":
+					grid[x][y] = 0
+					continue
+				elif token == "C":
+					# Collectible: spawn as special type that won't match with regular tiles
+					grid[x][y] = COLLECTIBLE
+					collectible_positions.append(Vector2(x, y))
+					continue
+				elif token == "U":
+					# Unmovable soft (2 hits)
+					grid[x][y] = 0
+					unmovable_map[str(x) + "," + str(y)] = 2
+					continue
+				elif token == "H":
+					# Unmovable hard (4 hits)
+					grid[x][y] = 0
+					unmovable_map[str(x) + "," + str(y)] = 4
+					continue
+
+			# Handle numeric / existing values
 			if cell_value == -1:
-				# Blocked cell - stays as -1
 				grid[x][y] = -1
 			elif cell_value == 0:
 				# Empty - fill with random tile
 				var tile_type = get_safe_random_tile(x, y)
 				grid[x][y] = tile_type
 			else:
-				# Specific tile type
-				grid[x][y] = cell_value
+				# Specific tile type number
+				grid[x][y] = int(cell_value)
+
+	print("[GameManager] fill_grid_from_layout: collected collectible_positions size=", collectible_positions.size(), ", unmovable_map size=", unmovable_map.size())
 
 func fill_initial_grid():
 	"""Legacy method for backward compatibility"""
@@ -653,8 +706,30 @@ func fill_empty_spaces() -> Array:
 				continue  # Skip blocked cells
 
 			if grid[x][y] == 0:
-				grid[x][y] = randi_range(1, TILE_TYPES)
-				new_tiles.append(Vector2(x, y))
+				# Check if this position should spawn a collectible
+				var should_spawn_collectible = false
+
+				# For collectible levels, check if we haven't reached the target yet
+				if collectible_target > 0 and collectibles_collected < collectible_target:
+					# Check if there's a collectible position marker in this column that needs spawning
+					for cpos in collectible_positions:
+						if int(cpos.x) == x:
+							# Spawn collectible in this column from the top
+							# Use a spawn rate to control frequency
+							var spawn_chance = 0.3  # 30% chance per empty cell in marked column
+							if randf() < spawn_chance:
+								should_spawn_collectible = true
+								print("[GameManager] Spawning collectible at (", x, ",", y, ") - column marked for collectibles")
+								break
+
+				if should_spawn_collectible:
+					# Spawn as collectible type
+					grid[x][y] = COLLECTIBLE
+					new_tiles.append(Vector2(x, y))
+				else:
+					# Spawn as regular tile
+					grid[x][y] = randi_range(1, TILE_TYPES)
+					new_tiles.append(Vector2(x, y))
 
 	return new_tiles
 
@@ -662,11 +737,21 @@ func add_score(points: int):
 	score += points
 	emit_signal("score_changed", score)
 
+	# For collectible-based levels, score doesn't trigger completion - only collecting all collectibles does
+	if collectible_target > 0:
+		print("[GameManager] 🪙 COLLECTIBLE LEVEL - Score: %d/%d, Collectibles: %d/%d - Score won't trigger completion" % [score, target_score, collectibles_collected, collectible_target])
+		return
+
+	# For score-based levels, proceed with normal score-based completion
+	print("[GameManager] 📊 SCORE LEVEL - Score: %d/%d" % [score, target_score])
+
 	# If a failure was pending but the score reached the target during a cascade, cancel failure
 	if score >= target_score and pending_level_failed:
+		print("[GameManager] ✓ Score reached target during cascade - cancelling pending failure")
 		pending_level_failed = false
 
 	if score >= target_score and not level_transitioning:
+		print("[GameManager] 🎯 TARGET SCORE REACHED - Triggering level completion")
 		# Store level completion state
 		last_level_won = true
 		last_level_score = score
@@ -677,12 +762,16 @@ func add_score(points: int):
 		# Mark that a level completion should occur, but defer until board activity stops
 		if not pending_level_complete:
 			pending_level_complete = true
+			print("[GameManager] → Setting pending_level_complete = true, calling _attempt_level_complete()")
 			# Start the coroutine that will wait for ongoing activity to finish before advancing
 			_attempt_level_complete()
 
 func advance_level():
 	# Called when level is complete - just trigger the level complete flow
 	# The level will be advanced later when user clicks Continue on the transition screen
+	print("[GameManager] 🎬 advance_level() called")
+	print("[GameManager] → Level type: %s" % ("COLLECTIBLE" if collectible_target > 0 else "SCORE"))
+	print("[GameManager] → Collectibles: %d/%d, Score: %d/%d" % [collectibles_collected, collectible_target, score, target_score])
 	combo_count = 0
 	on_level_complete()
 
@@ -692,11 +781,25 @@ func use_move():
 
 	print("[GameManager] use_move() called - moves_left now=", moves_left, ", score=", score, ", target=", target_score)
 
-	if moves_left <= 0 and score < target_score and not level_transitioning:
+	# Determine if level is failed based on level type
+	var level_failed = false
+
+	if collectible_target > 0:
+		# Collectible-based level: fail if collectibles not collected and out of moves
+		if moves_left <= 0 and collectibles_collected < collectible_target:
+			level_failed = true
+			print("[GameManager] Collectible level failed: ", collectibles_collected, "/", collectible_target, " collected")
+	else:
+		# Score-based level: fail if score not reached and out of moves
+		if moves_left <= 0 and score < target_score:
+			level_failed = true
+			print("[GameManager] Score level failed: ", score, "/", target_score, " points")
+
+	if level_failed and not level_transitioning:
 		# Instead of immediately failing, mark a pending failure and wait for cascades to finish
 		pending_level_failed = true
 		print("[GameManager] pending_level_failed set = true")
-		# Store level failure state snapshot (may be updated if score reaches target during cascade)
+		# Store level failure state snapshot (may be updated if goal reached during cascade)
 		last_level_won = false
 		last_level_score = score
 		last_level_target = target_score
@@ -853,8 +956,14 @@ func _attempt_level_failed():
 	# Wait until board activity completes
 	while processing_moves:
 		await get_tree().create_timer(0.1).timeout
-		# If level completed while waiting, cancel failure
-		if score >= target_score or level_transitioning:
+		# Check if level completed while waiting based on level type
+		var goal_met = false
+		if collectible_target > 0:
+			goal_met = collectibles_collected >= collectible_target
+		else:
+			goal_met = score >= target_score
+
+		if goal_met or level_transitioning:
 			pending_level_failed = false
 			return
 
@@ -862,8 +971,14 @@ func _attempt_level_failed():
 	if get_tree() != null:
 		await get_tree().create_timer(0.2).timeout
 
-	# If the score reached target during the wait, cancel failure
-	if score >= target_score:
+	# Check if the goal was reached during the wait, cancel failure
+	var goal_met = false
+	if collectible_target > 0:
+		goal_met = collectibles_collected >= collectible_target
+	else:
+		goal_met = score >= target_score
+
+	if goal_met:
 		pending_level_failed = false
 		# Trigger completion flow
 		if not level_transitioning:
@@ -908,7 +1023,12 @@ func on_level_failed():
 	level_transitioning = false
 
 func on_level_complete():
+	print("[GameManager] 🎯 on_level_complete() called")
+	print("[GameManager] → Level: %d, Type: %s" % [level, "COLLECTIBLE" if collectible_target > 0 else "SCORE"])
+	print("[GameManager] → Collectibles: %d/%d, Score: %d/%d, Moves left: %d" % [collectibles_collected, collectible_target, score, target_score, moves_left])
+
 	if level_transitioning:
+		print("[GameManager] → Already transitioning, returning")
 		return
 
 	level_transitioning = true
@@ -995,6 +1115,8 @@ func _convert_remaining_moves_to_bonus(remaining_moves: int):
 	This creates a fun visual celebration similar to Candy Crush's 'Sugar Crush'
 	Player can tap to skip and instantly calculate all bonus points"""
 
+	print("[GameManager] 🎉 _convert_remaining_moves_to_bonus called with %d moves" % remaining_moves)
+
 	# Lock player input during bonus phase
 	processing_moves = true
 	bonus_skipped = false
@@ -1002,18 +1124,25 @@ func _convert_remaining_moves_to_bonus(remaining_moves: int):
 	# Get GameBoard reference
 	var game_board = get_node_or_null("/root/MainGame/GameBoard")
 	if not game_board:
-		print("[GameManager] GameBoard not found, skipping bonus conversion")
+		print("[GameManager] ❌ GameBoard not found, skipping bonus conversion")
 		processing_moves = false
 		return
+
+	print("[GameManager] ✓ GameBoard found, starting bonus conversion")
 
 	# Show "Tap to Skip" message
 	if game_board.has_method("show_skip_bonus_hint"):
 		game_board.show_skip_bonus_hint()
+		print("[GameManager] ✓ Skip hint shown")
+	else:
+		print("[GameManager] ⚠️ GameBoard doesn't have show_skip_bonus_hint method")
 
 	var bonus_points = 0
 
 	# Convert each remaining move into a special tile
 	for i in range(remaining_moves):
+		print("[GameManager] Bonus move %d/%d - Looking for position..." % [i+1, remaining_moves])
+
 		# Check if player skipped
 		if bonus_skipped:
 			print("[GameManager] ⏩ Bonus skipped! Calculating remaining points instantly...")
@@ -1028,24 +1157,34 @@ func _convert_remaining_moves_to_bonus(remaining_moves: int):
 		# Find random active tile position
 		var random_pos = _get_random_active_tile_position()
 		if random_pos == Vector2(-1, -1):
+			print("[GameManager] ⚠️ No valid tile position found, ending bonus early at move %d/%d" % [i+1, remaining_moves])
 			break  # No more active tiles
+
+		print("[GameManager] ✓ Found position: %s" % random_pos)
 
 		# Decide which special tile to create based on move number
 		var special_type = FOUR_WAY_ARROW  # Most powerful for bonus
 
 		# Create special tile at this position
 		grid[int(random_pos.x)][int(random_pos.y)] = special_type
+		print("[GameManager] ✓ Created special tile type %d at %s" % [special_type, random_pos])
 
 		# Update visual tile if GameBoard has it
 		if game_board.has_method("update_tile_visual"):
 			game_board.update_tile_visual(random_pos, special_type)
+		else:
+			print("[GameManager] ⚠️ GameBoard doesn't have update_tile_visual method")
 
 		# Small delay between conversions for visual effect
 		await get_tree().create_timer(0.1).timeout
 
 		# Activate the special tile immediately
 		if game_board.has_method("activate_special_tile"):
+			print("[GameManager] Activating special tile at %s..." % random_pos)
 			await game_board.activate_special_tile(random_pos)
+			print("[GameManager] ✓ Special tile activated")
+		else:
+			print("[GameManager] ⚠️ GameBoard doesn't have activate_special_tile method")
 
 		# Calculate bonus points (each remaining move is worth progressively more)
 		var move_bonus = 100 * (i + 1)  # 100, 200, 300, etc.
@@ -1083,16 +1222,23 @@ func skip_bonus_animation():
 		print("[GameManager] Player requested to skip bonus animation")
 
 func _get_random_active_tile_position() -> Vector2:
-	"""Get a random active (non-blocked, non-empty) tile position"""
+	"""Get a random active (non-blocked, non-empty) tile position
+	Excludes special tiles (7-9) and collectibles (10)"""
 	var active_positions = []
 
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
-			if not is_cell_blocked(x, y) and grid[x][y] > 0 and grid[x][y] < 7:
-				# Active tile (not blocked, not empty, not already special)
+			var tile_type = grid[x][y]
+			# Include only regular tiles (1-6), exclude:
+			# - blocked cells (-1)
+			# - empty cells (0)
+			# - special tiles (7-9)
+			# - collectibles (10)
+			if not is_cell_blocked(x, y) and tile_type >= 1 and tile_type <= TILE_TYPES:
 				active_positions.append(Vector2(x, y))
 
 	if active_positions.size() == 0:
+		print("[GameManager] ⚠️ No valid positions for bonus conversion (active positions: 0)")
 		return Vector2(-1, -1)
 
 	# Return random position
@@ -1116,3 +1262,60 @@ func calculate_stars(final_score: int, target: int) -> int:
 	else:
 		# Below target = 0 stars (shouldn't happen as level completes when target reached)
 		return 1
+
+# Collectible handling
+var _collectible_spawned_positions: Array = []  # track positions already spawned to avoid duplicates
+
+func spawn_collectibles_for_targets():
+	"""Queue collectible visuals for all target positions that haven't been spawned yet."""
+	for cp in collectible_positions:
+		var key = str(int(cp.x)) + "," + str(int(cp.y))
+		if not _collectible_spawned_positions.has(key):
+			# Request GameBoard to spawn visual
+			var board = get_node_or_null("/root/MainGame/GameBoard")
+			if board and board.has_method("spawn_collectible_visual"):
+				board.spawn_collectible_visual(int(cp.x), int(cp.y), "coin")
+				_collectible_spawned_positions.append(key)
+
+func collectible_landed_at(pos: Vector2, coll_type: String):
+	"""Called by GameBoard when a falling collectible lands on its target position."""
+	print("[GameManager] 🪙 collectible_landed_at: ", pos, " type: ", coll_type)
+
+	# Increment collected counter
+	collectibles_collected += 1
+	emit_signal("collectibles_changed", collectibles_collected, collectible_target)
+	print("[GameManager] 🪙 Collected ", coll_type, " -> ", collectibles_collected, "/", collectible_target)
+
+	# Remove the collectible marker so it doesn't respawn
+	for i in range(collectible_positions.size()-1, -1, -1):
+		var cp = collectible_positions[i]
+		if int(cp.x) == int(pos.x) and int(cp.y) == int(pos.y):
+			collectible_positions.remove_at(i)
+
+	# Grant reward points
+	var reward_points = 500
+	add_score(reward_points)
+
+	# Check if level is complete (if collectible-based level)
+	if collectible_target > 0 and collectibles_collected >= collectible_target:
+		print("[GameManager] ✨ ALL COLLECTIBLES COLLECTED! Level complete!")
+		print("[GameManager] → Collectibles: %d/%d, Score: %d/%d" % [collectibles_collected, collectible_target, score, target_score])
+		if not level_transitioning and not pending_level_complete:
+			# Store level completion state
+			last_level_won = true
+			last_level_score = score
+			last_level_target = target_score
+			last_level_number = level
+			last_level_moves_left = moves_left
+
+			# Use pending mechanism to wait for any ongoing animations
+			pending_level_complete = true
+			print("[GameManager] → Setting pending_level_complete = true, calling _attempt_level_complete()")
+			_attempt_level_complete()
+
+	# NOTE: Gravity/refill is handled by GameBoard after collection animation
+
+	# Clean spawned positions tracking
+	var key = str(int(pos.x)) + "," + str(int(pos.y))
+	if _collectible_spawned_positions.has(key):
+		_collectible_spawned_positions.erase(key)

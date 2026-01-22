@@ -113,6 +113,7 @@ func _ready():
 	GameManager.connect("moves_changed", _on_moves_changed)
 	GameManager.connect("game_over", _on_game_over)
 	GameManager.connect("level_complete", _on_level_complete)
+	GameManager.connect("collectibles_changed", _on_collectibles_changed)
 
 	# Connect UI buttons
 	# restart_button removed - enhanced game over screen uses its own buttons
@@ -354,28 +355,54 @@ func update_display():
 	level_label.text = "Lv %d" % GameManager.level
 	moves_label.text = "%d" % GameManager.moves_left
 
-	# Update progress bar
-	var progress = float(GameManager.score) / float(GameManager.target_score)
-	target_progress.value = min(progress * 100, 100)
-	target_label.text = "Goal: %d" % GameManager.target_score
+	# Update progress bar and target label based on level type
+	if GameManager.collectible_target > 0:
+		# Collectible-based level
+		var progress = float(GameManager.collectibles_collected) / float(GameManager.collectible_target)
+		target_progress.value = min(progress * 100, 100)
+		target_label.text = "Coins: %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
+	else:
+		# Score-based level
+		var progress = float(GameManager.score) / float(GameManager.target_score)
+		target_progress.value = min(progress * 100, 100)
+		target_label.text = "Goal: %d" % GameManager.target_score
 
 func _on_score_changed(new_score: int):
 	score_label.text = "%d" % new_score
 
-	# Update progress
-	var progress = float(new_score) / float(GameManager.target_score)
-	target_progress.value = min(progress * 100, 100)
+	# Update progress only if score-based level
+	if GameManager.collectible_target == 0:
+		var progress = float(new_score) / float(GameManager.target_score)
+		target_progress.value = min(progress * 100, 100)
 
 	# Animate score increase
 	animate_score_change()
 
 func _on_level_changed(new_level: int):
 	level_label.text = "Lv %d" % new_level
-	target_label.text = "Goal: %d" % GameManager.target_score
+
+	# Update target label based on level type
+	if GameManager.collectible_target > 0:
+		target_label.text = "Coins: %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
+	else:
+		target_label.text = "Goal: %d" % GameManager.target_score
+
 	target_progress.value = 0
 
 	# Animate level change
 	animate_level_change()
+
+func _on_collectibles_changed(collected: int, target: int):
+	"""Update UI when collectibles are collected"""
+	if target > 0:
+		target_label.text = "Coins: %d/%d" % [collected, target]
+		var progress = float(collected) / float(target)
+		target_progress.value = min(progress * 100, 100)
+
+		# Animate collectible collection
+		var tween = create_tween()
+		tween.tween_property(target_label, "modulate", Color(1.0, 0.9, 0.2), 0.1)  # Gold flash
+		tween.tween_property(target_label, "modulate", Color.WHITE, 0.1)
 
 func _on_moves_changed(moves_left: int):
 	moves_label.text = "%d" % moves_left

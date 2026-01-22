@@ -1,0 +1,14 @@
+{
+  "level_number": 54,
+  "title": "Level 54",
+  "description": "Collect 3 coins!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 18500,
+  "max_moves": 52,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 C 0 0\n0 0 0 0 0 0 0 U\nC 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 C 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 3,
+  "collectible_type": "coin"
+}
