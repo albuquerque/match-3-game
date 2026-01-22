@@ -1,0 +1,931 @@
+extends Node2D
+class_name GameBoard
+
+signal move_completed
+signal board_idle
+
+# Basic board visual manager for the match-3 game.
+# This cleaned version keeps the public methods used across the project,
+# removes duplicate definitions and fixes previous parse/indent issues.
+
+@onready var background = get_node_or_null("Background")
+var tile_scene = preload("res://scenes/Tile.tscn")
+var tiles: Array = []
+
+# Layout variables
+var tile_size: float = 64.0
+var grid_offset: Vector2 = Vector2.ZERO
+var board_margin: float = 20.0
+
+# Config
+const BOARD_BACKGROUND_COLOR = Color(0.2, 0.2, 0.3, 0.7)
+var border_color: Color = Color(0.9, 0.9, 1.0, 0.95)
+const BORDER_WIDTH: float = 3.0
+
+# State helpers
+var selected_tile = null
+var skip_bonus_label: Label = null
+var skip_bonus_active: bool = false
+const COMBO_TIMEOUT: float = 2.0
+var combo_chain_count: int = 0
+var last_match_time: float = 0.0
+# Frame-based combo fallback
+var frame_time_acc: float = 0.0
+var last_match_frame: int = -999
+const COMBO_TIMEOUT_FRAMES: int = int(COMBO_TIMEOUT * 60)  # approximate using 60 FPS
+
+# Background image support
+var background_image_path: String = ""
+var background_sprite: TextureRect = null
+
+# Container for borders
+var border_container: Node2D = null
+var tile_area_overlay: Control = null
+
+func _ready() -> void:
+	GameManager.connect("game_over", Callable(self, "_on_game_over"))
+	GameManager.connect("level_complete", Callable(self, "_on_level_complete"))
+	GameManager.connect("level_loaded", Callable(self, "_on_level_loaded"))
+
+	border_container = Node2D.new()
+	border_container.name = "BorderContainer"
+	add_child(border_container)
+
+	background_image_path = "res://textures/background.jpg"
+	calculate_responsive_layout()
+	setup_background()
+	setup_background_image()
+
+	if Engine.has_singleton("GameManager") and GameManager.initialized:
+		create_visual_grid()
+		draw_board_borders()
+	else:
+		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
+
+func _process(delta: float) -> void:
+	# accumulate time used for combo timeout fallback
+	frame_time_acc += delta
+
+# --------------------------- Layout & background ---------------------------
+func calculate_responsive_layout() -> void:
+	var viewport = get_viewport()
+	if not viewport:
+		return
+	var screen_size = viewport.get_visible_rect().size
+
+	# Reserve UI space
+	var ui_top_space = 160.0
+	var ui_bottom_space = 100.0
+	var available_width = max(screen_size.x - (board_margin * 2), 1)
+	var available_height = max(screen_size.y - ui_top_space - ui_bottom_space - (board_margin * 2), 1)
+
+	# Request grid size from GameManager if present
+	var gw = 8
+	var gh = 8
+	if Engine.has_singleton("GameManager"):
+		gw = GameManager.GRID_WIDTH
+		gh = GameManager.GRID_HEIGHT
+
+	var max_tile_size_width = available_width / float(gw)
+	var max_tile_size_height = available_height / float(gh)
+	tile_size = min(max_tile_size_width, max_tile_size_height)
+	tile_size = max(tile_size, 40.0)
+
+	var total_grid_width = gw * tile_size
+	var total_grid_height = gh * tile_size
+	grid_offset = Vector2((screen_size.x - total_grid_width) / 2.0, ui_top_space + (available_height - total_grid_height) / 2.0)
+
+	print("[GameBoard] Screen size:", screen_size, " tile_size:", tile_size, " grid_offset:", grid_offset)
+
+func setup_background() -> void:
+	if background:
+		background.visible = false
+
+	# create or update tile area overlay
+	setup_tile_area_overlay()
+
+func setup_tile_area_overlay() -> void:
+	if tile_area_overlay and is_instance_valid(tile_area_overlay):
+		tile_area_overlay.queue_free()
+		tile_area_overlay = null
+
+	tile_area_overlay = Control.new()
+	tile_area_overlay.name = "TileAreaOverlay"
+	tile_area_overlay.z_index = -50
+	tile_area_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	if Engine.has_singleton("GameManager"):
+		for x in range(GameManager.GRID_WIDTH):
+			for y in range(GameManager.GRID_HEIGHT):
+				if not GameManager.is_cell_blocked(x, y):
+					var rect = ColorRect.new()
+					rect.color = Color(0.1, 0.12, 0.18, 0.45)
+					rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					rect.position = Vector2(grid_offset.x + x * tile_size, grid_offset.y + y * tile_size)
+					rect.size = Vector2(tile_size, tile_size)
+					tile_area_overlay.add_child(rect)
+
+	var parent = get_parent()
+	if parent:
+		parent.call_deferred("add_child", tile_area_overlay)
+	else:
+		add_child(tile_area_overlay)
+
+func setup_background_image() -> void:
+	if background_image_path == "":
+		return
+	if not ResourceLoader.exists(background_image_path):
+		print("[GameBoard] Background image not found:", background_image_path)
+		return
+
+	if background_sprite and is_instance_valid(background_sprite):
+		background_sprite.queue_free()
+
+	background_sprite = TextureRect.new()
+	background_sprite.name = "BackgroundImage"
+	background_sprite.texture = load(background_image_path)
+	background_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background_sprite.size = get_viewport().get_visible_rect().size
+	background_sprite.position = Vector2.ZERO
+	background_sprite.z_index = -100
+
+	var parent = get_parent()
+	if parent:
+		parent.call_deferred("add_child", background_sprite)
+		parent.call_deferred("move_child", background_sprite, 0)
+	else:
+		call_deferred("add_child", background_sprite)
+
+	print("[GameBoard] Background image added")
+
+# --------------------------- Grid visual handling ---------------------------
+func clear_tiles() -> void:
+	# remove only tile instances
+	for child in get_children():
+		if child and child.has_method("setup"):
+			remove_child(child)
+			child.queue_free()
+	tiles.clear()
+
+func create_visual_grid() -> void:
+	clear_tiles()
+	tiles = []
+
+	# Robust GameManager resolution (try /root/GameManager autoload first)
+	var gm_local = get_node_or_null("/root/GameManager")
+	if gm_local == null and get_tree():
+		var rt = get_tree().get_root()
+		if rt:
+			gm_local = rt.get_node_or_null("GameManager")
+	if gm_local == null and Engine.has_singleton("GameManager"):
+		gm_local = GameManager
+
+	# If GameManager is still not present or not initialized, wait briefly for it to be available (up to 2s)
+	var attempts = 0
+	var max_attempts = 40
+	while (gm_local == null or ("initialized" in gm_local and not gm_local.initialized)) and attempts < max_attempts:
+		# re-resolve
+		if get_tree():
+			var rt2 = get_tree().get_root()
+			if rt2:
+				gm_local = rt2.get_node_or_null("GameManager")
+		if gm_local == null and Engine.has_singleton("GameManager"):
+			gm_local = GameManager
+		await get_tree().create_timer(0.05).timeout
+		attempts += 1
+
+	if gm_local == null:
+		print("[GameBoard] ERROR: GameManager still not available after waiting; cannot create visual grid")
+		return
+	if ("initialized" in gm_local and not gm_local.initialized):
+		print("[GameBoard] ERROR: GameManager present but not initialized after waiting; cannot create visual grid")
+		return
+
+	# Use gm_local for subsequent references within this function where possible
+	var gw = gm_local.GRID_WIDTH
+	var gh = gm_local.GRID_HEIGHT
+	var scale_factor = tile_size / 64.0
+	var created = 0
+	for x in range(gw):
+		tiles.append([])
+		for y in range(gh):
+			var tt = gm_local.get_tile_at(Vector2(x, y))
+			if tt == -1:
+				tiles[x].append(null)
+				continue
+			var t = tile_scene.instantiate()
+			if t.has_method("setup"):
+				t.setup(tt, Vector2(x, y), scale_factor)
+				# place centered in tile cell
+				t.position = grid_to_world_position(Vector2(x, y))
+				# connect signals safely
+				if t.has_signal("tile_clicked"):
+					t.connect("tile_clicked", Callable(self, "_on_tile_clicked"))
+				if t.has_signal("tile_swiped"):
+					t.connect("tile_swiped", Callable(self, "_on_tile_swiped"))
+				add_child(t)
+				tiles[x].append(t)
+				created += 1
+			else:
+				# fallback placeholder
+				tiles[x].append(null)
+
+	print("[GameBoard] Created ", created, " tiles")
+
+# Convert grid position to world center
+func grid_to_world_position(grid_pos: Vector2) -> Vector2:
+	return Vector2(grid_pos.x * tile_size + grid_offset.x + tile_size / 2.0, grid_pos.y * tile_size + grid_offset.y + tile_size / 2.0)
+
+func world_to_grid_position(world_pos: Vector2) -> Vector2:
+	return Vector2(int((world_pos.x - grid_offset.x) / tile_size), int((world_pos.y - grid_offset.y) / tile_size))
+
+func set_border_color(color: Color):
+	"""Dynamically change border color"""
+	border_color = color
+	draw_board_borders()
+
+func set_background_image(image_path: String):
+	"""Dynamically change background image"""
+	background_image_path = image_path
+	setup_background_image()
+
+func hide_tile_overlay():
+	"""Hide the semi-transparent overlay over tiles"""
+	if tile_area_overlay:
+		tile_area_overlay.visible = false
+
+func show_tile_overlay():
+	"""Show the semi-transparent overlay over tiles"""
+	if tile_area_overlay:
+		tile_area_overlay.visible = true
+
+func update_tile_visual(grid_pos: Vector2, new_type: int):
+	"""Update a tile's visual to match a new type (e.g., when creating special tiles)"""
+	if grid_pos.x < 0 or grid_pos.x >= GameManager.GRID_WIDTH:
+		return
+	if grid_pos.y < 0 or grid_pos.y >= GameManager.GRID_HEIGHT:
+		return
+
+	var tile = tiles[int(grid_pos.x)][int(grid_pos.y)]
+	if not tile:
+		return
+
+	# Update the tile's texture to match the new type
+	if tile.has_method("update_type"):
+		tile.update_type(new_type)
+
+		# Add a flash effect to draw attention
+		var tween = create_tween()
+		tween.tween_property(tile, "modulate", Color(3, 3, 1, 1), 0.1)
+		tween.tween_property(tile, "modulate", Color.WHITE, 0.2)
+
+# --------------------------- Border drawing (missing implementations added) ---------------------------
+func draw_board_borders() -> void:
+	if not border_container:
+		border_container = Node2D.new()
+		add_child(border_container)
+	# clear old children
+	for c in border_container.get_children():
+		c.queue_free()
+	draw_simple_borders()
+
+func draw_simple_borders() -> void:
+	# Draw simple straight edges and quarter-circle corners around active tiles
+	var corner_radius = max(4.0, BORDER_WIDTH * 4.0)
+	# Guard GameManager presence
+	if not Engine.has_singleton("GameManager"):
+		return
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if GameManager.is_cell_blocked(x, y):
+				continue
+			var left = grid_offset.x + x * tile_size
+			var right = grid_offset.x + (x + 1) * tile_size
+			var top = grid_offset.y + y * tile_size
+			var bottom = grid_offset.y + (y + 1) * tile_size
+
+			var has_top = (y == 0 or GameManager.is_cell_blocked(x, y - 1))
+			var has_bottom = (y == GameManager.GRID_HEIGHT - 1 or GameManager.is_cell_blocked(x, y + 1))
+			var has_left = (x == 0 or GameManager.is_cell_blocked(x - 1, y))
+			var has_right = (x == GameManager.GRID_WIDTH - 1 or GameManager.is_cell_blocked(x + 1, y))
+
+			# Top border
+			if has_top:
+				var start_x = left
+				if has_left:
+					start_x += corner_radius
+				var end_x = right
+				if has_right:
+					end_x -= corner_radius
+				if end_x > start_x:
+					draw_border_edge(Vector2(start_x, top), Vector2(end_x, top))
+
+			# Bottom border
+			if has_bottom:
+				var b_start_x = left
+				if has_left:
+					b_start_x += corner_radius
+				var b_end_x = right
+				if has_right:
+					b_end_x -= corner_radius
+				if b_end_x > b_start_x:
+					draw_border_edge(Vector2(b_start_x, bottom), Vector2(b_end_x, bottom))
+
+			# Left border
+			if has_left:
+				var start_y = top
+				if has_top:
+					start_y += corner_radius
+				var end_y = bottom
+				if has_bottom:
+					end_y -= corner_radius
+				if end_y > start_y:
+					draw_border_edge(Vector2(left, start_y), Vector2(left, end_y))
+
+			# Right border
+			if has_right:
+				var r_start_y = top
+				if has_top:
+					r_start_y += corner_radius
+				var r_end_y = bottom
+				if has_bottom:
+					r_end_y -= corner_radius
+				if r_end_y > r_start_y:
+					draw_border_edge(Vector2(right, r_start_y), Vector2(right, r_end_y))
+
+			# Corner arcs
+			if has_top and has_left:
+				draw_corner_arc(Vector2(left, top), "top_left", corner_radius)
+			if has_top and has_right:
+				draw_corner_arc(Vector2(right, top), "top_right", corner_radius)
+			if has_bottom and has_left:
+				draw_corner_arc(Vector2(left, bottom), "bottom_left", corner_radius)
+			if has_bottom and has_right:
+				draw_corner_arc(Vector2(right, bottom), "bottom_right", corner_radius)
+
+func draw_border_edge(start: Vector2, end: Vector2) -> void:
+	var l = Line2D.new()
+	l.add_point(start)
+	l.add_point(end)
+	l.width = BORDER_WIDTH
+	l.default_color = border_color
+	l.antialiased = true
+	border_container.add_child(l)
+
+func draw_corner_arc(corner_pos: Vector2, corner_type: String, radius: float) -> void:
+	var line = Line2D.new()
+	var segments = 8
+	match corner_type:
+		"top_left":
+			for i in range(segments + 1):
+				var t = float(i) / float(segments)
+				var ang = lerp(PI, PI * 1.5, t)
+				line.add_point(corner_pos + Vector2(radius, radius) + Vector2(cos(ang), sin(ang)) * radius)
+		"top_right":
+			for i in range(segments + 1):
+				var t = float(i) / float(segments)
+				var ang = lerp(PI * 1.5, PI * 2.0, t)
+				line.add_point(corner_pos + Vector2(-radius, radius) + Vector2(cos(ang), sin(ang)) * radius)
+		"bottom_left":
+			for i in range(segments + 1):
+				var t = float(i) / float(segments)
+				var ang = lerp(PI * 0.5, PI, t)
+				line.add_point(corner_pos + Vector2(radius, -radius) + Vector2(cos(ang), sin(ang)) * radius)
+		"bottom_right":
+			for i in range(segments + 1):
+				var t = float(i) / float(segments)
+				var ang = lerp(0.0, PI * 0.5, t)
+				line.add_point(corner_pos + Vector2(-radius, -radius) + Vector2(cos(ang), sin(ang)) * radius)
+	line.width = BORDER_WIDTH
+	line.default_color = border_color
+	line.antialiased = true
+	border_container.add_child(line)
+
+# --------------------------- Matches & cascade ---------------------------
+func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)) -> void:
+	# Process cascades until no matches remain
+	if not Engine.has_singleton("GameManager"):
+		return
+
+	# Mark processing flag if available
+	if GameManager.has_method("processing_moves"):
+		GameManager.processing_moves = true
+
+	var depth = 0
+	while true:
+		depth += 1
+		if depth > 60:
+			print("[GameBoard] Cascade depth exceeded")
+			break
+
+		var matches = GameManager.find_matches() if GameManager.has_method("find_matches") else []
+		if matches == null or matches.size() == 0:
+			break
+
+		# Highlight
+		await highlight_matches(matches)
+
+		# Visual destroy with combo handling and particles
+		await animate_destroy_matches(matches)
+
+		# Tell GameManager to remove matches logically (pass swapped position for special creation)
+		if GameManager.has_method("remove_matches"):
+			GameManager.remove_matches(matches, initial_swap_pos)
+
+		# Gravity and refill
+		await animate_gravity()
+		await animate_refill()
+
+	# Clear processing flag
+	if GameManager.has_method("processing_moves"):
+		GameManager.processing_moves = false
+
+	# Reset combo if manager supports
+	if GameManager.has_method("reset_combo"):
+		GameManager.reset_combo()
+
+	# Inform listeners we're idle
+	emit_signal("board_idle")
+	return
+
+func highlight_matches(matches: Array) -> void:
+	# visually highlight matched tiles
+	if matches == null or matches.size() == 0:
+		return
+	for pos in matches:
+		var ix = int(pos.x)
+		var iy = int(pos.y)
+		if ix >= 0 and ix < tiles.size() and iy >= 0 and iy < tiles[ix].size():
+			var t = tiles[ix][iy]
+			if t and t.has_method("animate_match_highlight"):
+				var tw = t.animate_match_highlight()
+				if tw:
+					await tw.finished
+
+func animate_destroy_tiles(positions: Array) -> void:
+	if positions == null or positions.size() == 0:
+		return
+	var tweens = []
+	for pos in positions:
+		var ix = int(pos.x)
+		var iy = int(pos.y)
+		if ix < 0 or iy < 0:
+			continue
+		if ix >= tiles.size():
+			continue
+		if iy >= tiles[ix].size():
+			continue
+		var tile = tiles[ix][iy]
+		if tile:
+			if tile.has_method("animate_destroy"):
+				var t = tile.animate_destroy()
+				if t:
+					tweens.append(t)
+			else:
+				var tw = create_tween()
+				tw.tween_property(tile, "modulate", Color(1,1,1,0), 0.15)
+				tweens.append(tw)
+
+	if tweens.size() > 0:
+		await tweens[0].finished
+	else:
+		await get_tree().create_timer(0.12).timeout
+
+	# free nodes and clear references
+	for pos in positions:
+		var ix = int(pos.x)
+		var iy = int(pos.y)
+		if ix >=0 and ix < tiles.size() and iy >=0 and iy < tiles[ix].size():
+			var node = tiles[ix][iy]
+			if node and is_instance_valid(node):
+				node.queue_free()
+			tiles[ix][iy] = null
+
+func animate_gravity() -> void:
+	if not Engine.has_singleton("GameManager"):
+		return
+	var moved = GameManager.apply_gravity() if GameManager.has_method("apply_gravity") else false
+	# update visual positions to match logical grid
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(x, y) and GameManager.grid[x][y] > 0 and int(x) < tiles.size() and int(y) < tiles[int(x)].size():
+				var tile = tiles[int(x)][int(y)]
+				if tile:
+					var target = grid_to_world_position(Vector2(x, y))
+					if tile.position.distance_to(target) > 1 and tile.has_method("animate_to_position"):
+						var tw = tile.animate_to_position(target)
+						if tw:
+							await tw.finished
+	# short pause
+	await get_tree().create_timer(0.01).timeout
+
+func animate_refill() -> void:
+	if not Engine.has_singleton("GameManager"):
+		return
+	var new_positions = GameManager.fill_empty_spaces() if GameManager.has_method("fill_empty_spaces") else []
+	var spawn_tweens = []
+	for pos in new_positions:
+		if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
+			var ix = int(pos.x)
+			var iy = int(pos.y)
+			# instantiate tile if needed
+			if ix >= tiles.size() or iy >= tiles[ix].size() or tiles[ix][iy] == null:
+				var t = tile_scene.instantiate()
+				var tt = GameManager.get_tile_at(pos) if GameManager.has_method("get_tile_at") else 1
+				if t.has_method("setup"):
+					t.setup(tt, pos, tile_size/64.0)
+					t.position = grid_to_world_position(Vector2(ix, -1))
+					add_child(t)
+					# connect
+					if t.has_signal("tile_clicked"):
+						t.connect("tile_clicked", Callable(self, "_on_tile_clicked"))
+					if t.has_signal("tile_swiped"):
+						t.connect("tile_swiped", Callable(self, "_on_tile_swiped"))
+					# ensure tiles array sizes
+					while tiles.size() <= ix:
+						tiles.append([])
+					while tiles[ix].size() <= iy:
+						tiles[ix].append(null)
+					tiles[ix][iy] = t
+					var target = grid_to_world_position(Vector2(ix, iy))
+					if t.has_method("animate_to_position"):
+						var tw = t.animate_to_position(target)
+						if tw:
+							spawn_tweens.append(tw)
+
+	# wait for last spawn tween
+	if spawn_tweens.size() > 0:
+		await spawn_tweens[-1].finished
+	await get_tree().create_timer(0.05).timeout
+
+func animate_destroy_matches(matches: Array) -> void:
+	# wrapper to show combo text / screen shake then destroy
+	if matches == null or matches.size() == 0:
+		return
+
+	# Small screen shake effect
+	_apply_screen_shake(6, 0.12)
+
+	# show particle bursts at match centers
+	for pos in matches:
+		var world = grid_to_world_position(Vector2(int(pos.x), int(pos.y)))
+		var p = CPUParticles2D.new()
+		p.one_shot = true
+		p.amount = 8
+		p.lifetime = 0.6
+		p.position = world
+		p.scale_amount_min = 0.6
+		p.scale_amount_max = 1.2
+		p.color = Color(1, 1, 0.8)
+		add_child(p)
+		p.emitting = true
+		get_tree().create_timer(0.75).timeout.connect(Callable(p, "queue_free"))
+
+	# combo tracking already handled by caller
+	await animate_destroy_tiles(matches)
+
+func _apply_screen_shake(strength: float = 6.0, duration: float = 0.12) -> void:
+	# Simple screen shake by offsetting this node briefly
+	var original_pos = position
+	var tw = create_tween()
+	var shakes = int(duration / 0.03)
+	for i in range(shakes):
+		var ox = randf_range(-strength, strength)
+		var oy = randf_range(-strength, strength)
+		tw.tween_property(self, "position", original_pos + Vector2(ox, oy), 0.03)
+	# return to original
+	tw.tween_property(self, "position", original_pos, 0.03)
+
+func animate_destroy_matches_except(matches: Array, skip_pos: Vector2) -> void:
+	"""Destroy matches but skip a specific position (e.g., for booster activation)"""
+	if matches == null or matches.size() == 0:
+		return
+	var filtered = []
+	for pos in matches:
+		if pos != skip_pos:
+			filtered.append(pos)
+	await animate_destroy_matches(filtered)
+
+func _show_combo_text(match_count: int, positions: Array, combo_multiplier: int = 1):
+	"""Show floating combo text for impressive matches"""
+	if positions.size() == 0:
+		return
+
+	var viewport = get_viewport()
+	if not viewport:
+		return
+
+	var screen_size = viewport.get_visible_rect().size
+	var screen_center = screen_size / 2.0
+	var text_position = screen_center - Vector2(0, 100)
+
+	var combo_label = Label.new()
+	combo_label.z_index = 100
+	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	combo_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	var combo_text = ""
+	var combo_color = Color.WHITE
+
+	if combo_multiplier >= 5:
+		combo_text = "INCREDIBLE!"
+		combo_color = Color(1.0, 0.0, 1.0)
+	elif combo_multiplier >= 4:
+		combo_text = "AMAZING!"
+		combo_color = Color(1.0, 0.2, 1.0)
+	elif combo_multiplier >= 3:
+		combo_text = "SUPER!"
+		combo_color = Color(1.0, 0.5, 0.0)
+	elif combo_multiplier >= 2:
+		combo_text = "COMBO!"
+		combo_color = Color(0.2, 1.0, 0.2)
+	elif match_count >= 7:
+		combo_text = "AMAZING!"
+		combo_color = Color(1.0, 0.2, 1.0)
+	elif match_count >= 6:
+		combo_text = "SUPER!"
+		combo_color = Color(1.0, 0.5, 0.0)
+	elif match_count >= 5:
+		combo_text = "GREAT!"
+		combo_color = Color(0.2, 1.0, 0.2)
+	elif match_count >= 4:
+		combo_text = "GOOD!"
+		combo_color = Color(0.3, 0.7, 1.0)
+	else:
+		combo_text = "NICE!"
+		combo_color = Color(0.5, 0.5, 1.0)
+
+	if combo_multiplier > 1:
+		combo_text = combo_text + " x" + str(combo_multiplier)
+
+	combo_label.text = combo_text
+	ThemeManager.apply_bangers_font(combo_label, 72)
+	combo_label.add_theme_color_override("font_color", combo_color)
+	combo_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))
+	combo_label.add_theme_constant_override("outline_size", 8)
+
+	var shadow_color = combo_color
+	shadow_color.a = 0.6
+	combo_label.add_theme_color_override("font_shadow_color", shadow_color)
+	combo_label.add_theme_constant_override("shadow_offset_x", 0)
+	combo_label.add_theme_constant_override("shadow_offset_y", 0)
+	combo_label.add_theme_constant_override("shadow_outline_size", 20)
+
+	combo_label.position = text_position
+	combo_label.size = Vector2(400, 100)
+	combo_label.position.x -= 200
+	add_child(combo_label)
+
+	var tw = create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(combo_label, "position:y", text_position.y - 100, 1.2).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(combo_label, "modulate:a", 0.0, 1.2).set_delay(0.4)
+	tw.tween_property(combo_label, "scale", Vector2(1.3, 1.3), 0.3).set_ease(Tween.EASE_OUT)
+	await tw.finished
+	combo_label.queue_free()
+
+func highlight_special_activation(positions: Array):
+	"""Highlight tiles before special activation"""
+	for pos in positions:
+		var ix = int(pos.x)
+		var iy = int(pos.y)
+		if ix >= 0 and ix < tiles.size() and iy >= 0 and iy < tiles[ix].size():
+			var tile = tiles[ix][iy]
+			if tile and tile.has_method("animate_match_highlight"):
+				tile.animate_match_highlight()
+	await get_tree().create_timer(0.3).timeout
+
+func _create_special_activation_particles(world_pos: Vector2):
+	"""Create particles for special tile activation"""
+	var p = CPUParticles2D.new()
+	p.one_shot = true
+	p.amount = 20
+	p.lifetime = 0.8
+	p.position = world_pos
+	p.scale_amount_min = 1.0
+	p.scale_amount_max = 2.0
+	p.color = Color(1, 0.8, 0.2)
+	p.initial_velocity_min = 50
+	p.initial_velocity_max = 150
+	add_child(p)
+	p.emitting = true
+	await get_tree().create_timer(1.0).timeout
+	p.queue_free()
+
+func _create_row_clear_effect(row: int):
+	"""Visual effect for row clear"""
+	_create_lightning_beam_horizontal(Vector2(0, row))
+
+func _create_column_clear_effect(col: int):
+	"""Visual effect for column clear"""
+	_create_lightning_beam_vertical(Vector2(col, 0))
+
+func _create_impact_particles(pos: Vector2, color: Color):
+	"""Create impact particles at position"""
+	var p = CPUParticles2D.new()
+	p.one_shot = true
+	p.amount = 15
+	p.lifetime = 0.5
+	p.position = pos
+	p.color = color
+	p.initial_velocity_min = 30
+	p.initial_velocity_max = 100
+	add_child(p)
+	p.emitting = true
+	await get_tree().create_timer(0.7).timeout
+	p.queue_free()
+
+# --------------------------- Swap implementation (missing) ---------------------------
+func perform_swap(tile1, tile2) -> void:
+	if not tile1 or not tile2:
+		return
+	if not Engine.has_singleton("GameManager"):
+		return
+
+	GameManager.processing_moves = true
+	var pos1f = tile1.grid_position
+	var pos2f = tile2.grid_position
+	var pos1 = Vector2(int(pos1f.x), int(pos1f.y))
+	var pos2 = Vector2(int(pos2f.x), int(pos2f.y))
+
+	# Delegate logic to GameManager
+	if GameManager.has_method("swap_tiles"):
+		GameManager.swap_tiles(pos1, pos2)
+
+	# Play SFX
+	if Engine.has_singleton("AudioManager"):
+		AudioManager.play_sfx("tile_swap")
+
+	# animate visuals
+	var target1 = grid_to_world_position(pos2)
+	var target2 = grid_to_world_position(pos1)
+	var tw1 = tile1.animate_swap_to(target1) if tile1.has_method("animate_swap_to") else null
+	var tw2 = tile2.animate_swap_to(target2) if tile2.has_method("animate_swap_to") else null
+
+	# Update tile array references safely
+	var ix1 = int(pos1.x)
+	var iy1 = int(pos1.y)
+	var ix2 = int(pos2.x)
+	var iy2 = int(pos2.y)
+	if ix1 < tiles.size() and iy1 < tiles[ix1].size() and ix2 < tiles.size() and iy2 < tiles[ix2].size():
+		tiles[ix1][iy1] = tile2
+		tiles[ix2][iy2] = tile1
+		tile1.grid_position = Vector2(ix2, iy2)
+		tile2.grid_position = Vector2(ix1, iy1)
+
+	if tw1:
+		await tw1.finished
+	if tw2:
+		await tw2.finished
+
+	# scoring and cascade
+	var matches = GameManager.find_matches() if GameManager.has_method("find_matches") else []
+	if matches and matches.size() > 0:
+		if GameManager.has_method("use_move"):
+			GameManager.use_move()
+		var pts = GameManager.calculate_points(matches.size()) if GameManager.has_method("calculate_points") else 0
+		if GameManager.has_method("add_score"):
+			GameManager.add_score(pts)
+		await process_cascade(pos2)
+
+	GameManager.processing_moves = false
+	emit_signal("move_completed")
+
+# --------------------------- Signals from GameManager ---------------------------
+func _on_level_loaded() -> void:
+	print("[GameBoard] Level Loaded")
+	calculate_responsive_layout()
+	setup_background()
+	create_visual_grid()
+	draw_board_borders()
+
+func _on_level_complete() -> void:
+	print("[GameBoard] Level Complete")
+
+func _on_game_over() -> void:
+	print("[GameBoard] Game Over")
+	# disable tile input if present
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if x < tiles.size() and y < tiles[int(x)].size():
+				var t = tiles[int(x)][int(y)]
+				if t and t.has_method("set_process_input"):
+					t.set_process_input(false)
+
+# --------------------------- Input handlers for tiles ---------------------------
+func _on_tile_clicked(tile) -> void:
+	# Handle click-based selection and swapping
+	if not tile:
+		return
+	print("GameBoard received tile_clicked at", tile.grid_position)
+
+	# Block clicks while moves processing
+	if Engine.has_singleton("GameManager") and GameManager.processing_moves:
+		print("GameBoard: Move processing blocked")
+		return
+
+	# If the tile is a special tile, activate it
+	var tpos = Vector2(int(tile.grid_position.x), int(tile.grid_position.y))
+	var ttype = 0
+	if Engine.has_singleton("GameManager") and GameManager.has_method("get_tile_at"):
+		ttype = int(GameManager.get_tile_at(tpos))
+	if ttype >= 7:
+		print("GameBoard: Activating special tile at", tpos, "type", ttype)
+		await activate_special_tile(tpos)
+		return
+
+	# Selection logic: select first tile, attempt swap on second
+	if selected_tile == null:
+		selected_tile = tile
+		tile.set_selected(true)
+		print("GameBoard: Selected tile", tile.grid_position)
+		return
+	elif selected_tile == tile:
+		# Deselect
+		tile.set_selected(false)
+		selected_tile = null
+		print("GameBoard: Deselected tile", tile.grid_position)
+		return
+	else:
+		# Attempt swap between selected_tile and this tile
+		var pos1 = Vector2(int(selected_tile.grid_position.x), int(selected_tile.grid_position.y))
+		var pos2 = Vector2(int(tile.grid_position.x), int(tile.grid_position.y))
+		if Engine.has_singleton("GameManager") and GameManager.has_method("can_swap"):
+			if not GameManager.can_swap(pos1, pos2):
+				print("GameBoard: Swap not allowed between", pos1, "and", pos2)
+				# switch selection
+				selected_tile.set_selected(false)
+				selected_tile = tile
+				tile.set_selected(true)
+				return
+		# Perform swap
+		selected_tile.set_selected(false)
+		await perform_swap(selected_tile, tile)
+		selected_tile = null
+		return
+
+func _on_tile_swiped(tile, direction: Vector2) -> void:
+	print("GameBoard received tile_swiped from", tile.grid_position, "dir", direction)
+	# perform swap if possible
+	var target_pos = tile.grid_position + direction
+	if not GameManager.is_valid_position(target_pos):
+		return
+	var target_tile = tiles[int(target_pos.x)][int(target_pos.y)] if int(target_pos.x) < tiles.size() and int(target_pos.y) < tiles[int(target_pos.x)].size() else null
+	if target_tile:
+		await perform_swap(tile, target_tile)
+
+# --------------------------- Special visuals (reintroduced) ---------------------------
+func activate_special_tile(grid_pos: Vector2) -> void:
+	# Visual: show lightning depending on tile type and delegate logic to GameManager
+	var tt = 0
+	if Engine.has_singleton("GameManager") and GameManager.has_method("get_tile_at"):
+		tt = GameManager.get_tile_at(grid_pos)
+	# Visuals for arrows (constants expected on GameManager)
+	if Engine.has_singleton("GameManager"):
+		if tt == GameManager.HORIZTONAL_ARROW:
+			_create_lightning_beam_horizontal(grid_pos)
+		elif tt == GameManager.VERTICAL_ARROW:
+			_create_lightning_beam_vertical(grid_pos)
+		elif tt == GameManager.FOUR_WAY_ARROW:
+			_create_lightning_beam_horizontal(grid_pos)
+			_create_lightning_beam_vertical(grid_pos)
+
+	# Delegate actual logic to GameManager
+	if Engine.has_singleton("GameManager") and GameManager.has_method("activate_special_tile"):
+		GameManager.activate_special_tile(grid_pos)
+
+	# After activation, recreate visuals in case tiles were removed
+	call_deferred("create_visual_grid")
+
+func _create_lightning_beam_horizontal(grid_pos: Vector2) -> void:
+	var y = int(grid_pos.y)
+	var start = grid_to_world_position(Vector2(0, y))
+	var end = grid_to_world_position(Vector2(GameManager.GRID_WIDTH - 1, y))
+	var beam = Line2D.new()
+	beam.width = max(6.0, tile_size * 0.12)
+	beam.default_color = Color(1, 0.9, 0.6, 0.95)
+	beam.add_point(start - Vector2(tile_size/2, 0))
+	beam.add_point(end + Vector2(tile_size/2, 0))
+	beam.z_index = 500
+	add_child(beam)
+	var tw = create_tween()
+	tw.tween_property(beam, "default_color", Color(1, 1, 1, 0), 0.35).set_delay(0.05)
+	get_tree().create_timer(0.5).timeout.connect(Callable(beam, "queue_free"))
+
+func _create_lightning_beam_vertical(grid_pos: Vector2) -> void:
+	var x = int(grid_pos.x)
+	var start = grid_to_world_position(Vector2(x, 0))
+	var end = grid_to_world_position(Vector2(x, GameManager.GRID_HEIGHT - 1))
+	var beam = Line2D.new()
+	beam.width = max(6.0, tile_size * 0.12)
+	beam.default_color = Color(1, 0.9, 0.6, 0.95)
+	beam.add_point(start - Vector2(0, tile_size/2))
+	beam.add_point(end + Vector2(0, tile_size/2))
+	beam.z_index = 500
+	add_child(beam)
+	var tw = create_tween()
+	tw.tween_property(beam, "default_color", Color(1, 1, 1, 0), 0.35).set_delay(0.05)
+	get_tree().create_timer(0.5).timeout.connect(Callable(beam, "queue_free"))
+
+# --------------------------- End special visuals ---------------------------

@@ -1,106 +1,125 @@
 {
   "world_map": {
-    "title": "Journey of Faith",
-    "chapters": [
-      {
-        "id": 1,
-        "title": "Genesis: The Beginning",
-        "background_image": "res://textures/backgrounds/chapters/chapter_genesis.jpg",
-        "theme_color": "#3D5A80",
-        "level_grid": {
-          "rows": 2,
-          "columns": 5
-        },
-        "levels": [
-          { "level": 1, "pos": [360, 180], "unlocked": true, "name": "First Light" },
-          { "level": 2, "pos": [240, 250], "unlocked": true, "name": "Corner Gardens" },
-          { "level": 3, "pos": [480, 320], "unlocked": true, "name": "Sacred Cross" },
-          { "level": 4, "pos": [360, 390], "unlocked": false, "name": "Divine Rivers" },
-          { "level": 5, "pos": [200, 460], "unlocked": false, "name": "Eden's Heart" },
+	"title": "Journey of Faith",
+	"chapters": [
+	  {
+		"id": 1,
+		"title": "Genesis: The Beginning",
+		"background_image": "res://textures/backgrounds/chapters/chapter_genesis.jpg",
+		"theme_color": "#3D5A80",
+		"level_grid": {
+		  "rows": 2,
+		  "columns": 5
+		},
+		"levels": [
+		  { "level": 1, "pos": [360, 180], "unlocked": true, "name": "First Light" },
+		  { "level": 2, "pos": [240, 250], "unlocked": true, "name": "Corner Gardens" },
+		  { "level": 3, "pos": [480, 320], "unlocked": true, "name": "Sacred Cross" },
+		  { "level": 4, "pos": [360, 390], "unlocked": false, "name": "Divine Rivers" },
+		  { "level": 5, "pos": [200, 460], "unlocked": false, "name": "Eden's Heart" },
 
-          { "level": 6, "pos": [520, 530], "unlocked": false, "name": "Tree of Life" },
-          { "level": 7, "pos": [360, 600], "unlocked": false, "name": "Forbidden Fruit" },
-          { "level": 8, "pos": [220, 670], "unlocked": false, "name": "Noah's Ark" },
-          { "level": 9, "pos": [500, 670], "unlocked": false, "name": "Rainbow Promise" },
-          { "level": 10, "pos": [360, 740], "unlocked": false, "name": "Tower Falls" }
-        ],
-        "next_chapter_button_pos": [360, 810]
-      },
+		  { "level": 6, "pos": [520, 530], "unlocked": false, "name": "Tree of Life" },
+		  { "level": 7, "pos": [360, 600], "unlocked": false, "name": "Forbidden Fruit" },
+		  { "level": 8, "pos": [220, 670], "unlocked": false, "name": "Noah's Ark" },
+		  { "level": 9, "pos": [500, 670], "unlocked": false, "name": "Rainbow Promise" },
+		  { "level": 10, "pos": [360, 740], "unlocked": false, "name": "Tower Falls" }
+		],
+		"next_chapter_button_pos": [360, 810]
+	  },
 
-      {
-        "id": 2,
-        "title": "Exodus: The Journey",
-        "background_image": "res://textures/backgrounds/chapter_exodus.jpg",
-        "theme_color": "#D4A574",
-        "level_grid": {
-          "rows": 2,
-          "columns": 5
-        },
-        "levels": [
-          { "level": 11, "pos": [360, 180], "unlocked": false, "name": "Burning Bush" },
-          { "level": 12, "pos": [480, 250], "unlocked": false, "name": "Pharaoh's Palace" },
-          { "level": 13, "pos": [240, 320], "unlocked": false, "name": "Ten Plagues" },
-          { "level": 14, "pos": [360, 390], "unlocked": false, "name": "Red Sea" },
-          { "level": 15, "pos": [520, 460], "unlocked": false, "name": "Desert March" },
+	  {
+		"id": 2,
+		"title": "Exodus: The Journey",
+		"background_image": "res://textures/backgrounds/chapters/chapter_exodus.jpg",
+		"theme_color": "#D4A574",
+		"level_grid": {
+		  "rows": 2,
+		  "columns": 5
+		},
+		"levels": [
+		  { "level": 11, "pos": [360, 180], "unlocked": false, "name": "Burning Bush" },
+		  { "level": 12, "pos": [480, 250], "unlocked": false, "name": "Pharaoh's Palace" },
+		  { "level": 13, "pos": [240, 320], "unlocked": false, "name": "Ten Plagues" },
+		  { "level": 14, "pos": [360, 390], "unlocked": false, "name": "Red Sea" },
+		  { "level": 15, "pos": [520, 460], "unlocked": false, "name": "Desert March" },
 
-          { "level": 16, "pos": [200, 530], "unlocked": false, "name": "Mount Sinai" },
-          { "level": 17, "pos": [360, 600], "unlocked": false, "name": "Golden Calf" },
-          { "level": 18, "pos": [500, 670], "unlocked": false, "name": "Tabernacle" },
-          { "level": 19, "pos": [220, 670], "unlocked": false, "name": "Promised Land" },
-          { "level": 20, "pos": [360, 740], "unlocked": false, "name": "Jordan River" }
-        ],
-        "next_chapter_button_pos": [360, 810]
-      },
+		  { "level": 16, "pos": [200, 530], "unlocked": false, "name": "Mount Sinai" },
+		  { "level": 17, "pos": [360, 600], "unlocked": false, "name": "Golden Calf" },
+		  { "level": 18, "pos": [500, 670], "unlocked": false, "name": "Tabernacle" },
+		  { "level": 19, "pos": [220, 670], "unlocked": false, "name": "Promised Land" },
+		  { "level": 20, "pos": [360, 740], "unlocked": false, "name": "Jordan River" }
+		],
+		"next_chapter_button_pos": [360, 810]
+	  },
 
-      {
-        "id": 3,
-        "title": "Psalms: Songs of Praise",
-        "background_image": "res://textures/backgrounds/chapter_psalms.jpg",
-        "theme_color": "#6B8E5A",
-        "level_grid": {
-          "rows": 2,
-          "columns": 5
-        },
-        "levels": [
-          { "level": 21, "pos": [360, 180], "unlocked": false, "name": "Shepherd's Song" },
-          { "level": 22, "pos": [220, 250], "unlocked": false, "name": "Valley Shadow" },
-          { "level": 23, "pos": [500, 320], "unlocked": false, "name": "Still Waters" },
-          { "level": 24, "pos": [360, 390], "unlocked": false, "name": "Green Pastures" },
-          { "level": 25, "pos": [240, 460], "unlocked": false, "name": "Overflowing Cup" },
+	  {
+		"id": 3,
+		"title": "Psalms: Songs of Praise",
+		"background_image": "res://textures/backgrounds/chapters/chapter_psalms.jpg",
+		"theme_color": "#6B8E5A",
+		"level_grid": {
+		  "rows": 2,
+		  "columns": 5
+		},
+		"levels": [
+		  { "level": 21, "pos": [360, 180], "unlocked": false, "name": "Shepherd's Song" },
+		  { "level": 22, "pos": [220, 250], "unlocked": false, "name": "Valley Shadow" },
+		  { "level": 23, "pos": [500, 320], "unlocked": false, "name": "Still Waters" },
+		  { "level": 24, "pos": [360, 390], "unlocked": false, "name": "Green Pastures" },
+		  { "level": 25, "pos": [240, 460], "unlocked": false, "name": "Overflowing Cup" },
 
-          { "level": 26, "pos": [480, 530], "unlocked": false, "name": "Joyful Noise" },
-          { "level": 27, "pos": [360, 600], "unlocked": false, "name": "Morning Prayer" },
-          { "level": 28, "pos": [220, 670], "unlocked": false, "name": "Mighty Fortress" },
-          { "level": 29, "pos": [500, 670], "unlocked": false, "name": "Heavenly Host" },
-          { "level": 30, "pos": [360, 740], "unlocked": false, "name": "Eternal Song" }
-        ],
-        "next_chapter_button_pos": [360, 810]
-      },
+		  { "level": 26, "pos": [480, 530], "unlocked": false, "name": "Joyful Noise" },
+		  { "level": 27, "pos": [360, 600], "unlocked": false, "name": "Morning Prayer" },
+		  { "level": 28, "pos": [220, 670], "unlocked": false, "name": "Mighty Fortress" },
+		  { "level": 29, "pos": [500, 670], "unlocked": false, "name": "Heavenly Host" },
+		  { "level": 30, "pos": [360, 740], "unlocked": false, "name": "Eternal Song" }
+		],
+		"next_chapter_button_pos": [360, 810]
+	  },
 
-      {
-        "id": 4,
-        "title": "Proverbs: Words of Wisdom",
-        "background_image": "res://textures/backgrounds/chapters/chapter_proverbs.jpg",
-        "theme_color": "#8B5A6B",
-        "level_grid": {
-          "rows": 2,
-          "columns": 5
-        },
-        "levels": [
-          { "level": 31, "pos": [360, 180], "unlocked": false, "name": "Fear of Lord" },
-          { "level": 32, "pos": [480, 250], "unlocked": false, "name": "Wise Heart" },
-          { "level": 33, "pos": [240, 320], "unlocked": false, "name": "Gentle Answer" },
-          { "level": 34, "pos": [360, 390], "unlocked": false, "name": "Righteous Path" },
-          { "level": 35, "pos": [520, 460], "unlocked": false, "name": "Understanding" },
+	  {
+		"id": 4,
+		"title": "Proverbs: Words of Wisdom",
+		"background_image": "res://textures/backgrounds/chapters/chapter_proverbs.jpg",
+		"theme_color": "#8B5A6B",
+		"level_grid": {
+		  "rows": 2,
+		  "columns": 5
+		},
+		"levels": [
+		  { "level": 31, "pos": [360, 180], "unlocked": false, "name": "Fear of Lord" },
+		  { "level": 32, "pos": [480, 250], "unlocked": false, "name": "Wise Heart" },
+		  { "level": 33, "pos": [240, 320], "unlocked": false, "name": "Gentle Answer" },
+		  { "level": 34, "pos": [360, 390], "unlocked": false, "name": "Righteous Path" },
+		  { "level": 35, "pos": [520, 460], "unlocked": false, "name": "Understanding" },
 
-          { "level": 36, "pos": [200, 530], "unlocked": false, "name": "Golden Rule" },
-          { "level": 37, "pos": [360, 600], "unlocked": false, "name": "Virtuous Woman" },
-          { "level": 38, "pos": [500, 670], "unlocked": false, "name": "Trust & Honor" },
-          { "level": 39, "pos": [220, 670], "unlocked": false, "name": "Crown of Glory" },
-          { "level": 40, "pos": [360, 740], "unlocked": false, "name": "Eternal Wisdom" }
-        ],
-        "next_chapter_button_pos": [360, 810]
-      }
-    ]
+		  { "level": 36, "pos": [200, 530], "unlocked": false, "name": "Golden Rule" },
+		  { "level": 37, "pos": [360, 600], "unlocked": false, "name": "Virtuous Woman" },
+		  { "level": 38, "pos": [500, 670], "unlocked": false, "name": "Trust & Honor" },
+		  { "level": 39, "pos": [220, 670], "unlocked": false, "name": "Crown of Glory" },
+		  { "level": 40, "pos": [360, 740], "unlocked": false, "name": "Eternal Wisdom" }
+		],
+		"next_chapter_button_pos": [360, 810]
+	  },
+
+	  {
+		"id": 5,
+		"title": "Test: Collectibles & Obstacles",
+		"background_image": "res://textures/backgrounds/chapters/chapter_proverbs.jpg",
+		"theme_color": "#FF6B6B",
+		"level_grid": {
+		  "rows": 1,
+		  "columns": 5
+		},
+		"levels": [
+		  { "level": 51, "pos": [144, 400], "unlocked": true, "name": "Coins Test" },
+		  { "level": 52, "pos": [288, 400], "unlocked": true, "name": "Obstacles" },
+		  { "level": 53, "pos": [432, 400], "unlocked": true, "name": "Mixed Test" },
+		  { "level": 54, "pos": [576, 400], "unlocked": true, "name": "Advanced" },
+		  { "level": 55, "pos": [360, 500], "unlocked": true, "name": "Final Test" }
+		],
+		"next_chapter_button_pos": [360, 600]
+	  }
+	]
   }
 }

@@ -234,4 +234,3 @@ static func get_image_for_level(level: int) -> Dictionary:
 	if GALLERY_IMAGES.has(level):
 		return GALLERY_IMAGES[level]
 	return {}
-
