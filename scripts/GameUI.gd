@@ -114,6 +114,7 @@ func _ready():
 	GameManager.connect("game_over", _on_game_over)
 	GameManager.connect("level_complete", _on_level_complete)
 	GameManager.connect("collectibles_changed", _on_collectibles_changed)
+	GameManager.connect("unmovables_changed", _on_unmovables_changed)
 
 	# Connect UI buttons
 	# restart_button removed - enhanced game over screen uses its own buttons
@@ -356,7 +357,12 @@ func update_display():
 	moves_label.text = "%d" % GameManager.moves_left
 
 	# Update progress bar and target label based on level type
-	if GameManager.collectible_target > 0:
+	if GameManager.unmovable_target > 0:
+		# Unmovable-based level
+		var progress = float(GameManager.unmovables_cleared) / float(GameManager.unmovable_target)
+		target_progress.value = min(progress * 100, 100)
+		target_label.text = "Obstacles: %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
+	elif GameManager.collectible_target > 0:
 		# Collectible-based level
 		var progress = float(GameManager.collectibles_collected) / float(GameManager.collectible_target)
 		target_progress.value = min(progress * 100, 100)
@@ -370,8 +376,8 @@ func update_display():
 func _on_score_changed(new_score: int):
 	score_label.text = "%d" % new_score
 
-	# Update progress only if score-based level
-	if GameManager.collectible_target == 0:
+	# Update progress only if score-based level (not collectible or unmovable)
+	if GameManager.collectible_target == 0 and GameManager.unmovable_target == 0:
 		var progress = float(new_score) / float(GameManager.target_score)
 		target_progress.value = min(progress * 100, 100)
 
@@ -382,7 +388,9 @@ func _on_level_changed(new_level: int):
 	level_label.text = "Lv %d" % new_level
 
 	# Update target label based on level type
-	if GameManager.collectible_target > 0:
+	if GameManager.unmovable_target > 0:
+		target_label.text = "Obstacles: %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
+	elif GameManager.collectible_target > 0:
 		target_label.text = "Coins: %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
 	else:
 		target_label.text = "Goal: %d" % GameManager.target_score
@@ -402,6 +410,18 @@ func _on_collectibles_changed(collected: int, target: int):
 		# Animate collectible collection
 		var tween = create_tween()
 		tween.tween_property(target_label, "modulate", Color(1.0, 0.9, 0.2), 0.1)  # Gold flash
+		tween.tween_property(target_label, "modulate", Color.WHITE, 0.1)
+
+func _on_unmovables_changed(cleared: int, target: int):
+	"""Update UI when unmovables are cleared"""
+	if target > 0:
+		target_label.text = "Obstacles: %d/%d" % [cleared, target]
+		var progress = float(cleared) / float(target)
+		target_progress.value = min(progress * 100, 100)
+
+		# Animate unmovable clearing
+		var tween = create_tween()
+		tween.tween_property(target_label, "modulate", Color(1.0, 0.5, 0.3), 0.1)  # Orange flash
 		tween.tween_property(target_label, "modulate", Color.WHITE, 0.1)
 
 func _on_moves_changed(moves_left: int):
@@ -431,7 +451,7 @@ func _on_game_over():
 
 func _on_level_complete():
 	print("=".repeat(60))
-	print("[GameUI] ⭐ _on_level_complete() CALLED ⭐")
+	print("[GameUI] _on_level_complete() CALLED")
 	print("=".repeat(60))
 	print("[GameUI] Level complete! Score: %d, Target: %d" % [GameManager.score, GameManager.target_score])
 	print("[GameUI] GameManager.level = ", GameManager.level)
@@ -477,6 +497,7 @@ func _on_level_complete():
 
 	# Get star rating for the completed level
 	var stars = StarRatingManager.get_level_stars(completed_level_number)
+	print("[GameUI] get_level_stars returned:", stars, "for level", completed_level_number)
 	if stars == 0:
 		# If no stars saved yet, calculate based on current score
 		var lvl_mgr = get_node_or_null("/root/LevelManager")
@@ -490,6 +511,7 @@ func _on_level_complete():
 				moves_used,
 				total_moves
 			)
+			print("[GameUI] Calculated stars (fallback):", stars)
 
 	print("[GameUI] Level %d completed with %d stars" % [completed_level_number, stars])
 
@@ -1618,8 +1640,7 @@ func _show_shop_side():
 		shop_ui.anchor_left = 0
 		shop_ui.anchor_top = 0
 		shop_ui.anchor_right = 1
-		shop_ui.anchor_bottom = 1
-		# start offscreen to right (GameUI will animate position)
+		shop_ui.anchor_bottom = 1		# start offscreen to right (GameUI will animate position)
 		shop_ui.position = Vector2(vp.x, 0)
 		shop_ui.size = vp
 		shop_ui.visible = true
@@ -2103,7 +2124,7 @@ func _create_game_over_screen() -> Control:
 	elif percentage >= 75:
 		message.text = "Great effort! One more try! 💪"
 	elif percentage >= 50:
-		message.text = "You're getting there! Keep going! ⭐"
+		message.text = "You're getting there! Keep going!"
 	else:
 		message.text = "Don't give up! You can do it! 🚀"
 

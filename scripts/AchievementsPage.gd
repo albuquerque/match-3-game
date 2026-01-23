@@ -9,6 +9,9 @@ signal back_pressed
 @onready var claim_reward_button: Button
 @onready var back_button: Button
 
+# Preload gold star texture for consistent display
+var gold_star_texture = preload("res://textures/gold_star.svg")
+
 func _ready():
 	# Create UI programmatically for flexibility
 	_setup_ui()
@@ -198,7 +201,7 @@ func _update_badges(streak: int):
 			]
 		},
 		{
-			"title": "⭐ Star Collector",
+			"title": "Star Collector",
 			"achievements": [
 				{"id": "stars_10", "title": "Rising Star", "desc": "Earn 10 stars"},
 				{"id": "stars_25", "title": "Star Seeker", "desc": "Earn 25 stars"},
@@ -693,11 +696,13 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 				icon_rect.texture = ThemeManager.load_gem_icon()
 			reward_line.add_child(icon_rect)
 		else:
-			# Use emoji for stars
-			var icon_label = Label.new()
-			icon_label.text = "⭐"
-			ThemeManager.apply_bangers_font(icon_label, 28)
-			reward_line.add_child(icon_label)
+			# Use gold star texture instead of emoji for cross-platform consistency
+			var icon_rect = TextureRect.new()
+			icon_rect.custom_minimum_size = Vector2(28, 28)
+			icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon_rect.texture = gold_star_texture
+			reward_line.add_child(icon_rect)
 
 		var reward_text = Label.new()
 		reward_text.text = " %s x%d" % [name, amount]

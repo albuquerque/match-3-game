@@ -13,9 +13,10 @@ var multiplier_bar_bg: ColorRect
 var multiplier_pointer: ColorRect
 var multiplier_zones: Array = []
 var zone_labels: Array = []
-var tap_instruction_label: Label
+var tap_instruction_button: Button
 var ad_trigger_button: Button
 var continue_button: Button
+var multiplier_tap_area: Control  # Clickable area for stopping the pointer
 
 var level_data = {}
 var _base_coins = 0
@@ -27,6 +28,8 @@ var _pointer_direction = 1.0
 var _pointer_speed = 200.0  # pixels per second
 var _selected_multiplier = 1.0
 var bangers_font  # Bangers font resource for consistent styling
+# Preload gold star texture for consistent cross-platform rendering
+var gold_star_texture = preload("res://textures/gold_star.svg")
 
 # Multiplier zone configuration [start%, end%, multiplier, color]
 var _multiplier_config = [
@@ -215,15 +218,28 @@ func _create_multiplier_ui():
 	multiplier_pointer.size = Vector2(8, 60)
 	bar_container.add_child(multiplier_pointer)
 
-	# Tap instruction
-	tap_instruction_label = Label.new()
-	tap_instruction_label.name = "TapInstruction"
-	tap_instruction_label.text = "TAP TO STOP AND WATCH AD!"
-	tap_instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(tap_instruction_label, 20)
-	tap_instruction_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))  # Red
-	tap_instruction_label.visible = false  # Hidden until game starts
-	multiplier_container.add_child(tap_instruction_label)
+	# Create invisible tap area over the bar for pointer stopping
+	multiplier_tap_area = Control.new()
+	multiplier_tap_area.name = "MultiplierTapArea"
+	multiplier_tap_area.position = Vector2(10, 10)
+	multiplier_tap_area.size = Vector2(480, 60)
+	multiplier_tap_area.mouse_filter = Control.MOUSE_FILTER_STOP  # Capture mouse events
+	multiplier_tap_area.visible = false  # Hidden until game starts
+	bar_container.add_child(multiplier_tap_area)
+
+	# Connect tap area signals
+	multiplier_tap_area.gui_input.connect(_on_multiplier_tap_area_input)
+
+	# Tap instruction button (replaces label)
+	tap_instruction_button = Button.new()
+	tap_instruction_button.name = "TapInstructionButton"
+	tap_instruction_button.text = "🎯 TAP HERE TO STOP!"
+	tap_instruction_button.custom_minimum_size = Vector2(300, 60)
+	ThemeManager.apply_bangers_font_to_button(tap_instruction_button, 20)
+	tap_instruction_button.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))  # Red
+	tap_instruction_button.visible = false  # Hidden until game starts
+	tap_instruction_button.pressed.connect(_on_multiplier_tapped)
+	multiplier_container.add_child(tap_instruction_button)
 
 func _process(delta):
 	"""Update multiplier pointer position if mini-game is active"""
@@ -246,11 +262,12 @@ func _process(delta):
 	if multiplier_pointer:
 		multiplier_pointer.position.x = 10 + _pointer_position
 
-func _input(event):
-	"""Handle tap to stop the pointer"""
+func _on_multiplier_tap_area_input(event):
+	"""Handle input only on the multiplier bar tap area"""
 	if not _multiplier_active:
 		return
 
+	# Only respond to press events
 	if event is InputEventScreenTouch and event.pressed:
 		_on_multiplier_tapped()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -334,30 +351,33 @@ func _update_star_display(stars: int):
 
 	# Create 3 star labels
 	for i in range(3):
-		var star_label = Label.new()
-		ThemeManager.apply_bangers_font(star_label, 64)
+		# Use TextureRect with gold star SVG for reliable mobile rendering
+		var star_tex = TextureRect.new()
+		star_tex.texture = gold_star_texture
+		star_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		star_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		star_tex.custom_minimum_size = Vector2(64, 64)
 
+		# Color the star based on earned or not
 		if i < stars:
-			# Earned star - golden
-			star_label.text = "⭐"
-			star_label.add_theme_color_override("font_color", StarRatingManager.get_star_color(i + 1, stars))
+			# Earned star - golden color overlay
+			star_tex.modulate = StarRatingManager.get_star_color(i + 1, stars)
 		else:
-			# Unearned star - grey
-			star_label.text = "☆"
-			star_label.add_theme_color_override("font_color", StarRatingManager.get_star_color(i + 1, stars))
+			# Unearned star - greyed out
+			star_tex.modulate = Color(0.4, 0.4, 0.4, 0.6)
 
-		star_container.add_child(star_label)
+		star_container.add_child(star_tex)
 
 		# Animate star appearance with delay
-		star_label.modulate.a = 0
+		star_tex.modulate.a = 0
 		var tween = create_tween()
-		tween.tween_property(star_label, "modulate:a", 1.0, 0.3).set_delay(i * 0.2)
+		tween.tween_property(star_tex, "modulate:a", 1.0, 0.3).set_delay(i * 0.2)
 
 		# Scale animation for earned stars
 		if i < stars:
-			star_label.scale = Vector2(0.1, 0.1)
-			tween.parallel().tween_property(star_label, "scale", Vector2(1.2, 1.2), 0.3).set_delay(i * 0.2)
-			tween.tween_property(star_label, "scale", Vector2(1.0, 1.0), 0.1)
+			star_tex.scale = Vector2(0.1, 0.1)
+			tween.parallel().tween_property(star_tex, "scale", Vector2(1.2, 1.2), 0.3).set_delay(i * 0.2)
+			tween.tween_property(star_tex, "scale", Vector2(1.0, 1.0), 0.1)
 
 func _update_rewards_display(coins: int, gems: int):
 	"""Update the rewards display with current values and performance summary"""
@@ -497,9 +517,11 @@ func _reset_multiplier_ui():
 		bar_container.visible = true
 
 	# Hide tap instruction (will show when game starts)
-	if tap_instruction_label:
-		tap_instruction_label.visible = false
-		tap_instruction_label.text = "TAP TO STOP AND WATCH AD!"
+	if tap_instruction_button:
+		tap_instruction_button.visible = false
+
+	if multiplier_tap_area:
+		multiplier_tap_area.visible = false
 
 func _start_multiplier_game():
 	"""Start the multiplier mini-game automatically (no button needed)"""
@@ -509,9 +531,12 @@ func _start_multiplier_game():
 
 	print("[LevelTransition] Auto-starting multiplier challenge")
 
-	# Show tap instruction
-	if tap_instruction_label:
-		tap_instruction_label.visible = true
+	# Show tap instruction button and enable tap area
+	if tap_instruction_button:
+		tap_instruction_button.visible = true
+
+	if multiplier_tap_area:
+		multiplier_tap_area.visible = true
 
 	# Start the pointer movement immediately
 	_multiplier_active = true
@@ -559,9 +584,11 @@ func _on_multiplier_tapped():
 
 	print("[LevelTransition] Pointer stopped at %.2f%% - Multiplier: %.1fx" % [pointer_percent * 100, _selected_multiplier])
 
-	# Hide tap instruction
-	if tap_instruction_label:
-		tap_instruction_label.visible = false
+	# Hide tap instruction button and tap area - user has already tapped
+	if tap_instruction_button:
+		tap_instruction_button.visible = false
+	if multiplier_tap_area:
+		multiplier_tap_area.visible = false
 
 	# Show "Watch ad to claim" message
 	var watch_ad_label = Label.new()
@@ -609,9 +636,11 @@ func _apply_multiplier():
 	# Update the display
 	_update_rewards_display(_base_coins, _base_gems)
 
-	# Hide tap instruction
-	if tap_instruction_label:
-		tap_instruction_label.visible = false
+	# Hide tap instruction button and tap area
+	if tap_instruction_button:
+		tap_instruction_button.visible = false
+	if multiplier_tap_area:
+		multiplier_tap_area.visible = false
 
 	# Remove "watch ad to claim" label if it exists
 	var watch_ad_label = multiplier_container.get_node_or_null("WatchAdLabel")

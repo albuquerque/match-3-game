@@ -12,6 +12,8 @@ signal notification_closed
 
 var reward_queue: Array = []
 var is_showing: bool = false
+# Preload gold star texture for consistent display
+var gold_star_texture = preload("res://textures/gold_star.svg")
 
 func _ready():
 	visible = false
@@ -36,13 +38,10 @@ func _display_reward(reward_data: Dictionary):
 	visible = true
 
 	# Set reward text and icon based on type
-	var icon_texture: Texture2D = null
 	match reward_data.type:
 		"coins":
-			icon_texture = ThemeManager.load_coin_icon()
 			reward_label.text = "+%d Coins" % reward_data.amount
 		"gems":
-			icon_texture = ThemeManager.load_gem_icon()
 			reward_label.text = "+%d Gems" % reward_data.amount
 		"lives":
 			# Keep emoji for lives as we don't have an SVG
@@ -51,8 +50,8 @@ func _display_reward(reward_data: Dictionary):
 			# Keep emoji for booster as we don't have a generic SVG
 			reward_label.text = "🚀 Booster Unlocked!"
 		"stars":
-			# Keep emoji for stars as we don't have an SVG
-			reward_label.text = "⭐ %d Stars!" % reward_data.amount
+			# Use gold star SVG texture for star rewards
+			reward_label.text = "%d Stars!" % reward_data.amount
 		_:
 			# Keep emoji for generic rewards
 			reward_label.text = "🎁 Reward!"
@@ -68,16 +67,47 @@ func _display_reward(reward_data: Dictionary):
 	for child in icon_container.get_children():
 		child.queue_free()
 
-	if icon_texture:
-		# Use TextureRect for SVG icons
+	# Directly create the icon node based on reward type to avoid type/assignment issues
+	if reward_data.type == "coins":
+		var coin_tex = ThemeManager.load_coin_icon()
+		if coin_tex:
+			var icon_rect = TextureRect.new()
+			icon_rect.texture = coin_tex
+			icon_rect.custom_minimum_size = Vector2(80, 80)
+			icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon_container.add_child(icon_rect)
+		else:
+			var icon_label = Label.new()
+			icon_label.text = "💰"
+			icon_label.add_theme_font_size_override("font_size", 48)
+			icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			icon_container.add_child(icon_label)
+	elif reward_data.type == "gems":
+		var gem_tex = ThemeManager.load_gem_icon()
+		if gem_tex:
+			var icon_rect = TextureRect.new()
+			icon_rect.texture = gem_tex
+			icon_rect.custom_minimum_size = Vector2(80, 80)
+			icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon_container.add_child(icon_rect)
+		else:
+			var icon_label = Label.new()
+			icon_label.text = "💎"
+			icon_label.add_theme_font_size_override("font_size", 48)
+			icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			icon_container.add_child(icon_label)
+	elif reward_data.type == "stars":
+		# Use gold_star_texture directly
 		var icon_rect = TextureRect.new()
-		icon_rect.texture = icon_texture
+		icon_rect.texture = gold_star_texture
 		icon_rect.custom_minimum_size = Vector2(80, 80)
 		icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon_container.add_child(icon_rect)
 	else:
-		# Use Label for emoji fallback (lives, boosters, stars)
+		# Use Label for emoji fallback (lives, boosters, generic)
 		var icon_label = Label.new()
 		var icon_text = ""
 		match reward_data.type:
@@ -85,8 +115,6 @@ func _display_reward(reward_data: Dictionary):
 				icon_text = "❤️"
 			"booster":
 				icon_text = "🚀"
-			"stars":
-				icon_text = "⭐"
 			_:
 				icon_text = "🎁"
 		icon_label.text = icon_text
@@ -165,4 +193,3 @@ func show_daily_login_reward(day: int, coins: int, gems: int = 0, booster: Strin
 			"amount": 1,
 			"description": "Free %s booster!" % booster.capitalize()
 		})
-

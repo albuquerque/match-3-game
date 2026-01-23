@@ -2,12 +2,16 @@
 """
 Level generator for match-3-game
 Generates level JSON files named level_XX.json in the project's levels/ directory.
-Layout format matches existing levels: a single string where each row is concatenated and rows are separated by '\n' or simply concatenated in the string (existing files use a single string without explicit newlines in JSON). We'll follow the format used in docs: layout is a string of length width*height using '0' for playable cell, 'X' for blocked cell and other letters for special tiles (e.g., 'U' for unmovable soft, 'H' for hard unmovable, 'C' for collectible spawn marker).
+Layout format matches existing levels: a single string where each row is concatenated and rows are separated by '\n'.
 
 Usage:
     python3 tools/level_generator.py --start 11 --end 50 --out levels/
 
-This script will attempt to keep targets and moves reasonable.
+This script creates playable levels with proper unmovable tile placement:
+- Unmovable tiles are grouped together to form walls/barriers
+- Always placed adjacent to playable areas (can be broken)
+- Never isolated or in unreachable areas
+- Collectibles never spawn in bottom row
 """
 import json
 import os
@@ -25,84 +29,427 @@ LEVEL_TEMPLATE = {
     "num_tile_types": 6,
     "theme": "legacy",
     "layout": "",
-    "collectible_target": 0  # Number of collectibles to collect (0 = score-based level)
+    "collectible_target": 0,  # Number of collectibles to collect (0 = not required)
+    "unmovable_target": 0,  # Number of unmovables to clear (0 = not required)
+    "unmovable_type": "snow",  # Type of unmovable_soft (snow, glass, wood, etc.)
+    "collectible_type": "coin"
 }
 
 SPECIAL_CHARS = {
     'blocked': 'X',
     'playable': '0',
     'collectible': 'C',
-    'unmovable_soft': 'U',
-    'unmovable_hard': 'H'
+    'unmovable_soft': 'U',  # Soft unmovable - 1 hit to destroy
 }
 
 # Simple shapes to add variety
 SHAPES = [
-    # Full rectangle
+    # Full rectangle - always safe
     lambda w, h: [['0' for _ in range(w)] for __ in range(h)],
-    # Hollow center
-    lambda w, h: [[('0' if x==0 or y==0 or x==w-1 or y==h-1 else 'X') for x in range(w)] for y in range(h)],
-    # Cross
-    lambda w, h: [[('0' if x==w//2 or y==h//2 else 'X') for x in range(w)] for y in range(h)],
-    # Diagonal playable
-    lambda w, h: [[('0' if x==y or x==w-y-1 else 'X') for x in range(w)] for y in range(h)],
+    # Frame (hollow center) - only for larger grids
+    lambda w, h: [[('0' if x < 2 or y < 2 or x >= w-2 or y >= h-2 else 'X') for x in range(w)] for y in range(h)],
+    # Cross/Plus shape - only for larger grids
+    lambda w, h: [[('0' if abs(x - w//2) <= 1 or abs(y - h//2) <= 1 else 'X') for x in range(w)] for y in range(h)],
+    # Diamond shape - safe for most sizes
+    lambda w, h: [[('0' if abs(x - w//2) + abs(y - h//2) <= min(w,h)//2 + 1 else 'X') for x in range(w)] for y in range(h)],
+    # Checkerboard large blocks - only for larger grids
+    lambda w, h: [[('0' if (x//2 + y//2) % 2 == 0 else 'X') for x in range(w)] for y in range(h)],
 ]
 
 
-def generate_layout(w, h, shape_func, special_density=0.05):
-    grid = shape_func(w, h)
-    # Replace some playable cells with collectibles or unmovable tiles
-    playable_cells = [(x,y) for y in range(h) for x in range(w) if grid[y][x]=='0']
+def get_suitable_shapes(w, h):
+    """Get shapes suitable for the given grid size"""
+    # For small grids (6x6 or smaller), only use full rectangle and diamond
+    if w <= 6 or h <= 6:
+        return [
+            SHAPES[0],  # Full rectangle
+            SHAPES[3],  # Diamond
+        ]
 
-    # Filter out bottom row from collectible candidates
-    bottom_row = h - 1
-    collectible_candidates = [(x,y) for (x,y) in playable_cells if y != bottom_row]
+    # For medium grids (7x7 or 8x8), use most shapes
+    if w <= 8 and h <= 8:
+        return [
+            SHAPES[0],  # Full rectangle
+            SHAPES[1],  # Frame
+            SHAPES[3],  # Diamond
+        ]
 
-    random.shuffle(collectible_candidates)
-    # Add collectibles (but not in bottom row)
-    num_collect = max(1, int(len(playable_cells) * special_density))
-    for i in range(min(num_collect, len(collectible_candidates))):
-        x,y = collectible_candidates[i]
-        grid[y][x] = SPECIAL_CHARS['collectible']
+    # For large grids, use all shapes
+    return SHAPES
 
-    # Add a few unmovable tiles (can be anywhere)
-    random.shuffle(playable_cells)
-    for i in range(int(len(playable_cells)*special_density/2)):
-        x,y = playable_cells[i]
-        # Don't overwrite collectibles
-        if grid[y][x] == '0':
-            grid[y][x] = random.choice([SPECIAL_CHARS['unmovable_soft'], SPECIAL_CHARS['unmovable_hard']])
-    # Convert grid rows to string - use '0' for playable, 'X' for blocked, special chars left as-is
-    rows = [''.join(grid[y]) for y in range(h)]
-    # Join with newlines and add spaces between cells to match existing level format
+
+def has_adjacent_playable(grid, x, y, w, h):
+    """Check if position (x,y) has at least one adjacent playable cell"""
+    dirs = [(-1,0), (1,0), (0,-1), (0,1)]
+    for dx, dy in dirs:
+        nx, ny = x + dx, y + dy
+        if 0 <= nx < w and 0 <= ny < h:
+            if grid[ny][nx] == '0':
+                return True
+    return False
+
+
+def count_adjacent_playable(grid, x, y, w, h):
+    """Count how many adjacent cells are playable"""
+    dirs = [(-1,0), (1,0), (0,-1), (0,1)]
+    count = 0
+    for dx, dy in dirs:
+        nx, ny = x + dx, y + dy
+        if 0 <= nx < w and 0 <= ny < h:
+            if grid[ny][nx] == '0':
+                count += 1
+    return count
+
+
+def is_level_playable(grid, w, h):
+    """
+    Check if a level is playable by validating:
+    1. Enough playable cells (at least 50% of grid)
+    2. No isolated single cells
+    3. Each row has at least 3 consecutive playable cells
+    4. Each column has at least 3 consecutive playable cells
+    """
+    playable_count = 0
+    total_cells = w * h
+
+    # Count playable cells
+    for y in range(h):
+        for x in range(w):
+            if grid[y][x] == '0':
+                playable_count += 1
+
+    # Need at least 50% playable cells
+    if playable_count < total_cells * 0.5:
+        return False, "Not enough playable cells"
+
+    # Check for isolated cells (no adjacent playable cells)
+    for y in range(h):
+        for x in range(w):
+            if grid[y][x] == '0':
+                adjacent_count = count_adjacent_playable(grid, x, y, w, h)
+                if adjacent_count == 0:
+                    return False, f"Isolated cell at ({x},{y})"
+
+    # Check each row has at least 3 consecutive playable cells
+    for y in range(h):
+        max_consecutive = 0
+        current_consecutive = 0
+        for x in range(w):
+            if grid[y][x] == '0':
+                current_consecutive += 1
+                max_consecutive = max(max_consecutive, current_consecutive)
+            else:
+                current_consecutive = 0
+        if max_consecutive < 3:
+            return False, f"Row {y} doesn't have 3 consecutive playable cells"
+
+    # Check each column has at least 3 consecutive playable cells
+    for x in range(w):
+        max_consecutive = 0
+        current_consecutive = 0
+        for y in range(h):
+            if grid[y][x] == '0':
+                current_consecutive += 1
+                max_consecutive = max(max_consecutive, current_consecutive)
+            else:
+                current_consecutive = 0
+        if max_consecutive < 3:
+            return False, f"Column {x} doesn't have 3 consecutive playable cells"
+
+    return True, "Playable"
+
+
+def place_unmovable_barrier(grid, w, h, num_unmovables):
+    """
+    Place unmovable tiles in a meaningful pattern:
+    - Grouped together as a barrier/wall
+    - Always adjacent to playable areas
+    - Creates interesting gameplay challenges
+    """
+    if num_unmovables <= 0:
+        return
+
+    # Find all playable cells
+    playable_cells = [(x, y) for y in range(h) for x in range(w) if grid[y][x] == '0']
+
+    if len(playable_cells) < num_unmovables:
+        num_unmovables = len(playable_cells) // 2
+
+    # Choose a barrier pattern based on level complexity
+    barrier_patterns = [
+        'horizontal_line',  # Horizontal barrier across middle
+        'vertical_line',    # Vertical barrier down middle
+        'corner_blocks',    # Unmovables in corners
+        'center_cluster',   # Cluster in center
+        'scattered_groups', # Multiple small groups
+    ]
+
+    pattern = random.choice(barrier_patterns)
+    placed = []
+
+    if pattern == 'horizontal_line':
+        # Place horizontal line of unmovables across middle
+        mid_y = h // 2
+        start_x = max(1, (w - num_unmovables) // 2)
+        for i in range(min(num_unmovables, w - 2)):
+            x = start_x + i
+            if x < w and grid[mid_y][x] == '0':
+                grid[mid_y][x] = 'U'
+                placed.append((x, mid_y))
+
+    elif pattern == 'vertical_line':
+        # Place vertical line of unmovables down middle
+        mid_x = w // 2
+        start_y = max(1, (h - num_unmovables) // 2)
+        for i in range(min(num_unmovables, h - 2)):
+            y = start_y + i
+            if y < h and grid[y][mid_x] == '0':
+                grid[y][mid_x] = 'U'
+                placed.append((mid_x, y))
+
+    elif pattern == 'corner_blocks':
+        # Place small clusters in corners
+        corners = [
+            (1, 1), (w-2, 1), (1, h-2), (w-2, h-2)
+        ]
+        random.shuffle(corners)
+        per_corner = max(2, num_unmovables // 4)
+
+        for cx, cy in corners:
+            if len(placed) >= num_unmovables:
+                break
+            # Place a small cluster around this corner
+            cluster_offsets = [(0,0), (1,0), (0,1), (-1,0), (0,-1), (1,1)]
+            for dx, dy in cluster_offsets:
+                if len(placed) >= num_unmovables:
+                    break
+                x, y = cx + dx, cy + dy
+                if 0 <= x < w and 0 <= y < h and grid[y][x] == '0':
+                    grid[y][x] = 'U'
+                    placed.append((x, y))
+
+    elif pattern == 'center_cluster':
+        # Place cluster in center
+        cx, cy = w // 2, h // 2
+        # Spiral outward from center
+        placed_set = set()
+        queue = [(cx, cy)]
+        dirs = [(0,0), (1,0), (0,1), (-1,0), (0,-1), (1,1), (-1,-1), (1,-1), (-1,1)]
+
+        while queue and len(placed) < num_unmovables:
+            x, y = queue.pop(0)
+            if (x, y) in placed_set:
+                continue
+            if not (0 <= x < w and 0 <= y < h):
+                continue
+            if grid[y][x] != '0':
+                continue
+
+            grid[y][x] = 'U'
+            placed.append((x, y))
+            placed_set.add((x, y))
+
+            # Add neighbors to queue
+            for dx, dy in dirs:
+                nx, ny = x + dx, y + dy
+                if (nx, ny) not in placed_set:
+                    queue.append((nx, ny))
+
+    else:  # scattered_groups
+        # Place multiple small groups (2-3 tiles each)
+        group_size = 3
+        num_groups = max(1, num_unmovables // group_size)
+
+        for _ in range(num_groups):
+            if len(placed) >= num_unmovables:
+                break
+
+            # Pick random starting point from playable cells with good adjacency
+            candidates = [(x, y) for x, y in playable_cells
+                         if grid[y][x] == '0' and count_adjacent_playable(grid, x, y, w, h) >= 2]
+
+            if not candidates:
+                candidates = playable_cells
+
+            if candidates:
+                start_x, start_y = random.choice(candidates)
+                # Place small group
+                offsets = [(0,0), (1,0), (0,1), (-1,0)]
+                random.shuffle(offsets)
+
+                for dx, dy in offsets:
+                    if len(placed) >= num_unmovables:
+                        break
+                    x, y = start_x + dx, start_y + dy
+                    if 0 <= x < w and 0 <= y < h and grid[y][x] == '0':
+                        grid[y][x] = 'U'
+                        placed.append((x, y))
+
+    return len(placed)
+
+
+def generate_layout(w, h, shape_func, add_collectibles=True, add_unmovables=True, max_retries=5):
+    """Generate a level layout, ensuring it's playable"""
+
+    for attempt in range(max_retries):
+        grid = shape_func(w, h)
+
+        # Validate base shape is playable
+        is_playable, reason = is_level_playable(grid, w, h)
+        if not is_playable:
+            print(f"  Attempt {attempt + 1}: Base shape not playable - {reason}, retrying...")
+            # Try full rectangle as fallback
+            if attempt >= 2:
+                grid = SHAPES[0](w, h)  # Full rectangle
+            continue
+
+        # Count playable cells
+        playable_cells = [(x, y) for y in range(h) for x in range(w) if grid[y][x] == '0']
+        num_playable = len(playable_cells)
+
+        # Add unmovable tiles (barriers/walls) - 10-20% of playable area
+        if add_unmovables and num_playable > 10:
+            num_unmovables = random.randint(max(4, num_playable // 10), num_playable // 5)
+            placed_count = place_unmovable_barrier(grid, w, h, num_unmovables)
+
+            # Validate after adding unmovables
+            is_playable, reason = is_level_playable(grid, w, h)
+            if not is_playable:
+                print(f"  Attempt {attempt + 1}: Unmovables made level unplayable - {reason}, retrying...")
+                continue
+
+            print(f"  Placed {placed_count} unmovable tiles")
+
+        # Add collectibles (but not in bottom row, and not where unmovables are)
+        num_collectibles = 0
+        if add_collectibles:
+            bottom_row = h - 1
+            collectible_candidates = [
+                (x, y) for y in range(h) for x in range(w)
+                if grid[y][x] == '0' and y != bottom_row
+            ]
+
+            if collectible_candidates:
+                # 1-3 collectibles per level
+                num_collectibles = random.randint(1, min(3, len(collectible_candidates)))
+                random.shuffle(collectible_candidates)
+
+                for i in range(num_collectibles):
+                    x, y = collectible_candidates[i]
+                    grid[y][x] = 'C'
+
+        # Final validation
+        is_playable, reason = is_level_playable(grid, w, h)
+        if is_playable:
+            # Convert grid to layout string format
+            layout_rows = []
+            for y in range(h):
+                row_str = ' '.join(grid[y])
+                layout_rows.append(row_str)
+
+            layout = '\n'.join(layout_rows)
+            return layout, num_collectibles
+        else:
+            print(f"  Attempt {attempt + 1}: Final validation failed - {reason}, retrying...")
+
+    # If all retries failed, generate a simple full rectangle (guaranteed playable)
+    print(f"  All attempts failed, using safe full rectangle layout")
+    grid = SHAPES[0](w, h)  # Full rectangle
     layout_rows = []
-    for row_str in rows:
-        # Add space between each character
-        spaced_row = ' '.join(row_str)
-        layout_rows.append(spaced_row)
-    # Join rows with newline
+    for y in range(h):
+        row_str = ' '.join(grid[y])
+        layout_rows.append(row_str)
     layout = '\n'.join(layout_rows)
-    return layout
+    return layout, 0
 
 
-def estimate_target_and_moves(level_index, w, h):
-    # base difficulty scales with level index and grid size
-    # Increased for better engagement
-    base = 5000 + level_index * 250
-    size_factor = (w*h) / 64.0
+def estimate_target_and_moves(level_index, w, h, has_collectibles, has_unmovables):
+    # Base difficulty scales with level index and grid size
+    # For smaller grids, use a more reasonable base
+    if w * h <= 36:  # 6x6 or smaller
+        base = 2000 + level_index * 100
+    else:
+        base = 5000 + level_index * 300
+
+    size_factor = (w * h) / 64.0
     target = int(base * size_factor)
+
+    # Adjust based on level features
+    if has_collectibles:
+        # Collectible levels need lower score targets since collecting is the main goal
+        target = int(target * 0.6)
+
+    if has_unmovables:
+        # Unmovable barriers make levels harder, reduce target slightly
+        target = int(target * 0.8)
+
+    # Cap target score based on grid size
+    max_target = (w * h) * 500  # Max 500 points per cell
+    target = min(target, max_target)
+
     # More generous moves for better user engagement
-    moves = max(20, int(25 + level_index * 0.5))
+    base_moves = 25 + int(level_index * 0.3)
+
+    # Add extra moves for unmovables (need time to break barriers)
+    if has_unmovables:
+        base_moves += 8
+
+    # Add extra moves for collectibles
+    if has_collectibles:
+        base_moves += 5
+
+    moves = max(20, min(60, base_moves))
+
     return target, moves
 
 
-def write_level(out_dir, level_num, w=8, h=8):
-    shape = random.choice(SHAPES)
-    layout = generate_layout(w, h, shape, special_density=0.06)
-    target, moves = estimate_target_and_moves(level_num, w, h)
+def write_level(out_dir, level_num, w=8, h=8, level_type='random'):
+    print(f"\nGenerating level {level_num}...")
 
-    # Count collectibles in layout
-    num_collectibles = layout.count('C')
+    # Get suitable shapes for this grid size
+    suitable_shapes = get_suitable_shapes(w, h)
+    shape = random.choice(suitable_shapes)
+
+    # Determine level features based on type argument
+    if level_type == 'collectibles':
+        add_collectibles = True
+        add_unmovables = False
+    elif level_type == 'unmovables':
+        add_collectibles = False
+        add_unmovables = True
+    elif level_type == 'both':
+        add_collectibles = True
+        add_unmovables = True
+    elif level_type == 'score':
+        add_collectibles = False
+        add_unmovables = False
+    else:  # 'random' or any other value
+        # Vary level types randomly:
+        # 40% - collectibles only
+        # 30% - unmovables only
+        # 20% - both collectibles and unmovables
+        # 10% - plain score-based
+        rand = random.random()
+        if rand < 0.4:
+            add_collectibles = True
+            add_unmovables = False
+        elif rand < 0.7:
+            add_collectibles = False
+            add_unmovables = True
+        elif rand < 0.9:
+            add_collectibles = True
+            add_unmovables = True
+        else:
+            add_collectibles = False
+            add_unmovables = False
+
+    layout, num_collectibles = generate_layout(w, h, shape, add_collectibles, add_unmovables)
+
+    has_unmovables = 'U' in layout
+    # Count unmovables in layout
+    num_unmovables = layout.count('U')
+
+    target, moves = estimate_target_and_moves(level_num, w, h, num_collectibles > 0, has_unmovables)
 
     data = LEVEL_TEMPLATE.copy()
     data['level_number'] = level_num
@@ -114,12 +461,36 @@ def write_level(out_dir, level_num, w=8, h=8):
     data['num_tile_types'] = 6
     data['layout'] = layout
 
-    # Set collectible target and description based on level type
-    if num_collectibles > 0:
-        data['collectible_target'] = num_collectibles
-        data['collectible_type'] = 'coin'  # Default to coin, can be changed manually
-        data['description'] = f"Collect {num_collectibles} coin{'s' if num_collectibles > 1 else ''}!"
+    # Vary themes
+    data['theme'] = 'modern' if level_num % 2 == 0 else 'legacy'
+
+    # Vary unmovable types and set unmovable target
+    if has_unmovables:
+        unmovable_types = ['snow', 'glass', 'wood']
+        data['unmovable_type'] = random.choice(unmovable_types)
+        # Set unmovable target - must clear all unmovables to complete level
+        data['unmovable_target'] = num_unmovables
     else:
+        data['unmovable_type'] = 'snow'
+        data['unmovable_target'] = 0
+
+    # Set collectible target and description based on level type
+    if num_collectibles > 0 and has_unmovables:
+        # Both collectibles and unmovables
+        data['collectible_target'] = num_collectibles
+        data['collectible_type'] = 'coin'
+        data['description'] = f"Collect {num_collectibles} coin{'s' if num_collectibles > 1 else ''} and clear {num_unmovables} obstacle{'s' if num_unmovables > 1 else ''}!"
+    elif num_collectibles > 0:
+        # Collectibles only
+        data['collectible_target'] = num_collectibles
+        data['collectible_type'] = 'coin'
+        data['description'] = f"Collect {num_collectibles} coin{'s' if num_collectibles > 1 else ''}!"
+    elif has_unmovables:
+        # Unmovables only
+        data['collectible_target'] = 0
+        data['description'] = f"Clear all {num_unmovables} obstacle{'s' if num_unmovables > 1 else ''}!"
+    else:
+        # Score only
         data['collectible_target'] = 0
         data['description'] = f"Reach {target} points in {moves} moves!"
 
@@ -127,20 +498,41 @@ def write_level(out_dir, level_num, w=8, h=8):
     filename = os.path.join(out_dir, f"level_{level_num:02d}.json")
     with open(filename, 'w') as f:
         json.dump(data, f, indent=2)
-    print(f"Wrote {filename} (w={w}, h={h}, moves={moves}, target={target}, collectibles={num_collectibles})")
+
+    print(f"✓ Wrote {filename}")
+    print(f"  Size: {w}x{h}, Moves: {moves}, Target: {target}")
+    print(f"  Collectibles: {num_collectibles}, Unmovables: {'Yes' if has_unmovables else 'No'}")
+    if has_unmovables:
+        print(f"  Unmovable type: {data['unmovable_type']}")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--start', type=int, default=11)
-    parser.add_argument('--end', type=int, default=50)
-    parser.add_argument('--out', type=str, default='levels')
-    parser.add_argument('--width', type=int, default=8)
-    parser.add_argument('--height', type=int, default=8)
+    parser = argparse.ArgumentParser(description='Generate match-3 levels with proper unmovable tile placement')
+    parser.add_argument('--start', type=int, default=11, help='Starting level number')
+    parser.add_argument('--end', type=int, default=50, help='Ending level number')
+    parser.add_argument('--out', type=str, default='levels', help='Output directory')
+    parser.add_argument('--width', type=int, default=8, help='Grid width')
+    parser.add_argument('--height', type=int, default=8, help='Grid height')
+    parser.add_argument('--type', type=str, default='random',
+                       choices=['random', 'collectibles', 'unmovables', 'both', 'score'],
+                       help='Level type: random (default), collectibles (only collectibles), '
+                            'unmovables (only unmovables), both (collectibles + unmovables), '
+                            'score (plain score-based)')
     args = parser.parse_args()
 
-    for i in range(args.start, args.end+1):
-        write_level(args.out, i, args.width, args.height)
+    print(f"Generating levels {args.start} to {args.end}...")
+    print(f"Output directory: {args.out}")
+    print(f"Grid size: {args.width}x{args.height}")
+    print(f"Level type: {args.type}")
+
+    for i in range(args.start, args.end + 1):
+        write_level(args.out, i, args.width, args.height, args.type)
+
+    print(f"\n✓ Generated {args.end - args.start + 1} levels successfully!")
 
 if __name__ == '__main__':
     main()
+
+
+
+

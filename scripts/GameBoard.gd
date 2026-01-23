@@ -318,6 +318,7 @@ func show_tile_overlay():
 		print("[GameBoard] Background ColorRect remains hidden (using tile overlays)")
 
 func clear_tiles():
+	print("[CLEAR_TILES] Starting tile cleanup")
 	# Remove all Tile instances created by this board
 	# We need to collect them first to avoid modifying the array while iterating
 	var tiles_to_remove = []
@@ -331,7 +332,7 @@ func clear_tiles():
 		remove_child(tile)
 		tile.queue_free()
 
-	print("[GameBoard] Cleared ", tiles_to_remove.size(), " tiles")
+	print("[CLEAR_TILES] Cleared ", tiles_to_remove.size(), " tiles from scene")
 
 func create_visual_grid():
 	clear_tiles()
@@ -358,7 +359,18 @@ func create_visual_grid():
 				continue
 
 			var tile = tile_scene.instantiate()
-			tile.setup(tile_type, Vector2(x, y), scale_factor)
+			# If this is an unmovable_soft marker in the grid, create a visual tile and configure it as unmovable
+			if tile_type == GameManager.UNMOVABLE_SOFT:
+				# Use visual placeholder type 0 and configure unmovable properties
+				tile.setup(0, Vector2(x, y), scale_factor, true)
+				if tile.has_method("configure_unmovable"):
+					# single hit to destroy by adjacent matches
+					tile.configure_unmovable(1, GameManager.unmovable_type)
+				else:
+					# fallback to default setup
+					tile.setup(tile_type, Vector2(x, y), scale_factor)
+			else:
+				tile.setup(tile_type, Vector2(x, y), scale_factor)
 			tile.position = grid_to_world_position(Vector2(x, y))
 			tile.connect("tile_clicked", _on_tile_clicked)
 			tile.connect("tile_swiped", _on_tile_swiped)
@@ -622,33 +634,80 @@ func animate_destroy_matches_except(matches: Array, skip_pos: Vector2):
 
 func animate_gravity():
 	var moved = GameManager.apply_gravity()
-	print("animate_gravity: apply_gravity returned -> ", moved)
+	print("[GRAVITY] apply_gravity returned -> ", moved)
+
 
 	var gravity_tweens = []
+
+	# After apply_gravity, the grid values have been rearranged
+	# We need to match visual tiles to the new grid positions
+
 	for x in range(GameManager.GRID_WIDTH):
-		var column_tiles = []
-		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
-			if not GameManager.is_cell_blocked(x, y) and tiles[x][y] != null:
-				column_tiles.append(tiles[x][y])
+		# Step 1: Collect all non-null visual tiles from this column
+		# IMPORTANT: Collect from BOTTOM to TOP to match assignment order
+		# CRITICAL: Skip unmovable tiles - they don't move with gravity!
+		var visual_tiles_in_column = []
+		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):  # Bottom to top
+			var tile = tiles[x][y]
+			if tile != null and not tile.is_queued_for_deletion():
+				# Check grid value directly - if it's UNMOVABLE_SOFT, skip this tile
+				var grid_val = GameManager.grid[x][y]
+				if grid_val == GameManager.UNMOVABLE_SOFT:
+					# Skip unmovable tiles - they stay in place
+					print("[GRAVITY] Skipping unmovable tile at (", x, ",", y, ") with grid value ", grid_val)
+					continue
 
+				visual_tiles_in_column.append(tile)
+
+		# Step 2: Clear the tiles array for this column (except unmovables)
 		for y in range(GameManager.GRID_HEIGHT):
-			if GameManager.grid[x][y] == 0:
-				tiles[x][y] = null
+			# Check grid value directly - if it's UNMOVABLE_SOFT, don't clear
+			var grid_val = GameManager.grid[x][y]
+			if grid_val == GameManager.UNMOVABLE_SOFT:
+				print("[GRAVITY] Keeping unmovable tile at (", x, ",", y, ") in tiles array (grid value ", grid_val, ")")
+				continue
+			tiles[x][y] = null
 
+		# Step 3: Match visual tiles to grid positions that need them
+		# Scan from bottom to top, matching tiles to positions with grid values > 0
 		var tile_index = 0
 		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
 			if GameManager.is_cell_blocked(x, y):
 				continue
+
 			var tile_type = GameManager.get_tile_at(Vector2(x, y))
-			if tile_type > 0 and tile_index < column_tiles.size():
-				var tile = column_tiles[tile_index]
-				tiles[x][y] = tile
-				tile.grid_position = Vector2(x, y)
-				tile.update_type(tile_type)
-				var target_pos = grid_to_world_position(Vector2(x, y))
-				if tile.position.distance_to(target_pos) > 1:
-					gravity_tweens.append(tile.animate_to_position(target_pos))
-				tile_index += 1
+
+			# Skip unmovable positions - they already have their tiles
+			if tile_type == GameManager.UNMOVABLE_SOFT:
+				print("[GRAVITY] Position (", x, ",", y, ") is unmovable - skipping")
+				continue
+
+			if tile_type > 0:
+				# This position needs a tile
+				if tile_index < visual_tiles_in_column.size():
+					# We have a tile to assign
+					var tile = visual_tiles_in_column[tile_index]
+					tiles[x][y] = tile
+					tile.grid_position = Vector2(x, y)
+					tile.update_type(tile_type)
+
+					var target_pos = grid_to_world_position(Vector2(x, y))
+					if tile.position.distance_to(target_pos) > 1:
+						gravity_tweens.append(tile.animate_to_position(target_pos))
+
+					tile_index += 1
+				else:
+					# No tile available - refill will create it
+					print("[GRAVITY] Position (", x, ",", y, ") needs tile type ", tile_type, " but no visual tile available")
+			# else position should be empty (0 or blocked) - leave tiles[x][y] as null
+
+		# Step 4: Free any tiles that weren't reassigned (shouldn't happen in normal cases)
+		if tile_index < visual_tiles_in_column.size():
+			print("[GRAVITY] Column ", x, " has ", visual_tiles_in_column.size() - tile_index, " extra tiles - freeing them")
+			for i in range(tile_index, visual_tiles_in_column.size()):
+				var extra_tile = visual_tiles_in_column[i]
+				if extra_tile and not extra_tile.is_queued_for_deletion():
+					extra_tile.queue_free()
 
 	if gravity_tweens.size() > 0:
 		for tween in gravity_tweens:
@@ -661,7 +720,7 @@ func animate_gravity():
 	# Check if any collectibles reached the bottom row
 	_check_collectibles_at_bottom()
 
-	print("animate_gravity: done")
+	print("[GRAVITY] done")
 
 func _check_collectibles_at_bottom():
 	"""Check if any collectibles have reached the bottom row and collect them"""
@@ -787,63 +846,49 @@ func animate_refill():
 	var new_tile_positions = GameManager.fill_empty_spaces()
 	var spawn_tweens = []
 	var scale_factor = tile_size / 64.0
+
+	# Create tiles ONLY for the new positions returned by fill_empty_spaces
 	for pos in new_tile_positions:
-		if not GameManager.is_cell_blocked(int(pos.x), int(pos.y)):
-			if tiles[int(pos.x)][int(pos.y)] == null:
-				var tile = tile_scene.instantiate()
-				var tile_type = GameManager.get_tile_at(pos)
+		var x = int(pos.x)
+		var y = int(pos.y)
 
-				# Check if this is a collectible tile
-				var is_collectible = (tile_type == GameManager.COLLECTIBLE)
+		if GameManager.is_cell_blocked(x, y):
+			continue
 
-				if is_collectible:
-					# Setup as collectible - use type 0 for visual (collectibles don't match)
-					tile.setup(0, pos, scale_factor)
-					# Configure as collectible after setup
-					if tile.has_method("configure_collectible"):
-						tile.configure_collectible(GameManager.collectible_type)
-						print("[GameBoard] Spawned collectible at (", pos.x, ",", pos.y, ") type: ", GameManager.collectible_type)
-				else:
-					# Regular tile setup
-					tile.setup(tile_type, pos, scale_factor)
+		# If there's already a tile at this position, free it first
+		if tiles[x][y] != null:
+			var old_tile = tiles[x][y]
+			if old_tile and not old_tile.is_queued_for_deletion():
+				print("[GameBoard] WARNING: Tile already exists at (", x, ",", y, ") - freeing old tile")
+				old_tile.queue_free()
+			tiles[x][y] = null
 
-				tile.position = grid_to_world_position(Vector2(pos.x, -1))
-				tile.connect("tile_clicked", _on_tile_clicked)
-				tile.connect("tile_swiped", _on_tile_swiped)
-				add_child(tile)
-				tiles[int(pos.x)][int(pos.y)] = tile
-				var target_pos = grid_to_world_position(pos)
-				spawn_tweens.append(tile.animate_to_position(target_pos))
-				spawn_tweens.append(tile.animate_spawn())
+		# Now create the new tile
+		var tile = tile_scene.instantiate()
+		var tile_type = GameManager.get_tile_at(pos)
 
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(x, y) and GameManager.grid[x][y] > 0:
-				if tiles[x][y] == null:
-					var tile = tile_scene.instantiate()
-					var ttype = GameManager.grid[x][y]
+		# Check if this is a collectible tile
+		var is_collectible = (tile_type == GameManager.COLLECTIBLE)
 
-					# Check if this is a collectible tile
-					var is_collectible = (ttype == GameManager.COLLECTIBLE)
+		if is_collectible:
+			# Setup as collectible - use type 0 for visual (collectibles don't match)
+			tile.setup(0, pos, scale_factor)
+			# Configure as collectible after setup
+			if tile.has_method("configure_collectible"):
+				tile.configure_collectible(GameManager.collectible_type)
+				print("[GameBoard] Spawned collectible at (", pos.x, ",", pos.y, ") type: ", GameManager.collectible_type)
+		else:
+			# Regular tile setup
+			tile.setup(tile_type, pos, scale_factor)
 
-					if is_collectible:
-						# Setup as collectible
-						tile.setup(0, Vector2(x, y), scale_factor)
-						if tile.has_method("configure_collectible"):
-							tile.configure_collectible(GameManager.collectible_type)
-							print("[GameBoard] Spawned collectible at (", x, ",", y, ") type: ", GameManager.collectible_type)
-					else:
-						# Regular tile
-						tile.setup(ttype, Vector2(x, y), scale_factor)
-
-					tile.position = grid_to_world_position(Vector2(x, -1))
-					tile.connect("tile_clicked", _on_tile_clicked)
-					tile.connect("tile_swiped", _on_tile_swiped)
-					add_child(tile)
-					tiles[x][y] = tile
-					var target_pos = grid_to_world_position(Vector2(x, y))
-					spawn_tweens.append(tile.animate_to_position(target_pos))
-					spawn_tweens.append(tile.animate_spawn())
+		tile.position = grid_to_world_position(Vector2(x, -1))
+		tile.connect("tile_clicked", _on_tile_clicked)
+		tile.connect("tile_swiped", _on_tile_swiped)
+		add_child(tile)
+		tiles[x][y] = tile
+		var target_pos = grid_to_world_position(pos)
+		spawn_tweens.append(tile.animate_to_position(target_pos))
+		spawn_tweens.append(tile.animate_spawn())
 
 	if spawn_tweens.size() > 0:
 		await spawn_tweens[0].finished
@@ -1304,6 +1349,11 @@ func _input(event):
 func _on_tile_clicked(tile):
 	print("GameBoard received tile_clicked signal from tile at ", tile.grid_position)
 
+	# Prevent selecting or swapping unmovable tiles
+	if tile and tile.is_unmovable:
+		print("[GameBoard] Clicked tile is unmovable, ignoring selection/swap")
+		return
+
 	if GameManager.processing_moves:
 		print("GameBoard: Move processing blocked")
 		return
@@ -1413,6 +1463,11 @@ func _on_tile_clicked(tile):
 func _on_tile_swiped(tile, direction: Vector2):
 	print("GameBoard received tile_swiped signal from tile at ", tile.grid_position, " direction: ", direction)
 
+	# Prevent swiping unmovable tiles
+	if tile and tile.is_unmovable:
+		print("[GameBoard] Swiped tile is unmovable, ignoring swipe")
+		return
+
 	if GameManager.processing_moves:
 		print("GameBoard: Move processing blocked")
 		return
@@ -1440,6 +1495,11 @@ func _on_tile_swiped(tile, direction: Vector2):
 		print("GameBoard: No tile at target position (blocked cell)")
 		return
 
+	# Prevent swiping to unmovable tiles
+	if target_tile and target_tile.is_unmovable:
+		print("[GameBoard] Target tile for swipe is unmovable, ignoring swipe")
+		return
+
 	# Perform the swap directly
 	print("GameBoard: Swipe swap from ", tile.grid_position, " to ", target_pos)
 	await perform_swap(tile, target_tile)
@@ -1456,8 +1516,23 @@ func perform_swap(tile1, tile2):
 	var pos1 = tile1.grid_position
 	var pos2 = tile2.grid_position
 
-	# Perform swap in game logic
-	GameManager.swap_tiles(pos1, pos2)
+	# Attempt to perform swap in game logic; if disallowed, abort with feedback
+	var swapped = GameManager.swap_tiles(pos1, pos2)
+	if not swapped:
+		print("perform_swap: GameManager.swap_tiles returned false - swap not allowed")
+		# Play invalid sound and flash tiles to indicate invalid move
+		AudioManager.play_sfx("invalid_move")
+		var tw_bad = create_tween()
+		tw_bad.tween_property(tile1, "position", tile1.position + Vector2(6,0), 0.06)
+		tw_bad.tween_property(tile1, "position", tile1.position, 0.08)
+		tw_bad.tween_property(tile2, "position", tile2.position + Vector2(-6,0), 0.06)
+		tw_bad.tween_property(tile2, "position", tile2.position, 0.08)
+		if tw_bad:
+			await tw_bad.finished
+		GameManager.processing_moves = false
+		print("perform_swap: processing_moves = false (swap denied)")
+		emit_signal("move_completed")
+		return
 
 	# Play swap sound effect
 	AudioManager.play_sfx("tile_swap")
@@ -1469,7 +1544,7 @@ func perform_swap(tile1, tile2):
 	var tween1 = tile1.animate_swap_to(target_pos1)
 	var tween2 = tile2.animate_swap_to(target_pos2)
 
-	# Update grid references
+	# Update grid references (tiles array) — GameManager.grid already updated by swap_tiles
 	tiles[pos1.x][pos1.y] = tile2
 	tiles[pos2.x][pos2.y] = tile1
 	tile1.grid_position = pos2
@@ -1508,7 +1583,8 @@ func perform_swap(tile1, tile2):
 		emit_signal("move_completed")
 		return
 	else:
-		GameManager.swap_tiles(pos1, pos2)
+		# No matches — revert swap in data and visuals
+		GameManager.swap_tiles(pos1, pos2)  # revert logical swap
 
 		var revert_tween1 = tile1.animate_swap_to(target_pos2)
 		var revert_tween2 = tile2.animate_swap_to(target_pos1)
@@ -1624,6 +1700,28 @@ func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 			for x in range(GameManager.GRID_WIDTH):
 				row.append(GameManager.grid[x][y])
 			print(row)
+
+	# After cascade loop exits, ensure no empty cells remain
+	# (sometimes gravity+refill in the last iteration leaves empties that need one more pass)
+	print("[CASCADE] Cascade loop exited - checking for remaining empty cells...")
+	var has_empties = false
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if not GameManager.is_cell_blocked(x, y) and GameManager.grid[x][y] == 0:
+				has_empties = true
+				print("[CASCADE] Found empty cell at (", x, ",", y, ")")
+				break
+		if has_empties:
+			break
+
+	if has_empties:
+		print("[CASCADE] Empty cells found - running final gravity+refill")
+		await animate_gravity()
+		await animate_refill()
+		print("[CASCADE] Final refill complete")
+	else:
+		print("[CASCADE] No empty cells found - cascade complete")
+
 	# Always reset processing_moves and combo, even if an error occurred
 	GameManager.processing_moves = false
 	GameManager.reset_combo()
@@ -1813,9 +1911,6 @@ func activate_swap_booster(x1: int, y1: int, x2: int, y2: int):
 	tile1.grid_position = Vector2(x2, y2)
 	tile2.grid_position = Vector2(x1, y1)
 
-	# Update tile types
-	tile1.update_type(GameManager.grid[x2][y2])
-	tile2.update_type(GameManager.grid[x1][y1])
 
 	if tween1:
 		await tween1.finished
@@ -1851,8 +1946,15 @@ func activate_chain_reaction_booster(x: int, y: int):
 	var wave1 = [Vector2(x, y)]
 	await highlight_special_activation(wave1)
 	await animate_destroy_tiles(wave1)
+	# Handle wave1 unmovable/reporting
+	var scoring_count_wave1 = 0
 	for pos in wave1:
-		GameManager.grid[int(pos.x)][int(pos.y)] = 0
+		var t = GameManager.get_tile_at(pos)
+		if t == GameManager.UNMOVABLE_SOFT:
+			GameManager.report_unmovable_destroyed(pos)
+		else:
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			scoring_count_wave1 += 1
 
 	await get_tree().create_timer(0.3).timeout
 
@@ -1868,12 +1970,21 @@ func activate_chain_reaction_booster(x: int, y: int):
 
 	# Declare wave3 here so it's in scope for the total calculation later
 	var wave3 = []
+	# Ensure scoring_count variables exist in outer scope for aggregation
+	var scoring_count_wave2 = 0
+	var scoring_count_wave3 = 0
 
 	if wave2.size() > 0:
 		await highlight_special_activation(wave2)
 		await animate_destroy_tiles(wave2)
+		# Handle wave2 unmovable/reporting
 		for pos in wave2:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			var t = GameManager.get_tile_at(pos)
+			if t == GameManager.UNMOVABLE_SOFT:
+				GameManager.report_unmovable_destroyed(pos)
+			else:
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				scoring_count_wave2 += 1
 
 		await get_tree().create_timer(0.3).timeout
 
@@ -1891,20 +2002,27 @@ func activate_chain_reaction_booster(x: int, y: int):
 		if wave3.size() > 0:
 			await highlight_special_activation(wave3)
 			await animate_destroy_tiles(wave3)
+			# Handle wave3 unmovable/reporting
 			for pos in wave3:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				var t = GameManager.get_tile_at(pos)
+				if t == GameManager.UNMOVABLE_SOFT:
+					GameManager.report_unmovable_destroyed(pos)
+				else:
+					GameManager.grid[int(pos.x)][int(pos.y)] = 0
+					scoring_count_wave3 += 1
 
 	# Calculate total score
-	var total_destroyed = wave1.size() + wave2.size() + wave3.size()
-	var points = GameManager.calculate_points(total_destroyed)
-	GameManager.add_score(points)
+	var total_scoring = scoring_count_wave1 + (scoring_count_wave2 if defined(scoring_count_wave2) else 0) + (scoring_count_wave3 if defined(scoring_count_wave3) else 0)
+	var points = GameManager.calculate_points(total_scoring)
+	if points > 0:
+		GameManager.add_score(points)
 
 	await animate_gravity()
 	await animate_refill()
 	await process_cascade()
 
 	GameManager.processing_moves = false
-	print("[GameBoard] Chain reaction booster complete - destroyed ", total_destroyed, " tiles")
+	print("[GameBoard] Chain reaction booster complete - destroyed ", total_scoring, " tiles")
 
 func activate_bomb_3x3_booster(x: int, y: int):
 	"""Activate 3x3 bomb booster - destroys 3x3 area around selected tile"""
@@ -1939,11 +2057,19 @@ func activate_bomb_3x3_booster(x: int, y: int):
 		await highlight_special_activation(positions_to_clear)
 		await animate_destroy_tiles(positions_to_clear)
 
+		# Handle unmovables specially and score only regular tiles
+		var scoring_count = 0
 		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			var t = GameManager.get_tile_at(pos)
+			if t == GameManager.UNMOVABLE_SOFT:
+				GameManager.report_unmovable_destroyed(pos)
+			else:
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				scoring_count += 1
 
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
+		var points = GameManager.calculate_points(scoring_count)
+		if points > 0:
+			GameManager.add_score(points)
 
 		await animate_gravity()
 		await animate_refill()
@@ -2004,11 +2130,19 @@ func activate_line_blast_booster(direction: String, center_x: int, center_y: int
 		await highlight_special_activation(positions_to_clear)
 		await animate_destroy_tiles(positions_to_clear)
 
+		# Handle unmovables specially and score only regular tiles
+		var scoring_count = 0
 		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			var t = GameManager.get_tile_at(pos)
+			if t == GameManager.UNMOVABLE_SOFT:
+				GameManager.report_unmovable_destroyed(pos)
+			else:
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				scoring_count += 1
 
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
+		var points = GameManager.calculate_points(scoring_count)
+		if points > 0:
+			GameManager.add_score(points)
 
 		await animate_gravity()
 		await animate_refill()
@@ -2041,11 +2175,19 @@ func activate_hammer_booster(x: int, y: int):
 		await highlight_special_activation(positions_to_clear)
 		await animate_destroy_tiles(positions_to_clear)
 
+		# Handle unmovables specially and score only regular tiles
+		var scoring_count = 0
 		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			var t = GameManager.get_tile_at(pos)
+			if t == GameManager.UNMOVABLE_SOFT:
+				GameManager.report_unmovable_destroyed(pos)
+			else:
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				scoring_count += 1
 
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
+		var points = GameManager.calculate_points(scoring_count)
+		if points > 0:
+			GameManager.add_score(points)
 
 		await animate_gravity()
 		await animate_refill()
@@ -2097,11 +2239,19 @@ func activate_tile_squasher_booster(x: int, y: int):
 		# Use animate_destroy_tiles for arbitrary positions (matches var was incorrect)
 		await animate_destroy_tiles(positions_to_clear)
 
+		# Clear grid positions, but handle UNMOVABLE_SOFT specially (don't count them as normal tiles)
+		var scoring_count = 0
 		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			var t = GameManager.get_tile_at(pos)
+			if t == GameManager.UNMOVABLE_SOFT:
+				GameManager.report_unmovable_destroyed(pos)
+			else:
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				scoring_count += 1
 
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
+		var points = GameManager.calculate_points(scoring_count)
+		if points > 0:
+			GameManager.add_score(points)
 
 		await animate_gravity()
 		await animate_refill()
@@ -2134,11 +2284,19 @@ func activate_row_clear_booster(row: int):
 		await highlight_special_activation(positions_to_clear)
 		await animate_destroy_tiles(positions_to_clear)
 
+		# Handle unmovables specially and score only regular tiles
+		var scoring_count = 0
 		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			var t = GameManager.get_tile_at(pos)
+			if t == GameManager.UNMOVABLE_SOFT:
+				GameManager.report_unmovable_destroyed(pos)
+			else:
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				scoring_count += 1
 
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
+		var points = GameManager.calculate_points(scoring_count)
+		if points > 0:
+			GameManager.add_score(points)
 
 		await animate_gravity()
 		await animate_refill()
@@ -2171,11 +2329,19 @@ func activate_column_clear_booster(column: int):
 		await highlight_special_activation(positions_to_clear)
 		await animate_destroy_tiles(positions_to_clear)
 
+		# Handle unmovables specially and score only regular tiles
+		var scoring_count = 0
 		for pos in positions_to_clear:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			var t = GameManager.get_tile_at(pos)
+			if t == GameManager.UNMOVABLE_SOFT:
+				GameManager.report_unmovable_destroyed(pos)
+			else:
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				scoring_count += 1
 
-		var points = GameManager.calculate_points(positions_to_clear.size())
-		GameManager.add_score(points)
+		var points = GameManager.calculate_points(scoring_count)
+		if points > 0:
+			GameManager.add_score(points)
 
 		await animate_gravity()
 		await animate_refill()
@@ -2265,17 +2431,33 @@ func activate_special_tile(pos: Vector2):
 	await highlight_special_activation(positions_to_clear)
 	await animate_destroy_tiles(positions_to_clear)
 
-	# Clear tiles in GameManager grid
+	# Clear tiles in GameManager grid but handle UNMOVABLE_SOFT specially
+	var scoring_count = 0
 	for clear_pos in positions_to_clear:
-		GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+		var t = GameManager.get_tile_at(clear_pos)
+		if t == GameManager.UNMOVABLE_SOFT:
+			# Report to GameManager so it updates counters, signals & triggers deferred gravity
+			if GameManager.has_method("report_unmovable_destroyed"):
+				GameManager.report_unmovable_destroyed(clear_pos)
+			else:
+				# Fallback: directly update grid and counters
+				var key = str(int(clear_pos.x)) + "," + str(int(clear_pos.y))
+				if GameManager.unmovable_map.has(key):
+					GameManager.unmovable_map.erase(key)
+				GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+				GameManager.unmovables_cleared += 1
+		else:
+			GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+			scoring_count += 1
 
 	# Use a move for activating special tile
 	if GameManager.has_method("use_move"):
 		GameManager.use_move()
 
-	# Add points for cleared tiles
-	var points = GameManager.calculate_points(positions_to_clear.size())
-	GameManager.add_score(points)
+	# Add points for cleared (scoring) tiles only
+	var points = GameManager.calculate_points(scoring_count)
+	if points > 0:
+		GameManager.add_score(points)
 
 	# Activate any special tiles that were hit (chain reaction)
 	if special_tiles_to_activate.size() > 0:
@@ -2362,11 +2544,26 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 	await highlight_special_activation(positions_to_clear)
 	await animate_destroy_tiles(positions_to_clear)
 
+	# Clear tiles but treat UNMOVABLE_SOFT specially
+	var scoring_count = 0
 	for clear_pos in positions_to_clear:
-		GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+		var t = GameManager.get_tile_at(clear_pos)
+		if t == GameManager.UNMOVABLE_SOFT:
+			if GameManager.has_method("report_unmovable_destroyed"):
+				GameManager.report_unmovable_destroyed(clear_pos)
+			else:
+				var key = str(int(clear_pos.x)) + "," + str(int(clear_pos.y))
+				if GameManager.unmovable_map.has(key):
+					GameManager.unmovable_map.erase(key)
+				GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+				GameManager.unmovables_cleared += 1
+		else:
+			GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+			scoring_count += 1
 
-	var points = GameManager.calculate_points(positions_to_clear.size())
-	GameManager.add_score(points)
+	var points = GameManager.calculate_points(scoring_count)
+	if points > 0:
+		GameManager.add_score(points)
 
 	if special_tiles_to_activate.size() > 0:
 		for special_tile_info in special_tiles_to_activate:
@@ -2374,133 +2571,148 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 
 	return
 
-# Draw embossed borders around the active play area
-func draw_board_borders():
-	# Clear existing borders
-	if border_container:
-		for child in border_container.get_children():
+func _clear_board_borders():
+	"""Remove any previously created border children from the border container."""
+	if border_container == null:
+		return
+	for child in border_container.get_children():
+		if child and is_instance_valid(child):
 			child.queue_free()
 
-	# Simply draw borders around each edge of active tiles
-	draw_simple_borders()
+func _rounded_rect_points(rect_pos: Vector2, rect_size: Vector2, radius: float, segments: int = 8) -> Array:
+	"""Generate an ordered list of points approximating a rounded rect (CW).
+		rect_pos = top-left world position, rect_size = width/height
+		radius is clamped to half of min(width,height)
+		segments controls smoothness of the quarter-circle arcs.
+	"""
+	var pts = []
+	var w = rect_size.x
+	var h = rect_size.y
+	var r = clamp(radius, 0.0, min(w, h) * 0.5)
 
-	print("[Border] Drew borders with ", border_container.get_child_count(), " elements")
+	# center offsets for corners
+	var tl = rect_pos + Vector2(r, r)
+	var tr = rect_pos + Vector2(w - r, r)
+	var br = rect_pos + Vector2(w - r, h - r)
+	var bl = rect_pos + Vector2(r, h - r)
 
-# Draw simple borders by checking each tile's edges
-func draw_simple_borders():
-	var corner_radius = BORDER_WIDTH * 6.0  # Large radius for very pronounced rounded corners
+	# Define corners with start/end angles
+	var corners = [
+		{"center": tl, "a0": PI, "a1": PI * 1.5},
+		{"center": tr, "a0": PI * 1.5, "a1": PI * 2},
+		{"center": br, "a0": 0.0, "a1": PI * 0.5},
+		{"center": bl, "a0": PI * 0.5, "a1": PI}
+	]
 
-	# For each active tile, check which edges need borders and draw them
+	for corner in corners:
+		var c = corner["center"]
+		var a0 = corner["a0"]
+		var a1 = corner["a1"]
+		for i in range(segments + 1):
+			var t = float(i) / float(segments)
+			var a = lerp(a0, a1, t)
+			pts.append(c + Vector2(cos(a), sin(a)) * r)
+
+	return pts
+
+func draw_board_borders():
+	# Draw a rounded border around the contiguous active tile area.
+	# This is a resilient fallback implementation restoring visible borders.
+	# It draws a single rounded rectangle that bounds all non-blocked cells.
+	if border_container == null:
+		print("[GameBoard] border_container missing - cannot draw borders")
+		return
+
+	# Clear any previous borders
+	_clear_board_borders()
+
+	# Find bounding extents of active (non-blocked) cells
+	var min_x = GameManager.GRID_WIDTH
+	var min_y = GameManager.GRID_HEIGHT
+	var max_x = -1
+	var max_y = -1
 	for x in range(GameManager.GRID_WIDTH):
 		for y in range(GameManager.GRID_HEIGHT):
-			if GameManager.is_cell_blocked(x, y):
-				continue
+			if not GameManager.is_cell_blocked(x, y):
+				min_x = min(min_x, x)
+				min_y = min(min_y, y)
+				max_x = max(max_x, x)
+				max_y = max(max_y, y)
 
-			# Calculate tile edges in world coordinates
-			var left = x * tile_size + grid_offset.x
-			var right = (x + 1) * tile_size + grid_offset.x
-			var top = y * tile_size + grid_offset.y
-			var bottom = (y + 1) * tile_size + grid_offset.y
+	if max_x < 0:
+		# no active cells
+		print("[GameBoard] No active cells found - skipping border drawing")
+		return
 
-			# Check which edges need borders
-			var has_top = (y == 0 or GameManager.is_cell_blocked(x, y - 1))
-			var has_bottom = (y == GameManager.GRID_HEIGHT - 1 or GameManager.is_cell_blocked(x, y + 1))
-			var has_left = (x == 0 or GameManager.is_cell_blocked(x - 1, y))
-			var has_right = (x == GameManager.GRID_WIDTH - 1 or GameManager.is_cell_blocked(x + 1, y))
+	# Compute world rectangle covering active cells (with padding)
+	var left = float(min_x) * tile_size + grid_offset.x - BORDER_WIDTH
+	var top = float(min_y) * tile_size + grid_offset.y - BORDER_WIDTH
+	var width = (float(max_x - min_x + 1) * tile_size) + BORDER_WIDTH * 2
+	var height = (float(max_y - min_y + 1) * tile_size) + BORDER_WIDTH * 2
 
-			# Draw top border (shortened at corners)
-			if has_top:
-				var start_x = left + (corner_radius if has_left else 0)
-				var end_x = right - (corner_radius if has_right else 0)
-				if end_x > start_x:  # Only draw if there's space
-					draw_border_edge(Vector2(start_x, top), Vector2(end_x, top))
+	var rect_pos = Vector2(left, top)
+	var rect_size = Vector2(width, height)
 
-			# Draw bottom border (shortened at corners)
-			if has_bottom:
-				var start_x = left + (corner_radius if has_left else 0)
-				var end_x = right - (corner_radius if has_right else 0)
-				if end_x > start_x:
-					draw_border_edge(Vector2(start_x, bottom), Vector2(end_x, bottom))
+	# Choose corner radius relative to tile_size
+	var corner_radius = clamp(tile_size * 0.45, 6.0, tile_size)
 
-			# Draw left border (shortened at corners)
-			if has_left:
-				var start_y = top + (corner_radius if has_top else 0)
-				var end_y = bottom - (corner_radius if has_bottom else 0)
-				if end_y > start_y:
-					draw_border_edge(Vector2(left, start_y), Vector2(left, end_y))
+	# Create a Line2D for the rounded rectangle border
+	var border_line = Line2D.new()
+	border_line.name = "BoardBorder"
+	border_line.width = max(2.0, BORDER_WIDTH)
+	border_line.default_color = border_color
+	border_line.z_index = 200
+	border_line.antialiased = true
+	border_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	border_line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	border_line.joint_mode = Line2D.LINE_JOINT_ROUND
 
-			# Draw right border (shortened at corners)
-			if has_right:
-				var start_y = top + (corner_radius if has_top else 0)
-				var end_y = bottom - (corner_radius if has_bottom else 0)
-				if end_y > start_y:
-					draw_border_edge(Vector2(right, start_y), Vector2(right, end_y))
+	# Build points
+	var pts = _rounded_rect_points(rect_pos, rect_size, corner_radius, 10)
+	for p in pts:
+		border_line.add_point(p)
 
-			# Draw quarter-circle arcs at corners
-			if has_top and has_left:
-				draw_corner_arc(Vector2(left, top), "top_left", corner_radius)
-			if has_top and has_right:
-				draw_corner_arc(Vector2(right, top), "top_right", corner_radius)
-			if has_bottom and has_left:
-				draw_corner_arc(Vector2(left, bottom), "bottom_left", corner_radius)
-			if has_bottom and has_right:
-				draw_corner_arc(Vector2(right, bottom), "bottom_right", corner_radius)
+	# Close the path by adding the first point again
+	if pts.size() > 0:
+		border_line.add_point(pts[0])
 
-# Draw a single border edge
-func draw_border_edge(start: Vector2, end: Vector2):
+	border_container.add_child(border_line)
+	print("[GameBoard] draw_board_borders: drawn rounded rect covering cells [", min_x, ",", min_y, "] to [", max_x, ",", max_y, "] world rect:", rect_pos, rect_size)
+
+func draw_border_edge(start: Vector2, end: Vector2) -> void:
+	var l = Line2D.new()
+	l.add_point(start)
+	l.add_point(end)
+	l.width = BORDER_WIDTH
+	l.default_color = border_color
+	l.antialiased = true
+	border_container.add_child(l)
+
+func draw_corner_arc(corner_pos: Vector2, corner_type: String, radius: float) -> void:
 	var line = Line2D.new()
-	line.add_point(start)
-	line.add_point(end)
-	line.width = BORDER_WIDTH
-	line.default_color = border_color  # Use configurable color
-	line.antialiased = true
-	border_container.add_child(line)
-
-# Draw a quarter-circle arc at a corner
-func draw_corner_arc(corner_pos: Vector2, corner_type: String, radius: float):
-	var line = Line2D.new()
-	var num_segments = 8
-
-	# Determine the arc based on corner type
-	var start_angle = 0.0
-	var end_angle = 0.0
-
+	var segments = 8
 	match corner_type:
 		"top_left":
-			# Arc from left side to top side
-			# Start at (corner_pos.x + radius, corner_pos.y) going to (corner_pos.x, corner_pos.y + radius)
-			# Center is at (corner_pos.x + radius, corner_pos.y + radius)
-			for i in range(num_segments + 1):
-				var t = float(i) / float(num_segments)
-				var angle = lerp(PI, PI * 1.5, t)  # 180° to 270°
-				var point = corner_pos + Vector2(radius, radius) + Vector2(cos(angle), sin(angle)) * radius
-				line.add_point(point)
+			for i in range(segments + 1):
+				var t = float(i) / float(segments)
+				var ang = lerp(PI, PI * 1.5, t)
+				line.add_point(corner_pos + Vector2(radius, radius) + Vector2(cos(ang), sin(ang)) * radius)
 		"top_right":
-			# Arc from top side to right side
-			# Center is at (corner_pos.x - radius, corner_pos.y + radius)
-			for i in range(num_segments + 1):
-				var t = float(i) / float(num_segments)
-				var angle = lerp(PI * 1.5, PI * 2.0, t)  # 270° to 360°
-				var point = corner_pos + Vector2(-radius, radius) + Vector2(cos(angle), sin(angle)) * radius
-				line.add_point(point)
+			for i in range(segments + 1):
+				var t = float(i) / float(segments)
+				var ang = lerp(PI * 1.5, PI * 2.0, t)
+				line.add_point(corner_pos + Vector2(-radius, radius) + Vector2(cos(ang), sin(ang)) * radius)
 		"bottom_left":
-			# Arc from bottom side to left side
-			# Center is at (corner_pos.x + radius, corner_pos.y - radius)
-			for i in range(num_segments + 1):
-				var t = float(i) / float(num_segments)
-				var angle = lerp(PI * 0.5, PI, t)  # 90° to 180°
-				var point = corner_pos + Vector2(radius, -radius) + Vector2(cos(angle), sin(angle)) * radius
-				line.add_point(point)
+			for i in range(segments + 1):
+				var t = float(i) / float(segments)
+				var ang = lerp(PI * 0.5, PI, t)
+				line.add_point(corner_pos + Vector2(radius, -radius) + Vector2(cos(ang), sin(ang)) * radius)
 		"bottom_right":
-			# Arc from right side to bottom side
-			# Center is at (corner_pos.x - radius, corner_pos.y - radius)
-			for i in range(num_segments + 1):
-				var t = float(i) / float(num_segments)
-				var angle = lerp(0.0, PI * 0.5, t)  # 0° to 90°
-				var point = corner_pos + Vector2(-radius, -radius) + Vector2(cos(angle), sin(angle)) * radius
-				line.add_point(point)
-
+			for i in range(segments + 1):
+				var t = float(i) / float(segments)
+				var ang = lerp(0.0, PI * 0.5, t)
+				line.add_point(corner_pos + Vector2(-radius, -radius) + Vector2(cos(ang), sin(ang)) * radius)
 	line.width = BORDER_WIDTH
-	line.default_color = border_color  # Use configurable color
+	line.default_color = border_color
 	line.antialiased = true
 	border_container.add_child(line)
