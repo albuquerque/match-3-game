@@ -78,6 +78,9 @@ var start_page = null  # Will be set in _ready()
 # Level transition screen
 var level_transition = null  # Will be created in _ready()
 
+# Reintroduce game over panel reference (was removed earlier)
+var game_over_panel: Panel = null
+
 var is_paused = false
 var booster_mode_active = false
 var active_booster_type = ""
@@ -93,6 +96,12 @@ const SIDE_PANEL_WIDTH_PERCENT = 0.40
 var _shop_original_parent = null
 var _shop_original_index = -1
 var _side_position = "right"  # current side where the panel will open from: "left" or "right"
+
+# Helper flag used when awaiting level_loaded signal
+var _level_loaded_flag: bool = false
+
+func _level_loaded_signal():
+	_level_loaded_flag = true
 
 func _ready():
 	# Debug: print initial global state to help diagnose inadvertent Game Over
@@ -449,6 +458,113 @@ func _on_game_over():
 	# Show enhanced game over screen
 	_show_enhanced_game_over()
 
+# Create or show the enhanced Game Over panel (modal)
+func _show_enhanced_game_over():
+	# If already created, just show and return
+	if game_over_panel and is_instance_valid(game_over_panel):
+		show_panel(game_over_panel)
+		return
+
+	# Create a centered panel
+	var screen_size = get_viewport().get_visible_rect().size
+	var panel_size = Vector2(min(720, screen_size.x * 0.9), min(480, screen_size.y * 0.6))
+	game_over_panel = Panel.new()
+	game_over_panel.name = "EnhancedGameOverPanel"
+	game_over_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	game_over_panel.rect_min_size = panel_size
+	game_over_panel.rect_position = (screen_size - panel_size) / 2
+	game_over_panel.z_index = 2000
+
+	# Style container
+	var vb = VBoxContainer.new()
+	vb.name = "GameOverVBox"
+	vb.anchor_left = 0
+	vb.anchor_top = 0
+	vb.anchor_right = 1
+	vb.anchor_bottom = 1
+	vb.margin_left = 20
+	vb.margin_top = 20
+	vb.margin_right = -20
+	vb.margin_bottom = -20
+	game_over_panel.add_child(vb)
+
+	# Title
+	var title = Label.new()
+	title.name = "Title"
+	title.text = "Game Over"
+	ThemeManager.apply_bangers_font(title, 48)
+	title.add_theme_color_override("font_color", Color(1,0.2,0.2))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(title)
+
+	# Spacer
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 12)
+	vb.add_child(spacer)
+
+	# Details
+	var details = Label.new()
+	details.name = "Details"
+	details.text = "You have no moves left. Final Score: %d\nTarget: %d" % [GameManager.score, GameManager.target_score]
+	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	details.valign = VERTICAL_ALIGNMENT_CENTER
+	details.autowrap = true
+	details.add_theme_font_size_override("font_size", 20)
+	vb.add_child(details)
+
+	# Buttons row
+	var hb = HBoxContainer.new()
+	hb.name = "ButtonsRow"
+	hb.custom_minimum_size = Vector2(0, 16)
+	hb.anchor_left = 0
+	hb.anchor_right = 1
+	hb.margin_left = 30
+	hb.margin_right = -30
+	vb.add_child(hb)
+
+	# Retry button
+	var retry_btn = Button.new()
+	retry_btn.name = "RetryButton"
+	retry_btn.text = "Try Again"
+	retry_btn.focus_mode = Control.FOCUS_NONE
+	retry_btn.connect("pressed", Callable(self, "_on_game_over_retry"))
+	retry_btn.expand = true
+	hb.add_child(retry_btn)
+
+	# Quit button
+	var quit_btn = Button.new()
+	quit_btn.name = "QuitButton"
+	quit_btn.text = "Quit"
+	quit_btn.focus_mode = Control.FOCUS_NONE
+	quit_btn.connect("pressed", Callable(self, "_on_game_over_quit"))
+	quit_btn.expand = true
+	hb.add_child(quit_btn)
+
+	# Add the panel to this UI and make modal
+	add_child(game_over_panel)
+	show_panel(game_over_panel)
+	print("[GameUI] Enhanced Game Over panel created and shown")
+
+# Handler for retry pressed on enhanced game over
+func _on_game_over_retry():
+	AudioManager.play_sfx("ui_click")
+	if game_over_panel:
+		hide_panel(game_over_panel)
+		# Small delay to allow fade-out
+		await get_tree().create_timer(0.25).timeout
+		# Restart the current level / game
+		await restart_game()
+
+# Handler for quit pressed on enhanced game over
+func _on_game_over_quit():
+	AudioManager.play_sfx("ui_click")
+	# Gracefully quit the application (or go back to start page)
+	# If running in editor, just show start page
+	if Engine.is_editor_hint():
+		show_start_page()
+		return
+	get_tree().quit()
+
 func _on_level_complete():
 	print("=".repeat(60))
 	print("[GameUI] _on_level_complete() CALLED")
@@ -681,6 +797,13 @@ func show_start_page():
 	var board = get_node_or_null("../GameBoard")
 	if board:
 		board.visible = false
+
+		# Also clear any drawn borders so StartPage doesn't show a board-shaped border
+		if board.has_method("_clear_board_borders"):
+			board._clear_board_borders()
+		# Hide tile overlay if present
+		if board.has_method("hide_tile_overlay"):
+			board.hide_tile_overlay()
 
 	# Hide transition screen if visible
 	if level_transition:
@@ -1486,7 +1609,7 @@ func _find_or_instance_dialog(name: String, scene_path: String):
 					var cb = node.get_node("VBoxContainer/CloseButton")
 					if cb and cb is Button:
 						# Connect using a small inline function that captures the dialog node to avoid overload ambiguity
-						cb.pressed.connect(func(node=node): _on_dialog_close_pressed(node))
+						cb.pressed.connect(Callable(self, "_on_dialog_close_pressed"))
 			else:
 				print("[GameUI] Failed to load packed scene: %s" % scene_path)
 		else:
@@ -1860,587 +1983,201 @@ func _on_startpage_start_pressed():
 	AudioManager.play_sfx("ui_click")
 	AudioManager.play_music("game", 1.0)
 
-	# Check if the game is already initialized (e.g., from advancing to next level or restart)
-	if GameManager.initialized:
-		# Hide start page
-		if start_page:
-			start_page.visible = false
+	# Immediately hide StartPage to prevent board borders being drawn on top of it
+	if start_page:
+		start_page.visible = false
 
-		# Show game board
+	# Show a quick loading indicator (simple label) so user knows something is happening
+	var loading_label = Label.new()
+	loading_label.name = "StartLoadingLabel"
+	loading_label.text = "Loading level..."
+	loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	loading_label.add_theme_font_size_override("font_size", 24)
+	add_child(loading_label)
+
+	# Ensure we remove any previous borders so the StartPage remains clean
+	var board_check = get_node_or_null("../GameBoard")
+	if board_check and board_check.has_method("_clear_board_borders"):
+		board_check._clear_board_borders()
+
+	# If GameManager already initialized, shortcut (existing code)
+	if GameManager.initialized:
+		# Show game board immediately
 		var board = get_node_or_null("../GameBoard")
 		if board:
 			board.visible = true
-
-			# Force the board to recreate the visual grid since it may have missed the signal
 			if board.has_method("_on_level_loaded"):
 				board._on_level_loaded()
-
-		# Refresh UI to reflect loaded level and moves
+			if board.has_method("draw_board_borders"):
+				board.draw_board_borders()
+			if board.has_method("show_tile_overlay"):
+				board.show_tile_overlay()
+		# Cleanup loading indicator
+		if loading_label and is_instance_valid(loading_label):
+			loading_label.queue_free()
 		update_display()
 		update_booster_ui()
-
 		return
 
-	# LevelManager's current_level_index is already set in _ready() based on saved progress
-	# No need to set it again here
-
-	# Initialize game manager and AWAIT completion since it's async
+	# Otherwise, trigger GameManager initialization/load and wait for level_loaded signal
 	var gm = get_node_or_null("/root/GameManager")
-	if gm and gm.has_method("initialize_game"):
-		await gm.initialize_game()
-	elif typeof(GameManager) != TYPE_NIL and GameManager and GameManager.has_method("initialize_game"):
-		# Fallback to the global autoload name
-		await GameManager.initialize_game()
-	else:
+	if not gm:
 		print("[GameUI] ERROR: GameManager not found; cannot initialize game")
+		# Restore start page
+		if start_page:
+			start_page.visible = true
+		if loading_label and is_instance_valid(loading_label):
+			loading_label.queue_free()
 		return
 
-	# Refresh UI to reflect loaded level and moves
+	# Connect temporary signal handler to detect level_loaded
+	_level_loaded_flag = false
+	if not GameManager.is_connected("level_loaded", Callable(self, "_level_loaded_signal")):
+		GameManager.connect("level_loaded", Callable(self, "_level_loaded_signal"))
+
+	# Try preferred initialize method, otherwise fallback to load_current_level
+	if gm.has_method("initialize_game"):
+		gm.initialize_game()
+	elif gm.has_method("load_current_level"):
+		gm.load_current_level()
+	else:
+		print("[GameUI] WARNING: GameManager has no initialize/load_current_level method")
+
+	# Wait up to 6 seconds for level_loaded
+	var wait_timer = get_tree().create_timer(6.0)
+	while not _level_loaded_flag and wait_timer.time_left > 0:
+		await get_tree().process_frame
+
+	# Disconnect temporary handler
+	if GameManager.is_connected("level_loaded", Callable(self, "_level_loaded_signal")):
+		GameManager.disconnect("level_loaded", Callable(self, "_level_loaded_signal"))
+
+	if not _level_loaded_flag and not gm.initialized:
+		print("[GameUI] ERROR: GameManager did not emit level_loaded in time; restoring StartPage")
+		if start_page:
+			start_page.visible = true
+		if loading_label and is_instance_valid(loading_label):
+			loading_label.queue_free()
+		return
+
+	# Initialization succeeded - ensure UI updates and board setup
 	update_display()
 	update_booster_ui()
 
-	# Ensure the GameBoard is created once the level is loaded.
+	# After initialization, show the board and ensure borders are drawn
 	var board = get_node_or_null("../GameBoard")
-	print("[GameUI] After initialize_game: GameManager.initialized=", GameManager.initialized, ", GameManager.grid size=", GameManager.grid.size())
-	if GameManager.initialized:
-		# If GameManager reports initialized (level already loaded), create visual grid deferred
-		if board:
-			print("[GameUI] Deferring board layout and create_visual_grid() calls")
-			# Use a safe deferred helper that checks method existence on the board
-			call_deferred("_deferred_setup_board", board)
-			print("[GameUI] Deferred create_visual_grid scheduled")
-			# Also print a small grid snapshot for diagnostics
-			for y in range(GameManager.GRID_HEIGHT):
-				var row = []
-				for x in range(GameManager.GRID_WIDTH):
-					row.append(GameManager.grid[x][y])
-				print("[GameUI] Grid row[", y, "] = ", row)
-	else:
-		# If level load is asynchronous (e.g., lives consumed prevented immediate load), connect to the level_loaded signal once
-		if not GameManager.is_connected("level_loaded", Callable(self, "_on_game_manager_level_loaded")):
-			GameManager.connect("level_loaded", Callable(self, "_on_game_manager_level_loaded"))
-			print("[GameUI] Connected to GameManager.level_loaded to create grid when ready")
-
-	# Hide start page (don't destroy it - we'll reuse it for next level)
-	if start_page:
-		start_page.visible = false
-		print("[GameUI] Start page hidden")
-
-	# Show the game board
 	if board:
 		board.visible = true
-		print("[GameUI] Game board is now visible")
+		if board.has_method("_on_level_loaded"):
+			board._on_level_loaded()
+		if board.has_method("draw_board_borders"):
+			board.draw_board_borders()
+		if board.has_method("show_tile_overlay"):
+			board.show_tile_overlay()
 
-func _on_game_manager_level_loaded():
-	print("[GameUI] Received GameManager.level_loaded — creating visual grid")
-	# Called when GameManager finishes loading a level
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		print("[GameUI] Deferred calls to create visual grid (level_loaded). Grid size=", GameManager.grid.size())
-		_deferred_setup_board(board)
-		print("[GameUI] Deferred visual grid creation scheduled on level_loaded")
-
-	# Update booster UI to show selected boosters for this level
-	update_booster_ui()
-	update_display()
-
-	# Disconnect to avoid duplicate handling
-	if GameManager.is_connected("level_loaded", Callable(self, "_on_game_manager_level_loaded")):
-		GameManager.disconnect("level_loaded", Callable(self, "_on_game_manager_level_loaded"))
-
-func _deferred_setup_board(board):
-	# Robustly wait for the board script to be ready (methods available) before calling setup methods.
-	if not board:
-		print("[GameUI] _deferred_setup_board: board is null")
-		return
-
-	var attempts = 0
-	var max_attempts = 20  # ~1 second (20 * 0.05s)
-	while attempts < max_attempts and get_tree() != null:
-		# If the board already exposes the layout method, assume script is attached and ready
-		if board.has_method("calculate_responsive_layout") or board.has_method("create_visual_grid"):
-			break
-
-		# Otherwise wait a short time and retry
-		await get_tree().create_timer(0.05).timeout
-		attempts += 1
-
-	if attempts >= max_attempts:
-		print("[GameUI] Warning: Board script not ready after waiting; trying to call methods anyway")
-
-	# Safely call board setup methods if they exist
-	if board.has_method("calculate_responsive_layout"):
-		board.calculate_responsive_layout()
-	else:
-		print("[GameUI] Board has no method calculate_responsive_layout (timed out)")
-
-	if board.has_method("setup_background"):
-		board.setup_background()
-	else:
-		print("[GameUI] Board has no method setup_background (timed out)")
-
-	if board.has_method("create_visual_grid"):
-		board.create_visual_grid()
-	else:
-		print("[GameUI] Board has no method create_visual_grid (timed out)")
-func _on_startpage_settings_pressed():
-	# Show settings dialog if present
-	if settings_dialog and settings_dialog is Panel:
-		if settings_dialog.has_method("show_dialog"):
-			settings_dialog.show_dialog()
-		else:
-			settings_dialog.visible = true
-			settings_dialog.raise()
-	else:
-		# Fallback: present settings as fullscreen side (will instance scene)
-		_show_settings_side()
-		print("[GameUI] Settings dialog not found to open from StartPage; using fullscreen fallback")
-
-func _on_startpage_achievements_pressed():
-	# Show achievements page
-	_show_achievements_page()
-	print("[GameUI] Opening achievements page from StartPage")
+	# Cleanup loading indicator
+	if loading_label and is_instance_valid(loading_label):
+		loading_label.queue_free()
 
 func _on_startpage_map_pressed():
-	# Show world map
-	_show_world_map()
-	print("[GameUI] Opening world map from StartPage")
+	"""Called when StartPage requests to open the World Map."""
+	AudioManager.play_sfx("ui_click")
 
-func _show_enhanced_game_over():
-	"""Show enhanced game over screen with better UX"""
-	print("============================================================")
-	print("[GameUI] 🎮 _show_enhanced_game_over() CALLED")
-	print("============================================================")
+	# Try to find existing WorldMap node
+	var wm = get_node_or_null("WorldMap")
+	if not wm or not is_instance_valid(wm):
+		# Prefer a scene if available, otherwise attach the script to a Control
+		var scene_path = "res://scenes/WorldMap.tscn"
+		if ResourceLoader.exists(scene_path):
+			var packed = load(scene_path)
+			if packed and packed is PackedScene:
+				wm = packed.instantiate()
+				wm.name = "WorldMap"
+				add_child(wm)
+				print("[GameUI] Instanced WorldMap from scene")
+			else:
+				print("[GameUI] Failed to instance WorldMap scene")
+		else:
+			# Fallback: load script and attach to a Control
+			var script = load("res://scripts/WorldMap.gd")
+			if script:
+				wm = Control.new()
+				wm.set_script(script)
+				wm.name = "WorldMap"
+				add_child(wm)
+				print("[GameUI] Instanced WorldMap via script fallback")
+			else:
+				print("[GameUI] ERROR: WorldMap resource not found")
 
-	# Hide game board
+	if not wm:
+		print("[GameUI] ERROR: Could not create WorldMap")
+		return
+
+	# Configure as fullscreen control
+	var vp = get_viewport().get_visible_rect().size
+	wm.anchor_left = 0
+	wm.anchor_top = 0
+	wm.anchor_right = 1
+	wm.anchor_bottom = 1
+	wm.position = Vector2(0, 0)
+	wm.size = vp
+	wm.mouse_filter = Control.MOUSE_FILTER_STOP
+	wm.visible = true
+
+	# Connect signals from world map
+	if wm.has_signal("level_selected") and not wm.is_connected("level_selected", Callable(self, "_on_worldmap_level_selected")):
+		wm.connect("level_selected", Callable(self, "_on_worldmap_level_selected"))
+	if wm.has_signal("back_to_menu") and not wm.is_connected("back_to_menu", Callable(self, "_on_worldmap_back_to_menu")):
+		wm.connect("back_to_menu", Callable(self, "_on_worldmap_back_to_menu"))
+
+	# Hide start page and board while map is active
+	if start_page:
+		start_page.visible = false
 	var board = get_node_or_null("../GameBoard")
 	if board:
 		board.visible = false
-		print("[GameUI] ✓ GameBoard hidden")
+		if board.has_method("_clear_board_borders"):
+			board._clear_board_borders()
 
-	# Old game_over_panel has been removed from scene - no need to hide it anymore
-	print("[GameUI] ℹ️ Using enhanced game over screen (old panel removed)")
+	print("[GameUI] WorldMap shown")
 
-	# Create or reuse game over screen
-	var game_over_screen = get_node_or_null("EnhancedGameOver")
-	if not game_over_screen:
-		print("[GameUI] 📝 Creating NEW enhanced game over screen")
-		game_over_screen = _create_game_over_screen()
-		add_child(game_over_screen)
-		print("[GameUI] ✓ Enhanced screen created and added as child")
-	else:
-		print("[GameUI] ♻️ Reusing existing enhanced game over screen")
-
-	# Update content
-	_update_game_over_content(game_over_screen)
-
-	# Show screen with maximum priority
-	game_over_screen.visible = true
-	game_over_screen.z_index = 1000  # Increased from 100 to ensure it's on top
-	game_over_screen.mouse_filter = Control.MOUSE_FILTER_STOP  # Ensure it captures input
-
-	# Force to front of parent's children
-	if game_over_screen.get_parent():
-		game_over_screen.get_parent().move_child(game_over_screen, -1)  # Move to end (top)
-
-	# Debugging info
-	print("[GameUI] 📊 Enhanced screen properties:")
-	print("[GameUI]   - visible: ", game_over_screen.visible)
-	print("[GameUI]   - z_index: ", game_over_screen.z_index)
-	print("[GameUI]   - position: ", game_over_screen.position)
-	print("[GameUI]   - size: ", game_over_screen.size)
-	print("[GameUI]   - parent: ", game_over_screen.get_parent().name if game_over_screen.get_parent() else "NO PARENT")
-	print("[GameUI]   - children count: ", game_over_screen.get_child_count())
-	print("[GameUI]   - mouse_filter: ", game_over_screen.mouse_filter)
-
-	# Old panel check removed - panel no longer exists in scene
-
-	# List ALL children of GameUI to see what's visible
-	print("[GameUI] 📋 All GameUI children:")
-	for i in range(get_child_count()):
-		var child = get_child(i)
-		if child.visible:
-			print("[GameUI]   [%d] %s - VISIBLE (z_index: %s)" % [i, child.name, child.z_index if "z_index" in child else "N/A"])
-		else:
-			print("[GameUI]   [%d] %s - hidden" % [i, child.name])
-
-	print("[GameUI] ✅ Enhanced game over screen should now be displayed")
-	print("============================================================")
-
-func _create_game_over_screen() -> Control:
-	"""Create the enhanced game over screen UI"""
-	print("[GameUI] 🏗️ Building enhanced game over screen...")
-
-	var screen = Control.new()
-	screen.name = "EnhancedGameOver"
-	screen.anchor_right = 1.0
-	screen.anchor_bottom = 1.0
-	screen.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	print("[GameUI]   - Created root Control")
-
-	# Background
-	var bg = ColorRect.new()
-	bg.name = "Background"
-	bg.color = Color(0.1, 0.05, 0.15, 0.95)  # Dark purple tint
-	bg.anchor_right = 1.0
-	bg.anchor_bottom = 1.0
-	screen.add_child(bg)
-
-	print("[GameUI]   - Added background ColorRect")
-
-	# Content container
-	var content = VBoxContainer.new()
-	content.name = "Content"
-	content.anchor_left = 0.1
-	content.anchor_top = 0.2
-	content.anchor_right = 0.9
-	content.anchor_bottom = 0.8
-	content.add_theme_constant_override("separation", 30)
-	screen.add_child(content)
-
-	print("[GameUI]   - Added content VBoxContainer")
-
-	# Title
-	var title = Label.new()
-	title.name = "Title"
-	title.text = "Level Failed"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(title, 56)
-	title.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))  # Vibrant red
-	title.add_theme_color_override("font_outline_color", Color(0.3, 0.0, 0.0, 1.0))
-	title.add_theme_constant_override("outline_size", 3)
-	content.add_child(title)
-
-	# Encouragement message - varied based on performance
-	var message = Label.new()
-	message.name = "Message"
-	var score = GameManager.score
-	var target = GameManager.target_score
-	var percentage = int((float(score) / float(target)) * 100) if target > 0 else 0
-
-	if percentage >= 90:
-		message.text = "So Close! You almost had it! 🎯"
-	elif percentage >= 75:
-		message.text = "Great effort! One more try! 💪"
-	elif percentage >= 50:
-		message.text = "You're getting there! Keep going!"
-	else:
-		message.text = "Don't give up! You can do it! 🚀"
-
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(message, 28)
-	message.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
-	content.add_child(message)
-
-	# Score display with better formatting
-	var score_label = Label.new()
-	score_label.name = "ScoreLabel"
-	score_label.text = "Score: %d / %d" % [score, target]
-	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(score_label, 36)
-	score_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
-	content.add_child(score_label)
-
-	# Progress bar with styled container
-	var progress_container = VBoxContainer.new()
-	progress_container.name = "ProgressContainer"
-	progress_container.add_theme_constant_override("separation", 8)
-
-	var progress_bar = ProgressBar.new()
-	progress_bar.name = "ProgressBar"
-	progress_bar.custom_minimum_size = Vector2(500, 40)
-	progress_bar.show_percentage = false
-
-	# Style the progress bar
-	var progress_style = StyleBoxFlat.new()
-	progress_style.bg_color = Color(0.2, 0.2, 0.3, 0.8)
-	progress_style.corner_radius_top_left = 10
-	progress_style.corner_radius_top_right = 10
-	progress_style.corner_radius_bottom_left = 10
-	progress_style.corner_radius_bottom_right = 10
-	progress_style.border_width_left = 2
-	progress_style.border_width_right = 2
-	progress_style.border_width_top = 2
-	progress_style.border_width_bottom = 2
-	progress_style.border_color = Color(0.4, 0.4, 0.5, 0.6)
-	progress_style.content_margin_left = 12
-	progress_style.content_margin_right = 12
-	progress_style.content_margin_top = 8
-	progress_style.content_margin_bottom = 8
-
-	progress_bar.add_theme_stylebox_override("background", progress_style)
-
-	var progress_fill = StyleBoxFlat.new()
-	progress_fill.bg_color = Color(1.0, 0.6, 0.3, 1.0)  # Orange
-	progress_fill.corner_radius_top_left = 10
-	progress_fill.corner_radius_top_right = 10
-	progress_fill.corner_radius_bottom_left = 10
-	progress_fill.corner_radius_bottom_right = 10
-	progress_bar.add_theme_stylebox_override("fill", progress_fill)
-
-	progress_container.add_child(progress_bar)
-
-	var progress_label = Label.new()
-	progress_label.name = "ProgressLabel"
-	progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(progress_label, 20)
-	progress_label.text = "%d%% of target" % percentage
-
-	if percentage >= 90:
-		progress_label.text += " - So close! 🎯"
-		progress_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
-	elif percentage >= 75:
-		progress_label.text += " - Almost there! 💪"
-		progress_label.add_theme_color_override("font_color", Color(0.7, 1.0, 0.7))
-	else:
-		progress_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-
-	progress_container.add_child(progress_label)
-	content.add_child(progress_container)
-
-	# Spacer
-	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(0, 40)
-	content.add_child(spacer)
-
-	# Button container
-	var button_container = HBoxContainer.new()
-	button_container.name = "ButtonContainer"
-	button_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	button_container.add_theme_constant_override("separation", 30)
-	content.add_child(button_container)
-
-	# Retry button with better styling
-	var retry_btn = Button.new()
-	retry_btn.name = "RetryButton"
-	retry_btn.text = "🔄 TRY AGAIN"
-	retry_btn.custom_minimum_size = Vector2(220, 90)
-	ThemeManager.apply_bangers_font_to_button(retry_btn, 26)
-	retry_btn.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
-	retry_btn.pressed.connect(_on_game_over_retry)
-	button_container.add_child(retry_btn)
-
-	# Give Up button with better styling
-	var give_up_btn = Button.new()
-	give_up_btn.name = "GiveUpButton"
-	give_up_btn.text = "🚪 EXIT GAME"
-	give_up_btn.custom_minimum_size = Vector2(220, 90)
-	ThemeManager.apply_bangers_font_to_button(give_up_btn, 26)
-	give_up_btn.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5))
-	give_up_btn.pressed.connect(_on_game_over_give_up)
-	button_container.add_child(give_up_btn)
-
-	print("[GameUI]   - Added buttons (TRY AGAIN, EXIT GAME)")
-	print("[GameUI] ✅ Enhanced game over screen created with ", screen.get_child_count(), " children")
-
-	return screen
-
-func _update_game_over_content(screen: Control):
-	"""Update the game over screen with current level data"""
-	var score = GameManager.score
-	var target = GameManager.target_score
-	var percentage = int((float(score) / float(target)) * 100) if target > 0 else 0
-
-	# Update progress bar value (percentage already set in progress_label during creation)
-	var progress_bar = screen.get_node_or_null("Content/ProgressContainer/ProgressBar")
-	if progress_bar:
-		progress_bar.value = percentage
-		progress_bar.max_value = 100
-
-	print("[GameUI] Game over screen updated - Score: %d/%d (%d%%)" % [score, target, percentage])
-
-func _on_game_over_retry():
-	"""Handle retry button on game over screen"""
+func _on_worldmap_level_selected(level_num: int):
+	"""Handle when a level is selected from the WorldMap."""
+	print("[GameUI] WorldMap level selected: %d" % level_num)
 	AudioManager.play_sfx("ui_click")
-	print("[GameUI] Retry button pressed on game over screen")
 
-	# Hide game over screen
-	var game_over_screen = get_node_or_null("EnhancedGameOver")
-	if game_over_screen:
-		game_over_screen.visible = false
+	# Set LevelManager index to the selected level (1-based to 0-based)
+	var lm = get_node_or_null('/root/LevelManager')
+	if lm:
+		lm.current_level_index = max(0, int(level_num) - 1)
+		print("[GameUI] LevelManager.current_level_index set to %d" % lm.current_level_index)
 
-	# Show the GameBoard (it may have been hidden)
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		board.visible = true
-		print("[GameUI] GameBoard set to visible for retry")
+	# Close the WorldMap UI and show StartPage for selected level
+	var wm = get_node_or_null("WorldMap")
+	if wm:
+		wm.visible = false
+		# remove instance to avoid duplicates
+		wm.queue_free()
 
-	# Reset and restart current level
-	var level_to_retry = GameManager.level
-	var retry_index = level_to_retry - 1
-	print("[GameUI] Want to retry level %d" % level_to_retry)
-	print("[GameUI] Current GameManager.level = %d" % GameManager.level)
+	# Show StartPage (will pick up LevelManager.current_level_index)
+	show_start_page()
 
-	GameManager.level_transitioning = false
-	GameManager.initialized = false
+func _on_worldmap_back_to_menu():
+	"""Handle closing the WorldMap and returning to previous UI (StartPage)."""
+	print("[GameUI] WorldMap requested close/back to menu")
+	AudioManager.play_sfx("ui_click")
+	var wm = get_node_or_null("WorldMap")
+	if wm:
+		wm.visible = false
+		wm.queue_free()
 
-	if GameManager.level_manager:
-		GameManager.level_manager.current_level_index = retry_index
-		print("[GameUI] Set level_manager.current_level_index to %d (for level %d)" % [retry_index, level_to_retry])
-
-	GameManager.load_current_level()
-
-	# Show start page
+	# Show start page again
 	if start_page:
 		start_page.visible = true
-		if start_page.has_method("set_level_info"):
-			# Get level description from LevelManager
-			var description = "Welcome! Match 3 tiles to score points."
-			if GameManager.level_manager:
-				var level_data = GameManager.level_manager.get_level(retry_index)
-				if level_data and "description" in level_data:
-					description = level_data.description
-			start_page.set_level_info(level_to_retry, description)
 
-func _on_game_over_give_up():
-	"""Handle give up button on game over screen - quit the game"""
-	AudioManager.play_sfx("ui_click")
-	print("[GameUI] Quit button pressed - exiting game")
+	# Restore board if needed
+	var board = get_node_or_null("../GameBoard")
+	if board and board.has_method("show_tile_overlay"):
+		board.show_tile_overlay()
 
-	# Hide game over screen first for clean exit
-	var game_over_screen = get_node_or_null("EnhancedGameOver")
-	if game_over_screen:
-		game_over_screen.visible = false
-
-	# Save any pending progress before quitting
-	if RewardManager.has_method("save_progress"):
-		RewardManager.save_progress()
-		print("[GameUI] Progress saved before quit")
-
-	# Small delay to ensure audio plays and save completes
-	await get_tree().create_timer(0.1).timeout
-
-	# Quit the game
-	print("[GameUI] Quitting game...")
-	get_tree().quit()
-
-func _show_achievements_page():
-	# Load and instance the achievements page script
-	var achievements_script = load("res://scripts/AchievementsPage.gd")
-	if not achievements_script:
-		print("[GameUI] ERROR: Could not load AchievementsPage.gd")
-		return
-
-	var achievements_page = Control.new()
-	achievements_page.name = "AchievementsPage"
-	achievements_page.set_script(achievements_script)
-
-	# Make it fullscreen
-	achievements_page.anchor_right = 1.0
-	achievements_page.anchor_bottom = 1.0
-	achievements_page.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	# Connect back signal
-	achievements_page.connect("back_pressed", Callable(self, "_on_achievements_back_pressed"))
-
-	# Add to scene
-	add_child(achievements_page)
-
-	# Show the page
-	if achievements_page.has_method("show_page"):
-		achievements_page.show_page()
-
-	print("[GameUI] Achievements page created and shown")
-
-func _on_achievements_back_pressed():
-	var achievements_page = get_node_or_null("AchievementsPage")
-	if achievements_page:
-		achievements_page.queue_free()
-	print("[GameUI] Achievements page closed")
-
-func _show_world_map():
-	"""Show the world map for level selection"""
-	# Load and instance the world map script
-	var worldmap_script = load("res://scripts/WorldMap.gd")
-	if not worldmap_script:
-		print("[GameUI] ERROR: Could not load WorldMap.gd")
-		return
-
-	var world_map = Control.new()
-	world_map.name = "WorldMap"
-	world_map.set_script(worldmap_script)
-
-	# Make it fullscreen
-	world_map.anchor_right = 1.0
-	world_map.anchor_bottom = 1.0
-	world_map.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	# Connect signals
-	world_map.connect("level_selected", Callable(self, "_on_worldmap_level_selected"))
-	world_map.connect("back_to_menu", Callable(self, "_on_worldmap_back_pressed"))
-
-	# Add to scene
-	add_child(world_map)
-
-	print("[GameUI] World map created and shown")
-
-func _on_worldmap_level_selected(level_number: int):
-		"""Handle level selection from world map"""
-		# Close world map
-		var world_map = get_node_or_null("WorldMap")
-		if world_map:
-				world_map.queue_free()
-
-		# Load the selected level
-		print("[GameUI] Level %d selected from world map" % level_number)
-		LevelManager.current_level_index = level_number - 1  # Convert to 0-based index
-
-		# Force the GameManager to load the newly selected level even if it was previously initialized
-		var gm = get_node_or_null("/root/GameManager")
-		if gm and gm.has_method("load_current_level"):
-				# Mark as not initialized so load_current_level will perform a fresh load
-				gm.initialized = false
-				print("[GameUI] Forcing GameManager to load selected level (index %d)" % LevelManager.current_level_index)
-				await gm.load_current_level()
-				if gm:
-					print("[GameUI] GameManager finished loading selected level: %d" % gm.level)
-				else:
-					print("[GameUI] GameManager finished loading selected level: N/A")
-		elif typeof(GameManager) != TYPE_NIL and GameManager and GameManager.has_method("load_current_level"):
-			# Fallback to global autoload
-			GameManager.initialized = false
-			print("[GameUI] Forcing global GameManager to load selected level (index %d)" % LevelManager.current_level_index)
-			await GameManager.load_current_level()
-			if GameManager:
-				print("[GameUI] Global GameManager finished loading selected level: %d" % GameManager.level)
-			else:
-				print("[GameUI] Global GameManager finished loading selected level: N/A")
-
-		# Update UI with new level info
-		if start_page and start_page.has_method("set_level_info"):
-			var level_data = LevelManager.get_current_level_data()
-			if level_data:
-				start_page.set_level_info(level_number, level_data.description)
-
-		# Refresh level display and board
-		_update_level_label()
-		update_display()
-		update_booster_ui()
-
-		# Recreate visual grid on the board to reflect the newly loaded level
-		var board = get_node_or_null("../GameBoard")
-		if board:
-				# Use deferred helper used elsewhere to safely call board setup
-				call_deferred("_deferred_setup_board", board)
-				print("[GameUI] Deferred board setup scheduled after world map selection")
-
-		print("[GameUI] Level %d prepared and ready to start" % level_number)
-
-func _on_worldmap_back_pressed():
-	"""Handle back button from world map"""
-	var world_map = get_node_or_null("WorldMap")
-	if world_map:
-		world_map.queue_free()
-	print("[GameUI] World map closed")
-
-func _update_level_label():
-	"""Update the level display in the UI"""
-	var level_manager = get_node_or_null("/root/LevelManager")
-	if level_manager:
-		var level_data = level_manager.get_current_level_data()
-		if level_data:
-			var level_num = level_manager.current_level_index + 1
-			if level_label:
-				level_label.text = "Lv %d" % level_num
-			print("[GameUI] Updated level display to Level %d" % level_num)
+	print("[GameUI] WorldMap closed and StartPage restored")

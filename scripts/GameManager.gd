@@ -66,6 +66,9 @@ var pending_level_complete = false
 # Add a flag to request level failure when moves reach zero but cascades are still in progress
 var pending_level_failed = false
 
+# NEW: Flag to indicate bonus conversion in progress
+var in_bonus_conversion = false
+
 # Debugging
 var DEBUG_LOGGING = true
 
@@ -1329,11 +1332,15 @@ func _convert_remaining_moves_to_bonus(remaining_moves: int):
 	processing_moves = true
 	bonus_skipped = false
 
+	# Mark that we're in bonus conversion so other completion triggers defer
+	in_bonus_conversion = true
+
 	# Get GameBoard reference
 	var game_board = get_node_or_null("/root/MainGame/GameBoard")
 	if not game_board:
 		print("[GameManager] ❌ GameBoard not found, skipping bonus conversion")
 		processing_moves = false
+		in_bonus_conversion = false
 		return
 
 	print("[GameManager] ✓ GameBoard found, starting bonus conversion")
@@ -1417,6 +1424,9 @@ func _convert_remaining_moves_to_bonus(remaining_moves: int):
 		if game_board:
 			game_board.visible = false
 			print("[GameManager] After skip delay: board.visible = ", game_board.visible)
+
+	# Mark end of bonus conversion
+	in_bonus_conversion = false
 
 	# Release processing lock
 	processing_moves = false
@@ -1504,6 +1514,17 @@ func collectible_landed_at(pos: Vector2, coll_type: String):
 	var reward_points = 500
 	add_score(reward_points)
 
+	# If we are currently in bonus conversion, defer triggering level completion to avoid reentrancy
+	if in_bonus_conversion:
+		print("[GameManager] 🪙 Collectible landed during bonus conversion - deferring completion handling")
+		# Do not attempt to set pending_level_complete or call _attempt_level_complete here
+		# Let the ongoing bonus conversion continue; final completion will be handled when bonus finishes
+		# Clean spawned positions tracking
+		var key = str(int(pos.x)) + "," + str(int(pos.y))
+		if _collectible_spawned_positions.has(key):
+			_collectible_spawned_positions.erase(key)
+		return
+
 	# Check if level is complete (if collectible-based level)
 	if collectible_target > 0 and collectibles_collected >= collectible_target:
 		print("[GameManager] ✨ ALL COLLECTIBLES COLLECTED! Level complete!")
@@ -1559,5 +1580,3 @@ func report_unmovable_destroyed(pos: Vector2) -> void:
 			pending_level_complete = true
 			_attempt_level_complete()
 
-# In the adjacent-unmovable handling block, replace the direct model updates with a call to report_unmovable_destroyed
-# ...existing code...

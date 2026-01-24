@@ -21,7 +21,28 @@ The Achievements system tracks player milestones and grants rewards (coins/gems/
 - Use `RewardManager.grant_achievement_reward()` to grant
 
 ## Art & Background guidance
-- Achievement artwork should be distinct; see `ACHIEVEMENT_BACKGROUND_GUIDE.md` for art templates and safe areas.
+The achievements page supports custom background images with automatic fallback to solid biblical-themed colors. Recommended behavior and file locations:
+
+- The system searches these paths (priority):
+  - `res://textures/backgrounds/achievements_bg.jpg` / `.png`
+  - `res://textures/backgrounds/parchment_bg.jpg` / `.png`
+  - fallbacks: `res://textures/achievement_background.jpg`, `res://textures/biblical_background.jpg`
+
+- Image recommendations:
+  - Resolution: 1920×1080 or higher
+  - Format: JPG (smaller) or PNG (supports transparency)
+  - Palette: warm earth tones, golds, creams, soft blues
+  - Keep the center area lighter for text readability
+
+- Implementation notes:
+  - The page automatically loads the first available image, scales it to cover the screen, and applies a semi-transparent parchment overlay to ensure readable text.
+  - Programmatic override available via `AchievementsPage.set_background_image(path)`.
+
+- Overlay & accessibility:
+  - Use a semi-transparent overlay color such as `Color(0.96, 0.94, 0.88, 0.7)` to maintain readability.
+
+- Future enhancements:
+  - Multiple backgrounds (randomized), seasonal themes, and per-achievement backgrounds.
 
 ## Enhanced achievements flow
 - Timed animations and toast notifications on unlock

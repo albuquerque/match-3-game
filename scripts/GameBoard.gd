@@ -101,7 +101,7 @@ func _ready():
 	# Only create visual grid if GameManager has initialized a level; otherwise wait for level_loaded
 	if Engine.has_singleton("GameManager") and GameManager.initialized:
 		create_visual_grid()
-		draw_board_borders()
+		# Borders will be drawn when level_loaded triggers _on_level_loaded
 	else:
 		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
 
@@ -1242,15 +1242,26 @@ func _on_level_complete():
 	# Actions to perform on level completion, e.g. showing a summary, transitioning to next level, etc.
 
 func _on_level_loaded():
-	print("[GameBoard] Level Loaded")
+	print("[GameBoard] _on_level_loaded called - initializing visuals")
 
-	# Reset or initialize anything specific to the new level
+	# Recalculate layout and setup visuals immediately (we rely on create_visual_grid/draw_board_borders guards)
 	calculate_responsive_layout()
 	setup_background()
+	setup_background_image()
 
-	# Recreate the visual grid for the new level
-	create_visual_grid()
-	draw_board_borders()
+	# Create visual grid and draw borders (deferred to avoid parent busy errors)
+	if has_method("create_visual_grid"):
+		call_deferred("create_visual_grid")
+	else:
+		print("[GameBoard] Warning: create_visual_grid() method not found")
+
+	call_deferred("draw_board_borders")
+
+	# Ensure tile overlay is visible (if created)
+	if tile_area_overlay:
+		tile_area_overlay.visible = true
+
+	print("[GameBoard] _on_level_loaded completed")
 
 
 func _spawn_level_collectibles():
@@ -2012,7 +2023,7 @@ func activate_chain_reaction_booster(x: int, y: int):
 					scoring_count_wave3 += 1
 
 	# Calculate total score
-	var total_scoring = scoring_count_wave1 + (scoring_count_wave2 if defined(scoring_count_wave2) else 0) + (scoring_count_wave3 if defined(scoring_count_wave3) else 0)
+	var total_scoring = scoring_count_wave1 + scoring_count_wave2 + scoring_count_wave3
 	var points = GameManager.calculate_points(total_scoring)
 	if points > 0:
 		GameManager.add_score(points)
@@ -2616,68 +2627,143 @@ func _rounded_rect_points(rect_pos: Vector2, rect_size: Vector2, radius: float, 
 	return pts
 
 func draw_board_borders():
-	# Draw a rounded border around the contiguous active tile area.
-	# This is a resilient fallback implementation restoring visible borders.
-	# It draws a single rounded rectangle that bounds all non-blocked cells.
-	if border_container == null:
-		print("[GameBoard] border_container missing - cannot draw borders")
+	print("[GameBoard] draw_board_borders called - board visible=", visible)
+	print("[GameBoard] typeof(GameManager) = ", typeof(GameManager))
+
+	# Use typeof check instead of Engine.has_singleton() to detect autoload availability
+	if typeof(GameManager) == TYPE_NIL:
+		print("[GameBoard] draw_board_borders: GameManager not available (typeof==NIL) - skipping until level_loaded")
 		return
 
-	# Clear any previous borders
-	_clear_board_borders()
+	if not GameManager.initialized or GameManager.grid == null or GameManager.grid.size() == 0:
+		print("[GameBoard] draw_board_borders: GameManager not initialized or empty grid - skipping until level_loaded")
+		return
 
-	# Find bounding extents of active (non-blocked) cells
-	var min_x = GameManager.GRID_WIDTH
-	var min_y = GameManager.GRID_HEIGHT
-	var max_x = -1
-	var max_y = -1
+	# Ensure border_container exists
+	if border_container == null:
+		border_container = Node2D.new()
+		border_container.name = "BorderContainer"
+		add_child(border_container)
+
+	# Draw borders (per-cell rounded borders)
+	draw_simple_borders()
+
+	# Set visibility of border container to match this GameBoard's visibility
+	if border_container:
+		border_container.visible = visible
+
+	# Diagnostic: print summary
+	var child_count = border_container.get_child_count() if border_container else 0
+	print("[GameBoard] draw_board_borders completed - tile_size=", tile_size, ", grid_offset=", grid_offset, ", grid=", GameManager.GRID_WIDTH, "x", GameManager.GRID_HEIGHT, ", border_segments=", child_count)
+	return
+
+
+func draw_simple_borders() -> void:
+	# Draw simple straight edges and quarter-circle corners around active tiles
+	var corner_radius = max(4.0, BORDER_WIDTH * 4.0)
+	# Guard GameManager presence and grid readiness (use typeof check)
+	print("[GameBoard] draw_simple_borders: typeof(GameManager) = ", typeof(GameManager))
+	if typeof(GameManager) == TYPE_NIL:
+		print("[GameBoard] draw_simple_borders aborted: GameManager missing (typeof==NIL)")
+		return
+	if not GameManager.initialized or GameManager.grid == null or GameManager.grid.size() == 0:
+		# No level data yet - nothing to draw
+		print("[GameBoard] draw_simple_borders aborted: GameManager not initialized or empty grid")
+		return
+	# Ensure border_container exists
+	if border_container == null:
+		border_container = Node2D.new()
+		border_container.name = "BorderContainer"
+		add_child(border_container)
+	# clear old children
+	for c in border_container.get_children():
+		c.queue_free()
+
+	var segments_drawn = 0
+
+	# Iterate cells and draw outer edges where neighbor is blocked/out of bounds
 	for x in range(GameManager.GRID_WIDTH):
 		for y in range(GameManager.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(x, y):
-				min_x = min(min_x, x)
-				min_y = min(min_y, y)
-				max_x = max(max_x, x)
-				max_y = max(max_y, y)
+			if GameManager.is_cell_blocked(x, y):
+				continue
+			var left = grid_offset.x + x * tile_size
+			var right = grid_offset.x + (x + 1) * tile_size
+			var top = grid_offset.y + y * tile_size
+			var bottom = grid_offset.y + (y + 1) * tile_size
 
-	if max_x < 0:
-		# no active cells
-		print("[GameBoard] No active cells found - skipping border drawing")
-		return
+			var has_top = (y == 0 or GameManager.is_cell_blocked(x, y - 1))
+			var has_bottom = (y == GameManager.GRID_HEIGHT - 1 or GameManager.is_cell_blocked(x, y + 1))
+			var has_left = (x == 0 or GameManager.is_cell_blocked(x - 1, y))
+			var has_right = (x == GameManager.GRID_WIDTH - 1 or GameManager.is_cell_blocked(x + 1, y))
 
-	# Compute world rectangle covering active cells (with padding)
-	var left = float(min_x) * tile_size + grid_offset.x - BORDER_WIDTH
-	var top = float(min_y) * tile_size + grid_offset.y - BORDER_WIDTH
-	var width = (float(max_x - min_x + 1) * tile_size) + BORDER_WIDTH * 2
-	var height = (float(max_y - min_y + 1) * tile_size) + BORDER_WIDTH * 2
+			# Top border
+			if has_top:
+				var start_x = left
+				if has_left:
+					start_x += corner_radius
+				var end_x = right
+				if has_right:
+					end_x -= corner_radius
+				if end_x > start_x:
+					draw_border_edge(Vector2(start_x, top), Vector2(end_x, top))
+					segments_drawn += 1
 
-	var rect_pos = Vector2(left, top)
-	var rect_size = Vector2(width, height)
+			# Bottom border
+			if has_bottom:
+				var b_start_x = left
+				if has_left:
+					b_start_x += corner_radius
+				var b_end_x = right
+				if has_right:
+					b_end_x -= corner_radius
+				if b_end_x > b_start_x:
+					draw_border_edge(Vector2(b_start_x, bottom), Vector2(b_end_x, bottom))
+					segments_drawn += 1
 
-	# Choose corner radius relative to tile_size
-	var corner_radius = clamp(tile_size * 0.45, 6.0, tile_size)
+			# Left border
+			if has_left:
+				var start_y = top
+				if has_top:
+					start_y += corner_radius
+				var end_y = bottom
+				if has_bottom:
+					end_y -= corner_radius
+				if end_y > start_y:
+					draw_border_edge(Vector2(left, start_y), Vector2(left, end_y))
+					segments_drawn += 1
 
-	# Create a Line2D for the rounded rectangle border
-	var border_line = Line2D.new()
-	border_line.name = "BoardBorder"
-	border_line.width = max(2.0, BORDER_WIDTH)
-	border_line.default_color = border_color
-	border_line.z_index = 200
-	border_line.antialiased = true
-	border_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	border_line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	border_line.joint_mode = Line2D.LINE_JOINT_ROUND
+			# Right border
+			if has_right:
+				var r_start_y = top
+				if has_top:
+					r_start_y += corner_radius
+				var r_end_y = bottom
+				if has_bottom:
+					r_end_y -= corner_radius
+				if r_end_y > r_start_y:
+					draw_border_edge(Vector2(right, r_start_y), Vector2(right, r_end_y))
+					segments_drawn += 1
 
-	# Build points
-	var pts = _rounded_rect_points(rect_pos, rect_size, corner_radius, 10)
-	for p in pts:
-		border_line.add_point(p)
+			# Corner arcs
+			if has_top and has_left:
+				draw_corner_arc(Vector2(left, top), "top_left", corner_radius)
+				segments_drawn += 1
+			if has_top and has_right:
+				draw_corner_arc(Vector2(right, top), "top_right", corner_radius)
+				segments_drawn += 1
+			if has_bottom and has_left:
+				draw_corner_arc(Vector2(left, bottom), "bottom_left", corner_radius)
+				segments_drawn += 1
+			if has_bottom and has_right:
+				draw_corner_arc(Vector2(right, bottom), "bottom_right", corner_radius)
+				segments_drawn += 1
 
-	# Close the path by adding the first point again
-	if pts.size() > 0:
-		border_line.add_point(pts[0])
+	print("[GameBoard] draw_simple_borders: drawn per-cell borders; segments_drawn=", segments_drawn)
+	# Ensure border_container visibility reflects current board visibility
+	if border_container:
+		border_container.visible = visible
 
-	border_container.add_child(border_line)
-	print("[GameBoard] draw_board_borders: drawn rounded rect covering cells [", min_x, ",", min_y, "] to [", max_x, ",", max_y, "] world rect:", rect_pos, rect_size)
+	return
 
 func draw_border_edge(start: Vector2, end: Vector2) -> void:
 	var l = Line2D.new()

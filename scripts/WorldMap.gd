@@ -41,7 +41,13 @@ func _scale_position(pos: Array) -> Vector2:
 
 func _load_world_map_data():
 	"""Load world map configuration from JSON"""
-	var file = FileAccess.open("res://levels/world_map.json", FileAccess.READ)
+	var path = "res://levels/world_map.json"
+	if not FileAccess.file_exists(path):
+		print("[WorldMap] world_map.json not found at: %s" % path)
+		_create_fallback_data()
+		return
+
+	var file = FileAccess.open(path, FileAccess.READ)
 	if file:
 		var json_string = file.get_as_text()
 		file.close()
@@ -49,15 +55,27 @@ func _load_world_map_data():
 		var json = JSON.new()
 		var parse_result = json.parse(json_string)
 
-		if parse_result == OK:
-			world_map_data = json.data
-			print("[WorldMap] Loaded world map data: %d chapters" % world_map_data.world_map.chapters.size())
+		if parse_result == OK and json.data:
+			# Ensure structure contains expected keys
+			if typeof(json.data) == TYPE_DICTIONARY and json.data.has("world_map") and json.data.world_map.has("chapters"):
+				world_map_data = json.data
+				var chapters_count = 0
+				if typeof(world_map_data.world_map.chapters) == TYPE_ARRAY:
+					chapters_count = world_map_data.world_map.chapters.size()
+				print("[WorldMap] Loaded world map data: %d chapters" % chapters_count)
+				return
+			else:
+				print("[WorldMap] world_map.json missing expected keys, using fallback")
+				_create_fallback_data()
+				return
 		else:
-			print("[WorldMap] Error parsing world_map.json")
+			print("[WorldMap] Error parsing world_map.json - using fallback")
 			_create_fallback_data()
+			return
 	else:
 		print("[WorldMap] Could not open world_map.json, using fallback")
 		_create_fallback_data()
+		return
 
 func _create_fallback_data():
 	"""Create basic fallback data if JSON loading fails"""
@@ -406,8 +424,12 @@ func _update_progress_display():
 
 	# Update the combined progress text (star icon is a texture in the container)
 	var progress_text = get_node_or_null("TopUI/ProgressContainer/ProgressText")
-	if progress_text:
+	if progress_text and progress_text is Label:
 		progress_text.text = "%d Stars Collected | 📖 %d Levels Completed" % [total_stars, levels_completed]
+	else:
+		# Fallback: try to assign to module-level progress_label if created earlier
+		if progress_label and progress_label is Label:
+			progress_label.text = "%d Stars Collected | 📖 %d Levels Completed" % [total_stars, levels_completed]
 
 func _get_level_stars(level_num: int) -> int:
 	"""Get star count for a specific level"""
