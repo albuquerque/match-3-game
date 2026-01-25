@@ -1,0 +1,16 @@
+{
+  "level_number": 37,
+  "title": "Level 37",
+  "description": "Collect 2 coins and clear 9 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 7728,
+  "max_moves": 49,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "0 0 0 0 0 0 0 0\nU U U 0 0 0 U U\n0 U 0 0 0 0 0 U\n0 0 0 0 0 0 0 0\n0 0 0 C 0 0 0 0\n0 0 0 U 0 U 0 0\n0 0 0 0 C 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 2,
+  "unmovable_target": 9,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

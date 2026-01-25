@@ -723,18 +723,31 @@ func animate_gravity():
 	print("[GRAVITY] done")
 
 func _check_collectibles_at_bottom():
-	"""Check if any collectibles have reached the bottom row and collect them"""
-	var bottom_row = GameManager.GRID_HEIGHT - 1
+	"""Check if any collectibles have reached the bottom-most active cell in their column and collect them"""
+	# For each column, determine the bottom-most active row (the last non-blocked cell)
 	var collectibles_to_remove = []
 
 	for x in range(GameManager.GRID_WIDTH):
-		if GameManager.is_cell_blocked(x, bottom_row):
+		# Find the bottom-most active row for this column
+		var last_active_row = -1
+		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
+			if not GameManager.is_cell_blocked(x, y):
+				last_active_row = y
+				break
+
+		# If no active cell in this column, skip
+		if last_active_row == -1:
 			continue
 
-		var tile = tiles[x][bottom_row]
+		# If there's no tile array entry for this column/row, skip
+		if x >= tiles.size() or last_active_row >= tiles[x].size():
+			continue
+
+		var tile = tiles[x][last_active_row]
+		# If tile exists and it's a collectible (and not already collected), gather it
 		if tile and tile.is_collectible and not tile.collectible_collected_flag:
-			print("[GameBoard] Collectible reached bottom at (", x, ",", bottom_row, ")")
-			collectibles_to_remove.append({"tile": tile, "pos": Vector2(x, bottom_row)})
+			print("[GameBoard] Collectible reached bottom-most active cell at (", x, ",", last_active_row, ")")
+			collectibles_to_remove.append({"tile": tile, "pos": Vector2(x, last_active_row)})
 
 	# If no collectibles to collect, return immediately
 	if collectibles_to_remove.size() == 0:

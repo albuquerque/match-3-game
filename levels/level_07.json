@@ -1,11 +1,16 @@
 {
-  "level": 7,
-  "width": 8,
-  "height": 8,
-  "target_score": 14000,
-  "moves": 18,
-  "description": "Stairway pattern!",
+  "level_number": 7,
+  "title": "Level 7",
+  "description": "Clear all 10 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 5680,
+  "max_moves": 35,
+  "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "0 0 X X X X X X\n0 0 0 0 X X X X\n0 0 0 0 0 0 X X\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX X 0 0 0 0 0 0\nX X X X 0 0 0 0\nX X X X X X 0 0"
+  "layout": "0 0 0 0 0 0 0 0\nU U 0 0 0 0 0 0\nU 0 0 0 0 0 0 0\n0 0 0 0 0 U U U\n0 0 0 0 0 0 U 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 U U U 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 10,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
 }
-

@@ -1,0 +1,16 @@
+{
+  "level_number": 49,
+  "title": "Level 49",
+  "description": "Collect 1 coin!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 11820,
+  "max_moves": 44,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 C 0\n0 0 0 0 0 0 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 1,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

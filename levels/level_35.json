@@ -1,0 +1,16 @@
+{
+  "level_number": 35,
+  "title": "Level 35",
+  "description": "Clear all 6 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 12400,
+  "max_moves": 43,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 0 0\n0 0 0 0 U 0 0 0\n0 0 0 U U U 0 0\n0 0 0 0 U U 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 0,
+  "unmovable_target": 6,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

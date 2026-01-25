@@ -1,10 +1,16 @@
 {
-  "level": 8,
-  "width": 8,
-  "height": 8,
-  "target_score": 16000,
-  "moves": 18,
-  "description": "The hourglass!",
+  "level_number": 8,
+  "title": "Level 8",
+  "description": "Collect 1 coin!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 4440,
+  "max_moves": 32,
+  "num_tile_types": 6,
   "theme": "modern",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX 0 0 0 0 0 0 X\nX X 0 0 0 0 X X\nX X 0 0 0 0 X X\nX 0 0 0 0 0 0 X\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0"
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 C 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 1,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
 }

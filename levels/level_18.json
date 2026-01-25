@@ -1,0 +1,16 @@
+{
+  "level_number": 18,
+  "title": "Level 18",
+  "description": "Collect 1 coin and clear 10 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 4992,
+  "max_moves": 43,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 0 C\n0 0 0 U U U 0 0\n0 0 0 U U U U 0\n0 0 0 U U U 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 1,
+  "unmovable_target": 10,
+  "unmovable_type": "glass",
+  "collectible_type": "coin"
+}

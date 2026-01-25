@@ -1,0 +1,16 @@
+{
+  "level_number": 25,
+  "title": "Level 25",
+  "description": "Reach 12500 points in 32 moves!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 12500,
+  "max_moves": 32,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 0,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

@@ -1,0 +1,16 @@
+{
+  "level_number": 29,
+  "title": "Level 29",
+  "description": "Clear all 8 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 10960,
+  "max_moves": 41,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 0 0\n0 0 0 U U U 0 0\n0 0 0 U U U 0 0\n0 0 0 0 U U 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 0,
+  "unmovable_target": 8,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

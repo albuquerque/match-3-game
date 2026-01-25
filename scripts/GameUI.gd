@@ -471,8 +471,10 @@ func _show_enhanced_game_over():
 	game_over_panel = Panel.new()
 	game_over_panel.name = "EnhancedGameOverPanel"
 	game_over_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	game_over_panel.rect_min_size = panel_size
-	game_over_panel.rect_position = (screen_size - panel_size) / 2
+	# Use Godot 4 Control API: custom_minimum_size instead of rect_min_size
+	game_over_panel.custom_minimum_size = panel_size
+	# Position the panel centrally
+	game_over_panel.position = (screen_size - panel_size) / 2
 	game_over_panel.z_index = 2000
 
 	# Style container
@@ -482,10 +484,11 @@ func _show_enhanced_game_over():
 	vb.anchor_top = 0
 	vb.anchor_right = 1
 	vb.anchor_bottom = 1
-	vb.margin_left = 20
-	vb.margin_top = 20
-	vb.margin_right = -20
-	vb.margin_bottom = -20
+	# Use offset_* (Control API) instead of margin_* on Container-derived controls
+	vb.offset_left = 20
+	vb.offset_top = 20
+	vb.offset_right = -20
+	vb.offset_bottom = -20
 	game_over_panel.add_child(vb)
 
 	# Title
@@ -508,7 +511,9 @@ func _show_enhanced_game_over():
 	details.text = "You have no moves left. Final Score: %d\nTarget: %d" % [GameManager.score, GameManager.target_score]
 	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	details.valign = VERTICAL_ALIGNMENT_CENTER
-	details.autowrap = true
+	#	details.autowrap = true
+	# Godot 4 uses autowrap_mode on Label via TextServer constants
+	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	details.add_theme_font_size_override("font_size", 20)
 	vb.add_child(details)
 
@@ -518,8 +523,11 @@ func _show_enhanced_game_over():
 	hb.custom_minimum_size = Vector2(0, 16)
 	hb.anchor_left = 0
 	hb.anchor_right = 1
-	hb.margin_left = 30
-	hb.margin_right = -30
+	# Use offset_* instead of margin_* for Control positioning
+	hb.offset_left = 30
+	hb.offset_top = 0
+	hb.offset_right = -30
+	hb.offset_bottom = 0
 	vb.add_child(hb)
 
 	# Retry button
@@ -528,7 +536,8 @@ func _show_enhanced_game_over():
 	retry_btn.text = "Try Again"
 	retry_btn.focus_mode = Control.FOCUS_NONE
 	retry_btn.connect("pressed", Callable(self, "_on_game_over_retry"))
-	retry_btn.expand = true
+	# Godot 4: use size_flags to expand horizontally
+	retry_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(retry_btn)
 
 	# Quit button
@@ -537,7 +546,8 @@ func _show_enhanced_game_over():
 	quit_btn.text = "Quit"
 	quit_btn.focus_mode = Control.FOCUS_NONE
 	quit_btn.connect("pressed", Callable(self, "_on_game_over_quit"))
-	quit_btn.expand = true
+	# Godot 4: use size flags to expand horizontally
+	quit_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(quit_btn)
 
 	# Add the panel to this UI and make modal
@@ -735,8 +745,8 @@ func _on_continue_pressed():
 		print("[GameUI] Granted rewards: %d coins, %d gems" % [_pending_reward_coins, _pending_reward_gems])
 
 		# Show reward notification
-		if reward_notification:
-			reward_notification.show_reward("level_complete", _pending_reward_coins, "Level Complete!")
+		if reward_notification and reward_notification.has_method("show_reward"):
+			reward_notification.call("show_reward", "level_complete", _pending_reward_coins, "Level Complete!")
 
 		# Reset pending rewards
 		_pending_reward_coins = 0
@@ -1070,14 +1080,13 @@ func _on_item_purchased(item_type: String, cost_type: String, cost_amount: int):
 	print("[GameUI] Purchased: %s for %d %s" % [item_type, cost_amount, cost_type])
 
 	# Show reward notification
-	if reward_notification:
-		if reward_notification.has_method("show_reward"):
-			if item_type == "lives_refill":
-				reward_notification.show_reward("lives", 5, "Lives refilled!")
-			else:
-				reward_notification.show_reward("booster", 1, "%s booster added!" % item_type.capitalize())
+	if reward_notification and reward_notification.has_method("show_reward"):
+		if item_type == "lives_refill":
+			reward_notification.call("show_reward", "lives", 5, "Lives refilled!")
 		else:
-			print("[GameUI] reward_notification missing show_reward method")
+			reward_notification.call("show_reward", "booster", 1, "%s booster added!" % item_type.capitalize())
+	else:
+		print("[GameUI] reward_notification missing show_reward method")
 
 func _show_out_of_lives_dialog():
 	"""Show the out of lives dialog"""
@@ -1227,8 +1236,8 @@ func _on_extra_moves_pressed():
 		print("[GameUI] Extra moves activated - added 5 moves")
 
 		# Show feedback to player
-		if reward_notification:
-			reward_notification.show_reward("extra_moves", 5, "+5 Moves!")
+		if reward_notification and reward_notification.has_method("show_reward"):
+			reward_notification.call("show_reward", "extra_moves", 5, "+5 Moves!")
 
 		# Update booster UI
 		update_booster_ui()

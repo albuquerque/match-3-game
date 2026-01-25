@@ -1,0 +1,16 @@
+{
+  "level_number": 34,
+  "title": "Level 34",
+  "description": "Collect 2 coins!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 9120,
+  "max_moves": 40,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 C 0\n0 0 0 0 0 0 0 0\n0 0 0 0 C 0 0 0\n0 0 0 0 0 0 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 2,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}
