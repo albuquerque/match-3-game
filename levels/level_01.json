@@ -1,11 +1,16 @@
 {
-  "level": 1,
-  "width": 8,
-  "height": 8,
-  "target_score": 5000,
-  "moves": 30,
-  "description": "Welcome! Match 3 tiles to score points.",
+  "level_number": 1,
+  "title": "Level 1",
+  "description": "Reach 5300 points in 25 moves!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 5300,
+  "max_moves": 25,
+  "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0"
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
 }
-

@@ -1,0 +1,16 @@
+{
+  "level_number": 28,
+  "title": "Level 28",
+  "description": "Collect 1 coin!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 8040,
+  "max_moves": 38,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 C X\nX 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 1,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

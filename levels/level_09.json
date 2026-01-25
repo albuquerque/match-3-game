@@ -1,10 +1,16 @@
 {
-  "level": 9,
-  "width": 8,
-  "height": 8,
-  "target_score": 18000,
-  "moves": 16,
-  "description": "Swiss cheese pattern!",
+  "level_number": 9,
+  "title": "Level 9",
+  "description": "Reach 7700 points in 27 moves!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 7700,
+  "max_moves": 27,
+  "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "0 0 0 0 0 0 0 0\n0 X 0 0 0 0 X 0\n0 0 0 X X 0 0 0\n0 0 X 0 0 X 0 0\n0 0 X 0 0 X 0 0\n0 0 0 X X 0 0 0\n0 X 0 0 0 0 X 0\n0 0 0 0 0 0 0 0"
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
 }

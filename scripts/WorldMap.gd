@@ -13,25 +13,27 @@ signal back_to_menu
 @onready var chapters_vbox: VBoxContainer
 @onready var top_ui: Control
 @onready var title_label: Label
-@onready var progress_label: Label
+
+# Progress text label (created dynamically in _setup_ui)
+var progress_label: Label = null
 
 # Data
 var world_map_data: Dictionary = {}
 var current_chapter_containers: Array[Control] = []
 var screen_size: Vector2 = Vector2.ZERO
 var scale_factor: Vector2 = Vector2.ONE
+# Preload gold star texture for consistent cross-platform rendering
+var gold_star_texture = load("res://textures/gold_star.svg") as Texture2D
 
 func _ready():
 	"""Initialize the world map"""
-	print("[WorldMap] Initializing...")
 	screen_size = get_viewport_rect().size
 	# Base design was for 720x1280, calculate scale factors
 	scale_factor = Vector2(screen_size.x / 720.0, screen_size.y / 1280.0)
-	print("[WorldMap] Screen size: %s, Scale factor: %s" % [screen_size, scale_factor])
 	_load_world_map_data()
 	_setup_ui()
 	_populate_chapters()
-	print("[WorldMap] Ready!")
+	# Ready
 
 func _scale_position(pos: Array) -> Vector2:
 	"""Convert JSON position to screen-scaled position"""
@@ -39,7 +41,13 @@ func _scale_position(pos: Array) -> Vector2:
 
 func _load_world_map_data():
 	"""Load world map configuration from JSON"""
-	var file = FileAccess.open("res://levels/world_map.json", FileAccess.READ)
+	var path = "res://levels/world_map.json"
+	if not FileAccess.file_exists(path):
+		print("[WorldMap] world_map.json not found at: %s" % path)
+		_create_fallback_data()
+		return
+
+	var file = FileAccess.open(path, FileAccess.READ)
 	if file:
 		var json_string = file.get_as_text()
 		file.close()
@@ -47,15 +55,27 @@ func _load_world_map_data():
 		var json = JSON.new()
 		var parse_result = json.parse(json_string)
 
-		if parse_result == OK:
-			world_map_data = json.data
-			print("[WorldMap] Loaded world map data: %d chapters" % world_map_data.world_map.chapters.size())
+		if parse_result == OK and json.data:
+			# Ensure structure contains expected keys
+			if typeof(json.data) == TYPE_DICTIONARY and json.data.has("world_map") and json.data.world_map.has("chapters"):
+				world_map_data = json.data
+				var chapters_count = 0
+				if typeof(world_map_data.world_map.chapters) == TYPE_ARRAY:
+					chapters_count = world_map_data.world_map.chapters.size()
+				print("[WorldMap] Loaded world map data: %d chapters" % chapters_count)
+				return
+			else:
+				print("[WorldMap] world_map.json missing expected keys, using fallback")
+				_create_fallback_data()
+				return
 		else:
-			print("[WorldMap] Error parsing world_map.json")
+			print("[WorldMap] Error parsing world_map.json - using fallback")
 			_create_fallback_data()
+			return
 	else:
 		print("[WorldMap] Could not open world_map.json, using fallback")
 		_create_fallback_data()
+		return
 
 func _create_fallback_data():
 	"""Create basic fallback data if JSON loading fails"""
@@ -141,28 +161,39 @@ func _setup_ui():
 	title_label.offset_right = 200
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(title_label, 32)
-	title_label.add_theme_color_override("font_color", Color.WHITE)
-	title_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	title_label.add_theme_constant_override("outline_size", 3)
+	# Apply styled font (outline/glow)
+	ThemeManager.apply_bangers_font_styled(title_label, 32, Color.WHITE, Color(0,0,0), 3)
 	top_ui.add_child(title_label)
 
-	# Progress label
+	# Progress container: star icon + text (use texture for star to ensure mobile consistency)
+	var progress_container = HBoxContainer.new()
+	progress_container.name = "ProgressContainer"
+	progress_container.anchor_left = 0.5
+	progress_container.anchor_right = 0.5
+	progress_container.anchor_top = 0.5
+	progress_container.anchor_bottom = 0.8
+	progress_container.offset_left = -300
+	progress_container.offset_right = 300
+	progress_container.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	# Star icon
+	var progress_star = TextureRect.new()
+	progress_star.name = "ProgressStar"
+	progress_star.texture = gold_star_texture
+	progress_star.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	progress_star.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	progress_star.custom_minimum_size = Vector2(18, 18)
+	progress_container.add_child(progress_star)
+
+	# Progress text
 	progress_label = Label.new()
-	progress_label.name = "Progress"
-	progress_label.anchor_left = 0.5
-	progress_label.anchor_right = 0.5
-	progress_label.anchor_top = 0.5
-	progress_label.anchor_bottom = 0.8
-	progress_label.offset_left = -300
-	progress_label.offset_right = 300
+	progress_label.name = "ProgressText"
 	progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	progress_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(progress_label, 18)
-	progress_label.add_theme_color_override("font_color", Color.WHITE)
-	progress_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	progress_label.add_theme_constant_override("outline_size", 2)
-	top_ui.add_child(progress_label)
+	# Styled progress text
+	ThemeManager.apply_bangers_font_styled(progress_label, 18, Color.WHITE, Color(0,0,0), 2)
+	progress_container.add_child(progress_label)
+
+	top_ui.add_child(progress_container)
 
 	# Back Button
 	var back_button = Button.new()
@@ -170,7 +201,7 @@ func _setup_ui():
 	back_button.text = "← Back to Menu"
 	back_button.position = Vector2(20, 20)
 	back_button.custom_minimum_size = Vector2(180, 50)
-	ThemeManager.apply_bangers_font_to_button(back_button, 16)
+	ThemeManager.apply_bangers_font_to_button_styled(back_button, 16, Color.WHITE, Color(0,0,0), 2)
 	back_button.pressed.connect(_on_back_pressed)
 	top_ui.add_child(back_button)
 
@@ -318,12 +349,14 @@ func _create_level_button(level_data: Dictionary) -> Control:
 		stars_container.alignment = BoxContainer.ALIGNMENT_CENTER
 
 		for i in range(stars_earned):
-			var star = Label.new()
-			star.text = "⭐"
-			star.custom_minimum_size = Vector2(20 * scale_factor.x, 20 * scale_factor.y)
-			var star_font_size = int(14 * min(scale_factor.x, scale_factor.y))
-			ThemeManager.apply_bangers_font(star, star_font_size)
-			stars_container.add_child(star)
+			# Use TextureRect with the provided gold star SVG so mobile renders consistently
+			var star_tex = TextureRect.new()
+			star_tex.texture = gold_star_texture
+			star_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			star_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			# size scaled according to UI scale factor
+			star_tex.custom_minimum_size = Vector2(18 * scale_factor.x, 18 * scale_factor.y)
+			stars_container.add_child(star_tex)
 
 		level_container.add_child(stars_container)
 
@@ -335,10 +368,8 @@ func _create_level_button(level_data: Dictionary) -> Control:
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var name_font_size = int(12 * min(scale_factor.x, scale_factor.y))
-	ThemeManager.apply_bangers_font(name_label, name_font_size)
-	name_label.add_theme_color_override("font_color", Color.WHITE)
-	name_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	name_label.add_theme_constant_override("outline_size", 2)
+	# Styled name label for consistency
+	ThemeManager.apply_bangers_font_styled(name_label, name_font_size, Color.WHITE, Color(0,0,0), 2)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 	level_container.add_child(name_label)
@@ -391,7 +422,14 @@ func _update_progress_display():
 	var total_stars = rm.total_stars
 	var levels_completed = rm.levels_completed
 
-	progress_label.text = "⭐ %d Stars Collected | 📖 %d Levels Completed" % [total_stars, levels_completed]
+	# Update the combined progress text (star icon is a texture in the container)
+	var progress_text = get_node_or_null("TopUI/ProgressContainer/ProgressText")
+	if progress_text and progress_text is Label:
+		progress_text.text = "%d Stars Collected | 📖 %d Levels Completed" % [total_stars, levels_completed]
+	else:
+		# Fallback: try to assign to module-level progress_label if created earlier
+		if progress_label and progress_label is Label:
+			progress_label.text = "%d Stars Collected | 📖 %d Levels Completed" % [total_stars, levels_completed]
 
 func _get_level_stars(level_num: int) -> int:
 	"""Get star count for a specific level"""
@@ -459,10 +497,12 @@ func _update_level_button_state(level_container: Control):
 			stars_container.alignment = BoxContainer.ALIGNMENT_CENTER
 
 			for i in range(stars_earned):
-				var star = Label.new()
-				star.text = "⭐"
-				star.custom_minimum_size = Vector2(20, 20)
-				ThemeManager.apply_bangers_font(star, 14)
-				stars_container.add_child(star)
+				# Create TextureRect star instead of emoji label for reliable mobile rendering
+				var star_tex = TextureRect.new()
+				star_tex.texture = gold_star_texture
+				star_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+				star_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				star_tex.custom_minimum_size = Vector2(16, 16)
+				stars_container.add_child(star_tex)
 
 			level_container.add_child(stars_container)

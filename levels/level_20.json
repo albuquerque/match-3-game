@@ -1,0 +1,16 @@
+{
+  "level_number": 20,
+  "title": "Level 20",
+  "description": "Reach 11000 points in 31 moves!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 11000,
+  "max_moves": 31,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

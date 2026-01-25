@@ -1,0 +1,16 @@
+{
+  "level_number": 13,
+  "title": "Level 13",
+  "description": "Clear all 7 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 7120,
+  "max_moves": 36,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "0 0 0 0 0 0 0 0\n0 U U U 0 0 0 0\n0 0 U 0 0 0 0 0\n0 0 0 0 0 0 U U\n0 0 0 0 0 0 0 U\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 7,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

@@ -20,6 +20,7 @@ var collectible_collected_flag: bool = false
 var is_unmovable: bool = false
 var unmovable_hits: int = 0  # number of hits required to destroy
 var unmovable_max_hits: int = 0  # saved for visuals
+var unmovable_type: String = ""  # Type of unmovable (snow, glass, wood, etc.)
 
 # Rope/chain anchor (optional) - if set, this tile will move toward anchor when released
 var rope_anchor: Vector2 = Vector2(-1, -1)
@@ -60,7 +61,7 @@ func _ready():
 	# Defer update_visual to ensure all @onready nodes are ready
 	call_deferred("update_visual")
 
-func setup(type: int, pos: Vector2, scale_factor: float = 1.0):
+func setup(type: int, pos: Vector2, scale_factor: float = 1.0, skip_visual: bool = false):
 	tile_type = type
 	grid_position = pos
 	tile_scale = scale_factor
@@ -77,8 +78,9 @@ func setup(type: int, pos: Vector2, scale_factor: float = 1.0):
 			rect_shape.size = Vector2(BASE_TILE_SIZE * tile_scale, BASE_TILE_SIZE * tile_scale)
 
 
-	# Call update_visual to set the correct sprite scale based on texture size
-	update_visual()
+	# Call update_visual to set the correct sprite scale based on texture size unless skipped
+	if not skip_visual:
+		update_visual()
 
 func update_visual():
 	if is_queued_for_deletion():
@@ -121,8 +123,27 @@ func update_visual():
 			texture_path = coll_path
 			print("[Tile] Using collectible texture: ", texture_path)
 
-	# For unmovable tiles, allow special texture based on hits left
-	if is_unmovable and unmovable_max_hits > 0:
+	# For unmovable tiles, load texture based on type
+	if is_unmovable and unmovable_type != "":
+		var theme_name = "legacy"
+		if theme_manager and theme_manager.has_method("get_theme_name"):
+			theme_name = theme_manager.get_theme_name()
+
+		# Try theme-specific path with type, then fallback
+		var um_path = "res://textures/%s/unmovable_soft_%s.svg" % [theme_name, unmovable_type]
+		if not ResourceLoader.exists(um_path):
+			um_path = "res://textures/%s/unmovable_soft_%s.png" % [theme_name, unmovable_type]
+		if not ResourceLoader.exists(um_path):
+			# Fallback to root textures folder
+			um_path = "res://textures/unmovable_soft_%s.svg" % unmovable_type
+		if not ResourceLoader.exists(um_path):
+			um_path = "res://textures/unmovable_soft_%s.png" % unmovable_type
+
+		if ResourceLoader.exists(um_path):
+			texture_path = um_path
+			print("[Tile] Using unmovable texture: ", texture_path)
+	elif is_unmovable and unmovable_max_hits > 0:
+		# Legacy fallback for old unmovable system
 		var um_path = "res://textures/unmovable_hits_%d.png" % unmovable_hits
 		if ResourceLoader.exists(um_path):
 			texture_path = um_path
@@ -188,10 +209,15 @@ func configure_collectible(c_type: String) -> void:
 	# update visual immediately
 	update_visual()
 
-func configure_unmovable(hits: int) -> void:
+func configure_unmovable(hits: int, u_type: String = "snow") -> void:
 	is_unmovable = true
 	unmovable_hits = hits
 	unmovable_max_hits = hits
+	unmovable_type = u_type
+	print("[Tile] configure_unmovable called for pos=", grid_position, " type=", u_type, " hits=", hits)
+	# Make sure sprite is visible and update visual immediately
+	if sprite:
+		sprite.visible = true
 	update_visual()
 
 func take_hit(amount: int = 1) -> bool:
@@ -203,6 +229,8 @@ func take_hit(amount: int = 1) -> bool:
 	if unmovable_hits <= 0:
 		is_unmovable = false
 		unmovable_max_hits = 0
+		# Create smoke/dust effect when destroyed
+		_create_unmovable_destruction_particles()
 		emit_signal("unmovable_destroyed", self)
 		return true
 	return false
@@ -232,6 +260,137 @@ func _create_collection_particles():
 	add_child(p)
 	p.emitting = true
 	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
+
+func _create_unmovable_destruction_particles():
+	"""Create smoke/dust particle effect when unmovable tile is destroyed"""
+	print("[Tile] _create_unmovable_destruction_particles called for ", unmovable_type, " at ", grid_position)
+
+	if not is_inside_tree():
+		print("[Tile] Not in tree, returning")
+		return
+
+	# Get the parent node to add particles to (use GameBoard or scene root)
+	var particle_parent = get_parent()
+	if not particle_parent:
+		print("[Tile] No parent found, cannot create particles")
+		return
+
+	print("[Tile] Creating smoke particles...")
+
+	# Create smoke/dust cloud effect
+	var smoke = CPUParticles2D.new()
+	smoke.name = "UnmovableSmokeParticles"
+	smoke.position = global_position  # Use global position so it stays when tile is removed
+	smoke.emitting = true
+	smoke.one_shot = true
+	smoke.explosiveness = 0.7
+	smoke.amount = 40  # Dense smoke cloud
+	smoke.lifetime = 1.2  # Linger a bit
+	smoke.speed_scale = 1.5
+	smoke.z_index = 100  # Make sure it's visible on top
+
+	# Smoke properties - billowing cloud effect
+	smoke.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	smoke.emission_sphere_radius = 20.0  # Wider emission area
+	smoke.direction = Vector2(0, -1)  # Upward drift
+	smoke.spread = 45  # Less spread for more upward motion
+	smoke.gravity = Vector2(0, -20)  # Gentle upward float
+	smoke.initial_velocity_min = 15.0  # Much slower, more billowy
+	smoke.initial_velocity_max = 40.0
+	smoke.angular_velocity_min = -30  # Slow gentle rotation
+	smoke.angular_velocity_max = 30
+	smoke.scale_amount_min = 8.0  # Much larger smoke particles
+	smoke.scale_amount_max = 15.0  # Huge billowing clouds
+	smoke.damping_min = 1.0  # Slow down quickly
+	smoke.damping_max = 2.5
+
+	# Smoke color - opaque clouds based on unmovable type
+	var smoke_color = Color(0.7, 0.7, 0.7, 1.0)  # Default grey, fully opaque
+	if unmovable_type == "snow":
+		smoke_color = Color(0.9, 0.9, 0.95, 1.0)  # White/very light grey
+	elif unmovable_type == "glass":
+		smoke_color = Color(0.8, 0.85, 0.9, 1.0)  # Very light blue-grey
+	elif unmovable_type == "wood":
+		smoke_color = Color(0.5, 0.45, 0.4, 1.0)  # Brown/tan dust
+
+	# Gradient for smoke fade - much softer, longer fade
+	var gradient = Gradient.new()
+	gradient.add_point(0.0, smoke_color)  # Start fully opaque
+	gradient.add_point(0.3, Color(smoke_color.r, smoke_color.g, smoke_color.b, 0.8))
+	gradient.add_point(0.6, Color(smoke_color.r, smoke_color.g, smoke_color.b, 0.4))
+	gradient.add_point(1.0, Color(smoke_color.r, smoke_color.g, smoke_color.b, 0))  # Fade to transparent
+	smoke.color_ramp = gradient
+
+	# Scale curve - billowing smoke effect
+	var scale_curve = Curve.new()
+	scale_curve.add_point(Vector2(0, 0.2))  # Start very small
+	scale_curve.add_point(Vector2(0.15, 0.6))  # Quick initial expansion
+	scale_curve.add_point(Vector2(0.4, 1.0))  # Continue expanding
+	scale_curve.add_point(Vector2(0.7, 1.1))  # Reach maximum size
+	scale_curve.add_point(Vector2(1, 0.9))  # Slight shrink as it fades
+	smoke.scale_amount_curve = scale_curve
+
+	particle_parent.add_child(smoke)
+	print("[Tile] Smoke particles added to parent")
+
+	# Add some debris/chunks for extra effect
+	var debris = CPUParticles2D.new()
+	debris.name = "UnmovableDebrisParticles"
+	debris.position = global_position  # Use global position
+	debris.emitting = true
+	debris.one_shot = true
+	debris.explosiveness = 0.8  # Less explosive, more dusty
+	debris.amount = 15  # Fewer particles
+	debris.lifetime = 1.0  # Longer lifetime
+	debris.speed_scale = 1.5  # Slower
+	debris.z_index = 100  # Make sure it's visible on top
+
+	debris.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	debris.emission_sphere_radius = 12.0
+	debris.direction = Vector2(0, 1)  # Downward bias
+	debris.spread = 120  # Wide spread
+	debris.gravity = Vector2(0, 250)  # Less heavy
+	debris.initial_velocity_min = 50.0  # Slower burst
+	debris.initial_velocity_max = 120.0
+	debris.angular_velocity_min = -360  # Moderate rotation
+	debris.angular_velocity_max = 360
+	debris.scale_amount_min = 1.5  # Larger chunks
+	debris.scale_amount_max = 4.0  # Bigger debris
+
+	# Debris color - muted, dusty chunks (not bright/sparkly)
+	var debris_color = Color(0.6, 0.6, 0.6, 0.9)  # Muted grey
+	if unmovable_type == "snow":
+		debris_color = Color(0.8, 0.8, 0.85, 0.9)  # Light grey/white chunks
+	elif unmovable_type == "glass":
+		debris_color = Color(0.7, 0.75, 0.8, 0.8)  # Pale blue-grey
+	elif unmovable_type == "wood":
+		debris_color = Color(0.45, 0.35, 0.25, 0.9)  # Dark brown chunks
+
+	var debris_gradient = Gradient.new()
+	debris_gradient.add_point(0.0, debris_color)
+	debris_gradient.add_point(0.4, Color(debris_color.r * 0.9, debris_color.g * 0.9, debris_color.b * 0.9, debris_color.a))
+	debris_gradient.add_point(0.8, Color(debris_color.r * 0.7, debris_color.g * 0.7, debris_color.b * 0.7, debris_color.a * 0.5))
+	debris_gradient.add_point(1.0, Color(debris_color.r, debris_color.g, debris_color.b, 0))
+	debris.color_ramp = debris_gradient
+
+	particle_parent.add_child(debris)
+	print("[Tile] Debris particles added to parent")
+
+	# Play destruction sound
+	if AudioManager and AudioManager.has_method("play_sfx"):
+		print("[Tile] Playing destruction sound")
+		# Different sounds for different materials
+		if unmovable_type == "glass":
+			AudioManager.play_sfx("tile_break")  # Glass breaking sound
+		elif unmovable_type == "wood":
+			AudioManager.play_sfx("tile_break")  # Wood cracking sound
+		else:
+			AudioManager.play_sfx("tile_break")  # Generic break sound
+
+	# Auto-cleanup
+	get_tree().create_timer(1.5).timeout.connect(smoke.queue_free)
+	get_tree().create_timer(1.0).timeout.connect(debris.queue_free)
+	print("[Tile] Particle effect complete")
 
 func update_type(new_type: int):
 	"""Update the tile to a new type and refresh its visual appearance"""
@@ -547,3 +706,5 @@ func animate_match_highlight() -> Tween:
 		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 	return tween
+
+# Use the property 'is_unmovable' directly instead of a method to avoid name collision

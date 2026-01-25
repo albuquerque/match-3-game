@@ -12,8 +12,10 @@ class LevelData:
 	var theme: String = ""  # Theme name for this level
 	var collectible_target: int = 0  # Number of collectibles to collect (0 = score-based level)
 	var collectible_type: String = "coin"  # Type of collectible (coin, gem, star, etc.)
+	var unmovable_type: String = "snow"  # Type of unmovable_soft (snow, glass, wood, etc.)
+	var unmovable_target: int = 0  # Number of unmovables to clear (0 = not required)
 
-	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = "", coll_target: int = 0, coll_type: String = "coin"):
+	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = "", coll_target: int = 0, coll_type: String = "coin", unmov_type: String = "snow", unmov_target: int = 0):
 		level_number = num
 		grid_layout = layout
 		width = w
@@ -24,6 +26,8 @@ class LevelData:
 		theme = thm
 		collectible_target = coll_target
 		collectible_type = coll_type
+		unmovable_type = unmov_type
+		unmovable_target = unmov_target
 
 var levels: Array[LevelData] = []
 var current_level_index: int = 0
@@ -117,7 +121,9 @@ func load_level_from_json(file_path: String) -> LevelData:
 		data.get("description", ""),
 		data.get("theme", ""),
 		data.get("collectible_target", 0),  # Load collectible target from JSON
-		data.get("collectible_type", "coin")  # Load collectible type from JSON (default: coin)
+		data.get("collectible_type", "coin"),  # Load collectible type from JSON (default: coin)
+		data.get("unmovable_type", "snow"),  # Load unmovable type from JSON (default: snow)
+		data.get("unmovable_target", 0)  # Load unmovable target from JSON (default: 0)
 	)
 
 func parse_layout(layout_data, width: int, height: int) -> Array:

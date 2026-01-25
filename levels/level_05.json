@@ -1,11 +1,16 @@
 {
-  "level": 5,
-  "width": 8,
-  "height": 8,
-  "target_score": 10000,
-  "moves": 22,
-  "description": "The donut - avoid the hole!",
+  "level_number": 5,
+  "title": "Level 5",
+  "description": "Collect 1 coin!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 3900,
+  "max_moves": 31,
+  "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 X X 0 0 0\n0 0 0 X X 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0"
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 C 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 1,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
 }
-

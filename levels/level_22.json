@@ -1,0 +1,16 @@
+{
+  "level_number": 22,
+  "title": "Level 22",
+  "description": "Collect 1 coin!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 6960,
+  "max_moves": 36,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nC 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 1,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

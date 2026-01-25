@@ -10,15 +10,15 @@ var theme_paths = {
 }
 
 func _ready():
-	print("[ThemeManager] Initialized with theme: ", current_theme)
+	# Initialization is silent to avoid noisy logs in production
+	pass
 
 func set_theme(theme_name: String):
 	"""Set the current theme by name"""
 	if theme_name in theme_paths:
 		current_theme = theme_name
-		print("[ThemeManager] Theme changed to: ", current_theme)
 	else:
-		print("[ThemeManager] Unknown theme: ", theme_name, ", using modern")
+		# Fall back to modern silently
 		current_theme = "modern"
 
 func set_theme_by_name(theme_name: String):
@@ -51,12 +51,30 @@ func get_gem_icon_path() -> String:
 	return theme_paths[current_theme] + "gem.svg"
 
 func load_coin_icon() -> Texture2D:
-	"""Load and return the coin icon texture"""
-	return load(get_coin_icon_path())
+	"""Load and return the coin icon texture (Texture2D)"""
+	return load(get_coin_icon_path()) as Texture2D
 
 func load_gem_icon() -> Texture2D:
-	"""Load and return the gem icon texture"""
-	return load(get_gem_icon_path())
+	"""Load and return the gem icon texture (Texture2D)"""
+	return load(get_gem_icon_path()) as Texture2D
+
+func get_star_icon_path() -> String:
+	"""Return path for default star icon"""
+	return "res://textures/gold_star.svg"
+
+func load_star_icon() -> Texture2D:
+	"""Load and return the star icon as Texture2D (if available)"""
+	var tex = load(get_star_icon_path())
+	return tex as Texture2D
+
+func create_star_icon(size: int = 16) -> TextureRect:
+	"""Create a TextureRect with the star icon, sized appropriately."""
+	var icon = TextureRect.new()
+	icon.custom_minimum_size = Vector2(size, size)
+	icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture = load_star_icon()
+	return icon
 
 func create_currency_display(currency_type: String, amount: int, icon_size: int = 24, font_size: int = 24, color: Color = Color.WHITE) -> HBoxContainer:
 	"""
@@ -105,10 +123,7 @@ func get_bangers_font():
 	"""Get the Bangers font resource (cached for performance)"""
 	if _bangers_font == null:
 		_bangers_font = load("res://fonts/Bangers/Bangers-Regular.ttf")
-		if _bangers_font:
-			print("[ThemeManager] Loaded Bangers font successfully")
-		else:
-			print("[ThemeManager] WARNING: Failed to load Bangers font!")
+		# Intentionally silent on load failure; callers can detect nil
 	return _bangers_font
 
 func apply_bangers_font(label: Label, font_size: int = 24):
@@ -124,3 +139,29 @@ func apply_bangers_font_to_button(button: Button, font_size: int = 20):
 	if font:
 		button.add_theme_font_override("font", font)
 	button.add_theme_font_size_override("font_size", font_size)
+
+# ========================================
+# Styled font helpers (outline / glow)
+# ========================================
+
+func apply_bangers_font_styled(label: Label, font_size: int = 24, font_color: Color = Color.WHITE, outline_color: Color = Color(0,0,0), outline_size: int = 2):
+	"""Apply Bangers font and styled outline to a Label.
+	Parameters:
+	- label: Label node
+	- font_size: integer font size
+	- font_color: Color for main font
+	- outline_color: Color for the outline
+	- outline_size: integer outline thickness
+	"""
+	apply_bangers_font(label, font_size)
+	label.add_theme_color_override("font_color", font_color)
+	label.add_theme_color_override("font_outline_color", outline_color)
+	label.add_theme_constant_override("outline_size", outline_size)
+
+func apply_bangers_font_to_button_styled(button: Button, font_size: int = 20, font_color: Color = Color.WHITE, outline_color: Color = Color(0,0,0), outline_size: int = 2):
+	"""Apply Bangers font and styled outline to a Button's label"""
+	apply_bangers_font_to_button(button, font_size)
+	# The Button may contain text as its own property; try to set styling via add_theme overrides
+	button.add_theme_color_override("font_color", font_color)
+	button.add_theme_color_override("font_outline_color", outline_color)
+	button.add_theme_constant_override("outline_size", outline_size)

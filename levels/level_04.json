@@ -1,11 +1,16 @@
 {
-  "level": 4,
-  "width": 8,
-  "height": 8,
-  "target_score": 9000,
-  "moves": 25,
-  "description": "The diamond challenge!",
+  "level_number": 4,
+  "title": "Level 4",
+  "description": "Clear all 6 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 4960,
+  "max_moves": 34,
+  "num_tile_types": 6,
   "theme": "modern",
-  "layout": "X X X X X X X X\nX X X 0 0 X X X\nX X 0 0 0 0 X X\nX 0 0 0 0 0 0 X\nX 0 0 0 0 0 0 X\nX X 0 0 0 0 X X\nX X X 0 0 X X X\nX X X X X X X X"
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 U 0 0 0\n0 0 0 U U U 0 0\n0 0 0 0 U U 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 6,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
 }
-

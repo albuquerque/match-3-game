@@ -1,0 +1,16 @@
+{
+  "level_number": 26,
+  "title": "Level 26",
+  "description": "Reach 12800 points in 32 moves!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 12800,
+  "max_moves": 32,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

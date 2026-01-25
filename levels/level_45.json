@@ -1,0 +1,16 @@
+{
+  "level_number": 45,
+  "title": "Level 45",
+  "description": "Reach 18500 points in 38 moves!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 18500,
+  "max_moves": 38,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}

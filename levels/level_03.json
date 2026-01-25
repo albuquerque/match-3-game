@@ -1,11 +1,16 @@
 {
-  "level": 3,
-  "width": 8,
-  "height": 8,
-  "target_score": 8000,
-  "moves": 25,
-  "description": "Navigate the cross pattern!",
+  "level_number": 3,
+  "title": "Level 3",
+  "description": "Reach 5900 points in 25 moves!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 5900,
+  "max_moves": 25,
+  "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "X X 0 0 0 0 X X\nX X 0 0 0 0 X X\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX X 0 0 0 0 X X\nX X 0 0 0 0 X X"
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
 }
-

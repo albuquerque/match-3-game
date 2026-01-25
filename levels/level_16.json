@@ -1,0 +1,16 @@
+{
+  "level_number": 16,
+  "title": "Level 16",
+  "description": "Clear all 9 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 7840,
+  "max_moves": 37,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 U U U 0 0\n0 0 0 U U U 0 0\n0 0 0 U U U 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 9,
+  "unmovable_type": "glass",
+  "collectible_type": "coin"
+}
