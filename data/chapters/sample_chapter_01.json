@@ -1,0 +1,135 @@
+{
+  "chapter_id": "sample_chapter_01",
+  "requires_engine_version": "1.0.0",
+  "name": "Sample Chapter: The Beginning",
+  "description": "A sample chapter demonstrating the narrative animation system",
+  "levels": [
+	"level_01",
+	"level_02",
+    "level_03"
+  ],
+  "effects": [
+	{
+	  "on": "level_start",
+	  "effect": "play_animation",
+	  "anchor": "background",
+	  "target": "background",
+	  "params": {
+		"animation": "sunrise",
+		"duration": 2.0
+	  }
+	},
+	{
+	  "on": "tile_destroyed",
+	  "effect": "spawn_particles",
+	  "anchor": "background",
+	  "target": "entity",
+	  "params": {
+		"particle": "dust_small",
+		"count": 5,
+		"duration": 0.5
+	  }
+	},
+	{
+	  "on": "special_tile_activated",
+	  "effect": "camera_impulse",
+	  "anchor": "fullscreen_overlay",
+	  "target": "entity",
+	  "params": {
+		"strength": 0.3,
+		"duration": 0.2
+	  }
+	},
+	{
+	  "on": "level_complete",
+	  "effect": "timeline_sequence",
+	  "anchor": "fullscreen_overlay",
+	  "target": "background",
+	  "params": {
+		"steps": [
+		  {
+			"effect": "screen_overlay",
+			"params": {
+			  "texture": "victory_rays",
+			  "fade_in": 0.5,
+			  "hold": 0.5,
+			  "fade_out": 0.5
+			}
+		  },
+		  {
+			"effect": "play_animation",
+			"params": {
+			  "animation": "celebration",
+			  "duration": 1.5
+			}
+		  }
+		]
+	  }
+	},
+	{
+	  "on": "level_failed",
+	  "effect": "shader_param_lerp",
+	  "anchor": "background",
+	  "target": "background",
+	  "params": {
+		"param": "desaturation",
+		"from": 0.0,
+		"to": 1.0,
+		"duration": 1.0
+	  }
+	}
+  ],
+  "visuals": [
+	{
+	  "visual_id": "building_progress",
+	  "states": [
+		{
+		  "threshold": 0,
+		  "state": "foundation"
+		},
+		{
+		  "threshold": 3,
+		  "state": "walls"
+		},
+		{
+		  "threshold": 6,
+		  "state": "roof"
+		},
+		{
+		  "threshold": 10,
+		  "state": "complete"
+		}
+	  ],
+	  "on_destroy": {
+		"effect": "spawn_particles",
+		"params": {
+		  "particle": "building_debris",
+		  "count": 20,
+		  "duration": 1.5
+		}
+	  }
+	}
+  ],
+  "assets": {
+	"sprites": {
+	  "building_foundation": "res://textures/sample_chapter/building_foundation.png",
+	  "building_walls": "res://textures/sample_chapter/building_walls.png",
+	  "building_roof": "res://textures/sample_chapter/building_roof.png",
+	  "building_complete": "res://textures/sample_chapter/building_complete.png"
+	},
+	"animations": {
+	  "sunrise": "res://animations/sample_chapter/sunrise.tres",
+	  "celebration": "res://animations/sample_chapter/celebration.tres"
+	},
+	"particles": {
+	  "dust_small": "res://particles/sample_chapter/dust_small.tres",
+	  "building_debris": "res://particles/sample_chapter/building_debris.tres"
+	},
+	"shaders": {
+	  "desaturate": "res://shaders/sample_chapter/desaturate.gdshader"
+	},
+	"textures": {
+	  "victory_rays": "res://textures/sample_chapter/victory_rays.png"
+	}
+  }
+}

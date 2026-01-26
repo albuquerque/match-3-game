@@ -1,0 +1,23 @@
+{
+  "manifest_version": "1.0.0",
+  "last_updated": "2026-01-25T00:00:00Z",
+  "chapters": [
+    {
+      "chapter_id": "gospels",
+      "version": "1.0.0",
+      "name": "Chapter 6: The Gospels",
+      "description": "Experience the life and teachings of Jesus Christ through 10 new levels",
+      "chapter_number": 6,
+      "levels": "61-70",
+      "level_count": 10,
+      "download_url": "http://192.168.0.110:8000/dlc/chapters/gospels.zip",
+      "size_bytes": 15360,
+      "release_date": "2026-02-01",
+      "requires_engine_version": "1.0.0",
+      "tags": ["new-testament", "gospels", "jesus"],
+      "is_free": true,
+      "price_usd": 0.00
+    }
+  ],
+  "featured_chapter": "gospels"
+}

@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://doc3oxaambqkj" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
 [ext_resource type="Script" uid="uid://clght4j2ys21n" path="res://scripts/GameUI.gd" id="2_4y7z1"]
 [ext_resource type="Script" uid="uid://b7r5vfqaywpue" path="res://scripts/ShopUI.gd" id="3_shopui"]
-[ext_resource type="Script" uid="uid://cbcf7sn408x2r" path="res://scripts/OutOfLivesDialog.gd" id="4_outoflivesdialog"]
+[ext_resource type="Script" uid="uid://bbqp6ba2mgrmw" path="res://scripts/OutOfLivesDialog.gd" id="4_outoflivesdialog"]
 [ext_resource type="Script" uid="uid://daaqxkt41gscs" path="res://scripts/RewardNotification.gd" id="5_rewardnotification"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
@@ -159,7 +159,6 @@ size_flags_vertical = 3
 [node name="BottomPanel" type="HBoxContainer" parent="GameUI/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 0
-
 
 [node name="LevelCompletePanel" type="Panel" parent="GameUI"]
 visible = false

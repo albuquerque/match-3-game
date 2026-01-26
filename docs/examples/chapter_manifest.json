@@ -1,0 +1,16 @@
+{
+  "chapter_id": "chapter_01",
+  "version": "1.0.0",
+  "name": "Chapter 1: The Beginning",
+  "effects": [
+    {
+      "on": "level_start",
+      "effect": "play_animation",
+      "params": {"animation": "sunrise", "duration": 2.0}
+    }
+  ],
+  "assets": {
+    "sprites": {"hero": "sprites/hero.png"},
+    "animations": {"sunrise": "animations/sunrise.json"}
+  }
+}

@@ -22,6 +22,12 @@ var world_map_data: Dictionary = {}
 var current_chapter_containers: Array[Control] = []
 var screen_size: Vector2 = Vector2.ZERO
 var scale_factor: Vector2 = Vector2.ONE
+
+# DLC Management
+var dlc_chapters: Array = []
+var available_dlc: Array = []
+var progress_dialog: AcceptDialog = null
+
 # Preload gold star texture for consistent cross-platform rendering
 var gold_star_texture = load("res://textures/gold_star.svg") as Texture2D
 
@@ -31,8 +37,11 @@ func _ready():
 	# Base design was for 720x1280, calculate scale factors
 	scale_factor = Vector2(screen_size.x / 720.0, screen_size.y / 1280.0)
 	_load_world_map_data()
+	_load_dlc_chapters()
+	_connect_dlc_signals()
 	_setup_ui()
 	_populate_chapters()
+	_fetch_available_dlc()
 	# Ready
 
 func _scale_position(pos: Array) -> Vector2:
@@ -102,6 +111,79 @@ func _create_fallback_data():
 			"unlocked": i <= 3,
 			"name": "Level %d" % i
 		})
+
+func _load_dlc_chapters():
+	"""Load installed DLC chapters and integrate into world map"""
+	if not AssetRegistry:
+		print("[WorldMap] AssetRegistry not available")
+		return
+
+	var installed = AssetRegistry.get_installed_chapters()
+	print("[WorldMap] Found %d installed DLC chapters" % installed.size())
+
+	for chapter_id in installed:
+		print("[WorldMap] Processing chapter_id: %s" % chapter_id)
+		var manifest = AssetRegistry.get_chapter_info(chapter_id)
+		print("[WorldMap] Manifest keys: %s" % str(manifest.keys()))
+
+		var world_map_entry = manifest.get("world_map_entry", {})
+		print("[WorldMap] world_map_entry: %s" % str(world_map_entry))
+		print("[WorldMap] world_map_entry.is_empty(): %s" % str(world_map_entry.is_empty()))
+
+		if not world_map_entry.is_empty():
+			# Create chapter data in same format as built-in chapters
+			var chapter_data = {
+				"id": world_map_entry.get("chapter_number", 99),
+				"title": world_map_entry.get("title", "DLC Chapter"),
+				"background_image": _get_dlc_asset_path(chapter_id, world_map_entry.get("background_image", "")),
+				"theme_color": world_map_entry.get("theme_color", "#4A90E2"),
+				"level_grid": world_map_entry.get("level_grid", {}),
+				"levels": [],
+				"source": "dlc",
+				"chapter_id": chapter_id
+			}
+
+			# Convert level data from manifest format to world_map format
+			var manifest_levels = manifest.get("levels", [])
+			for level_info in manifest_levels:
+				chapter_data["levels"].append({
+					"level": level_info.get("number"),
+					"name": level_info.get("name", ""),
+					"pos": level_info.get("pos", [360, 180]),
+					"unlocked": level_info.get("unlocked", false),
+					"source": "dlc",
+					"file": level_info.get("file", "")
+				})
+
+			dlc_chapters.append(chapter_data)
+			print("[WorldMap] Loaded DLC chapter: %s (%d levels)" % [chapter_data["title"], chapter_data["levels"].size()])
+		else:
+			print("[WorldMap] ⚠️ Skipping chapter %s - world_map_entry is empty!" % chapter_id)
+
+func _connect_dlc_signals():
+	"""Connect to DLC manager signals"""
+	if not DLCManager:
+		print("[WorldMap] DLCManager not available")
+		return
+
+	print("[WorldMap] Connecting DLC signals...")
+	DLCManager.dlc_list_updated.connect(_on_dlc_list_updated)
+	DLCManager.download_complete.connect(_on_dlc_download_complete)
+	DLCManager.chapter_installed.connect(_on_dlc_chapter_installed)
+	print("[WorldMap] ✓ All DLC signals connected")
+
+func _fetch_available_dlc():
+	"""Fetch available DLC chapters from server"""
+	if not DLCManager:
+		return
+
+	DLCManager.fetch_available_chapters()
+
+func _get_dlc_asset_path(chapter_id: String, relative_path: String) -> String:
+	"""Convert DLC relative path to full path"""
+	if relative_path.begins_with("res://"):
+		return relative_path
+	return "user://dlc/chapters/" + chapter_id + "/" + relative_path
 
 func _setup_ui():
 	"""Create the UI hierarchy based on the pseudodoc structure"""
@@ -215,14 +297,31 @@ func _populate_chapters():
 	# Update progress
 	_update_progress_display()
 
-	# Create each chapter
+	# Combine built-in and DLC chapters
+	var all_chapters = []
+
+	# Add built-in chapters
 	for chapter_data in world_map_data.world_map.chapters:
+		all_chapters.append(chapter_data)
+
+	# Add DLC chapters
+	for dlc_chapter in dlc_chapters:
+		all_chapters.append(dlc_chapter)
+
+	# Sort by chapter ID
+	all_chapters.sort_custom(func(a, b): return a.get("id", 0) < b.get("id", 0))
+
+	print("[WorldMap] Displaying %d total chapters (%d built-in + %d DLC)" % [all_chapters.size(), world_map_data.world_map.chapters.size(), dlc_chapters.size()])
+
+	# Create each chapter
+	for i in range(all_chapters.size()):
+		var chapter_data = all_chapters[i]
 		var chapter_container = _create_chapter_container(chapter_data)
 		chapters_vbox.add_child(chapter_container)
 		current_chapter_containers.append(chapter_container)
 
-		# Add spacing between chapters
-		if chapter_data.id < world_map_data.world_map.chapters.size():
+		# Add spacing between chapters (except after last)
+		if i < all_chapters.size() - 1:
 			var spacer = Control.new()
 			spacer.custom_minimum_size = Vector2(0, 50)
 			chapters_vbox.add_child(spacer)
@@ -244,7 +343,25 @@ func _create_chapter_container(chapter_data: Dictionary) -> Control:
 	chapter_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 
 	# Load chapter background image
-	var bg_texture = load(chapter_data.background_image) as CompressedTexture2D
+	var bg_texture: Texture2D = null
+	var bg_path = chapter_data.background_image
+
+	if bg_path.begins_with("res://"):
+		# Built-in resource - use load()
+		bg_texture = load(bg_path) as CompressedTexture2D
+	elif bg_path.begins_with("user://"):
+		# DLC resource - load from file system
+		var absolute_path = ProjectSettings.globalize_path(bg_path)
+		if FileAccess.file_exists(absolute_path):
+			var image = Image.new()
+			var err = image.load(absolute_path)
+			if err == OK:
+				bg_texture = ImageTexture.create_from_image(image)
+			else:
+				push_warning("[WorldMap] Failed to load DLC background image: %s (error: %d)" % [bg_path, err])
+		else:
+			print("[WorldMap] Background image not found: %s - using fallback" % bg_path)
+
 	if bg_texture:
 		chapter_bg.texture = bg_texture
 	else:
@@ -506,3 +623,216 @@ func _update_level_button_state(level_container: Control):
 				stars_container.add_child(star_tex)
 
 			level_container.add_child(stars_container)
+
+# DLC Chapter Management
+
+func _on_dlc_list_updated(chapters: Array):
+	"""Handle DLC list update from server"""
+	available_dlc = chapters
+	print("[WorldMap] Received %d available DLC chapters" % chapters.size())
+	_display_dlc_download_options()
+
+func _on_dlc_download_complete(chapter_id: String, success: bool):
+	"""Handle DLC download completion"""
+	print("[WorldMap] _on_dlc_download_complete called: chapter_id=%s, success=%s" % [chapter_id, success])
+
+	# Close progress dialog first
+	if progress_dialog:
+		print("[WorldMap] Closing progress dialog")
+		progress_dialog.queue_free()
+		progress_dialog = null
+	else:
+		print("[WorldMap] No progress dialog to close")
+
+	if success:
+		print("[WorldMap] DLC chapter '%s' downloaded successfully" % chapter_id)
+
+		# Remove the download card
+		var card_name = "DLCCard_" + chapter_id
+		var download_card = chapters_vbox.get_node_or_null(card_name)
+		if download_card:
+			print("[WorldMap] Removing download card: %s" % card_name)
+			download_card.queue_free()
+
+		# Reload chapters to display the new DLC chapter
+		_reload_dlc_chapters()
+
+		# Show success message after a short delay to ensure cleanup
+		print("[WorldMap] Scheduling success dialog")
+		await get_tree().create_timer(0.1).timeout
+		_show_download_success(chapter_id)
+	else:
+		print("[WorldMap] Failed to download DLC chapter '%s'" % chapter_id)
+		# Use await for error dialog as well
+		await get_tree().create_timer(0.1).timeout
+		_show_download_error(chapter_id)
+
+func _on_dlc_chapter_installed(chapter_id: String):
+	"""Handle DLC chapter installation"""
+	print("[WorldMap] DLC chapter '%s' installed" % chapter_id)
+	_reload_dlc_chapters()
+
+func _reload_dlc_chapters():
+	"""Reload DLC chapters and update UI"""
+	print("[WorldMap] _reload_dlc_chapters called - clearing DLC chapters array")
+	dlc_chapters.clear()
+
+	print("[WorldMap] Loading DLC chapters...")
+	_load_dlc_chapters()
+
+	print("[WorldMap] Repopulating world map with %d DLC chapters" % dlc_chapters.size())
+	_populate_chapters()
+
+func _display_dlc_download_options():
+	"""Display download buttons for available DLC chapters"""
+	for dlc_info in available_dlc:
+		var chapter_id = dlc_info.get("chapter_id", "")
+
+		# Skip if already installed
+		if AssetRegistry.is_chapter_installed(chapter_id):
+			continue
+
+		# Create download card
+		var download_card = _create_dlc_download_card(dlc_info)
+		chapters_vbox.add_child(download_card)
+
+func _create_dlc_download_card(dlc_info: Dictionary) -> Control:
+	"""Create a download card for DLC chapter"""
+	var card = PanelContainer.new()
+	card.name = "DLCCard_" + dlc_info.get("chapter_id", "unknown")
+	card.custom_minimum_size = Vector2(0, 200 * scale_factor.y)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	card.add_child(vbox)
+
+	# Chapter name
+	var title = Label.new()
+	title.text = dlc_info.get("name", "New Chapter")
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ThemeManager.apply_bangers_font_styled(title, 24, Color.WHITE, Color.BLACK, 2)
+	vbox.add_child(title)
+
+	# Description
+	var desc = Label.new()
+	desc.text = dlc_info.get("description", "")
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ThemeManager.apply_bangers_font(desc, 14)
+	vbox.add_child(desc)
+
+	# Level count
+	var level_info = Label.new()
+	level_info.text = "📖 %s | %d Levels" % [dlc_info.get("levels", ""), dlc_info.get("level_count", 0)]
+	level_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ThemeManager.apply_bangers_font(level_info, 16)
+	vbox.add_child(level_info)
+
+	# Download button
+	var download_btn = Button.new()
+	var is_free = dlc_info.get("is_free", true)
+	if is_free:
+		download_btn.text = "📥 Download Free"
+	else:
+		var price = dlc_info.get("price_usd", 0.0)
+		download_btn.text = "📥 Download ($%.2f)" % price
+
+	download_btn.custom_minimum_size = Vector2(200 * scale_factor.x, 50 * scale_factor.y)
+	ThemeManager.apply_bangers_font_to_button_styled(download_btn, 18, Color.WHITE, Color.BLACK, 2)
+	download_btn.pressed.connect(_on_download_dlc_pressed.bind(dlc_info))
+	vbox.add_child(download_btn)
+
+	# Center the button
+	var center_container = CenterContainer.new()
+	vbox.remove_child(download_btn)
+	center_container.add_child(download_btn)
+	vbox.add_child(center_container)
+
+	return card
+
+func _on_download_dlc_pressed(dlc_info: Dictionary):
+	"""Handle DLC download button press"""
+	var chapter_id = dlc_info.get("chapter_id", "")
+	var is_free = dlc_info.get("is_free", true)
+
+	print("[WorldMap] Download requested for: %s" % chapter_id)
+
+	if is_free:
+		_start_dlc_download(chapter_id)
+	else:
+		# TODO: Integrate with payment system
+		_show_purchase_dialog(dlc_info)
+
+func _start_dlc_download(chapter_id: String):
+	"""Start downloading a DLC chapter"""
+	if not DLCManager:
+		print("[WorldMap] DLCManager not available")
+		return
+
+	print("[WorldMap] Starting download: %s" % chapter_id)
+	DLCManager.download_chapter(chapter_id)
+	_show_download_progress(chapter_id)
+
+func _show_download_progress(chapter_id: String):
+	"""Show download progress indicator"""
+	# Close any existing progress dialog
+	if progress_dialog:
+		progress_dialog.queue_free()
+
+	# Create a simple progress dialog
+	progress_dialog = AcceptDialog.new()
+	progress_dialog.title = "Downloading..."
+	progress_dialog.dialog_text = "Downloading new chapter. Please wait..."
+	progress_dialog.ok_button_text = "Background"
+	progress_dialog.dialog_close_on_escape = false
+	add_child(progress_dialog)
+
+	# Allow dismissing without canceling download
+	progress_dialog.confirmed.connect(_close_progress_dialog)
+
+	progress_dialog.popup_centered()
+
+	# TODO: Connect to download_progress signal and update progress bar
+
+func _close_progress_dialog():
+	"""Close the progress dialog"""
+	if progress_dialog:
+		progress_dialog.queue_free()
+		progress_dialog = null
+
+func _show_purchase_dialog(dlc_info: Dictionary):
+	"""Show purchase confirmation dialog"""
+	var dialog = ConfirmationDialog.new()
+	dialog.title = "Purchase Chapter"
+	dialog.dialog_text = "Purchase '%s' for $%.2f?" % [dlc_info.get("name", ""), dlc_info.get("price_usd", 0.0)]
+	dialog.ok_button_text = "Purchase"
+	dialog.cancel_button_text = "Cancel"
+
+	dialog.confirmed.connect(func(): _process_purchase(dlc_info))
+
+	add_child(dialog)
+	dialog.popup_centered()
+
+func _process_purchase(dlc_info: Dictionary):
+	"""Process DLC purchase"""
+	# TODO: Integrate with in-app purchase system
+	print("[WorldMap] Purchase initiated for: %s" % dlc_info.get("chapter_id", ""))
+
+	# For now, just download if it's "purchased"
+	_start_dlc_download(dlc_info.get("chapter_id", ""))
+
+func _show_download_error(chapter_id: String):
+	"""Show download error dialog"""
+	var dialog = AcceptDialog.new()
+	dialog.title = "Download Failed"
+	dialog.dialog_text = "Failed to download chapter. Please check your internet connection and try again."
+	add_child(dialog)
+	dialog.popup_centered()
+
+func _show_download_success(chapter_id: String):
+	"""Show download success dialog"""
+	var dialog = AcceptDialog.new()
+	dialog.title = "Download Complete!"
+	dialog.dialog_text = "Chapter downloaded successfully! You can now play the new levels."
+	add_child(dialog)
+	dialog.popup_centered()

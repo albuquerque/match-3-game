@@ -2385,6 +2385,13 @@ func activate_special_tile(pos: Vector2):
 	# Play general special activation sound
 	AudioManager.play_sfx("special_activate")
 
+	# Emit EventBus event for narrative system (DLC levels)
+	EventBus.emit_special_tile_activated("tile_%d_%d" % [int(pos.x), int(pos.y)], {
+		"position": pos,
+		"tile_type": tile_type,
+		"level": GameManager.level
+	})
+
 	# Collect positions to clear based on tile type
 	var positions_to_clear = []
 

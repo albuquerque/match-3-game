@@ -1,0 +1,16 @@
+{
+  "level_number": 57,
+  "title": "Level 57",
+  "description": "Collect 2 coins!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 13260,
+  "max_moves": 47,
+  "num_tile_types": 6,
+  "theme": "legacy",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 C 0 0\n0 0 C 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 2,
+  "unmovable_target": 0,
+  "unmovable_type": "snow",
+  "collectible_type": "coin"
+}
