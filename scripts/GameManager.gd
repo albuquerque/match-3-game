@@ -251,6 +251,9 @@ func load_current_level():
 
 	emit_signal("level_loaded")
 
+	# Emit EventBus event for narrative system (DLC levels)
+	EventBus.emit_level_loaded("level_%d" % level, {"level": level, "target": target_score})
+
 	# Emit unmovables_changed after level_loaded to ensure UI is ready
 	if unmovable_target > 0:
 		call_deferred("emit_signal", "unmovables_changed", unmovables_cleared, unmovable_target)
@@ -766,6 +769,10 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 		RewardManager.track_match_made()
 		RewardManager.track_tiles_cleared(tiles_removed)
 	RewardManager.track_combo_reached(combo_count)
+
+	# Emit match_cleared event for narrative effects
+	if tiles_removed > 0:
+		EventBus.emit_match_cleared(tiles_removed, {"combo": combo_count})
 
 	return tiles_removed
 
@@ -1315,6 +1322,9 @@ func on_level_complete():
 	print("[GameManager] Emitting level_complete signal")
 	emit_signal("level_complete")
 
+	# Emit EventBus event for narrative system (DLC levels)
+	EventBus.emit_level_complete("level_%d" % level, {"level": level, "score": score, "stars": stars})
+
 	# Keep level_transitioning = true to prevent further gameplay
 	# This will be reset when the next level loads or game restarts
 	# DO NOT set to false here!
@@ -1580,3 +1590,57 @@ func report_unmovable_destroyed(pos: Vector2) -> void:
 			pending_level_complete = true
 			_attempt_level_complete()
 
+func parse_layout_string(layout_str: String, width: int, height: int) -> Array:
+	"""Parse layout string for DLC levels (same logic as LevelManager)"""
+	var parsed = []
+	var lines = layout_str.strip_edges().split("\n")
+
+	# Normalize lines: if the entire layout is one long string equal to width*height, split into rows
+	if lines.size() == 1 and lines[0].length() == width * height:
+		var compact = lines[0]
+		lines = []
+		for r in range(height):
+			lines.append(compact.substr(r * width, width))
+
+	for x in range(width):
+		parsed.append([])
+		for _y in range(height):
+			parsed[x].append(0)
+
+	for y in range(min(lines.size(), height)):
+		var line = lines[y].strip_edges()
+		# If line contains separators, split by comma or space
+		var values = []
+		if "," in line:
+			values = line.split(",")
+		elif " " in line:
+			values = line.split(" ")
+		else:
+			# No separators - treat each character as a cell token
+			values = []
+			for i in range(min(line.length(), width)):
+				values.append(line.substr(i, 1))
+
+		for x in range(min(values.size(), width)):
+			var val_str = values[x].strip_edges()
+			# Recognize blocked or empty markers and convert to integers
+			if val_str == "X" or val_str == "x":
+				parsed[x][y] = -1
+			elif val_str == "0" or val_str == "." or val_str == "_":
+				parsed[x][y] = 0
+			elif val_str == "C":
+				# Collectible marker
+				parsed[x][y] = COLLECTIBLE
+			elif val_str == "U":
+				# Unmovable soft marker
+				parsed[x][y] = UNMOVABLE_SOFT
+			elif val_str == "H":
+				# Unmovable hard (not implemented yet, treat as empty)
+				parsed[x][y] = 0
+			elif val_str.is_valid_int():
+				parsed[x][y] = int(val_str)
+			else:
+				# Unknown token - default to empty
+				parsed[x][y] = 0
+
+	return parsed

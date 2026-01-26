@@ -1,0 +1,89 @@
+{
+  "manifest_version": "1.0.0",
+  "last_updated": "2026-01-25T00:00:00Z",
+  "chapters": [
+    {
+      "chapter_id": "chapter_01",
+      "version": "1.0.0",
+      "name": "Chapter 1: The Beginning",
+      "description": "The first chapter introduces our heroes and sets the stage for the adventure to come.",
+      "download_url": "https://your-cdn.com/dlc/packages/chapter_01_v1.0.0.zip",
+      "size_bytes": 3145728,
+      "release_date": "2026-02-01",
+      "requires_engine_version": "1.0.0",
+      "tags": ["story", "introduction", "free"],
+      "thumbnail_url": "https://your-cdn.com/dlc/thumbnails/chapter_01.jpg",
+      "is_free": true,
+      "price_usd": 0.00
+    },
+    {
+      "chapter_id": "chapter_02",
+      "version": "1.1.0",
+      "name": "Chapter 2: Rising Tension",
+      "description": "The stakes are raised as new challenges emerge. Features enhanced visual effects and new character animations.",
+      "download_url": "https://your-cdn.com/dlc/packages/chapter_02_v1.1.0.zip",
+      "size_bytes": 5242880,
+      "release_date": "2026-03-01",
+      "requires_engine_version": "1.0.0",
+      "tags": ["story", "action", "premium"],
+      "thumbnail_url": "https://your-cdn.com/dlc/thumbnails/chapter_02.jpg",
+      "is_free": false,
+      "price_usd": 0.99,
+      "changelog": [
+        "v1.1.0: Added new particle effects for special tiles",
+        "v1.0.1: Fixed animation timing issue",
+        "v1.0.0: Initial release"
+      ]
+    },
+    {
+      "chapter_id": "chapter_03",
+      "version": "1.0.0",
+      "name": "Chapter 3: The Revelation",
+      "description": "Secrets are revealed and the plot thickens. Includes branching narrative paths based on player performance.",
+      "download_url": "https://your-cdn.com/dlc/packages/chapter_03_v1.0.0.zip",
+      "size_bytes": 7340032,
+      "release_date": "2026-04-01",
+      "requires_engine_version": "1.1.0",
+      "tags": ["story", "choices", "premium"],
+      "thumbnail_url": "https://your-cdn.com/dlc/thumbnails/chapter_03.jpg",
+      "is_free": false,
+      "price_usd": 0.99,
+      "prerequisites": ["chapter_01", "chapter_02"]
+    },
+    {
+      "chapter_id": "holiday_special_2026",
+      "version": "1.0.0",
+      "name": "Holiday Special: Winter Wonderland",
+      "description": "Limited-time holiday-themed chapter with festive visual effects and seasonal music.",
+      "download_url": "https://your-cdn.com/dlc/packages/holiday_special_2026_v1.0.0.zip",
+      "size_bytes": 4194304,
+      "release_date": "2026-12-01",
+      "requires_engine_version": "1.0.0",
+      "tags": ["seasonal", "limited", "free"],
+      "thumbnail_url": "https://your-cdn.com/dlc/thumbnails/holiday_2026.jpg",
+      "is_free": true,
+      "price_usd": 0.00,
+      "available_until": "2027-01-15T23:59:59Z",
+      "is_limited_time": true
+    }
+  ],
+  "season_passes": [
+    {
+      "id": "season_1_pass",
+      "name": "Season 1 Pass",
+      "description": "Get all chapters 1-6 at a discounted price!",
+      "chapters": ["chapter_01", "chapter_02", "chapter_03", "chapter_04", "chapter_05", "chapter_06"],
+      "price_usd": 4.99,
+      "discount_percent": 50
+    }
+  ],
+  "featured_chapter": "chapter_02",
+  "announcements": [
+    {
+      "title": "Chapter 2 Now Available!",
+      "message": "Experience the next chapter in the saga with all-new visual effects.",
+      "date": "2026-03-01",
+      "url": "https://your-site.com/news/chapter-2-release"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "level_number": 52,
+  "title": "Level 52",
+  "description": "Clear all 5 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 16480,
+  "max_moves": 48,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 0 0\n0 0 0 0 U 0 0 0\n0 0 0 U U U 0 0\n0 0 0 0 U 0 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 0,
+  "unmovable_target": 5,
+  "unmovable_type": "wood",
+  "collectible_type": "coin"
+}

@@ -1,0 +1,16 @@
+{
+  "level_number": 66,
+  "title": "Level 66",
+  "description": "Clear all 6 obstacles!",
+  "grid_width": 8,
+  "grid_height": 8,
+  "target_score": 19840,
+  "max_moves": 52,
+  "num_tile_types": 6,
+  "theme": "modern",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 U 0 0 0\n0 0 0 U U U 0 0\n0 0 0 0 U U 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "collectible_target": 0,
+  "unmovable_target": 6,
+  "unmovable_type": "wood",
+  "collectible_type": "coin"
+}

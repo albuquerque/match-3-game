@@ -1,0 +1,140 @@
+{
+  "chapter_id": "gospels",
+  "version": "1.0.0",
+  "requires_engine_version": "1.0.0",
+  "name": "Chapter 6: The Gospels",
+  "description": "Experience the life and teachings of Jesus Christ through 10 new levels",
+  "release_date": "2026-02-01",
+  "world_map_entry": {
+    "chapter_number": 6,
+    "title": "The Gospels",
+    "background_image": "assets/backgrounds/gospels_bg.jpg",
+    "theme_color": "#4A90E2",
+    "level_grid": {
+      "rows": 2,
+      "columns": 5
+    }
+  },
+  "levels": [
+    {
+      "number": 61,
+      "name": "Bethlehem Star",
+      "file": "levels/level_61.json",
+      "pos": [360, 180],
+      "unlocked": true
+    },
+    {
+      "number": 62,
+      "name": "Wedding at Cana",
+      "file": "levels/level_62.json",
+      "pos": [240, 250],
+      "unlocked": false
+    },
+    {
+      "number": 63,
+      "name": "Sermon on Mount",
+      "file": "levels/level_63.json",
+      "pos": [480, 320],
+      "unlocked": false
+    },
+    {
+      "number": 64,
+      "name": "Feeding 5000",
+      "file": "levels/level_64.json",
+      "pos": [160, 390],
+      "unlocked": false
+    },
+    {
+      "number": 65,
+      "name": "Walking on Water",
+      "file": "levels/level_65.json",
+      "pos": [200, 460],
+      "unlocked": false
+    },
+    {
+      "number": 66,
+      "name": "Transfiguration",
+      "file": "levels/level_66.json",
+      "pos": [520, 530],
+      "unlocked": false
+    },
+    {
+      "number": 67,
+      "name": "Lazarus Raised",
+      "file": "levels/level_67.json",
+      "pos": [360, 600],
+      "unlocked": false
+    },
+    {
+      "number": 68,
+      "name": "Triumphal Entry",
+      "file": "levels/level_68.json",
+      "pos": [220, 670],
+      "unlocked": false
+    },
+    {
+      "number": 69,
+      "name": "Last Supper",
+      "file": "levels/level_69.json",
+      "pos": [500, 740],
+      "unlocked": false
+    },
+    {
+      "number": 70,
+      "name": "Resurrection",
+      "file": "levels/level_70.json",
+      "pos": [360, 810],
+      "unlocked": false
+    }
+  ],
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "narrative_dialogue",
+      "anchor": "board",
+      "params": {
+        "character": "Narrator",
+        "text": "The star appeared in the East, guiding the wise men to Bethlehem...",
+        "position": "bottom",
+        "duration": 4.0,
+        "style": "gospel"
+      }
+    },
+    {
+      "on": "special_tile_activated",
+      "effect": "narrative_dialogue",
+      "anchor": "board",
+      "params": {
+        "character": "Angel",
+        "text": "Glory to God in the highest!",
+        "position": "top",
+        "duration": 2.5,
+        "style": "miracle"
+      }
+    },
+    {
+      "on": "level_complete",
+      "effect": "narrative_dialogue",
+      "anchor": "board",
+      "params": {
+        "character": "Gospel",
+        "text": "And the Word became flesh and dwelt among us.",
+        "position": "center",
+        "duration": 0,
+        "style": "gospel"
+      }
+    }
+  ],
+  "assets": {
+    "particles": [
+      {
+        "id": "holy_sparkles",
+        "file": "particles/holy_sparkles.json"
+      },
+      {
+        "id": "divine_light",
+        "file": "particles/divine_light.json"
+      }
+    ]
+  }
+}
