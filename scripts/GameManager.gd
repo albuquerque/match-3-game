@@ -131,8 +131,20 @@ func initialize_game():
 
 	print("[GameManager] ✓ initialize_game() completed, initialized =", initialized, ", grid size =", grid.size())
 
+func reset_state_for_new_level():
+	"""Reset transient state flags that may block user input when starting/advancing levels."""
+	processing_moves = false
+	level_transitioning = false
+	pending_level_complete = false
+	pending_level_failed = false
+	in_bonus_conversion = false
+	bonus_skipped = false
+	print("[GameManager] reset_state_for_new_level: cleared transient flags")
+
 func load_current_level():
 	"""Load the current level from LevelManager"""
+	# Reset transient state before loading to ensure board isn't stuck
+	reset_state_for_new_level()
 	processing_moves = false  # Reset the processing flag when loading a level
 	score = 0  # Reset score for the new level
 	combo_count = 0  # Reset combo count
@@ -210,6 +222,24 @@ func load_current_level():
 
 		create_empty_grid()
 		fill_grid_from_layout(level_data.grid_layout)
+
+		# If the level JSON provided a hard_textures mapping, attach it to unmovable_map entries
+		# so GameBoard.create_visual_grid can pick up per-tile texture lists and reveal info.
+		if typeof(level_data.hard_textures) == TYPE_DICTIONARY:
+			var ht_map = level_data.hard_textures
+			var hr_map = {}
+			if typeof(level_data.hard_reveals) == TYPE_DICTIONARY:
+				hr_map = level_data.hard_reveals
+			for key in unmovable_map.keys():
+				var entry = unmovable_map[key]
+				if typeof(entry) == TYPE_DICTIONARY and entry.has("hard") and entry["hard"]:
+					var htype = entry.get("type", "")
+					if htype != "" and ht_map.has(htype):
+						entry["textures"] = ht_map[htype]
+						print("[GameManager] Attached hard_textures for", htype, "to unmovable at", key)
+					if htype != "" and hr_map.has(htype):
+						entry["reveals"] = hr_map[htype]
+						print("[GameManager] Attached hard_reveals for", htype, "to unmovable at", key)
 
 		print("Loaded level ", level, ": ", level_data.description)
 		print("Grid size: ", GRID_WIDTH, "x", GRID_HEIGHT)
@@ -344,7 +374,7 @@ func fill_grid_from_layout(layout: Array):
 
 			# Normalize string tokens if present
 			if typeof(cell_value) == TYPE_STRING:
-				# Single-char tokens expected
+				# Single-char tokens expected or H{hits}:{type}
 				var token = cell_value
 				if token == "X" or token == "x":
 					grid[x][y] = -1
@@ -360,15 +390,25 @@ func fill_grid_from_layout(layout: Array):
 				elif token == "U":
 					# Unmovable soft - single hit to destroy
 					grid[x][y] = UNMOVABLE_SOFT
-					# Store unmovable entry with hit count (1 by default)
+					# Store unmovable entry with hit count (1 by default) as a dictionary so we have a unified representation
 					var key = str(x) + "," + str(y)
-					unmovable_map[key] = 1
+					unmovable_map[key] = {"hits": 1, "type": unmovable_type, "hard": false}
 					print("[UNMOVABLE] Created unmovable at (", x, ",", y, ") with key '", key, "' and 1 hit")
 					continue
-				elif token == "H":
-					# Unmovable hard (not yet fully implemented)
-					grid[x][y] = 0
-					unmovable_map[str(x) + "," + str(y)] = 4
+				elif token.begins_with("H") and ":" in token:
+					# Hard unmovable token - parse hits and type e.g., H2:rock
+					var parts = token.substr(1, token.length()).split(":")
+					var hits = 1
+					var htype = "rock"
+					if parts.size() >= 2:
+						 # parts[0] may include digits and colon split kept; use split above
+						hits = int(parts[0]) if parts[0].is_valid_int() else 1
+						htype = parts[1]
+					# Represent hard unmovable as unmovable cell in grid and store metadata in unmovable_map
+					grid[x][y] = UNMOVABLE_SOFT
+					var key2 = str(x) + "," + str(y)
+					unmovable_map[key2] = {"hits": hits, "type": htype, "hard": true}
+					print("[UNMOVABLE] Created hard unmovable at (", x, ",", y, ") with key '", key2, "' hits=", hits, " type=", htype)
 					continue
 
 			# Handle numeric / existing values
@@ -553,14 +593,14 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 	print("[SCORING] Swapped position: ", swapped_pos)
 	print("[SCORING] Current combo_count: ", combo_count)
 
-	# Log what's actually at each match position
-	for i in range(min(matches.size(), 10)):  # Limit to first 10 to avoid spam
+	# Log what's actually at each match position (limit to avoid spam)
+	for i in range(min(matches.size(), 10)):
 		var pos = matches[i]
 		var val = grid[int(pos.x)][int(pos.y)] if is_valid_position(pos) else -999
 		print("[SCORING]   Match[", i, "]: pos=", pos, " grid_value=", val, " blocked=", is_cell_blocked(pos.x, pos.y))
 
 	# Filter out any blocked cells from matches
-	matches = matches.filter(func(pos): return not is_cell_blocked(pos.x, pos.y))
+	matches = matches.filter(func(p): return not is_cell_blocked(p.x, p.y))
 	print("[SCORING] After filtering blocked: ", matches.size(), " matches")
 
 	var tiles_removed = 0
@@ -575,17 +615,13 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 	var matches_on_same_col = 0
 
 	if create_special:
-		# Check if there are multiple matches on the same row (horizontal match)
 		for match_pos in matches:
 			if match_pos.y == swapped_pos.y:
 				matches_on_same_row += 1
-
-		# Check if there are multiple matches on the same column (vertical match)
 		for match_pos in matches:
 			if match_pos.x == swapped_pos.x:
 				matches_on_same_col += 1
 
-		# Detect horizontal and vertical matches (3+ tiles for T/L shapes, 4+ for directional arrows)
 		horizontal = matches_on_same_row >= 3
 		vertical = matches_on_same_col >= 3
 
@@ -596,22 +632,15 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 		print("remove_matches: initial matches count=", matches.size())
 		print("remove_matches: computed matches_on_same_row=", matches_on_same_row, " matches_on_same_col=", matches_on_same_col)
 		if horizontal and vertical:
-			# Both horizontal and vertical matches (T or L shape) - create 4-way arrow
 			special_tile_type = FOUR_WAY_ARROW
 		elif horizontal and matches_on_same_row >= 4:
-			# Only horizontal match of 4+ tiles - create horizontal arrow
 			special_tile_type = HORIZTONAL_ARROW
 		elif vertical and matches_on_same_col >= 4:
-			# Only vertical match of 4+ tiles - create vertical arrow
 			special_tile_type = VERTICAL_ARROW
 
 		print("remove_matches: special_tile_type after basic checks =", special_tile_type)
 
-		# If nothing selected but there exists a 4+ line or T/L anywhere in the matches,
-		# pick a valid position from the matches to create the special tile.
 		if special_tile_type == 0:
-			print("remove_matches: special_tile_type == 0, scanning matches for fallback special")
-			# Scan matches for T/L or 4+ lines
 			for test_pos in matches:
 				var row_count = 0
 				var col_count = 0
@@ -620,19 +649,16 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 						row_count += 1
 					if mpos.x == test_pos.x:
 						col_count += 1
-				# T/L shape
 				if row_count >= 3 and col_count >= 3:
 					special_tile_type = FOUR_WAY_ARROW
 					swapped_pos = test_pos
 					print("remove_matches: found T/L fallback at ", test_pos)
 					break
-				# 4+ horizontal
 				if row_count >= 4:
 					special_tile_type = HORIZTONAL_ARROW
 					swapped_pos = test_pos
 					print("remove_matches: found 4+ horizontal fallback at ", test_pos)
 					break
-				# 4+ vertical
 				if col_count >= 4:
 					special_tile_type = VERTICAL_ARROW
 					swapped_pos = test_pos
@@ -643,17 +669,12 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 	# Remove matched tiles (but preserve swapped position if creating special tile)
 	for match_pos in matches:
 		if is_cell_blocked(match_pos.x, match_pos.y):
-			continue  # Never remove blocked cells
-
+			continue
 		var grid_val = grid[match_pos.x][match_pos.y]
-
-		# CRITICAL: Never remove unmovable tiles - they can only be destroyed by adjacent matches!
 		if grid_val == UNMOVABLE_SOFT:
 			print("[UNMOVABLE] ❌ ERROR: Unmovable at (", match_pos.x, ",", match_pos.y, ") was included in matches - this is a bug!")
-			continue  # Skip it - unmovables can't match!
-
+			continue
 		if grid_val > 0:
-			# Skip the swapped position if we're creating a special tile there
 			if special_tile_type > 0 and match_pos.x == swapped_pos.x and match_pos.y == swapped_pos.y:
 				continue
 			grid[match_pos.x][match_pos.y] = 0
@@ -679,8 +700,7 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 						adj_unmovables.append(vec)
 						print("[UNMOVABLE] Found unmovable at (", nx, ",", ny, ") adjacent to match at (", match_pos.x, ",", match_pos.y, ")")
 				else:
-					# Debug: show what's at adjacent positions that aren't unmovables
-					if grid_value != -1 and grid_value != 0:  # Not blocked and not empty
+					if grid_value != -1 and grid_value != 0:
 						print("[UNMOVABLE]   Adjacent position (", nx, ",", ny, ") has grid value: ", grid_value, " (not unmovable)")
 
 	print("[UNMOVABLE] Total adjacent unmovables found: ", adj_unmovables.size())
@@ -692,58 +712,77 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 			var key = str(int(pos.x)) + "," + str(int(pos.y))
 			print("[UNMOVABLE] Processing unmovable at (", pos.x, ",", pos.y, "), key: ", key)
 
-			# Decrement hit count in unmovable_map
-			var remaining = 0
-			if unmovable_map.has(key):
-				var current_hits = int(unmovable_map[key])
-				remaining = current_hits - 1
-				print("[UNMOVABLE]   Current hits: ", current_hits, ", After damage: ", remaining)
+			# Get tile instance first to check if it's a hard unmovable
+			var tn = null
+			if board and board.tiles and int(pos.x) < board.tiles.size():
+				tn = board.tiles[int(pos.x)][int(pos.y)] if int(pos.y) < board.tiles[int(pos.x)].size() else null
+
+			# Check if this is a hard unmovable tile
+			var is_hard = false
+			if tn and "is_unmovable_hard" in tn:
+				is_hard = tn.is_unmovable_hard
+
+			if is_hard:
+				# For HARD tiles, always call take_hit and trust the tile's own hit tracking
+				if tn and tn.has_method("take_hit"):
+					var destroyed = tn.take_hit(1)
+					if destroyed:
+						destroyed_any = true
+						var revealed_keeps_cell = false
+						if tn.has_method("get"):
+							var tmp_coll = tn.get("is_collectible")
+							var tmp_tt = tn.get("tile_type")
+							if typeof(tmp_coll) != TYPE_NIL and tmp_coll == true:
+								revealed_keeps_cell = true
+							if typeof(tmp_tt) != TYPE_NIL and int(tmp_tt) > 0:
+								revealed_keeps_cell = true
+						report_unmovable_destroyed(pos, revealed_keeps_cell)
+						if not revealed_keeps_cell:
+							if board and int(pos.x) < board.tiles.size() and int(pos.y) < board.tiles[int(pos.x)].size():
+								board.tiles[int(pos.x)][int(pos.y)] = null
 			else:
-				# default to 0 -> destroyed (shouldn't happen)
-				print("[UNMOVABLE]   WARNING: Unmovable not in map! Defaulting to destroyed.")
-				remaining = 0
+				# For SOFT tiles, use the old unmovable_map tracking system
+				var entry = null
+				if unmovable_map.has(key):
+					entry = unmovable_map[key]
 
-			if remaining <= 0:
-				# Delegate model updates to report_unmovable_destroyed which centralizes counters and signals
-				report_unmovable_destroyed(pos)
+				var current_hits = 1
+				if entry != null and typeof(entry) == TYPE_DICTIONARY:
+					current_hits = int(entry.get("hits", 1))
+				elif entry != null:
+					current_hits = int(entry)
+				var remaining = current_hits - 1
+				print("[UNMOVABLE]   Current hits: ", current_hits, ", After damage: ", remaining)
 
-				# Trigger visual destruction on board if tile exists
-				if board and board.tiles and int(pos.x) < board.tiles.size():
-					var tn = board.tiles[int(pos.x)][int(pos.y)] if int(pos.y) < board.tiles[int(pos.x)].size() else null
+				if entry != null and typeof(entry) == TYPE_DICTIONARY:
+					entry["hits"] = remaining
+					unmovable_map[key] = entry
+				elif entry != null:
+					unmovable_map[key] = remaining
+
+				if remaining <= 0:
 					if tn and tn.has_method("take_hit"):
-						# Call take_hit which updates visuals; then animate destroy if destroyed
 						var destroyed = tn.take_hit(1)
 						if destroyed:
-							if tn.has_method("animate_destroy"):
-								tn.animate_destroy()
-							# Delay queue_free to allow particle effects to spawn
-							if not tn.is_queued_for_deletion():
-								# Use call_deferred with a slight delay to ensure particles are created first
-								tn.get_tree().create_timer(0.1).timeout.connect(tn.queue_free)
-							# Clear visual reference so gravity will pick up tiles above
-							if int(pos.x) < board.tiles.size() and int(pos.y) < board.tiles[int(pos.x)].size():
-								board.tiles[int(pos.x)][int(pos.y)] = null
 							destroyed_any = true
+							var revealed_keeps_cell = false
+							if tn.has_method("get"):
+								var tmp_coll = tn.get("is_collectible")
+								var tmp_tt = tn.get("tile_type")
+								if typeof(tmp_coll) != TYPE_NIL and tmp_coll == true:
+									revealed_keeps_cell = true
+								if typeof(tmp_tt) != TYPE_NIL and int(tmp_tt) > 0:
+									revealed_keeps_cell = true
+							report_unmovable_destroyed(pos, revealed_keeps_cell)
+							if not revealed_keeps_cell:
+								if board and int(pos.x) < board.tiles.size() and int(pos.y) < board.tiles[int(pos.x)].size():
+									board.tiles[int(pos.x)][int(pos.y)] = null
 					else:
-						# No method - just free it
-						if tn and not tn.is_queued_for_deletion():
-							tn.queue_free()
-							if int(pos.x) < board.tiles.size() and int(pos.y) < board.tiles[int(pos.x)].size():
-								board.tiles[int(pos.x)][int(pos.y)] = null
-							destroyed_any = true
-			else:
-				# Update remaining hits
-				unmovable_map[key] = remaining
-				# If board tile exists, call take_hit to update its visual (no destroy yet)
-				if board and board.tiles and int(pos.x) < board.tiles.size():
-					var tn2 = board.tiles[int(pos.x)][int(pos.y)] if int(pos.y) < board.tiles[int(pos.x)].size() else null
-					if tn2 and tn2.has_method("take_hit"):
-						tn2.take_hit(1)
+						report_unmovable_destroyed(pos)
 
-		# If any unmovable was destroyed, schedule gravity+refill to ensure tiles above fall into place
+		# After processing adj_unmovables, schedule gravity/refill if needed
 		if destroyed_any and board:
 			print("[GameManager] Unmovable destroyed - scheduling gravity+refill on GameBoard")
-			# Use call_deferred to avoid interfering with current flow; call the combined helper
 			board.call_deferred("deferred_gravity_then_refill")
 
 	# Create special tile at swapped position if applicable
@@ -809,7 +848,7 @@ func apply_gravity() -> bool:
 	var moved = false
 
 	if DEBUG_LOGGING:
-		print("apply_gravity: START — grid snapshot before gravity:")
+		print("apply_gravity: START - grid snapshot before gravity:")
 		for x in range(GRID_WIDTH):
 			var col = []
 			for y in range(GRID_HEIGHT):
@@ -859,7 +898,7 @@ func apply_gravity() -> bool:
 	# (this is handled by above logic)
 
 	if DEBUG_LOGGING:
-		print("apply_gravity: END — grid snapshot after gravity:")
+		print("apply_gravity: END - grid snapshot after gravity:")
 		for x in range(GRID_WIDTH):
 			var col = []
 			for y in range(GRID_HEIGHT):
@@ -1559,9 +1598,11 @@ func collectible_landed_at(pos: Vector2, coll_type: String):
 	if _collectible_spawned_positions.has(key):
 		_collectible_spawned_positions.erase(key)
 
-func report_unmovable_destroyed(pos: Vector2) -> void:
+func report_unmovable_destroyed(pos: Vector2, skip_clear: bool = false) -> void:
 	"""Update model when an unmovable soft tile is destroyed.
 	This centralizes counter updates, signal emission and level-completion checks.
+	The visual/transform behavior is the responsibility of GameBoard/Tile instances; callers
+	should pass skip_clear=true if the visual already transformed the cell into a collectible or tile.
 	"""
 	var key = str(int(pos.x)) + "," + str(int(pos.y))
 
@@ -1569,9 +1610,12 @@ func report_unmovable_destroyed(pos: Vector2) -> void:
 	if unmovable_map.has(key):
 		unmovable_map.erase(key)
 
-	# Clear grid cell to empty so gravity/refill can proceed
-	if int(pos.x) < grid.size() and int(pos.y) < grid[int(pos.x)].size():
-		grid[int(pos.x)][int(pos.y)] = 0
+	# Clear grid cell to empty so gravity/refill can proceed unless caller requested to keep revealed cell
+	if not skip_clear:
+		if int(pos.x) < grid.size() and int(pos.y) < grid[int(pos.x)].size():
+			grid[int(pos.x)][int(pos.y)] = 0
+	else:
+		print("[GameManager] report_unmovable_destroyed: preserving grid cell at ", pos, " because skip_clear=true (reveal occurred)")
 
 	# Track unmovables cleared and notify UI
 	unmovables_cleared += 1
@@ -1591,7 +1635,11 @@ func report_unmovable_destroyed(pos: Vector2) -> void:
 			_attempt_level_complete()
 
 func parse_layout_string(layout_str: String, width: int, height: int) -> Array:
-	"""Parse layout string for DLC levels (same logic as LevelManager)"""
+	"""Parse layout string for DLC levels (same logic as LevelManager)
+	Supports tokens separated by commas or spaces, or compact single-line layouts.
+	Hard unmovable tokens are preserved as strings (e.g. "H2:rock") so the
+	caller can handle metadata parsing.
+	"""
 	var parsed = []
 	var lines = layout_str.strip_edges().split("\n")
 
@@ -1602,28 +1650,31 @@ func parse_layout_string(layout_str: String, width: int, height: int) -> Array:
 		for r in range(height):
 			lines.append(compact.substr(r * width, width))
 
+	# Initialize parsed grid with zeros
 	for x in range(width):
 		parsed.append([])
 		for _y in range(height):
 			parsed[x].append(0)
 
+	# Parse each provided line (up to height)
 	for y in range(min(lines.size(), height)):
 		var line = lines[y].strip_edges()
-		# If line contains separators, split by comma or space
 		var values = []
+
+		# Accept comma-separated or space-separated tokens; otherwise treat each char as a token
 		if "," in line:
 			values = line.split(",")
 		elif " " in line:
 			values = line.split(" ")
 		else:
-			# No separators - treat each character as a cell token
 			values = []
 			for i in range(min(line.length(), width)):
 				values.append(line.substr(i, 1))
 
 		for x in range(min(values.size(), width)):
 			var val_str = values[x].strip_edges()
-			# Recognize blocked or empty markers and convert to integers
+
+			# Recognize blocked or empty markers and convert to integers or keep tokens
 			if val_str == "X" or val_str == "x":
 				parsed[x][y] = -1
 			elif val_str == "0" or val_str == "." or val_str == "_":
@@ -1634,9 +1685,9 @@ func parse_layout_string(layout_str: String, width: int, height: int) -> Array:
 			elif val_str == "U":
 				# Unmovable soft marker
 				parsed[x][y] = UNMOVABLE_SOFT
-			elif val_str == "H":
-				# Unmovable hard (not implemented yet, treat as empty)
-				parsed[x][y] = 0
+			elif val_str.begins_with("H") and ":" in val_str:
+				# Hard unmovable token like H2:rock - keep as string so fill_grid_from_layout can parse it
+				parsed[x][y] = val_str
 			elif val_str.is_valid_int():
 				parsed[x][y] = int(val_str)
 			else:

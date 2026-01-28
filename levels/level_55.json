@@ -1,16 +1,23 @@
 {
   "level_number": 55,
   "title": "Level 55",
-  "description": "Reach 21500 points in 41 moves!",
+  "description": "Clear all 8 obstacles!",
   "grid_width": 8,
   "grid_height": 8,
-  "target_score": 21500,
-  "max_moves": 41,
+  "target_score": 17200,
+  "max_moves": 49,
   "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nH3:metal 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 U 0\n0 U 0 0 0 U U U\n0 0 0 0 0 0 U U",
   "collectible_target": 0,
-  "unmovable_target": 0,
-  "unmovable_type": "snow",
-  "collectible_type": "coin"
+  "unmovable_target": 8,
+  "unmovable_type": "glass",
+  "collectible_type": "coin",
+  "hard_textures": {
+    "metal": [
+      "unmovable_hard_metal_0.svg",
+      "unmovable_hard_metal_1.svg",
+      "unmovable_hard_metal_2.svg"
+    ]
+  }
 }

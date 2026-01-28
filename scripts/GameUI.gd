@@ -846,11 +846,20 @@ func _advance_to_next_level():
 
 	print("[GameUI] Current level: %d, Next level: %d" % [current_level_num, next_level_num])
 
-	# Check if next level is a DLC level
-	if is_dlc_level(next_level_num):
-		print("[GameUI] Next level is DLC level %d" % next_level_num)
+	# Centralized loader handles DLC vs built-in levels
+	await _load_level_by_number(next_level_num)
+	return
 
-		# Find the DLC chapter containing this level
+# ...existing code...
+
+func _load_level_by_number(level_num: int):
+	print("[GameUI] Loading level by number: %d" % level_num)
+
+	# For DLC levels, handle narrative effects and chapter loading
+	if is_dlc_level(level_num):
+		print("[GameUI] DLC level detected, preparing to load")
+
+		# Find the DLC level file and load chapter effects
 		var installed_chapters = AssetRegistry.get_installed_chapters()
 		var level_file_path: String = ""
 		var chapter_manifest: Dictionary = {}
@@ -860,34 +869,29 @@ func _advance_to_next_level():
 			var levels_array = manifest.get("levels", [])
 
 			for level_info in levels_array:
-				if level_info.get("number") == next_level_num:
-					# Found the level - get its file path
+				if level_info.get("number") == level_num:
 					var chapter_path = "user://dlc/chapters/" + chapter_id + "/"
 					level_file_path = chapter_path + level_info.get("file", "")
 					chapter_manifest = manifest  # Store for effect loading
-					print("[GameUI] Found DLC level %d at: %s" % [next_level_num, level_file_path])
+					print("[GameUI] Found DLC level %d at: %s" % [level_num, level_file_path])
 					break
 
 			if level_file_path != "":
 				break
 
 		if level_file_path == "":
-			print("[GameUI] ERROR: Could not find DLC level %d" % next_level_num)
-			show_start_page()  # Show start page for menu
+			print("[GameUI] ERROR: Could not find DLC level %d" % level_num)
 			return
 
 		# Load narrative effects for this chapter
 		if chapter_manifest and EffectResolver:
 			print("[GameUI] Loading narrative effects for chapter: %s" % chapter_manifest.get("chapter_id", "unknown"))
+			# Clean up any previous level's visual overlays first
+			EffectResolver.cleanup_visual_overlays()
 			EffectResolver.load_effects(chapter_manifest)
 
-		# Load the DLC level directly
+		# Load the DLC level directly into GameManager
 		if GameManager:
-			GameManager.level_transitioning = false
-			GameManager.initialized = false
-			GameManager.level = next_level_num
-
-			# Load level data from DLC file
 			var absolute_path = ProjectSettings.globalize_path(level_file_path)
 			if FileAccess.file_exists(absolute_path):
 				var file = FileAccess.open(absolute_path, FileAccess.READ)
@@ -900,6 +904,7 @@ func _advance_to_next_level():
 						var level_data = json.data
 
 						# Apply level data to GameManager
+						GameManager.level = level_num
 						GameManager.GRID_WIDTH = level_data.get("grid_width", level_data.get("width", 8))
 						GameManager.GRID_HEIGHT = level_data.get("grid_height", level_data.get("height", 8))
 						GameManager.target_score = level_data.get("target_score", level_data.get("target", 1000))
@@ -915,14 +920,21 @@ func _advance_to_next_level():
 						var parsed_layout = GameManager.parse_layout_string(layout_str, GameManager.GRID_WIDTH, GameManager.GRID_HEIGHT)
 						GameManager.fill_grid_from_layout(parsed_layout)
 
+						# Reset state
 						GameManager.score = 0
 						GameManager.combo_count = 0
 						GameManager.collectibles_collected = 0
 						GameManager.unmovables_cleared = 0
 						GameManager.initialized = true
+						GameManager.level_transitioning = false
 
-						print("[GameUI] DLC level %d loaded successfully" % next_level_num)
-						GameManager.emit_signal("level_loaded")
+					print("[GameUI] DLC level %d loaded successfully" % level_num)
+					GameManager.emit_signal("level_loaded")
+
+					# Emit EventBus event for narrative system (DLC levels)
+					if EventBus:
+						EventBus.emit_level_loaded("level_%d" % level_num, {"level": level_num, "target": GameManager.target_score})
+						print("[GameUI] Emitted EventBus.level_loaded for level %d" % level_num)
 					else:
 						print("[GameUI] ERROR: Failed to parse DLC level JSON")
 				else:
@@ -930,30 +942,77 @@ func _advance_to_next_level():
 			else:
 				print("[GameUI] ERROR: DLC level file does not exist: %s" % absolute_path)
 	else:
-		# Built-in level - use existing logic
-		var level_manager = get_node_or_null("/root/LevelManager")
-		if level_manager:
-			print("[GameUI] Before advance: current_level_index = ", level_manager.current_level_index, ", levels_completed = ", RewardManager.levels_completed)
-			var has_next = level_manager.advance_to_next_level()
-			print("[GameUI] After advance: current_level_index = ", level_manager.current_level_index, ", has_next = ", has_next)
-			if not has_next:
-				print("[GameUI] No more levels available")
-				# Could show a "game complete" screen here
-				return
+		# Built-in level - use LevelManager
+		var lm = get_node_or_null('/root/LevelManager')
+		if lm:
+			# Robust resolution: search levels array for exact match of level_number
+			var found_idx = -1
+			for i in range(lm.levels.size()):
+				var lv = lm.get_level(i)
+				if lv:
+					var lv_num = 0
+					if typeof(lv) == TYPE_OBJECT and lv.level_number:
+						lv_num = int(lv.level_number)
+					elif typeof(lv) == TYPE_DICTIONARY and lv.has("level"):
+						lv_num = int(lv.level)
+					if lv_num == int(level_num):
+						found_idx = i
+						break
+			# If exact match not found, fall back to naive mapping and warn
+			if found_idx == -1:
+				found_idx = max(0, int(level_num) - 1)
+				print("[GameUI] WARNING: Exact match for level %d not found; falling back to index %d" % [level_num, found_idx])
+			# Set the index on the LevelManager
+			if lm.has_method("set_current_level"):
+				lm.set_current_level(found_idx)
+			else:
+				lm.current_level_index = found_idx
+			print("[GameUI] LevelManager.current_level_index set to %d" % (lm.current_level_index if lm.has_method("get_current_level") else found_idx))
+			# Load the level into GameManager
+			var gm = get_node_or_null('/root/GameManager')
+			if gm:
+				gm.initialized = false
+				if gm.has_method("load_current_level"):
+					print("[GameUI] Requesting GameManager to load new level %d" % level_num)
+					await gm.load_current_level()
+				else:
+					print("[GameUI] WARNING: GameManager does not expose load_current_level()")
+			else:
+				print("[GameUI] ERROR: LevelManager not found when selecting built-in level %d" % level_num)
 
-		# Reload the level in GameManager
-		if GameManager:
-			# Reset GameManager state for new level
-			GameManager.level_transitioning = false
-			GameManager.initialized = false
+		# Clean up visual effects from previous level
+		if EffectResolver:
+			EffectResolver.cleanup_visual_overlays()
 
-			# Load the new level
-			await GameManager.load_current_level()
+	# Close the WorldMap UI
+	var wm = get_node_or_null("WorldMap")
+	if wm:
+		wm.visible = false
+		wm.queue_free()
 
-			print("[GameUI] Next level loaded: ", GameManager.level)
-
-	# Show start page for next level
+	# Show StartPage for selected level
 	show_start_page()
+
+
+func _on_worldmap_back_to_menu():
+	"""Handle closing the WorldMap and returning to previous UI (StartPage)."""
+	print("[GameUI] WorldMap requested close/back to menu")
+	AudioManager.play_sfx("ui_click")
+	var wm = get_node_or_null("WorldMap")
+	if wm:
+		wm.visible = false
+		wm.queue_free()
+
+	# Show start page again
+	if start_page:
+		start_page.visible = true
+
+	# Restore board if needed
+	var board = get_node_or_null("../GameBoard")
+	if board and board.has_method("show_tile_overlay"):
+		board.show_tile_overlay()
+
+	print("[GameUI] WorldMap closed and StartPage restored")
 
 func show_start_page():
 	"""Show the start page for the current level"""
@@ -1277,7 +1336,7 @@ func _show_out_of_lives_dialog():
 
 		if out_of_lives_dialog.has_method("show_dialog"):
 			print("[GameUI] Calling show_dialog() method")
-			out_of_lives_dialog.show_dialog()
+			out_of_lives_dialog.call("show_dialog")
 		elif out_of_lives_dialog is Control:
 			print("[GameUI] Manually setting visible = true")
 			out_of_lives_dialog.visible = true
@@ -2333,128 +2392,5 @@ func _on_worldmap_level_selected(level_num: int):
 	print("[GameUI] WorldMap level selected: %d" % level_num)
 	AudioManager.play_sfx("ui_click")
 
-	# Check if this is a DLC level
-	if is_dlc_level(level_num):
-		print("[GameUI] DLC level selected: %d" % level_num)
-
-		# Find the DLC level file and load chapter effects
-		var installed_chapters = AssetRegistry.get_installed_chapters()
-		var level_file_path: String = ""
-		var chapter_manifest: Dictionary = {}
-
-		for chapter_id in installed_chapters:
-			var manifest = AssetRegistry.get_chapter_info(chapter_id)
-			var levels_array = manifest.get("levels", [])
-
-			for level_info in levels_array:
-				if level_info.get("number") == level_num:
-					var chapter_path = "user://dlc/chapters/" + chapter_id + "/"
-					level_file_path = chapter_path + level_info.get("file", "")
-					chapter_manifest = manifest  # Store for effect loading
-					print("[GameUI] Found DLC level %d at: %s" % [level_num, level_file_path])
-					break
-
-			if level_file_path != "":
-				break
-
-		if level_file_path == "":
-			print("[GameUI] ERROR: Could not find DLC level %d" % level_num)
-			return
-
-		# Load narrative effects for this chapter
-		if chapter_manifest and EffectResolver:
-			print("[GameUI] Loading narrative effects for chapter: %s" % chapter_manifest.get("chapter_id", "unknown"))
-			# Clean up any previous level's visual overlays first
-			EffectResolver.cleanup_visual_overlays()
-			EffectResolver.load_effects(chapter_manifest)
-
-		# Load the DLC level directly into GameManager
-		if GameManager:
-			var absolute_path = ProjectSettings.globalize_path(level_file_path)
-			if FileAccess.file_exists(absolute_path):
-				var file = FileAccess.open(absolute_path, FileAccess.READ)
-				if file:
-					var json_text = file.get_as_text()
-					file.close()
-
-					var json = JSON.new()
-					if json.parse(json_text) == OK:
-						var level_data = json.data
-
-						# Apply level data to GameManager
-						GameManager.level = level_num
-						GameManager.GRID_WIDTH = level_data.get("grid_width", level_data.get("width", 8))
-						GameManager.GRID_HEIGHT = level_data.get("grid_height", level_data.get("height", 8))
-						GameManager.target_score = level_data.get("target_score", level_data.get("target", 1000))
-						GameManager.moves_left = level_data.get("max_moves", level_data.get("moves", 20))
-						GameManager.collectible_target = level_data.get("collectible_target", 0)
-						GameManager.collectible_type = level_data.get("collectible_type", "coin")
-						GameManager.unmovable_type = level_data.get("unmovable_type", "snow")
-						GameManager.unmovable_target = level_data.get("unmovable_target", 0)
-
-						# Parse layout and initialize grid properly
-						var layout_str = level_data.get("layout", "")
-						GameManager.create_empty_grid()
-						var parsed_layout = GameManager.parse_layout_string(layout_str, GameManager.GRID_WIDTH, GameManager.GRID_HEIGHT)
-						GameManager.fill_grid_from_layout(parsed_layout)
-
-						# Reset state
-						GameManager.score = 0
-						GameManager.combo_count = 0
-						GameManager.collectibles_collected = 0
-						GameManager.unmovables_cleared = 0
-						GameManager.initialized = true
-						GameManager.level_transitioning = false
-
-					print("[GameUI] DLC level %d loaded successfully" % level_num)
-					GameManager.emit_signal("level_loaded")
-
-					# Emit EventBus event for narrative system (DLC levels)
-					if EventBus:
-						EventBus.emit_level_loaded("level_%d" % level_num, {"level": level_num, "target": GameManager.target_score})
-						print("[GameUI] Emitted EventBus.level_loaded for level %d" % level_num)
-					else:
-						print("[GameUI] ERROR: Failed to parse DLC level JSON")
-				else:
-					print("[GameUI] ERROR: Failed to open DLC level file")
-			else:
-				print("[GameUI] ERROR: DLC level file does not exist: %s" % absolute_path)
-	else:
-		# Built-in level - use LevelManager
-		var lm = get_node_or_null('/root/LevelManager')
-		if lm:
-			lm.current_level_index = max(0, int(level_num) - 1)
-			print("[GameUI] LevelManager.current_level_index set to %d" % lm.current_level_index)
-
-		# Clean up visual effects from previous level
-		if EffectResolver:
-			EffectResolver.cleanup_visual_overlays()
-
-	# Close the WorldMap UI
-	var wm = get_node_or_null("WorldMap")
-	if wm:
-		wm.visible = false
-		wm.queue_free()
-
-	# Show StartPage for selected level
-	show_start_page()
-
-func _on_worldmap_back_to_menu():
-	"""Handle closing the WorldMap and returning to previous UI (StartPage)."""
-	print("[GameUI] WorldMap requested close/back to menu")
-	AudioManager.play_sfx("ui_click")
-	var wm = get_node_or_null("WorldMap")
-	if wm:
-		wm.visible = false
-		wm.queue_free()
-
-	# Show start page again
-	if start_page:
-		start_page.visible = true
-
-	# Restore board if needed
-	var board = get_node_or_null("../GameBoard")
-	if board and board.has_method("show_tile_overlay"):
-		board.show_tile_overlay()
-
-	print("[GameUI] WorldMap closed and StartPage restored")
+	# Use centralized level loader (handles both DLC and built-in levels)
+	await _load_level_by_number(level_num)

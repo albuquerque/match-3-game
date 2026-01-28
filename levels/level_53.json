@@ -1,16 +1,23 @@
 {
   "level_number": 53,
   "title": "Level 53",
-  "description": "Collect 1 coin and clear 6 obstacles!",
+  "description": "Clear all 7 obstacles!",
   "grid_width": 8,
   "grid_height": 8,
-  "target_score": 10032,
-  "max_moves": 53,
+  "target_score": 16720,
+  "max_moves": 48,
   "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 0 0\n0 C 0 0 U 0 0 0\n0 0 0 U U U 0 0\n0 0 0 0 U U 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
-  "collectible_target": 1,
-  "unmovable_target": 6,
-  "unmovable_type": "snow",
-  "collectible_type": "coin"
+  "layout": "X X X 0 0 0 X X\nX X 0 0 0 0 0 X\nX 0 0 0 0 0 0 0\n0 0 0 0 U 0 0 0\n0 0 0 U U U 0 0\n0 0 0 H3:ice U U 0 0\nX 0 0 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "collectible_target": 0,
+  "unmovable_target": 7,
+  "unmovable_type": "glass",
+  "collectible_type": "coin",
+  "hard_textures": {
+    "ice": [
+      "unmovable_hard_ice_0.svg",
+      "unmovable_hard_ice_1.svg",
+      "unmovable_hard_ice_2.svg"
+    ]
+  }
 }

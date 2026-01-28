@@ -1,16 +1,16 @@
 {
   "level_number": 41,
-  "title": "Level 41",
-  "description": "Reach 17300 points in 37 moves!",
-  "grid_width": 8,
-  "grid_height": 8,
-  "target_score": 17300,
-  "max_moves": 37,
-  "num_tile_types": 6,
+  "width": 8,
+  "height": 8,
+  "target_score": 2000,
+  "moves": 20,
+  "description": "Reveal test: crate reveals a normal tile type 3",
   "theme": "legacy",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
-  "collectible_target": 0,
-  "unmovable_target": 0,
-  "unmovable_type": "snow",
-  "collectible_type": "coin"
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n1 1 1 H1:crate 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "hard_textures": {
+    "crate": ["unmovable_hard_crate_0.svg", "unmovable_hard_crate_1.svg"]
+  },
+  "hard_reveals": {
+    "crate": { "type": "tile", "value": 3 }
+  }
 }

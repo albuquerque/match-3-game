@@ -22,6 +22,14 @@ var unmovable_hits: int = 0  # number of hits required to destroy
 var unmovable_max_hits: int = 0  # saved for visuals
 var unmovable_type: String = ""  # Type of unmovable (snow, glass, wood, etc.)
 
+# Unmovable Hard (multi-hit) properties
+var is_unmovable_hard: bool = false
+var hard_hits: int = 0
+var hard_max_hits: int = 0
+var hard_type: String = ""               # e.g., rock, metal, ice
+var hard_textures: Array = []             # optional list of texture names/paths for each hit state (index 0 = full health)
+var hard_reveals_on_destroy: Dictionary = {}  # e.g., {"type":"collectible","value":"coin"} or {"type":"tile","value":3}
+
 # Rope/chain anchor (optional) - if set, this tile will move toward anchor when released
 var rope_anchor: Vector2 = Vector2(-1, -1)
 var rope_attached: bool = false
@@ -46,6 +54,36 @@ const COLORS = [
 	Color.PURPLE,
 	Color.ORANGE
 ]
+
+# Helper: robustly resolve the active theme name from ThemeManager (supports multiple method names)
+func _resolve_theme_name() -> String:
+	var tm = get_node_or_null("/root/ThemeManager")
+	if not tm:
+		return "legacy"
+	# try several possible method/property names used across versions
+	var candidates = ["get_theme_name", "get_current_theme_name", "get_current_theme", "current_theme", "theme_name"]
+	# Try calling with call method safely
+	for m in candidates:
+		if tm.has_method(m):
+			var res = tm.call(m)
+			if typeof(res) == TYPE_STRING and res != "":
+				return res
+	# Try as property
+	for p in candidates:
+		if tm.has_variable(p):
+			var v = tm.get(p)
+			if typeof(v) == TYPE_STRING and v != "":
+				return v
+	# Fallback
+	return "legacy"
+
+# Helper: try candidate paths and return first existing path or empty string
+func _find_existing_texture(candidates: Array) -> String:
+	for c in candidates:
+		if ResourceLoader.exists(c):
+			return c
+	# nothing found
+	return ""
 
 func _ready():
 	# Enable input processing
@@ -91,7 +129,7 @@ func update_visual():
 		call_deferred("update_visual")
 		return
 
-	if tile_type <= 0 and not is_collectible and not is_unmovable:
+	if tile_type <= 0 and not is_collectible and not is_unmovable and not is_unmovable_hard:
 		visible = false
 		return
 
@@ -100,47 +138,109 @@ func update_visual():
 	# Get texture path from ThemeManager (autoload singleton)
 	var texture_path = "res://textures/tile_%d.png" % tile_type
 	var theme_manager = get_node_or_null("/root/ThemeManager")
+	var theme_name = _resolve_theme_name()
 	if theme_manager:
-		texture_path = theme_manager.get_tile_texture_path(tile_type)
+		# keep debug friendly
+		print("[Tile] Resolved theme_name:", theme_name)
+		# allow ThemeManager to override a tile texture path if available
+		if theme_manager.has_method("get_tile_texture_path"):
+			# Use try/call to avoid crashing if method signature differs
+			var ok_path = theme_manager.call("get_tile_texture_path", tile_type) if theme_manager.has_method("get_tile_texture_path") else null
+			if ok_path and ok_path != "":
+				texture_path = ok_path
 
 	# If this tile is marked as a collectible, prefer collectible texture
 	if is_collectible:
-		var theme_name = "legacy"
-		if theme_manager and theme_manager.has_method("get_theme_name"):
-			theme_name = theme_manager.get_theme_name()
-
-		# Try SVG first, then PNG
-		var coll_path = "res://textures/%s/%s.svg" % [theme_name, collectible_type]
-		if not ResourceLoader.exists(coll_path):
-			coll_path = "res://textures/%s/%s.png" % [theme_name, collectible_type]
-		if not ResourceLoader.exists(coll_path):
-			# Fallback to root textures folder
-			coll_path = "res://textures/%s.svg" % collectible_type
-		if not ResourceLoader.exists(coll_path):
-			coll_path = "res://textures/%s.png" % collectible_type
-
-		if ResourceLoader.exists(coll_path):
-			texture_path = coll_path
+		# Prefer resolved theme_name
+		# Try SVG then PNG in theme folder, then root
+		var coll_candidates = [
+			"res://textures/%s/%s.svg" % [theme_name, collectible_type],
+			"res://textures/%s/%s.png" % [theme_name, collectible_type],
+			"res://textures/%s.svg" % collectible_type,
+			"res://textures/%s.png" % collectible_type
+		]
+		var found_coll = _find_existing_texture(coll_candidates)
+		if found_coll != "":
+			texture_path = found_coll
 			print("[Tile] Using collectible texture: ", texture_path)
 
-	# For unmovable tiles, load texture based on type
+	# For hard unmovable tiles, choose correct texture based on remaining hits
+	if is_unmovable_hard and hard_type != "":
+		var found_hard_texture = false
+		# If explicit hard_textures provided, use them (index by remaining hits)
+		if hard_textures and hard_textures.size() > 0:
+			var idx = clamp(hard_max_hits - hard_hits, 0, hard_textures.size() - 1)
+			var ht = hard_textures[idx]
+			if typeof(ht) == TYPE_STRING:
+				if ht.begins_with("res://"):
+					if ResourceLoader.exists(ht):
+						texture_path = ht
+						found_hard_texture = true
+				else:
+					# theme relative
+					var cand = "res://textures/%s/%s" % [theme_name, ht]
+					var cand_found = _find_existing_texture([cand, cand + ".svg", cand + ".png"])
+					if cand_found != "":
+						texture_path = cand_found
+						found_hard_texture = true
+
+		# otherwise try convention-based texture names: unmovable_hard_{type}_{stage}
+		if not found_hard_texture:
+			# Stage ordering: prefer current damage stage then others
+			var preferred_stage = max(0, hard_max_hits - hard_hits)
+			var tried = []
+			# try preferred stage first, then remaining stages
+			tried.append(preferred_stage)
+			for i in range(hard_max_hits):
+				if i != preferred_stage:
+					tried.append(i)
+			# Also try stage indices that might be used in assets (0..max-1)
+			var candidates = []
+			for s in tried:
+				candidates.append("res://textures/%s/unmovable_hard_%s_%d.svg" % [theme_name, hard_type, s])
+				candidates.append("res://textures/%s/unmovable_hard_%s_%d.png" % [theme_name, hard_type, s])
+				candidates.append("res://textures/unmovable_hard_%s_%d.svg" % [hard_type, s])
+				candidates.append("res://textures/unmovable_hard_%s_%d.png" % [hard_type, s])
+			# Also try without explicit stage (single-texture variants)
+			candidates.append("res://textures/%s/unmovable_hard_%s.svg" % [theme_name, hard_type])
+			candidates.append("res://textures/%s/unmovable_hard_%s.png" % [theme_name, hard_type])
+			candidates.append("res://textures/unmovable_hard_%s.svg" % hard_type)
+			candidates.append("res://textures/unmovable_hard_%s.png" % hard_type)
+			var found = _find_existing_texture(candidates)
+			if found != "":
+				texture_path = found
+				found_hard_texture = true
+
+		# FALLBACK: try unmovable_soft_{type} in theme or root if hard texture isn't available
+		if not found_hard_texture:
+			var soft_candidates = [
+				"res://textures/%s/unmovable_soft_%s.svg" % [theme_name, hard_type],
+				"res://textures/%s/unmovable_soft_%s.png" % [theme_name, hard_type],
+				"res://textures/unmovable_soft_%s.svg" % hard_type,
+				"res://textures/unmovable_soft_%s.png" % hard_type
+			]
+			var soft_found = _find_existing_texture(soft_candidates)
+			if soft_found != "":
+				texture_path = soft_found
+				found_hard_texture = true
+
+		# Debug log showing final chosen texture path for hard tile
+		if found_hard_texture:
+			print("[Tile] Hard texture chosen:", texture_path)
+		else:
+			print("[Tile] No hard-specific texture found for type=", hard_type, " tried theme=", theme_name)
+
+	# For unmovable tiles (soft), load texture based on type
 	if is_unmovable and unmovable_type != "":
-		var theme_name = "legacy"
-		if theme_manager and theme_manager.has_method("get_theme_name"):
-			theme_name = theme_manager.get_theme_name()
-
-		# Try theme-specific path with type, then fallback
-		var um_path = "res://textures/%s/unmovable_soft_%s.svg" % [theme_name, unmovable_type]
-		if not ResourceLoader.exists(um_path):
-			um_path = "res://textures/%s/unmovable_soft_%s.png" % [theme_name, unmovable_type]
-		if not ResourceLoader.exists(um_path):
-			# Fallback to root textures folder
-			um_path = "res://textures/unmovable_soft_%s.svg" % unmovable_type
-		if not ResourceLoader.exists(um_path):
-			um_path = "res://textures/unmovable_soft_%s.png" % unmovable_type
-
-		if ResourceLoader.exists(um_path):
-			texture_path = um_path
+		var um_candidates = [
+			"res://textures/%s/unmovable_soft_%s.svg" % [theme_name, unmovable_type],
+			"res://textures/%s/unmovable_soft_%s.png" % [theme_name, unmovable_type],
+			"res://textures/unmovable_soft_%s.svg" % unmovable_type,
+			"res://textures/unmovable_soft_%s.png" % unmovable_type
+		]
+		var um_found = _find_existing_texture(um_candidates)
+		if um_found != "":
+			texture_path = um_found
 			print("[Tile] Using unmovable texture: ", texture_path)
 	elif is_unmovable and unmovable_max_hits > 0:
 		# Legacy fallback for old unmovable system
@@ -160,6 +260,7 @@ func update_visual():
 		# Apply rounded corner shader
 		apply_rounded_corner_shader()
 	else:
+		# Fallback to solid color or procedural texture for missing textures
 		if tile_type > COLORS.size():
 			sprite.modulate = Color.WHITE
 		else:
@@ -196,10 +297,22 @@ func update_visual():
 	if is_collectible:
 		# Slight tint to indicate collectible
 		sprite.modulate = Color(1, 0.95, 0.7)
+	elif is_unmovable_hard:
+		# Show a tougher visual tint based on remaining hits
+		var strength_hard = clamp(float(hard_hits) / max(float(hard_max_hits), 1.0), 0.0, 1.0)
+		sprite.modulate = Color(0.9 - 0.3 * (1.0 - strength_hard), 0.9 - 0.3 * (1.0 - strength_hard), 1.0 - 0.4 * (1.0 - strength_hard))
+		# Ensure any legacy label is removed to avoid visual clutter
+		var old_label = get_node_or_null("HardHitsLabel")
+		if old_label:
+			old_label.queue_free()
 	elif is_unmovable:
 		# Show a greyed/tough look depending on remaining hits
-		var strength = clamp(float(unmovable_hits) / max(float(unmovable_max_hits), 1.0), 0.0, 1.0)
-		sprite.modulate = Color(0.9 - 0.3 * (1.0 - strength), 0.9 - 0.3 * (1.0 - strength), 1.0 - 0.4 * (1.0 - strength))
+		var strength_soft = clamp(float(unmovable_hits) / max(float(unmovable_max_hits), 1.0), 0.0, 1.0)
+		sprite.modulate = Color(0.9 - 0.3 * (1.0 - strength_soft), 0.9 - 0.3 * (1.0 - strength_soft), 1.0 - 0.4 * (1.0 - strength_soft))
+		# Remove any hard hits label if present
+		var old_label2 = get_node_or_null("HardHitsLabel")
+		if old_label2:
+			old_label2.queue_free()
 
 # New helper methods for mechanics (no new classes)
 func configure_collectible(c_type: String) -> void:
@@ -220,9 +333,46 @@ func configure_unmovable(hits: int, u_type: String = "snow") -> void:
 		sprite.visible = true
 	update_visual()
 
+# New configuration function for hard unmovable tiles
+func configure_unmovable_hard(hits: int, h_type: String = "rock", textures: Array = [], reveals: Dictionary = {}) -> void:
+	is_unmovable_hard = true
+	hard_hits = hits
+	hard_max_hits = hits
+	hard_type = h_type
+	hard_textures = textures
+	hard_reveals_on_destroy = reveals
+	print("[Tile] configure_unmovable_hard called for pos=", grid_position, " type=", h_type, " hits=", hits)
+	if sprite:
+		sprite.visible = true
+	update_visual()
+
 func take_hit(amount: int = 1) -> bool:
 	"""Apply a hit to unmovable tile. Returns true if destroyed."""
+	print("[Tile] take_hit called at ", grid_position, " amount=", amount, " is_unmovable_hard=", is_unmovable_hard, " hard_hits=", hard_hits, " is_unmovable=", is_unmovable, " unmovable_hits=", unmovable_hits)
+	# Handle hard unmovable first
+	if is_unmovable_hard:
+		hard_hits = max(0, hard_hits - amount)
+		print("[Tile] take_hit after decrement hard_hits=", hard_hits)
+		update_visual()
+		if hard_hits <= 0:
+			# transform or destroy
+			is_unmovable_hard = false
+			hard_max_hits = 0
+			_create_unmovable_destruction_particles()
+			# If reveals defined, transform tile accordingly
+			if hard_reveals_on_destroy and hard_reveals_on_destroy.has("type"):
+				_transform_on_hard_destroy(hard_reveals_on_destroy)
+			else:
+				# fallback: emit destroyed signal
+				emit_signal("unmovable_destroyed", self)
+			print("[Tile] take_hit returning true (hard destroyed) at ", grid_position)
+			return true
+		print("[Tile] take_hit returning false (hard still alive) at ", grid_position)
+		return false
+
+	# existing soft unmovable behavior
 	if not is_unmovable:
+		print("[Tile] take_hit: not unmovable, returning false at ", grid_position)
 		return false
 	unmovable_hits = max(0, unmovable_hits - amount)
 	update_visual()
@@ -232,19 +382,68 @@ func take_hit(amount: int = 1) -> bool:
 		# Create smoke/dust effect when destroyed
 		_create_unmovable_destruction_particles()
 		emit_signal("unmovable_destroyed", self)
+		print("[Tile] take_hit returning true (soft destroyed) at ", grid_position)
 		return true
+	print("[Tile] take_hit returning false (soft still alive) at ", grid_position)
 	return false
 
-func mark_collected() -> void:
-	if not is_collectible or collectible_collected_flag:
+# New helper to transform tile when hard unmovable is destroyed
+func _transform_on_hard_destroy(reveal: Dictionary) -> void:
+	# reveal example: {"type":"collectible","value":"coin"} or {"type":"tile","value":3}
+	if not reveal.has("type"):
 		return
-	collectible_collected_flag = true
-	is_collectible = false
-	# Play collection effect
-	_create_collection_particles()
-	emit_signal("collectible_collected", self, collectible_type)
-	# update visual so it won't render as collectible
-	update_visual()
+
+	var rtype = reveal["type"]
+
+	var gm = get_node_or_null("/root/GameManager")
+	var gx = int(grid_position.x)
+	var gy = int(grid_position.y)
+
+	if rtype == "collectible":
+		var collectible_value = reveal.get("value", "coin")
+		configure_collectible(collectible_value)
+
+		# update model so gravity/refill won't overwrite the revealed collectible
+		if gm and gm.grid.size() > gx and gm.grid[gx].size() > gy:
+			gm.grid[gx][gy] = gm.COLLECTIBLE
+
+		# play reveal animation
+		_create_collection_particles()
+
+		# Ensure the GameBoard tiles array contains this tile instance so it isn't replaced
+		var board = get_node_or_null("/root/MainGame/GameBoard")
+		if board and board.tiles and gx < board.tiles.size():
+			if gy >= board.tiles[gx].size():
+				# Grow inner array if needed
+				while board.tiles[gx].size() <= gy:
+					board.tiles[gx].append(null)
+			board.tiles[gx][gy] = self
+
+			# Snap visual position to grid
+			if board.has_method("grid_to_world_position"):
+				position = board.grid_to_world_position(Vector2(gx, gy))
+
+	elif rtype == "tile":
+		var new_type = reveal.get("value", 1)
+		update_type(int(new_type))
+
+		# update model to the revealed tile type to keep consistency
+		if gm and gm.grid.size() > gx and gm.grid[gx].size() > gy:
+			gm.grid[gx][gy] = int(new_type)
+		# Ensure GameBoard tiles array contains this tile instance
+		var board2 = get_node_or_null("/root/MainGame/GameBoard")
+		if board2 and board2.tiles and gx < board2.tiles.size():
+			if gy >= board2.tiles[gx].size():
+				while board2.tiles[gx].size() <= gy:
+					board2.tiles[gx].append(null)
+			board2.tiles[gx][gy] = self
+		if board2 and board2.has_method("grid_to_world_position"):
+			position = board2.grid_to_world_position(Vector2(gx, gy))
+		print("[Tile] transform to tile complete at ", grid_position)
+	elif rtype == "none":
+		# just mark visual but do not call report_unmovable_destroyed here
+		print("[Tile] transform type 'none' encountered - emitting unmovable_destroyed signal")
+		emit_signal("unmovable_destroyed", self)
 
 func _create_collection_particles():
 	# small visual feedback for collectible collection
@@ -397,7 +596,16 @@ func update_type(new_type: int):
 	print("Updating tile at ", grid_position, " from type ", tile_type, " to type ", new_type)
 	tile_type = new_type
 	update_visual()
-	print("Tile updated. Sprite visible: ", sprite.visible if sprite else "no sprite", " Texture: ", sprite.texture if sprite else "no sprite", " Scale: ", sprite.scale if sprite else "no sprite")
+	# Safely build debug strings without using inline ternary
+	var sprite_visible_str = "no sprite"
+	var texture_str = "no sprite"
+	var scale_str = "no sprite"
+	if sprite != null:
+		sprite_visible_str = str(sprite.visible)
+		if sprite.texture != null:
+			texture_str = str(sprite.texture)
+		scale_str = str(sprite.scale)
+	print("Tile updated. Sprite visible: ", sprite_visible_str, " Texture: ", texture_str, " Scale: ", scale_str)
 
 func apply_rounded_corner_shader():
 	"""Apply the rounded corner shader to the sprite"""
@@ -462,7 +670,11 @@ func set_selected(selected: bool):
 func _input(event):
 	# Handle touch/mouse press - check if it started on this tile
 	if (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed:
-		var global_pos = event.position if event is InputEventScreenTouch else get_global_mouse_position()
+		var global_pos = Vector2.ZERO
+		if event is InputEventScreenTouch:
+			global_pos = event.position
+		else:
+			global_pos = get_global_mouse_position()
 		var local_pos = to_local(global_pos)
 
 		if get_rect().has_point(local_pos):
@@ -477,7 +689,11 @@ func _input(event):
 
 		if touch_started_on_this_tile:
 			print("Touch released, checking swipe on tile at ", grid_position)
-			var global_pos = event.position if event is InputEventScreenTouch else get_global_mouse_position()
+			var global_pos = Vector2.ZERO
+			if event is InputEventScreenTouch:
+				global_pos = event.position
+			else:
+				global_pos = get_global_mouse_position()
 			var swipe_vector = global_pos - swipe_start_pos
 			var swipe_distance = swipe_vector.length()
 
@@ -507,10 +723,16 @@ func get_swipe_direction(swipe_vector: Vector2) -> Vector2:
 
 	if abs_x > abs_y:
 		# Horizontal swipe
-		return Vector2(1, 0) if swipe_vector.x > 0 else Vector2(-1, 0)
+		if swipe_vector.x > 0:
+			return Vector2(1, 0)
+		else:
+			return Vector2(-1, 0)
 	else:
 		# Vertical swipe
-		return Vector2(0, 1) if swipe_vector.y > 0 else Vector2(0, -1)
+		if swipe_vector.y > 0:
+			return Vector2(0, 1)
+		else:
+			return Vector2(0, -1)
 
 func _on_mouse_entered():
 	print("Mouse entered tile at ", grid_position)
@@ -636,7 +858,9 @@ func _create_destruction_particles():
 	particles.scale_amount_max = 2.5
 
 	# Color based on tile type - brighter
-	var particle_color = COLORS[tile_type - 1] if tile_type > 0 and tile_type <= COLORS.size() else Color.WHITE
+	var particle_color = Color.WHITE
+	if tile_type > 0 and tile_type <= COLORS.size():
+		particle_color = COLORS[tile_type - 1]
 	# Make colors brighter for more impact
 	particle_color = particle_color * 1.3
 	particles.color = particle_color

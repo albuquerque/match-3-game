@@ -1,16 +1,23 @@
 {
   "level_number": 54,
   "title": "Level 54",
-  "description": "Reach 21200 points in 41 moves!",
+  "description": "Clear all 10 obstacles!",
   "grid_width": 8,
   "grid_height": 8,
-  "target_score": 21200,
-  "max_moves": 41,
+  "target_score": 16960,
+  "max_moves": 49,
   "num_tile_types": 6,
   "theme": "modern",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 U U U 0 H1:rock\n0 0 0 U U U 0 0\n0 0 0 U U U 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
   "collectible_target": 0,
-  "unmovable_target": 0,
-  "unmovable_type": "snow",
-  "collectible_type": "coin"
+  "unmovable_target": 10,
+  "unmovable_type": "wood",
+  "collectible_type": "coin",
+  "hard_textures": {
+    "rock": [
+      "unmovable_hard_rock_0.svg",
+      "unmovable_hard_rock_1.svg",
+      "unmovable_hard_rock_2.svg"
+    ]
+  }
 }

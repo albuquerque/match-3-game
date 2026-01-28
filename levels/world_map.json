@@ -104,6 +104,31 @@
 
 	  {
 		"id": 5,
+		"title": "Kings: The Middle Lands",
+		"background_image": "res://textures/backgrounds/chapters/chapter_kings.jpg",
+		"theme_color": "#7A4E4E",
+		"level_grid": {
+		  "rows": 2,
+		  "columns": 5
+		},
+		"levels": [
+		  { "level": 41, "pos": [360, 180], "unlocked": false, "name": "Hill of Dawn" },
+		  { "level": 42, "pos": [480, 250], "unlocked": false, "name": "Royal Road" },
+		  { "level": 43, "pos": [240, 320], "unlocked": false, "name": "Golden Gate" },
+		  { "level": 44, "pos": [360, 390], "unlocked": false, "name": "Palace Courtyard" },
+		  { "level": 45, "pos": [520, 460], "unlocked": false, "name": "Market Square" },
+
+		  { "level": 46, "pos": [200, 530], "unlocked": false, "name": "City Walls" },
+		  { "level": 47, "pos": [360, 600], "unlocked": false, "name": "High Watch" },
+		  { "level": 48, "pos": [500, 670], "unlocked": false, "name": "Temple Steps" },
+		  { "level": 49, "pos": [220, 670], "unlocked": false, "name": "Fountain" },
+		  { "level": 50, "pos": [360, 740], "unlocked": false, "name": "Crown Terrace" }
+		],
+		"next_chapter_button_pos": [360, 810]
+	  },
+
+	  {
+		"id": 6,
 		"title": "Test: Collectibles & Obstacles",
 		"background_image": "res://textures/backgrounds/chapters/chapter_proverbs.jpg",
 		"theme_color": "#FF6B6B",
