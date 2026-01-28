@@ -14,8 +14,10 @@ class LevelData:
 	var collectible_type: String = "coin"  # Type of collectible (coin, gem, star, etc.)
 	var unmovable_type: String = "snow"  # Type of unmovable_soft (snow, glass, wood, etc.)
 	var unmovable_target: int = 0  # Number of unmovables to clear (0 = not required)
+	var hard_textures: Dictionary = {}  # mapping of hard type -> array of texture names/paths
+	var hard_reveals: Dictionary = {}   # optional mapping for reveal behavior on hard destroy
 
-	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = "", coll_target: int = 0, coll_type: String = "coin", unmov_type: String = "snow", unmov_target: int = 0):
+	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = "", coll_target: int = 0, coll_type: String = "coin", unmov_type: String = "snow", unmov_target: int = 0, hard_tex: Dictionary = {}, hard_rev: Dictionary = {}):
 		level_number = num
 		grid_layout = layout
 		width = w
@@ -28,6 +30,8 @@ class LevelData:
 		collectible_type = coll_type
 		unmovable_type = unmov_type
 		unmovable_target = unmov_target
+		hard_textures = hard_tex
+		hard_reveals = hard_rev
 
 var levels: Array[LevelData] = []
 var current_level_index: int = 0
@@ -61,6 +65,23 @@ func load_all_levels():
 		# If no JSON files found, use built-in levels
 		print("[LevelManager] No level JSON files found, using built-in levels")
 		create_builtin_levels()
+
+	# After loading all levels, ensure they're sorted by their level_number (defensive)
+	if levels.size() > 1:
+		levels.sort_custom(func(a, b):
+			var a_num = 0
+			var b_num = 0
+			if typeof(a) == TYPE_OBJECT and a.level_number:
+				a_num = int(a.level_number)
+			elif typeof(a) == TYPE_DICTIONARY and a.has("level"):
+				a_num = int(a.level)
+			if typeof(b) == TYPE_OBJECT and b.level_number:
+				b_num = int(b.level_number)
+			elif typeof(b) == TYPE_DICTIONARY and b.has("level"):
+				b_num = int(b.level)
+			return a_num < b_num
+		)
+		print("[LevelManager] Sorted levels by level_number for stable indexing")
 
 	print("Loaded ", levels.size(), " levels")
 
@@ -123,7 +144,9 @@ func load_level_from_json(file_path: String) -> LevelData:
 		data.get("collectible_target", 0),  # Load collectible target from JSON
 		data.get("collectible_type", "coin"),  # Load collectible type from JSON (default: coin)
 		data.get("unmovable_type", "snow"),  # Load unmovable type from JSON (default: snow)
-		data.get("unmovable_target", 0)  # Load unmovable target from JSON (default: 0)
+		data.get("unmovable_target", 0),  # Load unmovable target from JSON (default: 0)
+		data.get("hard_textures", {}),
+		data.get("hard_reveals", {})
 	)
 
 func parse_layout(layout_data, width: int, height: int) -> Array:
@@ -185,11 +208,8 @@ func parse_string_layout(layout_str: String, width: int, height: int) -> Array:
 			elif val_str.is_valid_int():
 				parsed[x][y] = int(val_str)
 			else:
-				# Keep single-character tokens like 'C','U','H' as strings
-				if val_str.length() == 1:
-					parsed[x][y] = val_str
-				else:
-					parsed[x][y] = 0
+				# Preserve multi-character tokens (e.g., H2:rock, C, U) as strings so downstream parser can handle them
+				parsed[x][y] = val_str
 
 	return parsed
 
@@ -337,3 +357,15 @@ func set_current_level(index: int):
 		print("[LevelManager] Current level set to index ", current_level_index, " (Level ", current_level_index + 1, ")")
 	else:
 		print("[LevelManager] ERROR: Invalid level index ", index)
+
+func get_level_index(level_number: int) -> int:
+	"""Return the index in `levels` for the given level_number, or -1 if not found."""
+	for i in range(levels.size()):
+		var ld = levels[i]
+		if typeof(ld) == TYPE_OBJECT and ld.level_number == level_number:
+			return i
+		# handle dictionary-shaped entries (defensive)
+		if typeof(ld) == TYPE_DICTIONARY and ld.has("level") and int(ld.level) == level_number:
+			return i
+	# Not found
+	return -1

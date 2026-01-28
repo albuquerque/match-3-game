@@ -69,9 +69,14 @@ var border_container: Node2D  # Container for all border lines
 var tile_area_overlay: Control = null  # Container for semi-transparent overlay pieces over tiles
 
 func _ready():
-	GameManager.connect("game_over", Callable(self, "_on_game_over"))
-	GameManager.connect("level_complete", Callable(self, "_on_level_complete"))
-	GameManager.connect("level_loaded", Callable(self, "_on_level_loaded"))
+	# Safely connect to GameManager signals if GameManager autoload is present
+	var gm = get_node_or_null("/root/GameManager")
+	if gm:
+		gm.connect("game_over", Callable(self, "_on_game_over"))
+		gm.connect("level_complete", Callable(self, "_on_level_complete"))
+		gm.connect("level_loaded", Callable(self, "_on_level_loaded"))
+	else:
+		print("[GameBoard] WARNING: GameManager autoload not available at _ready(); will wait for level_loaded signal")
 
 	# Create border container
 	border_container = Node2D.new()
@@ -99,7 +104,8 @@ func _ready():
 	setup_background_image()
 
 	# Only create visual grid if GameManager has initialized a level; otherwise wait for level_loaded
-	if Engine.has_singleton("GameManager") and GameManager.initialized:
+	var gm2 = get_node_or_null("/root/GameManager")
+	if gm2 and gm2.initialized:
 		create_visual_grid()
 		# Borders will be drawn when level_loaded triggers _on_level_loaded
 	else:
@@ -363,12 +369,44 @@ func create_visual_grid():
 			if tile_type == GameManager.UNMOVABLE_SOFT:
 				# Use visual placeholder type 0 and configure unmovable properties
 				tile.setup(0, Vector2(x, y), scale_factor, true)
-				if tile.has_method("configure_unmovable"):
-					# single hit to destroy by adjacent matches
-					tile.configure_unmovable(1, GameManager.unmovable_type)
+
+				# Check if this position has hard unmovable metadata in GameManager.unmovable_map
+				var key = str(x) + "," + str(y)
+				if GameManager.unmovable_map.has(key) and typeof(GameManager.unmovable_map[key]) == TYPE_DICTIONARY:
+					var meta = GameManager.unmovable_map[key]
+					var hits = 1
+					var htype = GameManager.unmovable_type
+					if meta.has("hits"):
+						hits = int(meta["hits"])
+					if meta.has("type"):
+						htype = str(meta["type"])
+					if tile.has_method("configure_unmovable_hard"):
+						var textures_arr = []
+						var reveals = {}
+						if typeof(meta) == TYPE_DICTIONARY:
+							if meta.has("textures"):
+								textures_arr = meta["textures"]
+							if meta.has("reveals"):
+								reveals = meta["reveals"]
+							# ensure types
+							if typeof(textures_arr) != TYPE_ARRAY:
+								textures_arr = []
+							if typeof(reveals) != TYPE_DICTIONARY:
+								reveals = {}
+						# call configure with textures and reveals
+						tile.configure_unmovable_hard(hits, htype, textures_arr, reveals)
+						print("[GameBoard] Configured hard unmovable tile at (", x, ",", y, ") hits=", hits, " type=", htype)
+					elif tile.has_method("configure_unmovable"):
+						# fallback to soft behavior
+						tile.configure_unmovable(hits, htype)
+						print("[GameBoard] Configured fallback unmovable (hard->soft) at (", x, ",", y, ")")
 				else:
-					# fallback to default setup
-					tile.setup(tile_type, Vector2(x, y), scale_factor)
+					if tile.has_method("configure_unmovable"):
+						# single hit to destroy by adjacent matches
+						tile.configure_unmovable(1, GameManager.unmovable_type)
+					else:
+						# fallback to default setup
+						tile.setup(tile_type, Vector2(x, y), scale_factor)
 			else:
 				tile.setup(tile_type, Vector2(x, y), scale_factor)
 			tile.position = grid_to_world_position(Vector2(x, y))
@@ -519,6 +557,13 @@ func animate_destroy_tiles(positions: Array):
 			continue
 		var tile = tiles[int(pos.x)][int(pos.y)]
 		if tile:
+			# CRITICAL FIX: Don't destroy hard unmovable tiles here!
+			# They need to be preserved so take_hit() can process them and handle reveals
+			print("[ANIMATE_DESTROY] Checking tile at (", pos.x, ",", pos.y, ") is_unmovable_hard=", tile.is_unmovable_hard)
+			if tile.is_unmovable_hard:
+				print("[GameBoard] ✓✓✓ Skipping visual destruction of hard unmovable at (", pos.x, ",", pos.y, ") ✓✓✓")
+				continue
+
 			# prefer tile.animate_destroy() if provided
 			if tile.has_method("animate_destroy"):
 				var tw = tile.animate_destroy()
@@ -646,6 +691,7 @@ func animate_gravity():
 		# Step 1: Collect all non-null visual tiles from this column
 		# IMPORTANT: Collect from BOTTOM to TOP to match assignment order
 		# CRITICAL: Skip unmovable tiles - they don't move with gravity!
+		# COLLECTIBLES DO MOVE - they should fall until they reach the bottom
 		var visual_tiles_in_column = []
 		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):  # Bottom to top
 			var tile = tiles[x][y]
@@ -656,16 +702,19 @@ func animate_gravity():
 					# Skip unmovable tiles - they stay in place
 					print("[GRAVITY] Skipping unmovable tile at (", x, ",", y, ") with grid value ", grid_val)
 					continue
-
+				# COLLECTIBLES SHOULD FALL - include them in visual_tiles_in_column
 				visual_tiles_in_column.append(tile)
 
 		# Step 2: Clear the tiles array for this column (except unmovables)
+		# COLLECTIBLES GET CLEARED so they can be reassigned by gravity
 		for y in range(GameManager.GRID_HEIGHT):
 			# Check grid value directly - if it's UNMOVABLE_SOFT, don't clear
 			var grid_val = GameManager.grid[x][y]
+			var tile = tiles[x][y]
 			if grid_val == GameManager.UNMOVABLE_SOFT:
 				print("[GRAVITY] Keeping unmovable tile at (", x, ",", y, ") in tiles array (grid value ", grid_val, ")")
 				continue
+			# Clear collectibles too - they will be reassigned by gravity
 			tiles[x][y] = null
 
 		# Step 3: Match visual tiles to grid positions that need them
@@ -681,9 +730,10 @@ func animate_gravity():
 			if tile_type == GameManager.UNMOVABLE_SOFT:
 				print("[GRAVITY] Position (", x, ",", y, ") is unmovable - skipping")
 				continue
+			# COLLECTIBLES SHOULD BE ASSIGNED - they need to animate falling
 
 			if tile_type > 0:
-				# This position needs a tile
+				# This position needs a tile (including collectibles)
 				if tile_index < visual_tiles_in_column.size():
 					# We have a tile to assign
 					var tile = visual_tiles_in_column[tile_index]
@@ -849,7 +899,7 @@ func _check_collectibles_at_bottom():
 	await animate_refill()
 
 	# Check for new matches after refill
-	var new_matches = GameManager.find_matches()
+	var new_matches = GameManager.find_matches() if GameManager.has_method("find_matches") else []
 	if new_matches.size() > 0:
 		await process_cascade()
 
@@ -915,6 +965,41 @@ func animate_refill():
 		for x in range(GameManager.GRID_WIDTH):
 			row.append(GameManager.grid[x][y])
 		print(row)
+
+# -----------------------------------------------------------------------------
+# Deferred helper invoked by GameManager.call_deferred("deferred_gravity_then_refill")
+# Ensures we run gravity+refill and then process any cascade matches safely.
+# -----------------------------------------------------------------------------
+func deferred_gravity_then_refill() -> void:
+	# This method is intentionally not `async` so it can be called_deferred safely.
+	# We create an async task and detach to avoid blocking the caller.
+	_task_deferred_gravity_then_refill()
+
+# Internal async worker
+func _task_deferred_gravity_then_refill() -> void:
+	print("[GameBoard] deferred_gravity_then_refill started")
+	# If GameManager signals level transition, skip
+	if GameManager.pending_level_complete or GameManager.level_transitioning:
+		print("[GameBoard] deferred_gravity_then_refill aborted: level transition pending")
+		return
+
+	# Apply gravity visuals
+	await animate_gravity()
+
+	# Refill newly empty spaces
+	await animate_refill()
+
+	# After refill, check for new matches and process cascade if found
+	var new_matches = GameManager.find_matches() if GameManager.has_method("find_matches") else []
+	if new_matches and new_matches.size() > 0:
+		print("[GameBoard] deferred_gravity_then_refill: new matches found, processing cascade")
+		await process_cascade()
+	else:
+		# No matches - emit board_idle so other systems can continue
+		print("[GameBoard] deferred_gravity_then_refill: no matches found, emitting board_idle")
+		emit_signal("board_idle")
+
+	print("[GameBoard] deferred_gravity_then_refill completed")
 
 func _show_combo_text(match_count: int, positions: Array, combo_multiplier: int = 1):
 	"""Show floating combo text for impressive matches"""
@@ -1257,6 +1342,17 @@ func _on_level_complete():
 func _on_level_loaded():
 	print("[GameBoard] _on_level_loaded called - initializing visuals")
 
+	# Safety: clear any lingering processing/transition flags so board is interactive
+	if typeof(GameManager) != TYPE_NIL:
+		# Defensive resets - only change flags if they exist
+		GameManager.processing_moves = false
+		GameManager.level_transitioning = false
+		GameManager.pending_level_complete = false
+		GameManager.pending_level_failed = false
+		GameManager.in_bonus_conversion = false
+		GameManager.reset_combo()
+		print("[GameBoard] Safety reset: processing_moves/level_transitioning/pending flags cleared")
+
 	# Recalculate layout and setup visuals immediately (we rely on create_visual_grid/draw_board_borders guards)
 	calculate_responsive_layout()
 	setup_background()
@@ -1273,6 +1369,15 @@ func _on_level_loaded():
 	# Ensure tile overlay is visible (if created)
 	if tile_area_overlay:
 		tile_area_overlay.visible = true
+
+	# Hide skip hint if shown
+	if skip_bonus_label:
+		hide_skip_bonus_hint()
+
+	# Clear any selected tile
+	if selected_tile:
+		selected_tile.set_selected(false)
+		selected_tile = null
 
 	print("[GameBoard] _on_level_loaded completed")
 
@@ -2312,10 +2417,44 @@ func activate_row_clear_booster(row: int):
 		var scoring_count = 0
 		for pos in positions_to_clear:
 			var t = GameManager.get_tile_at(pos)
-			if t == GameManager.UNMOVABLE_SOFT:
+			var gx = int(pos.x)
+			var gy = int(pos.y)
+
+			# Get the tile instance to check if it's a hard unmovable
+			var tile_instance = null
+			if gx < tiles.size() and gy < tiles[gx].size():
+				tile_instance = tiles[gx][gy]
+
+			# Check if this is a hard unmovable tile that needs to take a hit
+			if tile_instance and tile_instance.is_unmovable_hard:
+				print("[GameBoard] Row clear booster hitting hard unmovable at ", pos)
+				var destroyed = tile_instance.take_hit(1)
+				if destroyed:
+					print("[GameBoard] Hard tile destroyed, may have revealed something")
+					# If destroyed, the tile has already transformed if it had a reveal
+					# Update the grid to match what the tile became
+					if tile_instance.is_collectible:
+						GameManager.grid[gx][gy] = GameManager.COLLECTIBLE
+						# Ensure tile is still in tiles array at this position
+						tiles[gx][gy] = tile_instance
+						print("[GameBoard] Revealed collectible at ", pos, " - keeping in tiles array")
+					elif tile_instance.type > 0:
+						GameManager.grid[gx][gy] = tile_instance.type
+						# Ensure tile is still in tiles array at this position
+						tiles[gx][gy] = tile_instance
+						print("[GameBoard] Revealed tile type ", tile_instance.type, " at ", pos)
+					else:
+						# Tile was destroyed without reveal, clear it
+						GameManager.grid[gx][gy] = 0
+						scoring_count += 1
+				# else tile still has hits remaining, don't clear it from grid
+			elif t == GameManager.UNMOVABLE_SOFT:
+				# Handle soft unmovables
+				if tile_instance and tile_instance.is_unmovable:
+					tile_instance.take_hit(1)
 				GameManager.report_unmovable_destroyed(pos)
 			else:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				GameManager.grid[gx][gy] = 0
 				scoring_count += 1
 
 		var points = GameManager.calculate_points(scoring_count)
@@ -2357,10 +2496,44 @@ func activate_column_clear_booster(column: int):
 		var scoring_count = 0
 		for pos in positions_to_clear:
 			var t = GameManager.get_tile_at(pos)
-			if t == GameManager.UNMOVABLE_SOFT:
+			var gx = int(pos.x)
+			var gy = int(pos.y)
+
+			# Get the tile instance to check if it's a hard unmovable
+			var tile_instance = null
+			if gx < tiles.size() and gy < tiles[gx].size():
+				tile_instance = tiles[gx][gy]
+
+			# Check if this is a hard unmovable tile that needs to take a hit
+			if tile_instance and tile_instance.is_unmovable_hard:
+				print("[GameBoard] Column clear booster hitting hard unmovable at ", pos)
+				var destroyed = tile_instance.take_hit(1)
+				if destroyed:
+					print("[GameBoard] Hard tile destroyed, may have revealed something")
+					# If destroyed, the tile has already transformed if it had a reveal
+					# Update the grid to match what the tile became
+					if tile_instance.is_collectible:
+						GameManager.grid[gx][gy] = GameManager.COLLECTIBLE
+						# Ensure tile is still in tiles array at this position
+						tiles[gx][gy] = tile_instance
+						print("[GameBoard] Revealed collectible at ", pos, " - keeping in tiles array")
+					elif tile_instance.type > 0:
+						GameManager.grid[gx][gy] = tile_instance.type
+						# Ensure tile is still in tiles array at this position
+						tiles[gx][gy] = tile_instance
+						print("[GameBoard] Revealed tile type ", tile_instance.type, " at ", pos)
+					else:
+						# Tile was destroyed without reveal, clear it
+						GameManager.grid[gx][gy] = 0
+						scoring_count += 1
+				# else tile still has hits remaining, don't clear it from grid
+			elif t == GameManager.UNMOVABLE_SOFT:
+				# Handle soft unmovables
+				if tile_instance and tile_instance.is_unmovable:
+					tile_instance.take_hit(1)
 				GameManager.report_unmovable_destroyed(pos)
 			else:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				GameManager.grid[gx][gy] = 0
 				scoring_count += 1
 
 		var points = GameManager.calculate_points(scoring_count)
@@ -2462,11 +2635,52 @@ func activate_special_tile(pos: Vector2):
 	await highlight_special_activation(positions_to_clear)
 	await animate_destroy_tiles(positions_to_clear)
 
-	# Clear tiles in GameManager grid but handle UNMOVABLE_SOFT specially
+	# Clear tiles in GameManager grid but handle unmovables specially
 	var scoring_count = 0
 	for clear_pos in positions_to_clear:
 		var t = GameManager.get_tile_at(clear_pos)
-		if t == GameManager.UNMOVABLE_SOFT:
+		var gx = int(clear_pos.x)
+		var gy = int(clear_pos.y)
+
+		# Get the tile instance to check if it's a hard unmovable
+		var tile_instance = null
+		if not tiles or gx >= tiles.size():
+			continue
+		if not tiles[gx] or gy >= tiles[gx].size():
+			continue
+
+		tile_instance = tiles[gx][gy]
+
+		# Check if this is a hard unmovable tile that needs to take a hit
+		if tile_instance and tile_instance.is_unmovable_hard:
+			var destroyed = tile_instance.take_hit(1)
+			if destroyed:
+				var is_coll = tile_instance.is_collectible if "is_collectible" in tile_instance else false
+				var tile_type_check = tile_instance.type if "type" in tile_instance else 0
+				# If destroyed, the tile has already transformed if it had a reveal
+				# Update the grid to match what the tile became
+				if is_coll:
+					GameManager.grid[gx][gy] = GameManager.COLLECTIBLE
+					# Ensure tile is still in tiles array at this position
+					tiles[gx][gy] = tile_instance
+				elif tile_type_check > 0:
+					GameManager.grid[gx][gy] = tile_type_check
+					# Ensure tile is still in tiles array at this position
+					tiles[gx][gy] = tile_instance
+				else:
+					# Tile was destroyed without reveal, clear it
+					GameManager.grid[gx][gy] = 0
+					# Free the hard tile instance since it's no longer needed
+					if not tile_instance.is_queued_for_deletion():
+						tile_instance.queue_free()
+					tiles[gx][gy] = null
+					scoring_count += 1
+			# else tile still has hits remaining, don't clear it from grid
+		elif t == GameManager.UNMOVABLE_SOFT:
+			# Handle soft unmovables
+			# Call take_hit on tile instance if available
+			if tile_instance and tile_instance.is_unmovable:
+				tile_instance.take_hit(1)
 			# Report to GameManager so it updates counters, signals & triggers deferred gravity
 			if GameManager.has_method("report_unmovable_destroyed"):
 				GameManager.report_unmovable_destroyed(clear_pos)
@@ -2475,10 +2689,11 @@ func activate_special_tile(pos: Vector2):
 				var key = str(int(clear_pos.x)) + "," + str(int(clear_pos.y))
 				if GameManager.unmovable_map.has(key):
 					GameManager.unmovable_map.erase(key)
-				GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+				GameManager.grid[gx][gy] = 0
 				GameManager.unmovables_cleared += 1
 		else:
-			GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
+			# Regular tile - just clear it
+			GameManager.grid[gx][gy] = 0
 			scoring_count += 1
 
 	# Use a move for activating special tile

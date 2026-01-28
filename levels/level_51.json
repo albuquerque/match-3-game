@@ -1,16 +1,32 @@
 {
   "level_number": 51,
   "title": "Level 51",
-  "description": "Reach 20300 points in 40 moves!",
+  "description": "Clear all 7 obstacles!",
   "grid_width": 8,
   "grid_height": 8,
-  "target_score": 20300,
-  "max_moves": 40,
+  "target_score": 16240,
+  "max_moves": 48,
   "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "layout": [
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,"U","U","U","H2:rock"],
+    [0,0,0,0,0,"U",0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,"U","U"]
+  ],
   "collectible_target": 0,
-  "unmovable_target": 0,
-  "unmovable_type": "snow",
-  "collectible_type": "coin"
+  "unmovable_target": 7,
+  "unmovable_type": "glass",
+  "collectible_type": "coin",
+  "hard_textures": {
+    "rock": [
+      "unmovable_hard_rock_0.svg",
+      "unmovable_hard_rock_1.svg",
+      "unmovable_hard_rock_2.svg"
+    ]
+  }
 }

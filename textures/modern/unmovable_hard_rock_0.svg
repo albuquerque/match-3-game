@@ -1,0 +1,36 @@
+<svg width="256" height="256" viewBox="0 0 256 256"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Outer silhouette -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="#6f6f6f"/>
+
+  <!-- Inner base -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="#858585"/>
+
+  <!-- Faceted planes -->
+  <path d="M40 60 L120 40 L180 70 L110 90 Z"
+        fill="#9a9a9a"/>
+  <path d="M60 120 L120 90 L140 140 L80 160 Z"
+        fill="#7d7d7d"/>
+  <path d="M120 140 L180 110 L200 160 L140 180 Z"
+        fill="#8e8e8e"/>
+  <path d="M70 180 L130 170 L120 210 L60 210 Z"
+        fill="#777777"/>
+
+  <!-- Micro texture -->
+  <circle cx="92" cy="108" r="3" fill="#6a6a6a"/>
+  <circle cx="160" cy="150" r="2.5" fill="#666666"/>
+  <circle cx="140" cy="190" r="3" fill="#6b6b6b"/>
+  <circle cx="180" cy="90" r="2" fill="#707070"/>
+
+  <!-- Edge shadow (ambient occlusion) -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="none" stroke="#4f4f4f" stroke-width="4" opacity="0.4"/>
+
+  <!-- Outer border -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="none" stroke="#4a4a4a" stroke-width="6"/>
+</svg>
+

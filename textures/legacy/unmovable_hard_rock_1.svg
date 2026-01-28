@@ -1,0 +1,50 @@
+<svg width="256" height="256" viewBox="0 0 256 256"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Outer silhouette -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="#6f6f6f"/>
+
+  <!-- Inner base -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="#858585"/>
+
+  <!-- Facets -->
+  <path d="M40 70 L110 50 L160 80 L100 100 Z"
+        fill="#9a9a9a"/>
+  <path d="M80 140 L130 120 L160 160 L100 180 Z"
+        fill="#7b7b7b"/>
+
+  <!-- Main crack -->
+  <path d="M64 42 L110 92 L92 140 L130 180 L104 220"
+        stroke="#2f2f2f" stroke-width="7" fill="none"/>
+
+  <!-- Crack highlights -->
+  <path d="M66 46 L108 94 L96 138 L132 182"
+        stroke="#5a5a5a" stroke-width="3" fill="none"/>
+
+  <!-- Branch cracks -->
+  <path d="M110 92 L150 110 L180 96"
+        stroke="#3d3d3d" stroke-width="4" fill="none"/>
+  <path d="M92 140 L60 160 L50 190"
+        stroke="#3a3a3a" stroke-width="4" fill="none"/>
+
+  <!-- Chipped chunk -->
+  <path d="M182 182 L216 168 L212 214 Z"
+        fill="#6a6a6a"/>
+  <path d="M182 182 L216 168"
+        stroke="#2e2e2e" stroke-width="3"/>
+
+  <!-- Dark fracture core -->
+  <path d="M64 42 L110 92 L92 140 L130 180 L104 220"
+        stroke="#1f1f1f" stroke-width="2" fill="none" opacity="0.6"/>
+
+  <!-- Edge shadow -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="none" stroke="#4f4f4f" stroke-width="4" opacity="0.4"/>
+
+  <!-- Outer border -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="none" stroke="#4a4a4a" stroke-width="6"/>
+</svg>
+

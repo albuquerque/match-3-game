@@ -1,0 +1,25 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="snowGrad" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#dfefff"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Snow base -->
+  <rect x="6" y="6" width="116" height="116" rx="18"
+        fill="url(#snowGrad)"
+        stroke="#c9ddf0"
+        stroke-width="4"/>
+
+  <!-- Snow bumps -->
+  <circle cx="40" cy="48" r="14" fill="white" opacity="0.9"/>
+  <circle cx="78" cy="44" r="12" fill="white" opacity="0.85"/>
+  <circle cx="64" cy="72" r="18" fill="white" opacity="0.95"/>
+
+  <!-- Sparkles -->
+  <circle cx="30" cy="30" r="2" fill="#ffffff"/>
+  <circle cx="90" cy="28" r="2" fill="#ffffff"/>
+  <circle cx="96" cy="80" r="2" fill="#ffffff"/>
+</svg>
+
