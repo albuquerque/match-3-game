@@ -70,11 +70,15 @@ python3 tools/level_generator.py --start 11 --end 50 --out levels
 **`--type TYPE`** (default: `random`)
 - Level type to generate
 - Choices:
-  - `random` - Mix of different level types (40% collectibles, 30% unmovables, 20% both, 10% score)
-  - `collectibles` - Levels with collectibles only, no unmovables
-  - `unmovables` - Levels with unmovable barriers only, no collectibles
+  - `random` - Mix of different level types (30% collectibles, 25% unmovables, 15% spreaders, 15% both, 10% spreaders+collectibles, 5% score)
+  - `collectibles` - Levels with collectibles only, no unmovables or spreaders
+  - `unmovables` - Levels with unmovable barriers only, no collectibles or spreaders
+  - `spreaders` - Levels with spreader tiles only (must clear all to win)
   - `both` - Levels with both collectibles and unmovables
   - `score` - Plain score-based levels (no special features)
+  - `unmovable_soft` - Only soft unmovables (1 hit to destroy)
+  - `unmovable_hard` - Only hard unmovables (multi-hit)
+  - `unmovables_both` - Mix of soft and hard unmovables
 
 ## Examples
 
@@ -93,9 +97,14 @@ python3 tools/level_generator.py --start 21 --end 30 --type collectibles
 python3 tools/level_generator.py --start 31 --end 40 --type unmovables
 ```
 
+### Generate Only Spreader Levels
+```bash
+python3 tools/level_generator.py --start 41 --end 50 --type spreaders
+```
+
 ### Generate Levels with Both Features
 ```bash
-python3 tools/level_generator.py --start 41 --end 50 --type both
+python3 tools/level_generator.py --start 51 --end 60 --type both
 ```
 
 ### Generate Plain Score-Based Levels
@@ -134,6 +143,34 @@ Collectibles are placed strategically:
 - Never placed in bottom row (prevents instant collection)
 - Never overlaps with unmovables
 - Columns with collectibles spawn more during gameplay
+
+### Spreader Tiles
+
+Spreaders are infectious tiles that spread to adjacent cells:
+
+**Placement:**
+- 2-6 spreaders per level (based on difficulty)
+- Minimum Manhattan distance of 2 between spreaders
+- Never placed in corners (limited spread potential)
+- Only placed in cells with at least 2 adjacent playable cells
+- Strategically distributed across the board
+
+**Difficulty Scaling:**
+- **Early levels (< 35)**: 2-3 spreaders, 3-move grace, slow spread (1 per move), max 12 total
+- **Mid levels (35-59)**: 3-5 spreaders, 2-move grace, medium spread (2 per move), max 15 total
+- **Late levels (60+)**: 3-5 spreaders, 1-move grace, exponential spread (unlimited), max 20 total
+- **Boss levels (ends in 0)**: 4-6 spreaders for extra challenge
+
+**Spread Mechanics:**
+- `spreader_grace_moves`: Number of moves before spreading begins
+- `spreader_spread_limit`: Maximum new spreaders created per move (0 = unlimited/exponential)
+- `max_spreaders`: Hard cap to prevent board overwhelming
+- `spreader_type`: Randomly chosen from virus, blood, or lava
+
+**Level Objective:**
+- `spreader_target: true` means player must clear ALL spreaders to win (dynamic count)
+- Spreaders multiply during gameplay, so the goal changes as spreaders spread
+- Level completes when spreader count reaches 0
 
 ### Board Shapes
 
@@ -178,8 +215,14 @@ Generated files follow the existing level JSON format:
   "theme": "legacy",
   "layout": "0 0 0 0 U U U 0\n...",
   "collectible_target": 0,
+  "unmovable_target": 0,
+  "spreader_target": false,
   "unmovable_type": "snow",
-  "collectible_type": "coin"
+  "collectible_type": "coin",
+  "spreader_type": "virus",
+  "spreader_grace_moves": 2,
+  "max_spreaders": 20,
+  "spreader_spread_limit": 0
 }
 ```
 
@@ -190,6 +233,8 @@ Generated files follow the existing level JSON format:
 - `X` = blocked cell
 - `U` = unmovable soft tile
 - `C` = collectible marker
+- `S` = spreader tile
+- `H{hits}:{type}` = hard unmovable (e.g., `H3:rock`)
 
 ## Tips
 

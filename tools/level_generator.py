@@ -31,8 +31,13 @@ LEVEL_TEMPLATE = {
     "layout": "",
     "collectible_target": 0,  # Number of collectibles to collect (0 = not required)
     "unmovable_target": 0,  # Number of unmovables to clear (0 = not required)
+    "spreader_target": False,  # Boolean: True = must clear all spreaders to win
     "unmovable_type": "snow",  # Type of unmovable_soft (snow, glass, wood, etc.)
-    "collectible_type": "coin"
+    "collectible_type": "coin",
+    "spreader_type": "virus",  # Type of spreader (virus, blood, lava, etc.)
+    "spreader_grace_moves": 2,  # Grace period before spreaders start spreading
+    "max_spreaders": 20,  # Maximum number of spreaders allowed on board
+    "spreader_spread_limit": 0  # Max new spreaders per move (0 = unlimited)
 }
 
 SPECIAL_CHARS = {
@@ -41,6 +46,7 @@ SPECIAL_CHARS = {
     'collectible': 'C',
     'unmovable_soft': 'U',  # Soft unmovable - 1 hit to destroy
     'unmovable_hard': 'H',  # Hard unmovable - multi-hit, serialized as H{hits}:{type} in layout
+    'spreader': 'S',  # Spreader tile - converts adjacent tiles
 }
 
 # Simple shapes to add variety
@@ -325,6 +331,69 @@ def place_unmovable_hard(grid, w, h, num_hard, max_hits=3, types=None):
     return placed
 
 
+def place_spreaders(grid, w, h, num_spreaders, min_distance=2):
+    """
+    Place spreader tiles on the grid strategically.
+    - Spreaders are placed with minimum distance from each other
+    - Not in corners to allow spreading
+    - In playable areas with good adjacency
+
+    Args:
+        grid: The game grid
+        w: Grid width
+        h: Grid height
+        num_spreaders: Number of spreaders to place (1-5 recommended)
+        min_distance: Minimum Manhattan distance between spreaders
+
+    Returns:
+        List of placed spreader positions
+    """
+    if num_spreaders <= 0:
+        return []
+
+    # Find all playable cells, excluding corners
+    corner_positions = {(0, 0), (w-1, 0), (0, h-1), (w-1, h-1)}
+    playable_cells = []
+    for y in range(h):
+        for x in range(w):
+            if grid[y][x] == '0' and (x, y) not in corner_positions:
+                # Require good adjacency (at least 2 adjacent playable cells)
+                if count_adjacent_playable(grid, x, y, w, h) >= 2:
+                    playable_cells.append((x, y))
+
+    if not playable_cells:
+        return []
+
+    placed = []
+    attempts = 0
+    max_attempts = num_spreaders * 20
+
+    while len(placed) < num_spreaders and attempts < max_attempts:
+        attempts += 1
+        x, y = random.choice(playable_cells)
+
+        # Check if position is valid
+        if grid[y][x] != '0':
+            continue
+
+        # Check minimum distance from other spreaders
+        too_close = False
+        for px, py in placed:
+            distance = abs(x - px) + abs(y - py)  # Manhattan distance
+            if distance < min_distance:
+                too_close = True
+                break
+
+        if too_close:
+            continue
+
+        # Place spreader
+        grid[y][x] = 'S'
+        placed.append((x, y))
+
+    return placed
+
+
 def serialize_grid_to_layout(grid, w, h):
     """Convert internal grid (with special tuples) to the layout string used in levels.
     Rules:
@@ -332,6 +401,7 @@ def serialize_grid_to_layout(grid, w, h):
       - '0' stays as '0'
       - 'C' stays as 'C'
       - 'U' stays as 'U'
+      - 'S' stays as 'S' (spreader)
       - ('H', hits, type) becomes 'H{hits}:{htype}'
     Rows are newline-separated strings joined into a single string with '\n' between rows.
     """
@@ -507,53 +577,81 @@ def write_level(out_dir, level_num, w=8, h=8, level_type='random'):
     if level_type == 'collectibles':
         add_collectibles = True
         add_unmovables = False
+        add_spreaders = False
         unmovable_mode = 'any'
     elif level_type == 'unmovables':
         add_collectibles = False
         add_unmovables = True
+        add_spreaders = False
         unmovable_mode = 'any'
     elif level_type == 'unmovable_soft':
         add_collectibles = False
         add_unmovables = True
+        add_spreaders = False
         unmovable_mode = 'soft'
     elif level_type == 'unmovable_hard':
         add_collectibles = False
         add_unmovables = True
+        add_spreaders = False
         unmovable_mode = 'hard'
     elif level_type == 'unmovables_both':
         add_collectibles = False
         add_unmovables = True
+        add_spreaders = False
         unmovable_mode = 'both'
+    elif level_type == 'spreaders':
+        add_collectibles = False
+        add_unmovables = False
+        add_spreaders = True
+        unmovable_mode = 'any'
     elif level_type == 'both':
         add_collectibles = True
         add_unmovables = True
+        add_spreaders = False
         unmovable_mode = 'any'
     elif level_type == 'score':
         add_collectibles = False
         add_unmovables = False
+        add_spreaders = False
         unmovable_mode = 'any'
     else:  # 'random' or any other value
         # Vary level types randomly:
-        # 40% - collectibles only
-        # 30% - unmovables only
-        # 20% - both collectibles and unmovables
-        # 10% - plain score-based
+        # 30% - collectibles only
+        # 25% - unmovables only
+        # 15% - spreaders only
+        # 15% - both collectibles and unmovables
+        # 10% - spreaders + collectibles
+        # 5% - plain score-based
         rand = random.random()
-        if rand < 0.4:
+        if rand < 0.30:
             add_collectibles = True
             add_unmovables = False
+            add_spreaders = False
             unmovable_mode = 'any'
-        elif rand < 0.7:
+        elif rand < 0.55:
             add_collectibles = False
             add_unmovables = True
+            add_spreaders = False
             unmovable_mode = 'any'
-        elif rand < 0.9:
+        elif rand < 0.70:
+            add_collectibles = False
+            add_unmovables = False
+            add_spreaders = True
+            unmovable_mode = 'any'
+        elif rand < 0.85:
             add_collectibles = True
             add_unmovables = True
+            add_spreaders = False
+            unmovable_mode = 'any'
+        elif rand < 0.95:
+            add_collectibles = True
+            add_unmovables = False
+            add_spreaders = True
             unmovable_mode = 'any'
         else:
             add_collectibles = False
             add_unmovables = False
+            add_spreaders = False
             unmovable_mode = 'any'
 
     # Generate layout; for specific levels (51-55) force at least one hard tile
@@ -575,6 +673,32 @@ def write_level(out_dir, level_num, w=8, h=8, level_type='random'):
     has_unmovables = 'U' in layout or 'H' in layout
     # Count unmovables in layout
     num_unmovables = layout.count('U') + layout.count('H')
+
+    # Add spreaders if requested
+    num_spreaders = 0
+    if add_spreaders:
+        # Parse layout back to grid for spreader placement
+        lines = layout.strip().split('\n')
+        grid = []
+        for line in lines:
+            grid.append(list(line.split()))
+
+        # Determine number of spreaders based on level
+        if level_num % 10 == 0:  # Boss levels - more spreaders
+            num_spreaders_to_place = random.randint(4, 6)
+        elif level_num < 40:  # Early levels - fewer spreaders
+            num_spreaders_to_place = random.randint(2, 3)
+        else:  # Later levels - moderate spreaders
+            num_spreaders_to_place = random.randint(3, 5)
+
+        # Place spreaders
+        placed_spreaders = place_spreaders(grid, w, h, num_spreaders_to_place, min_distance=2)
+        num_spreaders = len(placed_spreaders)
+
+        # Convert grid back to layout string
+        layout = serialize_grid_to_layout(grid, w, h)
+
+    has_spreaders = 'S' in layout
 
     target, moves = estimate_target_and_moves(level_num, w, h, num_collectibles > 0, has_unmovables)
 
@@ -611,8 +735,45 @@ def write_level(out_dir, level_num, w=8, h=8, level_type='random'):
             hard_textures_map[t] = [f"unmovable_hard_{t}_{i}.svg" for i in range(3)]
         data['hard_textures'] = hard_textures_map
 
+    # Configure spreaders
+    if has_spreaders:
+        data['spreader_target'] = True  # Must clear all spreaders to win
+        data['spreader_type'] = random.choice(['virus', 'blood', 'lava'])
+
+        # Configure spread difficulty based on level
+        if level_num < 35:
+            # Early levels - slow controlled spread
+            data['spreader_grace_moves'] = 3
+            data['spreader_spread_limit'] = 1
+            data['max_spreaders'] = 12
+        elif level_num < 60:
+            # Mid levels - medium spread
+            data['spreader_grace_moves'] = 2
+            data['spreader_spread_limit'] = 2
+            data['max_spreaders'] = 15
+        else:
+            # Late levels - exponential spread (challenging!)
+            data['spreader_grace_moves'] = 1
+            data['spreader_spread_limit'] = 0  # Unlimited
+            data['max_spreaders'] = 20
+    else:
+        data['spreader_target'] = False
+        data['spreader_type'] = 'virus'
+        data['spreader_grace_moves'] = 2
+        data['spreader_spread_limit'] = 0
+        data['max_spreaders'] = 20
+
     # Set collectible target and description based on level type
-    if num_collectibles > 0 and has_unmovables:
+    if has_spreaders and num_collectibles > 0:
+        # Spreaders + collectibles
+        data['collectible_target'] = num_collectibles
+        data['collectible_type'] = 'coin'
+        data['description'] = f"Collect {num_collectibles} coin{'s' if num_collectibles > 1 else ''} and clear all spreaders!"
+    elif has_spreaders:
+        # Spreaders only
+        data['collectible_target'] = 0
+        data['description'] = f"Clear all {num_spreaders} spreader{'s' if num_spreaders > 1 else ''}!"
+    elif num_collectibles > 0 and has_unmovables:
         # Both collectibles and unmovables
         data['collectible_target'] = num_collectibles
         data['collectible_type'] = 'coin'
@@ -638,9 +799,12 @@ def write_level(out_dir, level_num, w=8, h=8, level_type='random'):
 
     print(f"✓ Wrote {filename}")
     print(f"  Size: {w}x{h}, Moves: {moves}, Target: {target}")
-    print(f"  Collectibles: {num_collectibles}, Unmovables: {'Yes' if has_unmovables else 'No'}")
+    print(f"  Collectibles: {num_collectibles}, Unmovables: {'Yes' if has_unmovables else 'No'}, Spreaders: {num_spreaders if has_spreaders else 'No'}")
     if has_unmovables:
         print(f"  Unmovable type: {data['unmovable_type']}")
+    if has_spreaders:
+        print(f"  Spreader type: {data['spreader_type']}, Grace: {data['spreader_grace_moves']}, Spread limit: {data['spreader_spread_limit']}")
+        print(f"  Spreader objective: Clear all spreaders to win")
 
 
 def main():
@@ -651,9 +815,9 @@ def main():
     parser.add_argument('--width', type=int, default=8, help='Grid width')
     parser.add_argument('--height', type=int, default=8, help='Grid height')
     parser.add_argument('--type', type=str, default='random',
-                       choices=['random', 'collectibles', 'unmovables', 'both', 'score', 'unmovable_soft', 'unmovable_hard', 'unmovables_both'],
+                       choices=['random', 'collectibles', 'unmovables', 'spreaders', 'both', 'score', 'unmovable_soft', 'unmovable_hard', 'unmovables_both'],
                        help='Level type: random (default), collectibles (only collectibles), '
-                            'unmovables (only unmovables), unmovable_soft (soft only), unmovable_hard (hard only), unmovables_both (both types), '
+                            'unmovables (only unmovables), spreaders (only spreaders), unmovable_soft (soft only), unmovable_hard (hard only), unmovables_both (both types), '
                             'both (collectibles + unmovables), score (plain score-based)')
     args = parser.parse_args()
 

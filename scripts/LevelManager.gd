@@ -14,10 +14,16 @@ class LevelData:
 	var collectible_type: String = "coin"  # Type of collectible (coin, gem, star, etc.)
 	var unmovable_type: String = "snow"  # Type of unmovable_soft (snow, glass, wood, etc.)
 	var unmovable_target: int = 0  # Number of unmovables to clear (0 = not required)
+	var spreader_target: int = 0  # Number of spreaders to clear (0 = not required)
+	var spreader_type: String = "virus"  # Type of spreader (virus, blood, lava, etc.)
+	var spreader_grace_moves: int = 2  # Grace period before spreading begins
+	var max_spreaders: int = 20  # Maximum number of spreaders allowed on board
+	var spreader_spread_limit: int = 0  # Max new spreaders per move (0 = unlimited)
+	var spreader_textures: Dictionary = {}  # mapping of spreader type -> array of texture names/paths
 	var hard_textures: Dictionary = {}  # mapping of hard type -> array of texture names/paths
 	var hard_reveals: Dictionary = {}   # optional mapping for reveal behavior on hard destroy
 
-	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = "", coll_target: int = 0, coll_type: String = "coin", unmov_type: String = "snow", unmov_target: int = 0, hard_tex: Dictionary = {}, hard_rev: Dictionary = {}):
+	func _init(num: int, layout: Array, w: int, h: int, score: int, mv: int, desc: String = "", thm: String = "", coll_target: int = 0, coll_type: String = "coin", unmov_type: String = "snow", unmov_target: int = 0, spread_target: int = 0, spread_type: String = "virus", spread_grace: int = 2, spread_max: int = 20, spread_limit: int = 0, spread_tex: Dictionary = {}, hard_tex: Dictionary = {}, hard_rev: Dictionary = {}):
 		level_number = num
 		grid_layout = layout
 		width = w
@@ -30,6 +36,12 @@ class LevelData:
 		collectible_type = coll_type
 		unmovable_type = unmov_type
 		unmovable_target = unmov_target
+		spreader_target = spread_target
+		spreader_type = spread_type
+		spreader_grace_moves = spread_grace
+		max_spreaders = spread_max
+		spreader_spread_limit = spread_limit
+		spreader_textures = spread_tex
 		hard_textures = hard_tex
 		hard_reveals = hard_rev
 
@@ -68,19 +80,7 @@ func load_all_levels():
 
 	# After loading all levels, ensure they're sorted by their level_number (defensive)
 	if levels.size() > 1:
-		levels.sort_custom(func(a, b):
-			var a_num = 0
-			var b_num = 0
-			if typeof(a) == TYPE_OBJECT and a.level_number:
-				a_num = int(a.level_number)
-			elif typeof(a) == TYPE_DICTIONARY and a.has("level"):
-				a_num = int(a.level)
-			if typeof(b) == TYPE_OBJECT and b.level_number:
-				b_num = int(b.level_number)
-			elif typeof(b) == TYPE_DICTIONARY and b.has("level"):
-				b_num = int(b.level)
-			return a_num < b_num
-		)
+		levels.sort_custom(func(a, b): return a.level_number < b.level_number)
 		print("[LevelManager] Sorted levels by level_number for stable indexing")
 
 	print("Loaded ", levels.size(), " levels")
@@ -145,6 +145,12 @@ func load_level_from_json(file_path: String) -> LevelData:
 		data.get("collectible_type", "coin"),  # Load collectible type from JSON (default: coin)
 		data.get("unmovable_type", "snow"),  # Load unmovable type from JSON (default: snow)
 		data.get("unmovable_target", 0),  # Load unmovable target from JSON (default: 0)
+		data.get("spreader_target", 0),  # Load spreader target from JSON (default: 0)
+		data.get("spreader_type", "virus"),  # Load spreader type from JSON (default: virus)
+		data.get("spreader_grace_moves", 2),  # Load spreader grace period from JSON (default: 2)
+		data.get("max_spreaders", 20),  # Load max spreaders from JSON (default: 20)
+		data.get("spreader_spread_limit", 0),  # Load spread limit from JSON (default: 0 = unlimited)
+		data.get("spreader_textures", {}),  # Load spreader textures mapping from JSON
 		data.get("hard_textures", {}),
 		data.get("hard_reveals", {})
 	)

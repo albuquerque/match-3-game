@@ -30,6 +30,12 @@ var hard_type: String = ""               # e.g., rock, metal, ice
 var hard_textures: Array = []             # optional list of texture names/paths for each hit state (index 0 = full health)
 var hard_reveals_on_destroy: Dictionary = {}  # e.g., {"type":"collectible","value":"coin"} or {"type":"tile","value":3}
 
+# Spreader tile properties
+var is_spreader: bool = false
+var spreader_grace_moves: int = 0        # Remaining grace moves before spreading begins
+var spreader_type: String = "virus"      # Type of spreader (for future expansion)
+var spreader_textures: Array = []        # Optional list of texture paths for spreader visuals
+
 # Rope/chain anchor (optional) - if set, this tile will move toward anchor when released
 var rope_anchor: Vector2 = Vector2(-1, -1)
 var rope_attached: bool = false
@@ -164,6 +170,53 @@ func update_visual():
 			texture_path = found_coll
 			print("[Tile] Using collectible texture: ", texture_path)
 
+	# If this tile is marked as a spreader, prefer spreader texture
+	if is_spreader:
+		var found_spreader_texture = false
+		# If explicit spreader_textures provided, use them (allows per-level custom textures)
+		if spreader_textures and spreader_textures.size() > 0:
+			# For now, use first texture (could later vary by grace state)
+			var st = spreader_textures[0]
+			if typeof(st) == TYPE_STRING:
+				if st.begins_with("res://"):
+					# Absolute path
+					if ResourceLoader.exists(st):
+						texture_path = st
+						found_spreader_texture = true
+				else:
+					# Theme relative - try multiple candidates
+					var candidates = []
+					# If filename already has extension, use as-is
+					if st.ends_with(".svg") or st.ends_with(".png"):
+						candidates.append("res://textures/%s/%s" % [theme_name, st])
+						candidates.append("res://textures/%s" % st)
+					else:
+						# No extension, try both svg and png
+						candidates.append("res://textures/%s/%s.svg" % [theme_name, st])
+						candidates.append("res://textures/%s/%s.png" % [theme_name, st])
+						candidates.append("res://textures/%s.svg" % st)
+						candidates.append("res://textures/%s.png" % st)
+
+					var cand_found = _find_existing_texture(candidates)
+					if cand_found != "":
+						texture_path = cand_found
+						found_spreader_texture = true
+						print("[Tile] Using custom spreader texture: ", texture_path)
+
+		# If no custom textures or not found, try convention-based texture names
+		if not found_spreader_texture:
+			var spreader_candidates = [
+				"res://textures/%s/spreader_%s.svg" % [theme_name, spreader_type],
+				"res://textures/%s/spreader_%s.png" % [theme_name, spreader_type],
+				"res://textures/spreader_%s.svg" % spreader_type,
+				"res://textures/spreader_%s.png" % spreader_type
+			]
+			var found_spreader = _find_existing_texture(spreader_candidates)
+			if found_spreader != "":
+				texture_path = found_spreader
+				found_spreader_texture = true
+				print("[Tile] Using spreader texture: ", texture_path)
+
 	# For hard unmovable tiles, choose correct texture based on remaining hits
 	if is_unmovable_hard and hard_type != "":
 		var found_hard_texture = false
@@ -294,7 +347,15 @@ func update_visual():
 		selection_ring.scale = Vector2(tile_scale, tile_scale)
 
 	# Additional visual indicators for collectible or unmovable
-	if is_collectible:
+	if is_spreader:
+		# Green tint for spreader tiles, brighter when grace period expired
+		if spreader_grace_moves <= 0:
+			# Active spreader - bright green glow
+			sprite.modulate = Color(0.5, 1.0, 0.5)  # Bright green
+		else:
+			# Grace period - yellowish tint
+			sprite.modulate = Color(0.9, 1.0, 0.7)  # Yellow-green
+	elif is_collectible:
 		# Slight tint to indicate collectible
 		sprite.modulate = Color(1, 0.95, 0.7)
 	elif is_unmovable_hard:
@@ -342,6 +403,17 @@ func configure_unmovable_hard(hits: int, h_type: String = "rock", textures: Arra
 	hard_textures = textures
 	hard_reveals_on_destroy = reveals
 	print("[Tile] configure_unmovable_hard called for pos=", grid_position, " type=", h_type, " hits=", hits)
+	if sprite:
+		sprite.visible = true
+	update_visual()
+
+# Configuration function for spreader tiles
+func configure_spreader(grace_moves: int = 2, s_type: String = "virus", textures: Array = []) -> void:
+	is_spreader = true
+	spreader_grace_moves = grace_moves
+	spreader_type = s_type
+	spreader_textures = textures
+	print("[Tile] configure_spreader called for pos=", grid_position, " type=", s_type, " grace=", grace_moves, " textures=", textures.size())
 	if sprite:
 		sprite.visible = true
 	update_visual()

@@ -1,0 +1,36 @@
+<svg width="256" height="256" viewBox="0 0 256 256"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Outer crust -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="#2a2a2a"/>
+
+  <!-- Inner stone -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="#3a3a3a"/>
+
+  <!-- Lava cracks -->
+  <path d="M40 60 L120 40 L100 100 L140 140 L90 180"
+        stroke="#ff6a00" stroke-width="10" fill="none"/>
+  <path d="M140 60 L180 90 L160 140"
+        stroke="#ff8c00" stroke-width="6" fill="none"/>
+  <path d="M80 140 L60 170 L80 210"
+        stroke="#ff5a00" stroke-width="6" fill="none"/>
+
+  <!-- Molten glow -->
+  <path d="M42 62 L118 44 L98 98"
+        stroke="#ffd27d" stroke-width="3" fill="none" opacity="0.6"/>
+
+  <!-- Core heat -->
+  <circle cx="128" cy="128" r="38" fill="#ff4d00" opacity="0.8"/>
+  <circle cx="128" cy="128" r="24" fill="#ffd27d" opacity="0.6"/>
+
+  <!-- Edge shadow -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="none" stroke="#000000" stroke-width="4" opacity="0.4"/>
+
+  <!-- Border -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="none" stroke="#1a1a1a" stroke-width="6"/>
+</svg>
+
