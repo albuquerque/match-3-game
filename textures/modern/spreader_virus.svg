@@ -1,0 +1,41 @@
+<svg width="256" height="256" viewBox="0 0 256 256"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Outer membrane -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="#3b4b3f"/>
+
+  <!-- Inner body -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="#567a60"/>
+
+  <!-- Organic blobs -->
+  <path d="M80 90 C60 120, 90 160, 120 140
+           C150 120, 140 80, 110 80 Z"
+        fill="#7fbf8a"/>
+
+  <path d="M140 140 C120 170, 150 200, 180 170
+           C200 150, 180 120, 150 120 Z"
+        fill="#6fae78"/>
+
+  <!-- Veins -->
+  <path d="M60 60 L100 100 L80 140"
+        stroke="#2e4d34" stroke-width="4" fill="none"/>
+  <path d="M140 100 L180 80 L200 110"
+        stroke="#2e4d34" stroke-width="4" fill="none"/>
+  <path d="M120 140 L100 180 L140 200"
+        stroke="#2e4d34" stroke-width="4" fill="none"/>
+
+  <!-- Infection core -->
+  <circle cx="128" cy="128" r="26" fill="#9be3a6"/>
+  <circle cx="128" cy="128" r="14" fill="#c8f5d1"/>
+
+  <!-- Edge shadow -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="none" stroke="#1f3325" stroke-width="4" opacity="0.5"/>
+
+  <!-- Border -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="none" stroke="#253b2a" stroke-width="6"/>
+</svg>
+

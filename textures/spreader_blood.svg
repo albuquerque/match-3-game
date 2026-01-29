@@ -1,0 +1,43 @@
+<svg width="256" height="256" viewBox="0 0 256 256"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Outer tile -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="#4a1e1e"/>
+
+  <!-- Inner pool -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="#7a2424"/>
+
+  <!-- Blood pools -->
+  <path d="M70 100 C60 140, 100 180, 140 160
+           C180 140, 160 90, 120 90 Z"
+        fill="#a92e2e"/>
+
+  <path d="M120 150 C100 190, 140 210, 180 180
+           C200 160, 170 130, 140 140 Z"
+        fill="#922626"/>
+
+  <!-- Veins / flow -->
+  <path d="M50 70 L90 110 L70 150"
+        stroke="#5a1414" stroke-width="5" fill="none"/>
+  <path d="M140 80 L180 120 L200 150"
+        stroke="#5a1414" stroke-width="5" fill="none"/>
+
+  <!-- Wet highlights -->
+  <path d="M80 100 C90 90, 120 90, 140 100"
+        stroke="#d96a6a" stroke-width="4" fill="none" opacity="0.6"/>
+
+  <!-- Core -->
+  <circle cx="128" cy="128" r="22" fill="#c73737"/>
+  <circle cx="128" cy="128" r="10" fill="#f07a7a" opacity="0.6"/>
+
+  <!-- Edge shadow -->
+  <rect x="26" y="26" width="204" height="204" rx="24"
+        fill="none" stroke="#2a0d0d" stroke-width="4" opacity="0.5"/>
+
+  <!-- Border -->
+  <rect x="14" y="14" width="228" height="228" rx="30"
+        fill="none" stroke="#2f0f0f" stroke-width="6"/>
+</svg>
+

@@ -18,6 +18,7 @@ const VERTICAL_ARROW = 8
 const FOUR_WAY_ARROW = 9
 const COLLECTIBLE = 10  # Special type for collectibles - won't match with regular tiles
 const UNMOVABLE_SOFT = 11  # Special type for unmovable_soft tiles - destroyed by adjacent matches
+const SPREADER = 12  # Special type for spreader tiles - convert adjacent tiles
 
 # Scoring
 const POINTS_PER_TILE = 100
@@ -43,6 +44,13 @@ var unmovables_cleared = 0  # Number of unmovable tiles destroyed
 var unmovable_target = 0  # 0 = not required, >0 = must clear this many unmovables
 
 signal unmovables_changed(cleared, target)
+
+# Spreader clearing tracking
+var use_spreader_objective: bool = false  # If true, level completes when spreader_count reaches 0
+var spreader_count: int = 0  # Current number of spreaders on the board
+var spreaders_destroyed_this_turn: bool = false  # Track if any spreaders were destroyed during current turn
+
+signal spreaders_changed(current_count)
 
 # Level system
 var level_manager: Node = null
@@ -81,6 +89,14 @@ var available_boosters: Array = []  # Boosters available for current level
 # Collectibles & special layout markers
 var collectible_positions: Array = []
 var unmovable_map: Dictionary = {}
+
+# Spreader tracking
+var spreader_positions: Array = []  # Tracks all active spreader positions
+var spreader_grace_default: int = 2  # Default grace period from level configuration
+var max_spreaders: int = 20  # Maximum number of spreaders allowed on board
+var spreader_spread_limit: int = 0  # Max new spreaders per move (0 = unlimited, 1 = slow spread)
+var spreader_textures_map: Dictionary = {}  # Maps spreader types to texture arrays from level data
+var spreader_type: String = "virus"  # Type of spreader for current level
 
 # Booster tier definitions (for random selection)
 const BOOSTER_TIERS = {
@@ -194,7 +210,20 @@ func load_current_level():
 		unmovable_target = level_data.unmovable_target if "unmovable_target" in level_data else 0
 		unmovables_cleared = 0
 
+		# Load spreader configuration
+		spreader_grace_default = level_data.spreader_grace_moves if "spreader_grace_moves" in level_data else 2
+		max_spreaders = level_data.max_spreaders if "max_spreaders" in level_data else 20
+		spreader_spread_limit = level_data.spreader_spread_limit if "spreader_spread_limit" in level_data else 0
+		use_spreader_objective = level_data.spreader_target if "spreader_target" in level_data else false
+		spreader_type = level_data.spreader_type if "spreader_type" in level_data else "virus"
+		spreader_count = 0  # Will be set after layout is parsed
+
 		print("[GameManager]   unmovable_type='", unmovable_type, "'")
+		print("[GameManager]   spreader_type='", spreader_type, "'")
+		print("[GameManager]   spreader_grace_default=", spreader_grace_default)
+		print("[GameManager]   max_spreaders=", max_spreaders)
+		print("[GameManager]   spreader_spread_limit=", spreader_spread_limit, " (0=unlimited)")
+		print("[GameManager]   use_spreader_objective=", use_spreader_objective)
 
 		if unmovable_target > 0:
 			print("[GameManager]   unmovable_target=", unmovable_target, " (must clear all unmovables)")
@@ -240,6 +269,12 @@ func load_current_level():
 					if htype != "" and hr_map.has(htype):
 						entry["reveals"] = hr_map[htype]
 						print("[GameManager] Attached hard_reveals for", htype, "to unmovable at", key)
+
+		# Load spreader_textures mapping if provided
+		spreader_textures_map = {}
+		if "spreader_textures" in level_data and typeof(level_data.spreader_textures) == TYPE_DICTIONARY:
+			spreader_textures_map = level_data.spreader_textures
+			print("[GameManager] Loaded spreader_textures mapping with ", spreader_textures_map.size(), " types")
 
 		print("Loaded level ", level, ": ", level_data.description)
 		print("Grid size: ", GRID_WIDTH, "x", GRID_HEIGHT)
@@ -363,10 +398,13 @@ func create_empty_grid():
 			grid[x].append(0)
 
 func fill_grid_from_layout(layout: Array):
-	"""Fill the grid based on level layout. Supports layout entries as ints (-1,0,N) or single-char tokens like 'C','U','H'."""
+	"""Fill the grid based on level layout. Supports layout entries as ints (-1,0,N) or single-char tokens like 'C','U','H','S'."""
 	# Clear helper structures
 	collectible_positions.clear()
 	unmovable_map.clear()
+	spreader_positions.clear()
+	spreader_count = 0  # Reset spreader count when refilling grid
+	print("[SPREADER] Reset spreader_count to 0 at start of fill_grid_from_layout")
 
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
@@ -386,6 +424,13 @@ func fill_grid_from_layout(layout: Array):
 					# Collectible: spawn as special type that won't match with regular tiles
 					grid[x][y] = COLLECTIBLE
 					collectible_positions.append(Vector2(x, y))
+					continue
+				elif token == "S":
+					# Spreader tile
+					grid[x][y] = SPREADER
+					spreader_positions.append(Vector2(x, y))
+					spreader_count += 1
+					print("[SPREADER] Created spreader at (", x, ",", y, ") - Total: ", spreader_count)
 					continue
 				elif token == "U":
 					# Unmovable soft - single hit to destroy
@@ -489,17 +534,17 @@ func are_adjacent(pos1: Vector2, pos2: Vector2) -> bool:
 	var dy = abs(pos1.y - pos2.y)
 	return (dx == 1 and dy == 0) or (dx == 0 and dy == 1)
 
-# New: whether cell contains a movable tile (not an unmovable_soft)
+# New: whether cell contains a movable tile (not an unmovable_soft or spreader)
 func is_cell_movable(x: int, y: int) -> bool:
 	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT:
 		return false
 	if grid.size() <= x or grid[x].size() <= y:
 		return false
 	var v = grid[x][y]
-	# Movable if it's a regular tile or a special tile; not movable if blocked, empty or unmovable_soft
+	# Movable if it's a regular tile or a special tile; not movable if blocked, empty, unmovable_soft, or spreader
 	if v == -1 or v == 0:
 		return false
-	if v == UNMOVABLE_SOFT:
+	if v == UNMOVABLE_SOFT or v == SPREADER:
 		return false
 	return true
 
@@ -539,8 +584,8 @@ func find_matches() -> Array:
 
 			if tile_type != current_type or x == GRID_WIDTH:
 				if x - match_start >= MIN_MATCH_SIZE and current_type > 0 and current_type < 7:
-					# CRITICAL: Don't match unmovables, collectibles, or special tiles
-					if current_type != UNMOVABLE_SOFT and current_type != COLLECTIBLE:
+					# CRITICAL: Don't match unmovables, collectibles, spreaders, or special tiles
+					if current_type != UNMOVABLE_SOFT and current_type != COLLECTIBLE and current_type != SPREADER:
 						print("[FIND_MATCHES] Horizontal match found: y=", y, ", x from ", match_start, " to ", x-1, ", type=", current_type)
 						for i in range(match_start, x):
 							if not is_cell_blocked(i, y):
@@ -562,8 +607,8 @@ func find_matches() -> Array:
 
 			if tile_type != current_type or y == GRID_HEIGHT:
 				if y - match_start >= MIN_MATCH_SIZE and current_type > 0 and current_type < 7:
-					# CRITICAL: Don't match unmovables, collectibles, or special tiles
-					if current_type != UNMOVABLE_SOFT and current_type != COLLECTIBLE:
+					# CRITICAL: Don't match unmovables, collectibles, spreaders, or special tiles
+					if current_type != UNMOVABLE_SOFT and current_type != COLLECTIBLE and current_type != SPREADER:
 						print("[FIND_MATCHES] Vertical match found: x=", x, ", y from ", match_start, " to ", y-1, ", type=", current_type)
 						for i in range(match_start, y):
 							if not is_cell_blocked(x, i):
@@ -680,13 +725,14 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 			grid[match_pos.x][match_pos.y] = 0
 			tiles_removed += 1
 
-	# After removing matched tiles, damage adjacent unmovable_soft tiles
-	print("[UNMOVABLE] === CHECKING MATCH FOR ADJACENT UNMOVABLES ===")
+	# After removing matched tiles, damage adjacent unmovable_soft and spreader tiles
+	print("[UNMOVABLE] === CHECKING MATCH FOR ADJACENT UNMOVABLES & SPREADERS ===")
 	print("[UNMOVABLE] Matched tiles: ", matches.size(), " tiles")
 	for i in range(matches.size()):
 		print("[UNMOVABLE]   Match[", i, "]: position (", matches[i].x, ",", matches[i].y, ")")
 
 	var adj_unmovables = []
+	var adj_spreaders = []
 	for match_pos in matches:
 		var dirs = [Vector2(-1,0), Vector2(1,0), Vector2(0,-1), Vector2(0,1)]
 		for d in dirs:
@@ -699,11 +745,17 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 					if not adj_unmovables.has(vec):
 						adj_unmovables.append(vec)
 						print("[UNMOVABLE] Found unmovable at (", nx, ",", ny, ") adjacent to match at (", match_pos.x, ",", match_pos.y, ")")
+				elif grid_value == SPREADER:
+					var vec = Vector2(nx, ny)
+					if not adj_spreaders.has(vec):
+						adj_spreaders.append(vec)
+						print("[SPREADER] Found spreader at (", nx, ",", ny, ") adjacent to match at (", match_pos.x, ",", match_pos.y, ")")
 				else:
 					if grid_value != -1 and grid_value != 0:
-						print("[UNMOVABLE]   Adjacent position (", nx, ",", ny, ") has grid value: ", grid_value, " (not unmovable)")
+						print("[UNMOVABLE]   Adjacent position (", nx, ",", ny, ") has grid value: ", grid_value, " (not unmovable/spreader)")
 
 	print("[UNMOVABLE] Total adjacent unmovables found: ", adj_unmovables.size())
+	print("[SPREADER] Total adjacent spreaders found: ", adj_spreaders.size())
 
 	if adj_unmovables.size() > 0:
 		var board = get_node_or_null("/root/MainGame/GameBoard")
@@ -785,6 +837,60 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 			print("[GameManager] Unmovable destroyed - scheduling gravity+refill on GameBoard")
 			board.call_deferred("deferred_gravity_then_refill")
 
+	# Process adjacent spreaders - they get destroyed by adjacent matches
+	if adj_spreaders.size() > 0:
+		var board = get_node_or_null("/root/MainGame/GameBoard")
+		var destroyed_spreaders := false
+
+		for pos in adj_spreaders:
+			var x = int(pos.x)
+			var y = int(pos.y)
+			print("[SPREADER] Processing spreader at (", x, ",", y, ")")
+
+			# Get the tile instance to check what it was covering
+			var tile = null
+			if board and board.tiles and x < board.tiles.size() and y < board.tiles[x].size():
+				tile = board.tiles[x][y]
+
+			# Store original tile type if the spreader was covering something
+			var revealed_tile_type = 0
+			if tile and tile.has_method("get"):
+				# Check if spreader has an underlying tile_type (what it converted from)
+				var tt = tile.get("tile_type")
+				if typeof(tt) != TYPE_NIL and int(tt) > 0:
+					revealed_tile_type = int(tt)
+
+			# Remove spreader from grid
+			if revealed_tile_type > 0 and revealed_tile_type <= 6:
+				# Reveal the original tile that was converted
+				grid[x][y] = revealed_tile_type
+				print("[SPREADER] Spreader destroyed at (", x, ",", y, "), revealing tile type ", revealed_tile_type)
+				# Update visual tile
+				if tile:
+					tile.is_spreader = false
+					tile.spreader_grace_moves = 0
+					tile.tile_type = revealed_tile_type
+					tile.update_visual()
+			else:
+				# No underlying tile, just clear it
+				grid[x][y] = 0
+				print("[SPREADER] Spreader destroyed at (", x, ",", y, "), clearing to empty")
+				if tile:
+					board.tiles[x][y] = null
+					tile.queue_free()
+
+			# Remove from spreader_positions tracking
+			spreader_positions.erase(pos)
+
+			# Report spreader cleared for level objectives
+			report_spreader_destroyed(pos)
+			destroyed_spreaders = true
+
+		# Schedule gravity/refill after spreader removal
+		if destroyed_spreaders and board:
+			print("[SPREADER] Spreaders destroyed - scheduling gravity+refill on GameBoard")
+			board.call_deferred("deferred_gravity_then_refill")
+
 	# Create special tile at swapped position if applicable
 	if special_tile_type > 0 and not is_cell_blocked(swapped_pos.x, swapped_pos.y):
 		grid[swapped_pos.x][swapped_pos.y] = special_tile_type
@@ -820,18 +926,59 @@ func activate_special_tile(pos: Vector2):
 	if tile_type == HORIZTONAL_ARROW:
 		for x in range(GRID_WIDTH):
 			if not is_cell_blocked(x, int(pos.y)):
+				# Check if this is a spreader before clearing
+				if grid[x][pos.y] == SPREADER:
+					spreader_count -= 1
+					spreader_positions.erase(Vector2(x, pos.y))
+					print("[SPREADER] Special tile destroyed spreader at (", x, ",", pos.y, ") - Remaining: ", spreader_count)
 				grid[x][pos.y] = 0
 	elif tile_type == VERTICAL_ARROW:
 		for y in range(GRID_HEIGHT):
 			if not is_cell_blocked(int(pos.x), y):
+				# Check if this is a spreader before clearing
+				if grid[pos.x][y] == SPREADER:
+					spreader_count -= 1
+					spreader_positions.erase(Vector2(pos.x, y))
+					print("[SPREADER] Special tile destroyed spreader at (", pos.x, ",", y, ") - Remaining: ", spreader_count)
 				grid[pos.x][y] = 0
 	elif tile_type == FOUR_WAY_ARROW:
 		for x in range(GRID_WIDTH):
 			if not is_cell_blocked(x, int(pos.y)):
+				# Check if this is a spreader before clearing
+				if grid[x][pos.y] == SPREADER:
+					spreader_count -= 1
+					spreader_positions.erase(Vector2(x, pos.y))
+					print("[SPREADER] Special tile destroyed spreader at (", x, ",", pos.y, ") - Remaining: ", spreader_count)
 				grid[x][pos.y] = 0
 		for y in range(GRID_HEIGHT):
 			if not is_cell_blocked(int(pos.x), y):
+				# Check if this is a spreader before clearing
+				if grid[pos.x][y] == SPREADER:
+					spreader_count -= 1
+					spreader_positions.erase(Vector2(pos.x, y))
+					print("[SPREADER] Special tile destroyed spreader at (", pos.x, ",", y, ") - Remaining: ", spreader_count)
 				grid[pos.x][y] = 0
+
+	# Emit signal to update UI
+	if use_spreader_objective:
+		emit_signal("spreaders_changed", spreader_count)
+
+		# Debug: Verify count accuracy
+		if spreader_count < 0:
+			print("[SPREADER] ⚠️ WARNING: spreader_count went negative! Resetting to 0")
+			spreader_count = 0
+
+		# Check if all spreaders cleared
+		if spreader_count == 0:
+			print("[SPREADER] 🎯 ALL SPREADERS CLEARED by special tile - Triggering level completion")
+			if not pending_level_complete and not level_transitioning:
+				last_level_won = true
+				last_level_score = score
+				last_level_target = 0
+				last_level_number = level
+				last_level_moves_left = moves_left
+				pending_level_complete = true
+				_attempt_level_complete()
 
 func calculate_points(tiles_removed: int) -> int:
 	var base_points = tiles_removed * POINTS_PER_TILE
@@ -975,6 +1122,14 @@ func add_score(points: int):
 	score += points
 	emit_signal("score_changed", score)
 
+	# DEBUG: Verify spreader_target is loaded correctly
+	print("[GameManager] add_score called - use_spreader_objective=", use_spreader_objective, " unmovable_target=", unmovable_target, " collectible_target=", collectible_target)
+
+	# For spreader-based levels, score doesn't trigger completion - only clearing all spreaders does
+	if use_spreader_objective:
+		print("[GameManager] 🦠 SPREADER LEVEL - Score: %d/%d, Spreaders remaining: %d - Score won't trigger completion" % [score, target_score, spreader_count])
+		return
+
 	# For unmovable-based levels, score doesn't trigger completion - only clearing all unmovables does
 	if unmovable_target > 0:
 		print("[GameManager] 🧱 UNMOVABLE LEVEL - Score: %d/%d, Unmovables: %d/%d - Score won't trigger completion" % [score, target_score, unmovables_cleared, unmovable_target])
@@ -993,27 +1148,35 @@ func add_score(points: int):
 		print("[GameManager] ✓ Score reached target during cascade - cancelling pending failure")
 		pending_level_failed = false
 
+	# Check if level is complete based on score - but only if no other objectives exist
 	if score >= target_score and not level_transitioning:
-		print("[GameManager] 🎯 TARGET SCORE REACHED - Triggering level completion")
-		# Store level completion state
-		last_level_won = true
-		last_level_score = score
-		last_level_target = target_score
-		last_level_number = level
-		last_level_moves_left = moves_left
+		# Don't complete on score alone if there's a spreader/unmovable/collectible target
+		if use_spreader_objective or unmovable_target > 0 or collectible_target > 0:
+			print("[GameManager] Score target reached but objectives remain: use_spreader_objective=", use_spreader_objective, " unmovable=", unmovable_target, " collectible=", collectible_target)
+		else:
+			print("[GameManager] 🎯 TARGET SCORE REACHED - Triggering level completion")
+			# Store level completion state
+			last_level_won = true
+			last_level_score = score
+			last_level_target = target_score
+			last_level_number = level
+			last_level_moves_left = moves_left
 
-		# Mark that a level completion should occur, but defer until board activity stops
-		if not pending_level_complete:
-			pending_level_complete = true
-			print("[GameManager] → Setting pending_level_complete = true, calling _attempt_level_complete()")
-			# Start the coroutine that will wait for ongoing activity to finish before advancing
-			_attempt_level_complete()
+			# Mark that a level completion should occur, but defer until board activity stops
+			if not pending_level_complete:
+				pending_level_complete = true
+				print("[GameManager] → Setting pending_level_complete = true, calling _attempt_level_complete()")
+				# Start the coroutine that will wait for ongoing activity to finish before advancing
+				_attempt_level_complete()
 
 func advance_level():
 	# Called when level is complete - just trigger the level complete flow
 	# The level will be advanced later when user clicks Continue on the transition screen
 	print("[GameManager] 🎬 advance_level() called")
-	if unmovable_target > 0:
+	if use_spreader_objective:
+		print("[GameManager] → Level type: SPREADER")
+		print("[GameManager] → Spreaders remaining: %d (target: 0)" % spreader_count)
+	elif unmovable_target > 0:
 		print("[GameManager] → Level type: UNMOVABLE")
 		print("[GameManager] → Unmovables: %d/%d" % [unmovables_cleared, unmovable_target])
 	elif collectible_target > 0:
@@ -1025,16 +1188,147 @@ func advance_level():
 	combo_count = 0
 	on_level_complete()
 
+func check_and_spread_tiles():
+	"""Check spreader tiles and spread them if conditions are met
+	This should be called AFTER all cascades from a move complete"""
+	if spreader_positions.size() == 0:
+		return
+
+	print("[SPREADER] check_and_spread_tiles called - spreaders count: ", spreader_positions.size())
+
+	# Get the GameBoard to access tile instances
+	var board = get_node_or_null("/root/MainGame/GameBoard")
+	if not board or not board.tiles:
+		print("[SPREADER] GameBoard not available")
+		return
+
+	# Step 1: Decrement grace moves for all spreaders
+	var active_spreaders = []  # Spreaders with grace expired
+	for pos in spreader_positions:
+		var x = int(pos.x)
+		var y = int(pos.y)
+		if x >= 0 and x < board.tiles.size() and y >= 0 and y < board.tiles[x].size():
+			var tile = board.tiles[x][y]
+			if tile and tile.is_spreader:
+				if tile.spreader_grace_moves > 0:
+					tile.spreader_grace_moves -= 1
+					tile.update_visual()  # Update visual to show grace status
+					print("[SPREADER] Decremented grace at (", x, ",", y, ") to ", tile.spreader_grace_moves)
+
+				if tile.spreader_grace_moves <= 0:
+					active_spreaders.append(pos)
+
+	if active_spreaders.size() == 0:
+		print("[SPREADER] No active spreaders (all still in grace period)")
+		return
+
+	print("[SPREADER] Active spreaders ready to spread: ", active_spreaders.size())
+
+	# Step 2: Check if any spreaders were destroyed during this turn
+	if spreaders_destroyed_this_turn:
+		print("[SPREADER] Spreading prevented - spreaders were destroyed this turn")
+		return
+
+	print("[SPREADER] No spreaders destroyed this turn - spreading will occur")
+
+	# Step 3: Spread to adjacent tiles
+	var new_spreaders = []
+	for pos in active_spreaders:
+		var x = int(pos.x)
+		var y = int(pos.y)
+
+		# Check all 4 adjacent positions
+		var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
+		for dir in directions:
+			var nx = x + int(dir.x)
+			var ny = y + int(dir.y)
+
+			# Check if position is valid and can be converted
+			if nx >= 0 and nx < GRID_WIDTH and ny >= 0 and ny < GRID_HEIGHT:
+				if can_convert_to_spreader(nx, ny):
+					# Check spread limit (if set)
+					if spreader_spread_limit > 0 and new_spreaders.size() >= spreader_spread_limit:
+						print("[SPREADER] Spread limit reached (", spreader_spread_limit, " new spreaders per move)")
+						break  # Stop spreading for this move
+
+					# Check max spreaders limit
+					if spreader_positions.size() + new_spreaders.size() >= max_spreaders:
+						print("[SPREADER] Max spreaders limit reached (", max_spreaders, ")")
+						break
+
+					# Store the original tile type before converting
+					var original_tile_type = grid[nx][ny]
+
+					# Convert the tile to a spreader
+					grid[nx][ny] = SPREADER
+					new_spreaders.append(Vector2(nx, ny))
+
+					# Update the visual tile instance, preserving original tile_type
+					if nx < board.tiles.size() and ny < board.tiles[nx].size():
+						var tile = board.tiles[nx][ny]
+						if tile:
+							# Keep the original tile_type so we can reveal it when destroyed
+							# tile.tile_type stays as the original value
+							# Get textures for spreader type from spreader_textures_map
+							var textures = []
+							if spreader_textures_map.has(spreader_type):
+								textures = spreader_textures_map[spreader_type]
+							tile.configure_spreader(spreader_grace_default, spreader_type, textures)
+
+					print("[SPREADER] Converted tile at (", nx, ",", ny, ") to spreader (was type ", original_tile_type, ")")
+
+		# If spread limit reached, stop processing more active spreaders
+		if spreader_spread_limit > 0 and new_spreaders.size() >= spreader_spread_limit:
+			break
+
+	# Add new spreaders to tracking array and update count
+	for new_pos in new_spreaders:
+		spreader_positions.append(new_pos)
+		spreader_count += 1
+
+	if new_spreaders.size() > 0:
+		print("[SPREADER] Spread complete - ", new_spreaders.size(), " new spreaders created. Total spreaders: ", spreader_count)
+		emit_signal("spreaders_changed", spreader_count)
+
+func can_convert_to_spreader(x: int, y: int) -> bool:
+	"""Check if a tile can be converted to a spreader"""
+	if is_cell_blocked(x, y):
+		return false
+
+	var tile_val = grid[x][y]
+
+	# Can convert regular tiles (1-6)
+	if tile_val >= 1 and tile_val <= 6:
+		return true
+
+	# Cannot convert special tiles, collectibles, unmovables, or other spreaders
+	if tile_val == COLLECTIBLE or tile_val == UNMOVABLE_SOFT or tile_val == SPREADER:
+		return false
+	if tile_val >= 7 and tile_val <= 9:  # Special tiles (arrows)
+		return false
+
+	return false
+
 func use_move():
 	moves_left -= 1
 	emit_signal("moves_changed", moves_left)
 
 	print("[GameManager] use_move() called - moves_left now=", moves_left, ", score=", score, ", target=", target_score)
 
+	# Reset the spreaders_destroyed flag at the start of each move
+	spreaders_destroyed_this_turn = false
+
+	# Note: check_and_spread_tiles() is now called from GameBoard AFTER all cascades complete
+
 	# Determine if level is failed based on level type
 	var level_failed = false
 
-	if unmovable_target > 0:
+	if use_spreader_objective:
+		# Spreader-based level: fail if spreaders still remain and out of moves
+		if moves_left <= 0 and spreader_count > 0:
+			level_failed = true
+			print("[GameManager] Spreader level failed: ", spreader_count, " spreaders remaining (need 0)")
+	elif unmovable_target > 0:
 		# Unmovable-based level: fail if not all unmovables cleared and out of moves
 		if moves_left <= 0 and unmovables_cleared < unmovable_target:
 			level_failed = true
@@ -1213,7 +1507,9 @@ func _attempt_level_failed():
 		await get_tree().create_timer(0.1).timeout
 		# Check if level completed while waiting based on level type
 		var goal_met = false
-		if unmovable_target > 0:
+		if use_spreader_objective:
+			goal_met = spreader_count == 0
+		elif unmovable_target > 0:
 			goal_met = unmovables_cleared >= unmovable_target
 		elif collectible_target > 0:
 			goal_met = collectibles_collected >= collectible_target
@@ -1230,7 +1526,9 @@ func _attempt_level_failed():
 
 	# Check if the goal was reached during the wait, cancel failure
 	var goal_met = false
-	if unmovable_target > 0:
+	if use_spreader_objective:
+		goal_met = spreader_count == 0
+	elif unmovable_target > 0:
 		goal_met = unmovables_cleared >= unmovable_target
 	elif collectible_target > 0:
 		goal_met = collectibles_collected >= collectible_target
@@ -1629,6 +1927,55 @@ func report_unmovable_destroyed(pos: Vector2, skip_clear: bool = false) -> void:
 			last_level_won = true
 			last_level_score = score
 			last_level_target = unmovable_target
+			last_level_number = level
+			last_level_moves_left = moves_left
+			pending_level_complete = true
+			_attempt_level_complete()
+
+func report_spreader_destroyed(pos: Vector2) -> void:
+	"""Update model when a spreader tile is destroyed.
+	This centralizes counter updates, signal emission and level-completion checks.
+	"""
+	print("[SPREADER] report_spreader_destroyed at (", pos.x, ",", pos.y, ")")
+
+	# Mark that a spreader was destroyed this turn (prevents spreading)
+	spreaders_destroyed_this_turn = true
+
+	# Decrement spreader count
+	spreader_count -= 1
+	if spreader_count < 0:
+		spreader_count = 0  # Safety check
+
+	emit_signal("spreaders_changed", spreader_count)
+	print("[SPREADER] Spreader destroyed - Remaining spreaders: ", spreader_count)
+
+	# Check completion - level completes when spreader_count reaches 0
+	if use_spreader_objective and spreader_count == 0:
+		# Verify count matches reality
+		var actual_spreaders = 0
+		for x in range(GRID_WIDTH):
+			for y in range(GRID_HEIGHT):
+				if grid[x][y] == SPREADER:
+					actual_spreaders += 1
+					print("[SPREADER] ⚠️ Found spreader at (", x, ",", y, ") but count=0!")
+
+		if actual_spreaders != 0:
+			print("[SPREADER] ❌ ERROR: spreader_count=0 but found ", actual_spreaders, " spreaders in grid!")
+			print("[SPREADER] spreader_positions size: ", spreader_positions.size())
+			for sp_pos in spreader_positions:
+				var gx = int(sp_pos.x)
+				var gy = int(sp_pos.y)
+				print("[SPREADER]   - Tracked position: (", gx, ",", gy, ") - Grid value: ", grid[gx][gy])
+			# Correct the count
+			spreader_count = actual_spreaders
+			emit_signal("spreaders_changed", spreader_count)
+			return  # Don't trigger completion if there are still spreaders
+
+		print("[SPREADER] 🎯 ALL SPREADERS CLEARED (count=0, verified) - Triggering level completion")
+		if not pending_level_complete and not level_transitioning:
+			last_level_won = true
+			last_level_score = score
+			last_level_target = 0  # Target was to reach 0 spreaders
 			last_level_number = level
 			last_level_moves_left = moves_left
 			pending_level_complete = true

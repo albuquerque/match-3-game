@@ -419,6 +419,16 @@ func create_visual_grid():
 					tile.configure_collectible(GameManager.collectible_type)
 					print("[GameBoard] Configured tile at (", x, ",", y, ") as collectible: ", GameManager.collectible_type)
 
+			# Check if this is a spreader tile (type 12)
+			if tile_type == GameManager.SPREADER:
+				if tile.has_method("configure_spreader"):
+					# Get textures for this spreader type from GameManager's spreader_textures_map
+					var textures = []
+					if GameManager.spreader_textures_map.has(GameManager.spreader_type):
+						textures = GameManager.spreader_textures_map[GameManager.spreader_type]
+					tile.configure_spreader(GameManager.spreader_grace_default, GameManager.spreader_type, textures)
+					print("[GameBoard] Configured tile at (", x, ",", y, ") as spreader type '", GameManager.spreader_type, "' with grace: ", GameManager.spreader_grace_default, " textures: ", textures.size())
+
 			add_child(tile)
 			tiles[x].append(tile)
 			tiles_created += 1
@@ -1707,6 +1717,12 @@ func perform_swap(tile1, tile2):
 				swap_pos_in_match = fallback_pos
 
 		await process_cascade(swap_pos_in_match)
+
+		# After all cascades complete, check if spreaders should spread
+		if GameManager.has_method("check_and_spread_tiles"):
+			print("[GameBoard] Cascades complete - checking spreader spreading")
+			GameManager.check_and_spread_tiles()
+
 		GameManager.processing_moves = false
 		print("perform_swap: processing_moves = false (from cascade end)")
 		emit_signal("move_completed")
@@ -2692,9 +2708,29 @@ func activate_special_tile(pos: Vector2):
 				GameManager.grid[gx][gy] = 0
 				GameManager.unmovables_cleared += 1
 		else:
-			# Regular tile - just clear it
+			# Regular tile - check if it's a spreader before clearing
+			if t == GameManager.SPREADER:
+				GameManager.spreader_count -= 1
+				GameManager.spreader_positions.erase(clear_pos)
+				print("[SPREADER] GameBoard special tile destroyed spreader at (", gx, ",", gy, ") - Remaining: ", GameManager.spreader_count)
 			GameManager.grid[gx][gy] = 0
 			scoring_count += 1
+
+	# Check if spreaders were cleared and emit signal
+	if GameManager.use_spreader_objective:
+		GameManager.emit_signal("spreaders_changed", GameManager.spreader_count)
+
+		# Check if all spreaders cleared
+		if GameManager.spreader_count == 0:
+			print("[SPREADER] 🎯 ALL SPREADERS CLEARED by GameBoard special tile - Triggering level completion")
+			if not GameManager.pending_level_complete and not GameManager.level_transitioning:
+				GameManager.last_level_won = true
+				GameManager.last_level_score = GameManager.score
+				GameManager.last_level_target = 0
+				GameManager.last_level_number = GameManager.level
+				GameManager.last_level_moves_left = GameManager.moves_left
+				GameManager.pending_level_complete = true
+				GameManager._attempt_level_complete()
 
 	# Use a move for activating special tile
 	if GameManager.has_method("use_move"):
