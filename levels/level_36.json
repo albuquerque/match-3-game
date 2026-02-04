@@ -8,7 +8,7 @@
   "max_moves": 43,
   "num_tile_types": 6,
   "theme": "modern",
-  "layout": "X X X 0 0 0 X X\nX X U 0 0 0 0 X\nX U U 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX U U 0 0 0 0 0\nX X 0 0 0 0 0 X",
+  "layout": "X X X 0 0 0 X X\nX X H1:glass 0 0 0 0 X\nX H1:glass H1:glass 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nX H1:glass H1:glass 0 0 0 0 0\nX X 0 0 0 0 0 X",
   "collectible_target": 0,
   "unmovable_target": 5,
   "unmovable_type": "glass",

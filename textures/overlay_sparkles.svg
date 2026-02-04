@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Sparkle/glitter effect - small stars scattered -->
+  <defs>
+    <radialGradient id="sparkle" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:rgb(255,255,255);stop-opacity:1" />
+      <stop offset="100%" style="stop-color:rgb(255,255,255);stop-opacity:0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Random sparkles -->
+  <circle cx="30" cy="40" r="3" fill="url(#sparkle)" />
+  <circle cx="80" cy="25" r="2" fill="url(#sparkle)" />
+  <circle cx="150" cy="60" r="4" fill="url(#sparkle)" />
+  <circle cx="200" cy="35" r="2.5" fill="url(#sparkle)" />
+  <circle cx="230" cy="90" r="3" fill="url(#sparkle)" />
+  <circle cx="45" cy="120" r="2" fill="url(#sparkle)" />
+  <circle cx="120" cy="140" r="3.5" fill="url(#sparkle)" />
+  <circle cx="180" cy="125" r="2" fill="url(#sparkle)" />
+  <circle cx="210" cy="160" r="3" fill="url(#sparkle)" />
+  <circle cx="60" cy="200" r="2.5" fill="url(#sparkle)" />
+  <circle cx="140" cy="220" r="4" fill="url(#sparkle)" />
+  <circle cx="190" cy="210" r="2" fill="url(#sparkle)" />
+  <circle cx="100" cy="180" r="3" fill="url(#sparkle)" />
+
+  <!-- 4-pointed stars -->
+  <path d="M 250 20 L 252 22 L 254 20 L 252 18 Z" fill="white" opacity="0.8" />
+  <path d="M 20 230 L 23 233 L 26 230 L 23 227 Z" fill="white" opacity="0.8" />
+  <path d="M 240 200 L 242 202 L 244 200 L 242 198 Z" fill="white" opacity="0.8" />
+</svg>

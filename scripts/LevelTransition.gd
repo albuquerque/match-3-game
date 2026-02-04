@@ -323,18 +323,18 @@ func show_transition(completed_level: int, final_score: int, coins_earned: int, 
 	# Reset multiplier UI
 	_reset_multiplier_ui()
 
+	# Show this screen FIRST (before any await delays)
+	visible = true
+	print("[LevelTransition] ✅ Visibility set to: ", visible)
+	print("[LevelTransition] Parent: ", get_parent().name if get_parent() else "NO PARENT")
+	print("[LevelTransition] Is in scene tree: ", is_inside_tree())
+
 	# Add small delay before starting multiplier to avoid consuming skip tap
 	await get_tree().create_timer(0.3).timeout
 
 	# Auto-start the multiplier game (no button needed)
 	_start_multiplier_game()
 
-	# Show this screen
-	visible = true
-
-	print("[LevelTransition] ✅ Visibility set to: ", visible)
-	print("[LevelTransition] Parent: ", get_parent().name if get_parent() else "NO PARENT")
-	print("[LevelTransition] Is in scene tree: ", is_inside_tree())
 	print("=".repeat(60))
 	print("[LevelTransition] Transition screen displayed")
 	print("=".repeat(60))

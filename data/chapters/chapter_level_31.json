@@ -1,0 +1,87 @@
+{
+  "chapter_id": "level_31_spreaders",
+  "version": "1.0.0",
+  "requires_engine_version": "1.0.0",
+  "name": "Viral Outbreak",
+  "description": "Narrative effects for the spreader introduction level",
+
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "background_dim",
+      "params": {
+        "intensity": 0.5,
+        "duration": 2.0
+      },
+      "condition": {"level": 31}
+    },
+    {
+      "on": "level_loaded",
+      "effect": "vignette",
+      "params": {
+        "intensity": 0.5,
+        "color": "#004400"
+      },
+      "condition": {"level": 31}
+    },
+    {
+      "on": "spreader_destroyed",
+      "effect": "background_tint",
+      "params": {
+        "color": "#00FF00",
+        "intensity": 0.7,
+        "duration": 0.6
+      },
+      "condition": {"level": 31}
+    },
+    {
+      "on": "spreader_destroyed",
+      "effect": "screen_flash",
+      "params": {
+        "color": "#00FF00",
+        "intensity": 1.0,
+        "duration": 0.3
+      },
+      "condition": {"level": 31}
+    },
+    {
+      "on": "level_complete",
+      "effect": "background_tint",
+      "params": {
+        "color": "#00FF00",
+        "intensity": 0.8,
+        "duration": 3.0
+      },
+      "condition": {"level": 31}
+    },
+    {
+      "on": "level_complete",
+      "effect": "screen_flash",
+      "params": {
+        "color": "#FFFFFF",
+        "intensity": 1.0,
+        "duration": 0.5
+      },
+      "condition": {"level": 31}
+    },
+    {
+      "on": "level_failed",
+      "effect": "background_tint",
+      "params": {
+        "color": "#FF0000",
+        "intensity": 0.8,
+        "duration": 3.0
+      },
+      "condition": {"level": 31}
+    },
+    {
+      "on": "level_failed",
+      "effect": "vignette",
+      "params": {
+        "intensity": 0.8,
+        "color": "#FF0000"
+      },
+      "condition": {"level": 31}
+    }
+  ]
+}

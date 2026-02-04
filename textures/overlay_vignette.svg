@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Radial gradient overlay - darker at edges, lighter in center -->
+  <defs>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" style="stop-color:rgb(255,255,255);stop-opacity:0.1" />
+      <stop offset="50%" style="stop-color:rgb(255,255,255);stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:rgb(0,0,0);stop-opacity:0.8" />
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#vignette)" />
+</svg>

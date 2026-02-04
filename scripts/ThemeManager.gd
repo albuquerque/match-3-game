@@ -126,8 +126,8 @@ func get_bangers_font():
 		# Intentionally silent on load failure; callers can detect nil
 	return _bangers_font
 
-func apply_bangers_font(label: Label, font_size: int = 24):
-	"""Apply Bangers font to a label with the specified size"""
+func apply_bangers_font(label: Control, font_size: int = 24):
+	"""Apply Bangers font to a label (works with Label, RichTextLabel, etc.) with the specified size"""
 	var font = get_bangers_font()
 	if font:
 		label.add_theme_font_override("font", font)
@@ -144,10 +144,10 @@ func apply_bangers_font_to_button(button: Button, font_size: int = 20):
 # Styled font helpers (outline / glow)
 # ========================================
 
-func apply_bangers_font_styled(label: Label, font_size: int = 24, font_color: Color = Color.WHITE, outline_color: Color = Color(0,0,0), outline_size: int = 2):
-	"""Apply Bangers font and styled outline to a Label.
+func apply_bangers_font_styled(label: Control, font_size: int = 24, font_color: Color = Color.WHITE, outline_color: Color = Color(0,0,0), outline_size: int = 2):
+	"""Apply Bangers font and styled outline to a Label or RichTextLabel.
 	Parameters:
-	- label: Label node
+	- label: Control node (Label, RichTextLabel, etc.)
 	- font_size: integer font size
 	- font_color: Color for main font
 	- outline_color: Color for the outline

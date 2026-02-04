@@ -8,7 +8,7 @@
   "max_moves": 49,
   "num_tile_types": 6,
   "theme": "modern",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 U U U 0 H1:rock\n0 0 0 U U U 0 0\n0 0 0 U U U 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 H1:wood H1:wood H1:wood 0 H1:rock\n0 0 0 H1:wood H1:wood H1:wood 0 0\n0 0 0 H1:wood H1:wood H1:wood 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0",
   "collectible_target": 0,
   "unmovable_target": 10,
   "unmovable_type": "wood",

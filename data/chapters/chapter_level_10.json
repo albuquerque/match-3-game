@@ -1,0 +1,142 @@
+{
+  "chapter_id": "level_10_narrative_demo",
+  "version": "1.0.0",
+  "name": "Narrative Effects Demonstration",
+  "description": "Demonstrates new narrative effects: gameplay_pause, camera_lerp, symbolic_overlay, and enhanced dialogue",
+
+  "assets": {
+    "overlays": {
+      "light_rays": "res://textures/overlays/overlay_victory_rays.svg"
+    }
+  },
+
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "timeline_sequence",
+      "params": {
+        "steps": [
+          {
+            "effect": "gameplay_pause",
+            "params": {
+              "duration": 4.0,
+              "resume_mode": "auto"
+            }
+          },
+          {
+            "delay": 0.5
+          },
+          {
+            "effect": "symbolic_overlay",
+            "params": {
+              "asset": "light_rays.svg",
+              "blend": "additive",
+              "motion": "slow_pulse",
+              "opacity": 0.3,
+              "duration": 3.5
+            }
+          },
+          {
+            "delay": 0.3
+          },
+          {
+            "effect": "camera_lerp",
+            "params": {
+              "target": "board",
+              "zoom": 1.08,
+              "duration": 1.2,
+              "easing": "ease_in_out"
+            }
+          },
+          {
+            "delay": 0.5
+          },
+           {
+            "effect": "camera_lerp",
+            "params": {
+              "target": "board",
+              "zoom": 1.0,
+              "duration": 1.2,
+              "easing": "ease_in_out"
+            }
+          },
+          {
+            "delay": 0.5
+          },
+          {
+            "effect": "narrative_dialogue",
+            "params": {
+              "title": "Creation",
+              "message": "Let there be LIGHT",
+              "position": "center",
+              "reveal_mode": "typewriter",
+              "typewriter_speed": 20,
+              "emphasis": [
+                {
+                  "word": "LIGHT",
+                  "style": "glow"
+                }
+              ],
+              "duration": 0
+            }
+          }
+        ]
+      },
+      "condition": {"level": 10}
+    },
+
+    {
+      "on": "special_tile_activated",
+      "effect": "narrative_dialogue",
+      "params": {
+        "title": "Divine Power",
+        "message": "The light spreads across the darkness!",
+        "position": "top",
+        "reveal_mode": "typewriter",
+        "duration": 2.5
+      },
+      "condition": {"level": 10}
+    },
+
+    {
+      "on": "level_complete",
+      "effect": "timeline_sequence",
+      "params": {
+        "steps": [
+          {
+            "effect": "camera_lerp",
+            "params": {
+              "target": "board",
+              "zoom": 1.0,
+              "duration": 1.0,
+              "easing": "ease_out"
+            }
+          },
+          {
+            "effect": "symbolic_overlay",
+            "params": {
+              "asset": "light_rays.svg",
+              "blend": "additive",
+              "motion": "fade_in_out",
+              "opacity": 0.5,
+              "duration": 2.5
+            }
+          },
+          {
+            "delay": 0.5
+          },
+          {
+            "effect": "narrative_dialogue",
+            "params": {
+              "title": "Victory",
+              "message": "And the light conquered the darkness.",
+              "position": "center",
+              "duration": 3.0
+            }
+          }
+        ]
+      },
+      "condition": {"level": 10}
+    }
+  ]
+}

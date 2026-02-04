@@ -1,0 +1,71 @@
+{
+  "chapter_id": "levels_4_plus_common",
+  "version": "1.0.0",
+  "requires_engine_version": "1.0.0",
+  "name": "Levels 4+ Narrative Effects",
+  "description": "A common set of narrative effects for built-in levels 4 and above (test harness)",
+
+  "assets": {
+    "animations": {
+      "test_anim": "res://assets/animations/test_animation.tres"
+    }
+  },
+
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "background_dim",
+      "params": { "intensity": 0.35, "duration": 1.2 }
+    },
+    {
+      "on": "level_loaded",
+      "effect": "vignette",
+      "params": { "intensity": 0.25 }
+    },
+    {
+      "on": "match_cleared",
+      "effect": "spawn_particles",
+      "params": { "count": 4, "duration": 0.6 }
+    },
+    {
+      "on": "match_cleared",
+      "effect": "camera_impulse",
+      "params": { "strength": 1.2, "duration": 0.25 }
+    },
+    {
+      "on": "special_tile_activated",
+      "effect": "screen_shake",
+      "params": { "strength": 0.6, "duration": 0.25 }
+    },
+    {
+      "on": "special_tile_activated",
+      "effect": "screen_flash",
+      "params": { "color": "#FFFFFF", "intensity": 0.6, "duration": 0.25 }
+    },
+    {
+      "on": "spreader_destroyed",
+      "effect": "background_tint",
+      "params": { "color": "#00FF00", "intensity": 0.6, "duration": 0.5 }
+    },
+    {
+      "on": "level_complete",
+      "effect": "screen_flash",
+      "params": { "color": "#FFFFFF", "intensity": 1.0, "duration": 0.6 }
+    },
+    {
+      "on": "level_complete",
+      "effect": "background_tint",
+      "params": { "color": "#FFD700", "intensity": 0.35, "duration": 2.0 }
+    },
+    {
+      "on": "level_loaded",
+       "effect": "timeline_sequence",
+      "params": {
+        "sequence": [
+          { "delay": 0.3, "binding": { "effect": "play_animation", "params": { "animation": "test_anim", "duration": 0.5 } } }
+        ],
+        "id": "play_anim_delay"
+      }
+    }
+  ]
+}

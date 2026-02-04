@@ -1,0 +1,99 @@
+{
+  "chapter_id": "level_5_demo",
+  "version": "1.0.0",
+  "requires_engine_version": "1.0.0",
+  "name": "Level 5 Demo Effects",
+  "description": "Demo effects for level 5: screen overlay (texture & tint), narrative dialog, shader param lerp, and play animation",
+
+  "assets": {
+    "shaders": {
+      "test_overlay": "res://assets/shaders/test_overlay.shader"
+    },
+    "animations": {
+      "test_anim": "res://assets/animations/test_animation.tres"
+    },
+    "textures": {
+      "vignette": "res://textures/overlay_vignette.svg",
+      "victory_rays": "res://textures/overlay_victory_rays.svg",
+      "sparkles": "res://textures/overlay_sparkles.svg"
+    }
+  },
+
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "narrative_dialogue",
+      "params": {
+        "title": "Level 5 - Effects Showcase",
+        "message": "Welcome to Level 5! You'll see:\n\n• Vignette overlay (texture)\n• Gold tint overlay (color)\n• Green shader effect\n• Board animation\n\nTry to complete the level to see victory effects!",
+        "icon": "info"
+      }
+    },
+    {
+      "on": "level_loaded",
+      "effect": "screen_overlay",
+      "params": {
+        "texture": "vignette",
+        "fade_in": 1.0,
+        "hold": 2.0,
+        "fade_out": 1.0,
+        "intensity": 0.6,
+        "scale": "cover"
+      }
+    },
+    {
+      "on": "level_loaded",
+      "effect": "screen_overlay",
+      "params": {
+        "tint": "gold",
+        "fade_in": 0.8,
+        "hold": 1.5,
+        "fade_out": 1.0,
+        "intensity": 0.2
+      }
+    },
+    {
+      "on": "level_loaded",
+      "effect": "shader_param_lerp",
+      "params": { "shader": "test_overlay", "param": "u_intensity", "from": 0.0, "to": 1.75, "duration": 1.0 }
+    },
+    {
+      "on": "level_loaded",
+      "effect": "play_animation",
+      "params": { "animation": "test_anim", "duration": 0.5 }
+    },
+    {
+      "on": "level_complete",
+      "effect": "narrative_dialogue",
+      "params": {
+        "title": "🎉 Victory! 🎉",
+        "message": "Congratulations! You completed Level 5.\n\nYou should see victory rays and sparkles!",
+        "icon": "success"
+      }
+    },
+    {
+      "on": "level_complete",
+      "effect": "screen_overlay",
+      "params": {
+        "texture": "victory_rays",
+        "fade_in": 0.3,
+        "hold": 1.2,
+        "fade_out": 0.8,
+        "intensity": 0.7,
+        "scale": "cover"
+      }
+    },
+    {
+      "on": "level_complete",
+      "effect": "screen_overlay",
+      "params": {
+        "texture": "sparkles",
+        "fade_in": 0.5,
+        "hold": 1.0,
+        "fade_out": 0.6,
+        "intensity": 0.8,
+        "scale": "cover"
+      }
+    }
+  ]
+}
