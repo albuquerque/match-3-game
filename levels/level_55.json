@@ -8,7 +8,7 @@
   "max_moves": 49,
   "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nH3:metal 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 U 0\n0 U 0 0 0 U U U\n0 0 0 0 0 0 U U",
+  "layout": "0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\nH3:metal 0 0 0 0 0 0 0\n0 0 0 0 0 0 0 0\n0 0 0 0 0 0 H1:glass 0\n0 H1:glass 0 0 0 H1:glass H1:glass H1:glass\n0 0 0 0 0 0 H1:glass H1:glass",
   "collectible_target": 0,
   "unmovable_target": 8,
   "unmovable_type": "glass",

@@ -365,49 +365,41 @@ func create_visual_grid():
 				continue
 
 			var tile = tile_scene.instantiate()
-			# If this is an unmovable_soft marker in the grid, create a visual tile and configure it as unmovable
-			if tile_type == GameManager.UNMOVABLE_SOFT:
-				# Use visual placeholder type 0 and configure unmovable properties
+
+			# Check if this position has a hard unmovable in GameManager.unmovable_map
+			var key = str(x) + "," + str(y)
+			if GameManager.unmovable_map.has(key) and typeof(GameManager.unmovable_map[key]) == TYPE_DICTIONARY:
+				# This is a hard unmovable position - create unmovable tile with placeholder visual
 				tile.setup(0, Vector2(x, y), scale_factor, true)
 
-				# Check if this position has hard unmovable metadata in GameManager.unmovable_map
-				var key = str(x) + "," + str(y)
-				if GameManager.unmovable_map.has(key) and typeof(GameManager.unmovable_map[key]) == TYPE_DICTIONARY:
-					var meta = GameManager.unmovable_map[key]
-					var hits = 1
-					var htype = GameManager.unmovable_type
-					if meta.has("hits"):
-						hits = int(meta["hits"])
-					if meta.has("type"):
-						htype = str(meta["type"])
-					if tile.has_method("configure_unmovable_hard"):
-						var textures_arr = []
-						var reveals = {}
-						if typeof(meta) == TYPE_DICTIONARY:
-							if meta.has("textures"):
-								textures_arr = meta["textures"]
-							if meta.has("reveals"):
-								reveals = meta["reveals"]
-							# ensure types
-							if typeof(textures_arr) != TYPE_ARRAY:
-								textures_arr = []
-							if typeof(reveals) != TYPE_DICTIONARY:
-								reveals = {}
-						# call configure with textures and reveals
-						tile.configure_unmovable_hard(hits, htype, textures_arr, reveals)
-						print("[GameBoard] Configured hard unmovable tile at (", x, ",", y, ") hits=", hits, " type=", htype)
-					elif tile.has_method("configure_unmovable"):
-						# fallback to soft behavior
-						tile.configure_unmovable(hits, htype)
-						print("[GameBoard] Configured fallback unmovable (hard->soft) at (", x, ",", y, ")")
+				var meta = GameManager.unmovable_map[key]
+				var hits = 1
+				var htype = GameManager.unmovable_type
+				if meta.has("hits"):
+					hits = int(meta["hits"])
+				if meta.has("type"):
+					htype = str(meta["type"])
+
+				if tile.has_method("configure_unmovable_hard"):
+					var textures_arr = []
+					var reveals = {}
+					if typeof(meta) == TYPE_DICTIONARY:
+						if meta.has("textures"):
+							textures_arr = meta["textures"]
+						if meta.has("reveals"):
+							reveals = meta["reveals"]
+						# ensure types
+						if typeof(textures_arr) != TYPE_ARRAY:
+							textures_arr = []
+						if typeof(reveals) != TYPE_DICTIONARY:
+							reveals = {}
+					# call configure with textures and reveals
+					tile.configure_unmovable_hard(hits, htype, textures_arr, reveals)
+					print("[GameBoard] Configured hard unmovable tile at (", x, ",", y, ") hits=", hits, " type=", htype)
 				else:
-					if tile.has_method("configure_unmovable"):
-						# single hit to destroy by adjacent matches
-						tile.configure_unmovable(1, GameManager.unmovable_type)
-					else:
-						# fallback to default setup
-						tile.setup(tile_type, Vector2(x, y), scale_factor)
+					print("[GameBoard] WARNING: Tile missing configure_unmovable_hard method at (", x, ",", y, ")")
 			else:
+				# Normal tile (not unmovable)
 				tile.setup(tile_type, Vector2(x, y), scale_factor)
 			tile.position = grid_to_world_position(Vector2(x, y))
 			tile.connect("tile_clicked", _on_tile_clicked)
@@ -565,27 +557,40 @@ func animate_destroy_tiles(positions: Array):
 			continue
 		if pos.x >= GameManager.GRID_WIDTH or pos.y >= GameManager.GRID_HEIGHT:
 			continue
-		var tile = tiles[int(pos.x)][int(pos.y)]
-		if tile:
-			# CRITICAL FIX: Don't destroy hard unmovable tiles here!
-			# They need to be preserved so take_hit() can process them and handle reveals
-			print("[ANIMATE_DESTROY] Checking tile at (", pos.x, ",", pos.y, ") is_unmovable_hard=", tile.is_unmovable_hard)
-			if tile.is_unmovable_hard:
-				print("[GameBoard] ✓✓✓ Skipping visual destruction of hard unmovable at (", pos.x, ",", pos.y, ") ✓✓✓")
-				continue
 
-			# prefer tile.animate_destroy() if provided
-			if tile.has_method("animate_destroy"):
-				var tw = tile.animate_destroy()
-				if tw:
-					destroy_tweens.append(tw)
-			else:
-				# fallback: simple fade out
-				var tw2 = create_tween()
-				tw2.tween_property(tile, "modulate", Color(1,1,1,0), 0.15)
-				destroy_tweens.append(tw2)
-			tiles_to_free.append(tile)
-			destroyed_positions.append(pos)
+		var gx = int(pos.x)
+		var gy = int(pos.y)
+
+		# Safety check for tiles array
+		if not tiles or gx >= tiles.size() or not tiles[gx] or gy >= tiles[gx].size():
+			print("[ANIMATE_DESTROY] WARNING: Invalid tiles array access at (", gx, ",", gy, ")")
+			continue
+
+		var tile = tiles[gx][gy]
+		if not tile or not is_instance_valid(tile):
+			print("[ANIMATE_DESTROY] No valid tile at (", gx, ",", gy, ")")
+			continue
+
+		# CRITICAL FIX: Don't destroy hard unmovable tiles here!
+		# They need to be preserved so take_hit() can process them and handle reveals
+		var is_hard = tile.is_unmovable_hard if "is_unmovable_hard" in tile else false
+		print("[ANIMATE_DESTROY] Checking tile at (", gx, ",", gy, ") is_unmovable_hard=", is_hard)
+		if is_hard:
+			print("[GameBoard] ✓✓✓ Skipping visual destruction of hard unmovable at (", gx, ",", gy, ") ✓✓✓")
+			continue
+
+		# prefer tile.animate_destroy() if provided
+		if tile.has_method("animate_destroy"):
+			var tw = tile.animate_destroy()
+			if tw:
+				destroy_tweens.append(tw)
+		else:
+			# fallback: simple fade out
+			var tw2 = create_tween()
+			tw2.tween_property(tile, "modulate", Color(1,1,1,0), 0.15)
+			destroy_tweens.append(tw2)
+		tiles_to_free.append(tile)
+		destroyed_positions.append(pos)
 
 	# Await tweens to finish (or short timeout)
 	if destroy_tweens.size() > 0:
@@ -706,24 +711,24 @@ func animate_gravity():
 		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):  # Bottom to top
 			var tile = tiles[x][y]
 			if tile != null and not tile.is_queued_for_deletion():
-				# Check grid value directly - if it's UNMOVABLE_SOFT, skip this tile
-				var grid_val = GameManager.grid[x][y]
-				if grid_val == GameManager.UNMOVABLE_SOFT:
-					# Skip unmovable tiles - they stay in place
-					print("[GRAVITY] Skipping unmovable tile at (", x, ",", y, ") with grid value ", grid_val)
+				# Skip hard unmovables - check tile instance property
+				if "is_unmovable_hard" in tile and tile.is_unmovable_hard:
+					print("[GRAVITY] Skipping hard unmovable tile at (", x, ",", y, ")")
 					continue
+
 				# COLLECTIBLES SHOULD FALL - include them in visual_tiles_in_column
 				visual_tiles_in_column.append(tile)
 
-		# Step 2: Clear the tiles array for this column (except unmovables)
+		# Step 2: Clear the tiles array for this column (except hard unmovables)
 		# COLLECTIBLES GET CLEARED so they can be reassigned by gravity
 		for y in range(GameManager.GRID_HEIGHT):
-			# Check grid value directly - if it's UNMOVABLE_SOFT, don't clear
-			var grid_val = GameManager.grid[x][y]
 			var tile = tiles[x][y]
-			if grid_val == GameManager.UNMOVABLE_SOFT:
-				print("[GRAVITY] Keeping unmovable tile at (", x, ",", y, ") in tiles array (grid value ", grid_val, ")")
+
+			# Skip hard unmovables - check tile instance
+			if tile and "is_unmovable_hard" in tile and tile.is_unmovable_hard:
+				print("[GRAVITY] Keeping hard unmovable tile at (", x, ",", y, ") in tiles array")
 				continue
+
 			# Clear collectibles too - they will be reassigned by gravity
 			tiles[x][y] = null
 
@@ -736,10 +741,13 @@ func animate_gravity():
 
 			var tile_type = GameManager.get_tile_at(Vector2(x, y))
 
-			# Skip unmovable positions - they already have their tiles
-			if tile_type == GameManager.UNMOVABLE_SOFT:
-				print("[GRAVITY] Position (", x, ",", y, ") is unmovable - skipping")
+
+			# Skip hard unmovable positions - check if there's already a hard unmovable tile there
+			var existing_tile = tiles[x][y]
+			if existing_tile and "is_unmovable_hard" in existing_tile and existing_tile.is_unmovable_hard:
+				print("[GRAVITY] Position (", x, ",", y, ") has hard unmovable - skipping")
 				continue
+
 			# COLLECTIBLES SHOULD BE ASSIGNED - they need to animate falling
 
 			if tile_type > 0:
@@ -752,8 +760,16 @@ func animate_gravity():
 					tile.update_type(tile_type)
 
 					var target_pos = grid_to_world_position(Vector2(x, y))
-					if tile.position.distance_to(target_pos) > 1:
+
+					# Only animate if tile actually needs to move
+					# And make sure it's not a hard unmovable being incorrectly animated
+					var should_animate = tile.position.distance_to(target_pos) > 1
+					if should_animate and not ("is_unmovable_hard" in tile and tile.is_unmovable_hard):
 						gravity_tweens.append(tile.animate_to_position(target_pos))
+					elif should_animate:
+						# Safety: Hard unmovable shouldn't be animated but would have been
+						print("[GRAVITY] WARNING: Almost animated hard unmovable at (", x, ",", y, ") - fixing position instantly")
+						tile.position = target_pos
 
 					tile_index += 1
 				else:
@@ -920,6 +936,33 @@ func animate_refill():
 	var spawn_tweens = []
 	var scale_factor = tile_size / 64.0
 
+	# IMPORTANT: Also check for positions that have grid values but no visual tiles
+	# This can happen during bonus moves when tiles are destroyed rapidly
+	var positions_needing_tiles = []
+	for x in range(GameManager.GRID_WIDTH):
+		for y in range(GameManager.GRID_HEIGHT):
+			if GameManager.is_cell_blocked(x, y):
+				continue
+			var grid_value = GameManager.get_tile_at(Vector2(x, y))
+			if grid_value > 0:  # Position has a tile in the grid
+				# Check if there's a visual tile
+				var has_visual_tile = false
+				if x < tiles.size() and tiles[x] and y < tiles[x].size():
+					if tiles[x][y] != null and is_instance_valid(tiles[x][y]):
+						has_visual_tile = true
+
+				if not has_visual_tile:
+					# Grid has a value but no visual tile - need to create one
+					var pos_vec = Vector2(x, y)
+					if not new_tile_positions.has(pos_vec):
+						print("[REFILL] Position (", x, ",", y, ") has grid value ", grid_value, " but no visual tile - adding to spawn list")
+						positions_needing_tiles.append(pos_vec)
+
+	# Combine both lists
+	for pos in positions_needing_tiles:
+		if not new_tile_positions.has(pos):
+			new_tile_positions.append(pos)
+
 	# Create tiles ONLY for the new positions returned by fill_empty_spaces
 	for pos in new_tile_positions:
 		var x = int(pos.x)
@@ -960,11 +1003,22 @@ func animate_refill():
 		add_child(tile)
 		tiles[x][y] = tile
 		var target_pos = grid_to_world_position(pos)
-		spawn_tweens.append(tile.animate_to_position(target_pos))
-		spawn_tweens.append(tile.animate_spawn())
+		var pos_tween = tile.animate_to_position(target_pos)
+		var spawn_tween = tile.animate_spawn()
+		# Only add tweens that are not null (tile might be queued for deletion)
+		if pos_tween:
+			spawn_tweens.append(pos_tween)
+		if spawn_tween:
+			spawn_tweens.append(spawn_tween)
 
-	if spawn_tweens.size() > 0:
-		await spawn_tweens[0].finished
+	# Wait for animations to complete - filter out any null tweens
+	var valid_tweens = []
+	for tw in spawn_tweens:
+		if tw != null:
+			valid_tweens.append(tw)
+
+	if valid_tweens.size() > 0:
+		await valid_tweens[0].finished
 	else:
 		if get_tree() != null:
 			await get_tree().create_timer(0.3).timeout
@@ -1284,6 +1338,116 @@ func _create_lightning_beam_vertical(col: int, color: Color = Color.CYAN):
 	tween.finished.connect(beam.queue_free)
 
 	return tween
+
+func _destroy_tiles_immediately(positions: Array):
+	"""Destroy tiles immediately after lightning beam - handles unmovables properly"""
+	if positions.size() == 0:
+		return
+
+	print("[GameBoard] _destroy_tiles_immediately: processing ", positions.size(), " positions")
+
+	# Highlight briefly
+	await highlight_special_activation(positions)
+
+	# Count tiles for scoring BEFORE processing/animating
+	# This ensures we count them even if instances become invalid during animation
+	var scoring_count = 0
+	for clear_pos in positions:
+		var t = GameManager.get_tile_at(clear_pos)
+		var gx = int(clear_pos.x)
+		var gy = int(clear_pos.y)
+
+		# Count any non-empty, non-blocked tile for scoring
+		# Special tiles (7-9), regular tiles (1-6), and spreaders (12) all count
+		# Collectibles (10) don't count (they're handled separately)
+		# Unmovables have grid value 0 but we'll count them if they get destroyed
+		if t > 0 and t != GameManager.COLLECTIBLE:
+			scoring_count += 1
+			print("[SCORING] Will score tile at (", gx, ",", gy, ") type ", t)
+
+	print("[GameBoard] Pre-counted ", scoring_count, " tiles for scoring")
+
+	# Animate destruction (skips hard unmovables automatically)
+	await animate_destroy_tiles(positions)
+
+	# Process each position for game logic (grid clearing, unmovable hits, spreader tracking)
+	for clear_pos in positions:
+		var t = GameManager.get_tile_at(clear_pos)
+		var gx = int(clear_pos.x)
+		var gy = int(clear_pos.y)
+
+		print("[DESTROY_IMMEDIATE] Processing position (", gx, ",", gy, ") - grid value before: ", t)
+
+		# Get tile instance
+		var tile_instance = null
+		if tiles and gx < tiles.size() and tiles[gx] and gy < tiles[gx].size():
+			tile_instance = tiles[gx][gy]
+
+		# Validate instance
+		if not tile_instance or not is_instance_valid(tile_instance):
+			# Handle missing instance - this can happen if the tile was already freed during animate_destroy_tiles
+			# We should still clear the grid value to 0
+			print("[DESTROY_IMMEDIATE] No valid tile instance at (", gx, ",", gy, ") - clearing grid anyway")
+
+			if tile_instance and "is_unmovable_hard" in tile_instance and tile_instance.is_unmovable_hard:
+				if GameManager.has_method("report_unmovable_destroyed"):
+					GameManager.report_unmovable_destroyed(clear_pos, true)
+
+			# Always clear the grid, regardless of whether it was an unmovable or not
+			GameManager.grid[gx][gy] = 0
+			print("[DESTROY_IMMEDIATE] Grid cleared (no instance) - now value: ", GameManager.grid[gx][gy])
+			continue
+
+		# Check if hard unmovable
+		if "is_unmovable_hard" in tile_instance and tile_instance.is_unmovable_hard:
+			var destroyed = tile_instance.take_hit(1)
+			if destroyed:
+				if GameManager.has_method("report_unmovable_destroyed"):
+					GameManager.report_unmovable_destroyed(clear_pos, true)
+
+				# Handle reveals
+				var is_coll = tile_instance.is_collectible if "is_collectible" in tile_instance else false
+				var tile_type_check = tile_instance.tile_type if "tile_type" in tile_instance else 0
+				if is_coll:
+					GameManager.grid[gx][gy] = GameManager.COLLECTIBLE
+					tiles[gx][gy] = tile_instance
+				elif tile_type_check > 0:
+					GameManager.grid[gx][gy] = tile_type_check
+					tiles[gx][gy] = tile_instance
+				else:
+					GameManager.grid[gx][gy] = 0
+					if not tile_instance.is_queued_for_deletion():
+						tile_instance.queue_free()
+					tiles[gx][gy] = null
+		else:
+			# Regular tile or spreader or SPECIAL TILE
+			if t == GameManager.SPREADER:
+				GameManager.spreader_count -= 1
+				GameManager.spreader_positions.erase(clear_pos)
+			print("[DESTROY_IMMEDIATE] Clearing grid at (", gx, ",", gy, ") - was type ", t)
+			GameManager.grid[gx][gy] = 0
+			print("[DESTROY_IMMEDIATE] Grid cleared - now value: ", GameManager.grid[gx][gy])
+
+	# Check spreader objectives
+	if GameManager.use_spreader_objective:
+		GameManager.emit_signal("spreaders_changed", GameManager.spreader_count)
+		if GameManager.spreader_count == 0:
+			if not GameManager.pending_level_complete and not GameManager.level_transitioning:
+				GameManager.last_level_won = true
+				GameManager.last_level_score = GameManager.score
+				GameManager.last_level_target = 0
+				GameManager.last_level_number = GameManager.level
+				GameManager.last_level_moves_left = GameManager.moves_left
+				GameManager.pending_level_complete = true
+				GameManager._attempt_level_complete()
+
+	# Add score for cleared tiles
+	if scoring_count > 0:
+		var points = GameManager.calculate_points(scoring_count)
+		if points > 0:
+			GameManager.add_score(points)
+
+	print("[GameBoard] _destroy_tiles_immediately: complete, scored ", scoring_count, " tiles")
 
 func _create_row_clear_effect(row: int):
 	"""Create visual effect for clearing an entire row"""
@@ -1870,10 +2034,16 @@ func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 	# Always reset processing_moves and combo, even if an error occurred
 	GameManager.processing_moves = false
 	GameManager.reset_combo()
-	print("=== Cascade process complete ===")
+	print("=== Cascade process complete, processing_moves forced to false ===")
+
 	# Short buffer to ensure all last tweens/deferred calls have finished before marking board idle
 	if get_tree() != null:
 		await get_tree().create_timer(0.2).timeout
+
+	# Safety check: If we're in bonus conversion and cascade took too long, skip remaining bonus
+	if GameManager.in_bonus_conversion and cascade_depth > 15:
+		print("[CASCADE] ⚠️ WARNING: Deep cascade during bonus (%d iterations) - may need to skip remaining bonus" % cascade_depth)
+
 	if not GameManager.has_possible_moves():
 		print("No valid moves detected! Auto-shuffling...")
 		await get_tree().create_timer(1.0).timeout
@@ -2094,11 +2264,19 @@ func activate_chain_reaction_booster(x: int, y: int):
 	# Handle wave1 unmovable/reporting
 	var scoring_count_wave1 = 0
 	for pos in wave1:
-		var t = GameManager.get_tile_at(pos)
-		if t == GameManager.UNMOVABLE_SOFT:
+		var gx = int(pos.x)
+		var gy = int(pos.y)
+		# Check if this is a hard unmovable
+		var is_unmovable = false
+		if tiles and gx < tiles.size() and tiles[gx] and gy < tiles[gx].size():
+			var tile_inst = tiles[gx][gy]
+			if tile_inst and "is_unmovable_hard" in tile_inst and tile_inst.is_unmovable_hard:
+				is_unmovable = true
+
+		if is_unmovable:
 			GameManager.report_unmovable_destroyed(pos)
 		else:
-			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			GameManager.grid[gx][gy] = 0
 			scoring_count_wave1 += 1
 
 	await get_tree().create_timer(0.3).timeout
@@ -2124,12 +2302,8 @@ func activate_chain_reaction_booster(x: int, y: int):
 		await animate_destroy_tiles(wave2)
 		# Handle wave2 unmovable/reporting
 		for pos in wave2:
-			var t = GameManager.get_tile_at(pos)
-			if t == GameManager.UNMOVABLE_SOFT:
-				GameManager.report_unmovable_destroyed(pos)
-			else:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
-				scoring_count_wave2 += 1
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			scoring_count_wave2 += 1
 
 		await get_tree().create_timer(0.3).timeout
 
@@ -2149,12 +2323,8 @@ func activate_chain_reaction_booster(x: int, y: int):
 			await animate_destroy_tiles(wave3)
 			# Handle wave3 unmovable/reporting
 			for pos in wave3:
-				var t = GameManager.get_tile_at(pos)
-				if t == GameManager.UNMOVABLE_SOFT:
-					GameManager.report_unmovable_destroyed(pos)
-				else:
-					GameManager.grid[int(pos.x)][int(pos.y)] = 0
-					scoring_count_wave3 += 1
+				GameManager.grid[int(pos.x)][int(pos.y)] = 0
+				scoring_count_wave3 += 1
 
 	# Calculate total score
 	var total_scoring = scoring_count_wave1 + scoring_count_wave2 + scoring_count_wave3
@@ -2205,12 +2375,8 @@ func activate_bomb_3x3_booster(x: int, y: int):
 		# Handle unmovables specially and score only regular tiles
 		var scoring_count = 0
 		for pos in positions_to_clear:
-			var t = GameManager.get_tile_at(pos)
-			if t == GameManager.UNMOVABLE_SOFT:
-				GameManager.report_unmovable_destroyed(pos)
-			else:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
-				scoring_count += 1
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			scoring_count += 1
 
 		var points = GameManager.calculate_points(scoring_count)
 		if points > 0:
@@ -2278,12 +2444,8 @@ func activate_line_blast_booster(direction: String, center_x: int, center_y: int
 		# Handle unmovables specially and score only regular tiles
 		var scoring_count = 0
 		for pos in positions_to_clear:
-			var t = GameManager.get_tile_at(pos)
-			if t == GameManager.UNMOVABLE_SOFT:
-				GameManager.report_unmovable_destroyed(pos)
-			else:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
-				scoring_count += 1
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			scoring_count += 1
 
 		var points = GameManager.calculate_points(scoring_count)
 		if points > 0:
@@ -2323,12 +2485,8 @@ func activate_hammer_booster(x: int, y: int):
 		# Handle unmovables specially and score only regular tiles
 		var scoring_count = 0
 		for pos in positions_to_clear:
-			var t = GameManager.get_tile_at(pos)
-			if t == GameManager.UNMOVABLE_SOFT:
-				GameManager.report_unmovable_destroyed(pos)
-			else:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
-				scoring_count += 1
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			scoring_count += 1
 
 		var points = GameManager.calculate_points(scoring_count)
 		if points > 0:
@@ -2384,15 +2542,11 @@ func activate_tile_squasher_booster(x: int, y: int):
 		# Use animate_destroy_tiles for arbitrary positions (matches var was incorrect)
 		await animate_destroy_tiles(positions_to_clear)
 
-		# Clear grid positions, but handle UNMOVABLE_SOFT specially (don't count them as normal tiles)
+		# Clear grid positions and count scoring tiles
 		var scoring_count = 0
 		for pos in positions_to_clear:
-			var t = GameManager.get_tile_at(pos)
-			if t == GameManager.UNMOVABLE_SOFT:
-				GameManager.report_unmovable_destroyed(pos)
-			else:
-				GameManager.grid[int(pos.x)][int(pos.y)] = 0
-				scoring_count += 1
+			GameManager.grid[int(pos.x)][int(pos.y)] = 0
+			scoring_count += 1
 
 		var points = GameManager.calculate_points(scoring_count)
 		if points > 0:
@@ -2464,7 +2618,6 @@ func activate_row_clear_booster(row: int):
 						GameManager.grid[gx][gy] = 0
 						scoring_count += 1
 				# else tile still has hits remaining, don't clear it from grid
-			elif t == GameManager.UNMOVABLE_SOFT:
 				# Handle soft unmovables
 				if tile_instance and tile_instance.is_unmovable:
 					tile_instance.take_hit(1)
@@ -2543,7 +2696,6 @@ func activate_column_clear_booster(column: int):
 						GameManager.grid[gx][gy] = 0
 						scoring_count += 1
 				# else tile still has hits remaining, don't clear it from grid
-			elif t == GameManager.UNMOVABLE_SOFT:
 				# Handle soft unmovables
 				if tile_instance and tile_instance.is_unmovable:
 					tile_instance.take_hit(1)
@@ -2581,165 +2733,102 @@ func activate_special_tile(pos: Vector2):
 		"level": GameManager.level
 	})
 
-	# Collect positions to clear based on tile type
+	# Process special tile activation with IMMEDIATE tile destruction
+	# This makes lightning feel more impactful - tiles destroyed as beam hits them
 	var positions_to_clear = []
+	var special_tiles_to_activate = []
 
 	if tile_type == GameManager.HORIZTONAL_ARROW:
 		AudioManager.play_sfx("special_horiz")
 		# Create horizontal lightning beam
 		print("[GameBoard] Creating lightning for horizontal arrow at row ", int(pos.y))
 		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.9, 0.3))
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
 
+		# Collect positions in this row AND check for special tiles
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				var tile_at_pos = GameManager.get_tile_at(Vector2(x, pos.y))
-				# Skip collectibles - they should not be destroyed by special tiles
+				var check_pos = Vector2(x, pos.y)
+				var tile_at_pos = GameManager.get_tile_at(check_pos)
 				if tile_at_pos != GameManager.COLLECTIBLE:
-					positions_to_clear.append(Vector2(x, pos.y))
+					positions_to_clear.append(check_pos)
+					# Check for special tiles (before destruction)
+					if check_pos != pos and tile_at_pos >= 7 and tile_at_pos <= 9:
+						print("[CHAIN] Found special tile type ", tile_at_pos, " at (", x, ",", pos.y, ") - will chain activate")
+						special_tiles_to_activate.append({"pos": check_pos, "type": tile_at_pos})
+
+		# Destroy tiles IMMEDIATELY after lightning appears
+		await _destroy_tiles_immediately(positions_to_clear)
 
 	elif tile_type == GameManager.VERTICAL_ARROW:
 		AudioManager.play_sfx("special_vert")
 		# Create vertical lightning beam
 		print("[GameBoard] Creating lightning for vertical arrow at column ", int(pos.x))
 		_create_lightning_beam_vertical(int(pos.x), Color(0.4, 0.9, 1.0))
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
 
+		# Collect positions in this column AND check for special tiles
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
-				var tile_at_pos = GameManager.get_tile_at(Vector2(pos.x, y))
-				# Skip collectibles - they should not be destroyed by special tiles
+				var check_pos = Vector2(pos.x, y)
+				var tile_at_pos = GameManager.get_tile_at(check_pos)
 				if tile_at_pos != GameManager.COLLECTIBLE:
-					positions_to_clear.append(Vector2(pos.x, y))
+					positions_to_clear.append(check_pos)
+					# Check for special tiles (before destruction)
+					if check_pos != pos and tile_at_pos >= 7 and tile_at_pos <= 9:
+						print("[CHAIN] Found special tile type ", tile_at_pos, " at (", pos.x, ",", y, ") - will chain activate")
+						special_tiles_to_activate.append({"pos": check_pos, "type": tile_at_pos})
+
+		# Destroy tiles IMMEDIATELY after lightning appears
+		await _destroy_tiles_immediately(positions_to_clear)
 
 	elif tile_type == GameManager.FOUR_WAY_ARROW:
 		AudioManager.play_sfx("special_fourway")
-		# Create both horizontal and vertical lightning beams with slight delay
 		print("[GameBoard] Creating cross lightning for four-way arrow at ", pos)
-		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.5, 1.0))  # Magenta
-		await get_tree().create_timer(0.05).timeout
-		_create_lightning_beam_vertical(int(pos.x), Color(1.0, 0.5, 1.0))  # Magenta
-		await get_tree().create_timer(0.1).timeout  # Brief delay for visual effect
 
+		# Create horizontal beam
+		_create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.5, 1.0))
+		var horizontal_positions = []
 		for x in range(GameManager.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(x, int(pos.y)):
-				var tile_at_pos = GameManager.get_tile_at(Vector2(x, pos.y))
-				# Skip collectibles - they should not be destroyed by special tiles
+				var check_pos = Vector2(x, pos.y)
+				var tile_at_pos = GameManager.get_tile_at(check_pos)
 				if tile_at_pos != GameManager.COLLECTIBLE:
-					positions_to_clear.append(Vector2(x, pos.y))
+					horizontal_positions.append(check_pos)
+					positions_to_clear.append(check_pos)
+					# Check for special tiles (before destruction)
+					if check_pos != pos and tile_at_pos >= 7 and tile_at_pos <= 9:
+						print("[CHAIN] Found special tile type ", tile_at_pos, " at (", x, ",", pos.y, ") - will chain activate")
+						special_tiles_to_activate.append({"pos": check_pos, "type": tile_at_pos})
+		await _destroy_tiles_immediately(horizontal_positions)
+
+		# Small delay before vertical beam
+		await get_tree().create_timer(0.05).timeout
+
+		# Create vertical beam
+		_create_lightning_beam_vertical(int(pos.x), Color(1.0, 0.5, 1.0))
+		var vertical_positions = []
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
-				var tile_at_pos = GameManager.get_tile_at(Vector2(pos.x, y))
-				# Skip collectibles - they should not be destroyed by special tiles
+				var check_pos = Vector2(pos.x, y)
+				var tile_at_pos = GameManager.get_tile_at(check_pos)
 				if tile_at_pos != GameManager.COLLECTIBLE:
-					if not positions_to_clear.has(Vector2(pos.x, y)):
-						positions_to_clear.append(Vector2(pos.x, y))
+					if not positions_to_clear.has(check_pos):
+						vertical_positions.append(check_pos)
+						positions_to_clear.append(check_pos)
+						# Check for special tiles (before destruction)
+						if check_pos != pos and tile_at_pos >= 7 and tile_at_pos <= 9:
+							print("[CHAIN] Found special tile type ", tile_at_pos, " at (", pos.x, ",", y, ") - will chain activate")
+							special_tiles_to_activate.append({"pos": check_pos, "type": tile_at_pos})
+		await _destroy_tiles_immediately(vertical_positions)
 
-	print("Clearing ", positions_to_clear.size(), " tiles")
+	print("Cleared ", positions_to_clear.size(), " tiles total, found ", special_tiles_to_activate.size(), " special tiles to chain")
 
-	# Check for other special tiles in the positions to clear (chain reaction)
-	var special_tiles_to_activate = []
-	for clear_pos in positions_to_clear:
-		if clear_pos == pos:
-			continue
-
-		var check_tile_type = GameManager.get_tile_at(clear_pos)
-		if check_tile_type >= 7 and check_tile_type <= 9:
-			special_tiles_to_activate.append({"pos": clear_pos, "type": check_tile_type})
-
-	# Highlight and destroy visually
-	await highlight_special_activation(positions_to_clear)
-	await animate_destroy_tiles(positions_to_clear)
-
-	# Clear tiles in GameManager grid but handle unmovables specially
-	var scoring_count = 0
-	for clear_pos in positions_to_clear:
-		var t = GameManager.get_tile_at(clear_pos)
-		var gx = int(clear_pos.x)
-		var gy = int(clear_pos.y)
-
-		# Get the tile instance to check if it's a hard unmovable
-		var tile_instance = null
-		if not tiles or gx >= tiles.size():
-			continue
-		if not tiles[gx] or gy >= tiles[gx].size():
-			continue
-
-		tile_instance = tiles[gx][gy]
-
-		# Check if this is a hard unmovable tile that needs to take a hit
-		if tile_instance and tile_instance.is_unmovable_hard:
-			var destroyed = tile_instance.take_hit(1)
-			if destroyed:
-				var is_coll = tile_instance.is_collectible if "is_collectible" in tile_instance else false
-				var tile_type_check = tile_instance.type if "type" in tile_instance else 0
-				# If destroyed, the tile has already transformed if it had a reveal
-				# Update the grid to match what the tile became
-				if is_coll:
-					GameManager.grid[gx][gy] = GameManager.COLLECTIBLE
-					# Ensure tile is still in tiles array at this position
-					tiles[gx][gy] = tile_instance
-				elif tile_type_check > 0:
-					GameManager.grid[gx][gy] = tile_type_check
-					# Ensure tile is still in tiles array at this position
-					tiles[gx][gy] = tile_instance
-				else:
-					# Tile was destroyed without reveal, clear it
-					GameManager.grid[gx][gy] = 0
-					# Free the hard tile instance since it's no longer needed
-					if not tile_instance.is_queued_for_deletion():
-						tile_instance.queue_free()
-					tiles[gx][gy] = null
-					scoring_count += 1
-			# else tile still has hits remaining, don't clear it from grid
-		elif t == GameManager.UNMOVABLE_SOFT:
-			# Handle soft unmovables
-			# Call take_hit on tile instance if available
-			if tile_instance and tile_instance.is_unmovable:
-				tile_instance.take_hit(1)
-			# Report to GameManager so it updates counters, signals & triggers deferred gravity
-			if GameManager.has_method("report_unmovable_destroyed"):
-				GameManager.report_unmovable_destroyed(clear_pos)
-			else:
-				# Fallback: directly update grid and counters
-				var key = str(int(clear_pos.x)) + "," + str(int(clear_pos.y))
-				if GameManager.unmovable_map.has(key):
-					GameManager.unmovable_map.erase(key)
-				GameManager.grid[gx][gy] = 0
-				GameManager.unmovables_cleared += 1
-		else:
-			# Regular tile - check if it's a spreader before clearing
-			if t == GameManager.SPREADER:
-				GameManager.spreader_count -= 1
-				GameManager.spreader_positions.erase(clear_pos)
-				print("[SPREADER] GameBoard special tile destroyed spreader at (", gx, ",", gy, ") - Remaining: ", GameManager.spreader_count)
-			GameManager.grid[gx][gy] = 0
-			scoring_count += 1
-
-	# Check if spreaders were cleared and emit signal
-	if GameManager.use_spreader_objective:
-		GameManager.emit_signal("spreaders_changed", GameManager.spreader_count)
-
-		# Check if all spreaders cleared
-		if GameManager.spreader_count == 0:
-			print("[SPREADER] 🎯 ALL SPREADERS CLEARED by GameBoard special tile - Triggering level completion")
-			if not GameManager.pending_level_complete and not GameManager.level_transitioning:
-				GameManager.last_level_won = true
-				GameManager.last_level_score = GameManager.score
-				GameManager.last_level_target = 0
-				GameManager.last_level_number = GameManager.level
-				GameManager.last_level_moves_left = GameManager.moves_left
-				GameManager.pending_level_complete = true
-				GameManager._attempt_level_complete()
-
-	# Use a move for activating special tile
-	if GameManager.has_method("use_move"):
+	# Use a move for activating special tile (but not during bonus conversion)
+	if GameManager.has_method("use_move") and not GameManager.in_bonus_conversion:
 		GameManager.use_move()
+		print("[GameBoard] activate_special_tile: used a move, moves_left now: ", GameManager.moves_left)
+	elif GameManager.in_bonus_conversion:
+		print("[GameBoard] activate_special_tile: skipping use_move() because in_bonus_conversion=true")
 
-	# Add points for cleared (scoring) tiles only
-	var points = GameManager.calculate_points(scoring_count)
-	if points > 0:
-		GameManager.add_score(points)
 
 	# Activate any special tiles that were hit (chain reaction)
 	if special_tiles_to_activate.size() > 0:
@@ -2757,8 +2846,8 @@ func activate_special_tile(pos: Vector2):
 	# Check for cascade matches after refill
 	await process_cascade()
 
-	GameManager.processing_moves = false
-	print("activate_special_tile: processing_moves = false")
+	# Note: processing_moves is reset inside process_cascade()
+	print("activate_special_tile: complete (processing_moves reset by process_cascade)")
 
 # Activate special tile as part of a chain reaction
 func activate_special_tile_chain(pos: Vector2, tile_type: int):
@@ -2826,11 +2915,53 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 	await highlight_special_activation(positions_to_clear)
 	await animate_destroy_tiles(positions_to_clear)
 
-	# Clear tiles but treat UNMOVABLE_SOFT specially
+	# Clear tiles but handle unmovables specially
 	var scoring_count = 0
 	for clear_pos in positions_to_clear:
 		var t = GameManager.get_tile_at(clear_pos)
-		if t == GameManager.UNMOVABLE_SOFT:
+		var gx = int(clear_pos.x)
+		var gy = int(clear_pos.y)
+
+		# Get the tile instance to check if it's a hard unmovable
+		var tile_instance = null
+		if not tiles or gx >= tiles.size():
+			continue
+		if not tiles[gx] or gy >= tiles[gx].size():
+			continue
+
+		tile_instance = tiles[gx][gy]
+
+		# Check if this is a hard unmovable tile that needs to take a hit
+		if tile_instance and tile_instance.is_unmovable_hard:
+			var destroyed = tile_instance.take_hit(1)
+			if destroyed:
+				print("[GameBoard] Chain: Hard unmovable destroyed at (", gx, ",", gy, ") - calling report_unmovable_destroyed")
+
+				# Report destruction to GameManager for counter tracking
+				if GameManager.has_method("report_unmovable_destroyed"):
+					# Pass skip_clear=true because we're handling the grid update here
+					GameManager.report_unmovable_destroyed(clear_pos, true)
+
+				var is_coll = tile_instance.is_collectible if "is_collectible" in tile_instance else false
+				var tile_type_check = tile_instance.type if "type" in tile_instance else 0
+				# If destroyed, the tile has already transformed if it had a reveal
+				# Update the grid to match what the tile became
+				if is_coll:
+					GameManager.grid[gx][gy] = GameManager.COLLECTIBLE
+					tiles[gx][gy] = tile_instance
+				elif tile_type_check > 0:
+					GameManager.grid[gx][gy] = tile_type_check
+					tiles[gx][gy] = tile_instance
+				else:
+					# Tile was destroyed without reveal, clear it
+					GameManager.grid[gx][gy] = 0
+					if not tile_instance.is_queued_for_deletion():
+						tile_instance.queue_free()
+					tiles[gx][gy] = null
+					scoring_count += 1
+			else:
+				print("[GameBoard] Chain: Hard unmovable at (", gx, ",", gy, ") took hit but not destroyed yet")
+			# Handle soft unmovables (legacy U tokens)
 			if GameManager.has_method("report_unmovable_destroyed"):
 				GameManager.report_unmovable_destroyed(clear_pos)
 			else:
@@ -2840,6 +2971,11 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 				GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
 				GameManager.unmovables_cleared += 1
 		else:
+			# Regular tile or spreader
+			if t == GameManager.SPREADER:
+				GameManager.spreader_count -= 1
+				GameManager.spreader_positions.erase(clear_pos)
+				print("[SPREADER] Chain destroyed spreader at (", gx, ",", gy, ") - Remaining: ", GameManager.spreader_count)
 			GameManager.grid[int(clear_pos.x)][int(clear_pos.y)] = 0
 			scoring_count += 1
 

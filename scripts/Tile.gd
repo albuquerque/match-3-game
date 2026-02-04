@@ -546,12 +546,24 @@ func _create_unmovable_destruction_particles():
 		print("[Tile] No parent found, cannot create particles")
 		return
 
-	print("[Tile] Creating smoke particles...")
+	# Capture GLOBAL position for validation
+	var global_pos = global_position
+
+	# Safety check: if position is at origin (0,0) or invalid, don't create particles
+	if global_pos == Vector2.ZERO or global_pos.length() < 10:
+		print("[Tile] WARNING: Invalid particle position (", global_pos, "), skipping particle creation")
+		return
+
+	# Calculate position RELATIVE to particle_parent
+	# Since we're adding particles as children of parent, we need local coordinates
+	var particle_position = position  # This tile's position relative to its parent
+
+	print("[Tile] Creating smoke particles at global: ", global_pos, " local: ", particle_position)
 
 	# Create smoke/dust cloud effect
 	var smoke = CPUParticles2D.new()
 	smoke.name = "UnmovableSmokeParticles"
-	smoke.position = global_position  # Use global position so it stays when tile is removed
+	smoke.position = particle_position  # Use captured position
 	smoke.emitting = true
 	smoke.one_shot = true
 	smoke.explosiveness = 0.7
@@ -602,12 +614,12 @@ func _create_unmovable_destruction_particles():
 	smoke.scale_amount_curve = scale_curve
 
 	particle_parent.add_child(smoke)
-	print("[Tile] Smoke particles added to parent")
+	print("[Tile] Smoke particles added to parent at position: ", particle_position)
 
 	# Add some debris/chunks for extra effect
 	var debris = CPUParticles2D.new()
 	debris.name = "UnmovableDebrisParticles"
-	debris.position = global_position  # Use global position
+	debris.position = particle_position  # Use captured position
 	debris.emitting = true
 	debris.one_shot = true
 	debris.explosiveness = 0.8  # Less explosive, more dusty

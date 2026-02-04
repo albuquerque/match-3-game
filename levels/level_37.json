@@ -8,7 +8,7 @@
   "max_moves": 49,
   "num_tile_types": 6,
   "theme": "legacy",
-  "layout": "0 0 0 0 0 0 0 0\nU U U 0 0 0 U U\n0 U 0 0 0 0 0 U\n0 0 0 0 0 0 0 0\n0 0 0 C 0 0 0 0\n0 0 0 U 0 U 0 0\n0 0 0 0 C 0 0 0\n0 0 0 0 0 0 0 0",
+  "layout": "0 0 0 0 0 0 0 0\nH1:snow H1:snow H1:snow 0 0 0 H1:snow H1:snow\n0 H1:snow 0 0 0 0 0 H1:snow\n0 0 0 0 0 0 0 0\n0 0 0 C 0 0 0 0\n0 0 0 H1:snow 0 H1:snow 0 0\n0 0 0 0 C 0 0 0\n0 0 0 0 0 0 0 0",
   "collectible_target": 2,
   "unmovable_target": 9,
   "unmovable_type": "snow",

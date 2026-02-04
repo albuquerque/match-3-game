@@ -855,6 +855,18 @@ func _advance_to_next_level():
 func _load_level_by_number(level_num: int):
 	print("[GameUI] Loading level by number: %d" % level_num)
 
+	# Ensure HUD is visible (in case previous level's effects hid it)
+	var hud_container = $VBoxContainer/TopPanel/HUD
+	if hud_container:
+		hud_container.visible = true
+		print("[GameUI] Restored HUD visibility for level %d" % level_num)
+
+	# Reset GameBoard position (in case previous level's effects moved it)
+	var board = get_node_or_null("../GameBoard")
+	if board and board is Node2D:
+		board.position = Vector2.ZERO
+		print("[GameUI] Reset GameBoard position for level %d" % level_num)
+
 	# For DLC levels, handle narrative effects and chapter loading
 	if is_dlc_level(level_num):
 		print("[GameUI] DLC level detected, preparing to load")
@@ -968,7 +980,40 @@ func _load_level_by_number(level_num: int):
 			else:
 				lm.current_level_index = found_idx
 			print("[GameUI] LevelManager.current_level_index set to %d" % (lm.current_level_index if lm.has_method("get_current_level") else found_idx))
-			# Load the level into GameManager
+
+			# Load narrative effects for built-in level BEFORE loading level
+			# This ensures effects are active when level_loaded event fires
+			print("[GameUI] DEBUG: Checking EffectResolver - exists: %s" % (EffectResolver != null))
+			if EffectResolver:
+				print("[GameUI] DEBUG: EffectResolver is available, proceeding with effect loading")
+				EffectResolver.cleanup_visual_overlays()
+
+				# Try to load level-specific chapter file first
+				var level_chapter_path = "res://data/chapters/chapter_level_%d.json" % level_num
+				var global_chapter_path = "res://data/chapters/chapter_builtin.json"
+
+				print("[GameUI] DEBUG: Checking for level chapter at: %s" % level_chapter_path)
+				var level_file_exists = FileAccess.file_exists(level_chapter_path)
+				print("[GameUI] DEBUG: Level chapter exists: %s" % level_file_exists)
+
+				if level_file_exists:
+					print("[GameUI] Loading narrative effects for built-in level %d from: %s" % [level_num, level_chapter_path])
+					if EffectResolver.load_effects_from_file(level_chapter_path):
+						print("[GameUI] Successfully loaded level-specific narrative effects")
+					else:
+						print("[GameUI] Failed to load level-specific narrative effects")
+				elif FileAccess.file_exists(global_chapter_path):
+					print("[GameUI] Loading global narrative effects for built-in levels from: %s" % global_chapter_path)
+					if EffectResolver.load_effects_from_file(global_chapter_path):
+						print("[GameUI] Successfully loaded global narrative effects")
+					else:
+						print("[GameUI] Failed to load global narrative effects")
+				else:
+					print("[GameUI] No narrative effects defined for built-in level %d" % level_num)
+			else:
+				print("[GameUI] ERROR: EffectResolver is null - narrative effects cannot be loaded!")
+
+			# Now load the level into GameManager (will emit level_loaded event)
 			var gm = get_node_or_null('/root/GameManager')
 			if gm:
 				gm.initialized = false
@@ -980,18 +1025,35 @@ func _load_level_by_number(level_num: int):
 			else:
 				print("[GameUI] ERROR: LevelManager not found when selecting built-in level %d" % level_num)
 
-		# Clean up visual effects from previous level
-		if EffectResolver:
-			EffectResolver.cleanup_visual_overlays()
-
 	# Close the WorldMap UI
 	var wm = get_node_or_null("WorldMap")
 	if wm:
 		wm.visible = false
 		wm.queue_free()
 
-	# Show StartPage for selected level
-	show_start_page()
+	# Show the game board directly (level and effects already loaded above)
+	print("[GameUI] Level selected from WorldMap - showing game board directly")
+
+	# Hide start page if visible
+	if start_page:
+		start_page.visible = false
+
+	# Show game board (reusing board variable from earlier in function)
+	if not board:
+		board = get_node_or_null("../GameBoard")
+	if board:
+		board.visible = true
+		if board.has_method("_on_level_loaded"):
+			board._on_level_loaded()
+		if board.has_method("draw_board_borders"):
+			board.draw_board_borders()
+		if board.has_method("show_tile_overlay"):
+			board.show_tile_overlay()
+
+	# Update UI
+	update_display()
+	update_booster_ui()
+
 
 
 func _on_worldmap_back_to_menu():
@@ -1193,6 +1255,61 @@ func _reorganize_hud():
 		print("[GameUI] TopPanel not found, skipping reorganization")
 		return
 
+	# Create HUD container with rounded translucent background
+	var hud_container = top_panel.get_node_or_null("HUD")
+	if not hud_container:
+		hud_container = PanelContainer.new()
+		hud_container.name = "HUD"
+
+		# Create StyleBox for rounded translucent background
+		var style_box = StyleBoxFlat.new()
+		style_box.bg_color = Color(0.1, 0.1, 0.15, 0.7)  # Dark translucent
+		style_box.corner_radius_top_left = 12
+		style_box.corner_radius_top_right = 12
+		style_box.corner_radius_bottom_left = 12
+		style_box.corner_radius_bottom_right = 12
+		style_box.border_width_left = 2
+		style_box.border_width_right = 2
+		style_box.border_width_top = 2
+		style_box.border_width_bottom = 2
+		style_box.border_color = Color(0.4, 0.4, 0.5, 0.8)  # Subtle border
+		style_box.content_margin_left = 20
+		style_box.content_margin_right = 20
+		style_box.content_margin_top = 15
+		style_box.content_margin_bottom = 15
+
+		hud_container.add_theme_stylebox_override("panel", style_box)
+
+		# Create inner HBox for the actual HUD elements
+		var inner_hbox = HBoxContainer.new()
+		inner_hbox.name = "HUDContent"
+		inner_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		inner_hbox.add_theme_constant_override("separation", 40)
+		hud_container.add_child(inner_hbox)
+
+		# Reparent existing containers to the new HUD
+		var moves_container = top_panel.get_node_or_null("MovesContainer")
+		var score_container = top_panel.get_node_or_null("ScoreContainer")
+		var target_container = top_panel.get_node_or_null("TargetContainer")
+
+		if moves_container:
+			moves_container.reparent(inner_hbox)
+		if score_container:
+			score_container.reparent(inner_hbox)
+		if target_container:
+			target_container.reparent(inner_hbox)
+
+		# Add HUD container to top panel
+		top_panel.add_child(hud_container)
+
+		# Register with VisualAnchorManager
+		var vam = get_node_or_null("/root/VisualAnchorManager")
+		if vam and vam.has_method("register_anchor"):
+			vam.register_anchor("hud", hud_container)
+			print("[GameUI] Registered HUD container with VisualAnchorManager")
+
+		print("[GameUI] Created HUD container with rounded translucent background")
+
 	# Make top panel a clean HBoxContainer for horizontal layout
 	if top_panel is HBoxContainer:
 		# Clear default alignment and spacing
@@ -1200,9 +1317,9 @@ func _reorganize_hud():
 		top_panel.add_theme_constant_override("separation", 40)
 
 	# Add header labels above the values for clarity
-	_add_header_label_to_container($VBoxContainer/TopPanel/MovesContainer, "MOVES")
-	_add_header_label_to_container($VBoxContainer/TopPanel/ScoreContainer, "SCORE")
-	_add_header_label_to_container($VBoxContainer/TopPanel/TargetContainer, "GOAL")
+	_add_header_label_to_container(hud_container.get_node("HUDContent/MovesContainer"), "MOVES")
+	_add_header_label_to_container(hud_container.get_node("HUDContent/ScoreContainer"), "SCORE")
+	_add_header_label_to_container(hud_container.get_node("HUDContent/TargetContainer"), "GOAL")
 
 	# Create a cleaner layout - hide level label (redundant with start page)
 	if level_label and level_label.get_parent():
@@ -2248,6 +2365,23 @@ func _on_startpage_start_pressed():
 
 	# If GameManager already initialized, shortcut (existing code)
 	if GameManager.initialized:
+		# Load narrative effects for the current level BEFORE showing the board
+		if EffectResolver:
+			var current_level = GameManager.level if GameManager else 1
+			EffectResolver.cleanup_visual_overlays()
+
+			# Try to load level-specific chapter file
+			var level_chapter_path = "res://data/chapters/chapter_level_%d.json" % current_level
+			if FileAccess.file_exists(level_chapter_path):
+				print("[GameUI] Loading narrative effects for level %d from: %s" % [current_level, level_chapter_path])
+				if EffectResolver.load_effects_from_file(level_chapter_path):
+					print("[GameUI] Successfully loaded level-specific narrative effects")
+					# Manually emit level_loaded event now that effects are loaded
+					EventBus.emit_level_loaded("level_%d" % current_level, {"level": current_level, "target": GameManager.target_score})
+					print("[GameUI] Emitted level_loaded event for effects to trigger")
+				else:
+					print("[GameUI] Failed to load level-specific narrative effects")
+
 		# Show game board immediately
 		var board = get_node_or_null("../GameBoard")
 		if board:
@@ -2280,6 +2414,22 @@ func _on_startpage_start_pressed():
 	_level_loaded_flag = false
 	if not GameManager.is_connected("level_loaded", Callable(self, "_level_loaded_signal")):
 		GameManager.connect("level_loaded", Callable(self, "_level_loaded_signal"))
+
+	# Load narrative effects for level 1 BEFORE GameManager initialization
+	# This ensures effects are active when level_loaded event fires
+	if EffectResolver:
+		print("[GameUI] Loading narrative effects for level 1 before initialization")
+		EffectResolver.cleanup_visual_overlays()
+
+		var level_chapter_path = "res://data/chapters/chapter_level_1.json"
+		if FileAccess.file_exists(level_chapter_path):
+			print("[GameUI] Loading narrative effects from: %s" % level_chapter_path)
+			if EffectResolver.load_effects_from_file(level_chapter_path):
+				print("[GameUI] Successfully loaded level 1 narrative effects")
+			else:
+				print("[GameUI] Failed to load level 1 narrative effects")
+		else:
+			print("[GameUI] No chapter file found for level 1 at: %s" % level_chapter_path)
 
 	# Try preferred initialize method, otherwise fallback to load_current_level
 	if gm.has_method("initialize_game"):

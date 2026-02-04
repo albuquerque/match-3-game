@@ -1,0 +1,60 @@
+{
+  "chapter_id": "builtin_levels",
+  "version": "1.0.0",
+  "requires_engine_version": "1.0.0",
+  "name": "Built-in Levels",
+  "description": "Global narrative effects for all built-in levels",
+
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "background_dim",
+      "params": {
+        "intensity": 0.2,
+        "duration": 0.5
+      }
+    },
+    {
+      "on": "match_cleared",
+      "effect": "spawn_particles",
+      "params": {
+        "count": 3,
+        "duration": 0.8
+      }
+    },
+    {
+      "on": "match_cleared",
+      "effect": "camera_impulse",
+      "params": {
+        "strength": 0.8,
+        "duration": 0.25
+      }
+    },
+    {
+      "on": "special_tile_activated",
+      "effect": "screen_shake",
+      "params": {
+        "intensity": 5,
+        "duration": 0.3
+      }
+    },
+    {
+      "on": "level_complete",
+      "effect": "screen_flash",
+      "params": {
+        "color": "#FFFFFF",
+        "intensity": 0.5,
+        "duration": 0.3
+      }
+    },
+    {
+      "on": "level_complete",
+      "effect": "background_tint",
+      "params": {
+        "color": "#FFD700",
+        "intensity": 0.2,
+        "duration": 1.5
+      }
+    }
+  ]
+}

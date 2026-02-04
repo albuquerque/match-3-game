@@ -1,0 +1,101 @@
+{
+  "chapter_id": "level_02_showcase",
+  "version": "1.0.0",
+  "requires_engine_version": "1.0.0",
+  "name": "Narrative Effects Showcase",
+  "description": "Comprehensive demonstration of all narrative effects for level 2",
+
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "background_dim",
+      "params": {
+        "intensity": 0.6,
+        "duration": 1.5
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "level_loaded",
+      "effect": "vignette",
+      "params": {
+        "intensity": 0.6
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "match_cleared",
+      "effect": "screen_shake",
+      "params": {
+        "strength": 0.3,
+        "duration": 0.2
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "special_tile_activated",
+      "effect": "screen_flash",
+      "params": {
+        "color": "#FFD700",
+        "intensity": 0.7,
+        "duration": 0.4
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "special_tile_activated",
+      "effect": "screen_shake",
+      "params": {
+        "strength": 0.5,
+        "duration": 0.3
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "level_complete",
+      "effect": "background_tint",
+      "params": {
+        "color": "#00FF00",
+        "intensity": 0.6,
+        "duration": 2.5
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "level_complete",
+      "effect": "screen_flash",
+      "params": {
+        "color": "#FFFFFF",
+        "intensity": 1.0,
+        "duration": 0.6
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "level_complete",
+      "effect": "vignette",
+      "params": {
+        "intensity": 0.0
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "level_failed",
+      "effect": "background_tint",
+      "params": {
+        "color": "#FF0000",
+        "intensity": 0.7,
+        "duration": 2.5
+      },
+      "condition": {"level": 2}
+    },
+    {
+      "on": "level_failed",
+      "effect": "vignette",
+      "params": {
+        "intensity": 0.9
+      },
+      "condition": {"level": 2}
+    }
+  ]
+}

@@ -2,6 +2,122 @@
 
 All notable changes to the Match-3 Game project.
 
+## [Unreleased] - February 2026
+
+### Added
+- **Narrative Effects System** - Complete implementation for local and DLC levels
+  - 14 effect executors (background_dim, vignette, screen_flash, camera_impulse, shader_param_lerp, play_animation, timeline_sequence, state_swap, screen_overlay, narrative_dialogue, spawn_particles, foreground_dim, background_tint, progressive_brightness)
+  - Screen overlay with texture and tint support
+  - Narrative dialogue system with title/message parameters
+  - Timeline sequence for multi-step chained effects
+  - State swap for visibility/position swapping
+  - All effects working on both local and DLC levels
+  - Demo levels (1-6, 31) showcasing various effects
+
+- **Sample Overlay Textures** - 3 SVG textures for screen overlays
+  - `overlay_vignette.svg` - Dark edges effect
+  - `overlay_victory_rays.svg` - Radiating golden light
+  - `overlay_sparkles.svg` - Scattered stars celebration
+
+- **Spreader Tiles System** - Special mechanic tiles
+  - Configurable grace moves before spreading (1-2 moves)
+  - Controlled spread rate (1 tile per turn or all adjacent)
+  - Track spreader count for level completion goals
+  - Spreader-specific narrative effects integration
+  - Level 31 demo implementation
+
+- **HUD Enhancements**
+  - Rounded translucent background panel for HUD elements
+  - Registered as VisualAnchor "hud" for narrative effects targeting
+  - Professional polished appearance with subtle borders
+
+### Fixed
+- **Godot 4.5 Compatibility** - All narrative effects updated for Godot 4 APIs
+  - `Animation.loop_mode = Animation.LOOP_NONE` instead of `loop = false`
+  - `AnimationLibrary + add_animation_library()` instead of `add_animation()`
+  - Shader loading via `FileAccess` + `Shader.new().code` pattern
+  - SVG texture loading via `FileAccess.file_exists()` + `load()`
+  - Removed all deprecated `find_node()` calls
+  - Safe tree access patterns via viewport
+  - Lambda callbacks in timeline_sequence instead of unsafe await
+
+- **State Management Between Levels**
+  - HUD visibility automatically restored on every level load
+  - GameBoard position reset to (0,0) on level transitions
+  - Visual overlays properly cleaned up between levels
+  - No state leakage from previous levels
+
+- **Level Transition Screen** - Visibility timing issues
+  - Transition screen appears immediately on level complete
+  - Fixed `await` blocking visibility change
+  - Proper effect cleanup before transition
+
+- **Particle System** - Coordinate system and positioning
+  - Particles spawn at correct tile world positions
+  - Fixed top-left corner spawning bug
+  - Proper tile-to-world coordinate conversion
+
+- **Gravity System** - Tile refill and animation
+  - Tiles animate smoothly when dropping after matches
+  - No flying upward tiles
+  - Proper cascade refill behavior
+  - Fixed empty gaps on board
+
+- **Unmovable Tiles** - Consolidated implementation
+  - Removed UNMOVABLE_SOFT (use UNMOVABLE_HARD with H1 notation)
+  - All level files updated to H1/H2/H3 notation
+  - Fixed destruction counting and tracking
+  - Proper adjacent match detection and clearing
+
+- **Lightning Special Tiles** - Immediate tile destruction
+  - Tiles destroyed instantly as lightning beam passes
+  - Cascading lightning activation works correctly
+  - No delayed destruction animations
+
+- **Bonus Moves Counter** - Negative value prevention
+  - Counter stops at 0 instead of going negative
+  - Proper move counting during special tile chains
+  - Accurate move display during bonus cascade
+
+- **Narrative Dialogue** - Parameter support
+  - Supports both `title`/`message` AND `character`/`text` parameters
+  - Backward compatible with both naming conventions
+  - Messages display correctly in dialog boxes
+
+- **Screen Overlay** - Tint persistence bug
+  - Fixed tint overlays staying on screen permanently
+  - Proper fade-in → hold → fade-out → cleanup sequence
+  - ColorRect correctly animated and removed
+
+### Changed
+- **Documentation Structure** - Reorganized per coding guidelines
+  - All documentation moved to `docs/` directory
+  - Only `README.md` and `CHANGELOG.md` remain in root
+  - Created `docs/archive/fixes_2026_02_01/` for Feb 1 fixes
+  - Created `docs/archive/fixes_2026_02_02/` for Feb 2 fixes
+  - Updated `DOCUMENTATION_INDEX.md` with current structure
+  - Consolidated 20 individual fix docs into comprehensive guides
+
+- **Level Configuration Files** - Updated formats
+  - Levels 1-6 configured with narrative effect demos
+  - Level 31 showcases spreader mechanics
+  - All levels use H1/H2/H3 notation for unmovables
+  - Removed legacy "U" notation for soft unmovables
+
+- **Effect Naming** - Standardized across system
+  - `narrative_dialogue` (not `narrative_dialog`)
+  - Consistent parameter names throughout
+  - Clear documentation of supported parameters
+
+### Documentation
+- ✅ `COMPLETE_TESTING_SUMMARY.md` - Comprehensive testing status
+- ✅ `NARRATIVE_EFFECTS_COMPLETE_SUMMARY.md` - System implementation guide
+- ✅ `NARRATIVE_SYSTEM_COMPLETE.md` - Technical reference
+- ✅ `BUILTIN_NARRATIVE_QUICKSTART.md` - Quick tutorial
+- ✅ `SPREADER_TILES.md` - Spreader implementation guide
+- ✅ `CLEANUP_SUMMARY_2026_02_02.md` - Documentation cleanup summary
+- ✅ All fix documents archived with explanatory READMEs
+
 ## [1.0.0] - 2024-12-11
 
 ### Added - AdMob Integration

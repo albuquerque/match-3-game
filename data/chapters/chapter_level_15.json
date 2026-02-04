@@ -1,0 +1,94 @@
+{
+  "chapter_id": "level_15_dialogue_demo",
+  "version": "1.0.0",
+  "name": "Enhanced Dialogue Demo",
+  "description": "Demonstrates narrative dialogue with images and typewriter effects",
+
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "narrative_dialogue",
+      "params": {
+        "title": "The Prophet",
+        "message": "Welcome, traveler. The LIGHT awaits those who seek it.",
+        "image": "prophet_wise.svg",
+        "position": "bottom",
+        "reveal_mode": "typewriter",
+        "typewriter_speed": 25,
+        "emphasis": [
+          {
+            "word": "LIGHT",
+            "style": "glow"
+          }
+        ],
+        "duration": 0,
+        "style": "gospel"
+      },
+      "condition": {"level": 15}
+    },
+
+    {
+      "on": "match_cleared",
+      "effect": "narrative_dialogue",
+      "params": {
+        "title": "Guidance",
+        "message": "Good! The path becomes clearer with each match.",
+        "position": "top",
+        "reveal_mode": "typewriter",
+        "typewriter_speed": 35,
+        "duration": 2.0
+      },
+      "condition": {"level": 15}
+    },
+
+    {
+      "on": "special_tile_activated",
+      "effect": "narrative_dialogue",
+      "params": {
+        "title": "The Prophet",
+        "message": "Behold! The POWER of divine intervention!",
+        "image": "prophet_amazed.svg",
+        "position": "center",
+        "reveal_mode": "typewriter",
+        "emphasis": [
+          {
+            "word": "POWER",
+            "style": "shake"
+          },
+          {
+            "word": "divine",
+            "style": "rainbow"
+          }
+        ],
+        "duration": 0
+      },
+      "condition": {"level": 15}
+    },
+
+    {
+      "on": "level_complete",
+      "effect": "narrative_dialogue",
+      "params": {
+        "title": "Victory",
+        "message": "You have done well. The DARKNESS retreats before your light.",
+        "image": "prophet_proud.svg",
+        "position": "center",
+        "reveal_mode": "typewriter",
+        "typewriter_speed": 20,
+        "emphasis": [
+          {
+            "word": "DARKNESS",
+            "style": "shake"
+          },
+          {
+            "word": "light",
+            "style": "glow"
+          }
+        ],
+        "duration": 4.0,
+        "style": "gospel"
+      },
+      "condition": {"level": 15}
+    }
+  ]
+}

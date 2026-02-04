@@ -1,0 +1,30 @@
+{
+  "chapter_id": "level_6_demo",
+  "version": "1.0.0",
+  "requires_engine_version": "1.0.0",
+  "name": "Level 6 Demo Effects",
+  "description": "Demo effects for level 6: timeline sequence and state swap",
+
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "timeline_sequence",
+      "params": {
+        "sequence": [
+          { "delay": 0.2, "binding": { "effect": "screen_flash", "params": { "color": "#00FF00", "intensity": 0.6, "duration": 0.3 } } },
+          { "delay": 0.6, "binding": { "effect": "background_tint", "params": { "color": "#FFD700", "intensity": 0.5, "duration": 0.6 } } }
+        ]
+      }
+    },
+    {
+      "on": "level_loaded",
+      "effect": "state_swap",
+      "params": { "anchor_a": "board", "anchor_b": "hud", "mode": "visibility" }
+    },
+    {
+      "on": "level_complete",
+      "effect": "state_swap",
+      "params": { "anchor_a": "board", "anchor_b": "hud", "mode": "visibility" }
+    }
+  ]
+}

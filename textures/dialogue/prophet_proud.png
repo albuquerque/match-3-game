@@ -1,0 +1,9 @@
+<svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" fill="#4A5568"/>
+  <circle cx="60" cy="50" r="25" fill="#E2E8F0"/>
+  <rect x="35" y="75" width="50" height="30" rx="5" fill="#718096"/>
+  <line x1="45" y1="45" x2="55" y2="43" stroke="#2D3748" stroke-width="2"/>
+  <line x1="65" y1="43" x2="75" y2="45" stroke="#2D3748" stroke-width="2"/>
+  <path d="M 50 58 Q 60 63 70 58" stroke="#2D3748" stroke-width="2" fill="none"/>
+  <text x="60" y="110" font-family="Arial" font-size="10" fill="#F7FAFC" text-anchor="middle">Proud</text>
+</svg>
