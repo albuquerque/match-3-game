@@ -1176,23 +1176,27 @@ func fill_empty_spaces() -> Array:
 				var should_spawn_collectible = false
 
 				# For collectible levels, check if we haven't reached the target yet
+				# AND we're not in bonus moves (level_transitioning or in_bonus_conversion)
 				if collectible_target > 0 and collectibles_collected < collectible_target:
-					# Check if there's a collectible position marker in this column that needs spawning
-					for cpos in collectible_positions:
-						if int(cpos.x) == x:
-							# Spawn collectible in this column
-							# Use a spawn rate to control frequency
-							var spawn_chance = 0.3  # 30% chance per empty cell in marked column
-							if randf() < spawn_chance:
-								should_spawn_collectible = true
-								break
+					# Don't spawn new collectibles during bonus moves
+					if not level_transitioning and not in_bonus_conversion:
+						# Check if there's a collectible position marker in this column that needs spawning
+						for cpos in collectible_positions:
+							if int(cpos.x) == x:
+								# Spawn collectible in this column
+								# Use a spawn rate to control frequency
+								var spawn_chance = 0.3  # 30% chance per empty cell in marked column
+								if randf() < spawn_chance:
+									should_spawn_collectible = true
+									break
 
+				# Spawn the appropriate tile type
 				if should_spawn_collectible:
 					# Spawn as collectible type
 					grid[x][y] = COLLECTIBLE
 					new_tiles.append(Vector2(x, y))
 				else:
-					# Spawn as regular tile
+					# Spawn as regular tile (for all levels, whether collectible-based or not)
 					grid[x][y] = randi_range(1, TILE_TYPES)
 					new_tiles.append(Vector2(x, y))
 

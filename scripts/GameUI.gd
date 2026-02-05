@@ -56,7 +56,12 @@ class_name GameUI
 @onready var level_complete_score = $LevelCompletePanel/VBoxContainer/LevelScoreLabel
 
 # Update menu & popup references
-@onready var menu_button = $VBoxContainer/TopPanel/MenuButton
+@onready var floating_menu = $FloatingMenu
+@onready var menu_button = $FloatingMenu/MenuButton
+@onready var expandable_panel = $FloatingMenu/ExpandablePanel
+@onready var map_button = $FloatingMenu/ExpandablePanel/MapButton
+@onready var audio_button = $FloatingMenu/ExpandablePanel/AudioButton
+@onready var shop_menu_button = $FloatingMenu/ExpandablePanel/ShopButton
 @onready var main_menu_popup = $MainMenuPopup
 
 # Phase 2: Shop and Dialogs
@@ -100,6 +105,9 @@ var _side_position = "right"  # current side where the panel will open from: "le
 # Helper flag used when awaiting level_loaded signal
 var _level_loaded_flag: bool = false
 
+# Floating menu state
+var menu_expanded = false
+
 # Helper function to determine if a level is a DLC level
 func is_dlc_level(level_num: int) -> bool:
 	"""Check if a level number is a DLC level (beyond built-in levels)"""
@@ -142,66 +150,23 @@ func _ready():
 	continue_button.connect("pressed", _on_continue_pressed)
 	menu_button.connect("pressed", _on_menu_pressed)
 
-	# Ensure the menu button has its SVG texture loaded at runtime
-	var menu_icon_path = "res://textures/menu_hamburger.svg"
-	if menu_button:
-		print("[GameUI] MenuButton found; attempting to load icon from:", menu_icon_path)
-		menu_button.visible = true
-		menu_button.mouse_filter = Control.MOUSE_FILTER_STOP
-		menu_button.modulate = Color(1,1,1,1)
-		menu_button.focus_mode = Control.FOCUS_NONE
-		menu_button.custom_minimum_size = Vector2(44, 44)
-		# Try loading texture
-		if ResourceLoader.exists(menu_icon_path):
-			var tex = load(menu_icon_path)
-			if tex:
-				# Prefer using an explicit child Icon TextureRect if present. This avoids the
-				# TextureButton drawing the texture as background AND the child Icon also drawing
-				# the same texture which results in duplicate rendering (appears as doubled lines).
-				var icon_node = null
-				if menu_button.has_node("Icon"):
-					icon_node = menu_button.get_node("Icon")
+	# Connect floating menu buttons
+	if map_button:
+		map_button.connect("pressed", _on_map_button_pressed)
+	if audio_button:
+		audio_button.connect("pressed", _on_audio_button_pressed)
+	if shop_menu_button:
+		shop_menu_button.connect("pressed", _on_shop_menu_button_pressed)
 
-				if icon_node and icon_node is TextureRect:
-					# Use child TextureRect for icon rendering and don't set button textures
-					icon_node.texture = tex
-					icon_node.visible = true
-					icon_node.modulate = Color(1,1,1,1)
-					icon_node.custom_minimum_size = Vector2(24, 24)
-					icon_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-					print("[GameUI] Loaded menu icon into child Icon TextureRect:", tex)
-				else:
-					# No child Icon present — set the TextureButton textures so it displays
-					if "texture_normal" in menu_button:
-						menu_button.texture_normal = tex
-					if "texture_pressed" in menu_button:
-						menu_button.texture_pressed = tex
-					print("[GameUI] Loaded menu icon into TextureButton textures:", tex)
+	# Initialize expandable panel as hidden
+	if expandable_panel:
+		expandable_panel.modulate = Color(1, 1, 1, 0)
+		expandable_panel.visible = false
 
-					# Fall back: if the button still doesn't show the icon (some controls types),
-					# add a runtime TextureRect under MenuButton to be safe.
-					if (not menu_button.has_node("MenuIconRuntime")):
-						var runtime_icon = TextureRect.new()
-						runtime_icon.name = "MenuIconRuntime"
-						runtime_icon.texture = tex
-						runtime_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-						runtime_icon.custom_minimum_size = Vector2(28, 28)
-						runtime_icon.anchor_left = 0.5
-						runtime_icon.anchor_top = 0.5
-						runtime_icon.anchor_right = 0.5
-						runtime_icon.anchor_bottom = 0.5
-						runtime_icon.offset_left = -14
-						runtime_icon.offset_top = -14
-						runtime_icon.offset_right = 14
-						runtime_icon.offset_bottom = 14
-						menu_button.add_child(runtime_icon)
-						print("[GameUI] Added runtime MenuIconRuntime fallback")
-			else:
-				print("[GameUI] Failed to load texture from:", menu_icon_path)
-		else:
-			print("[GameUI] Menu icon not found at:", menu_icon_path)
+	# Start glow animations for menu buttons
+	_start_menu_glow_animations()
 
-	# Set up Main Menu popup
+	# Set up Main Menu popup (kept for backward compatibility but not used in floating menu)
 	if main_menu_popup:
 		main_menu_popup.add_item("Settings", 0)
 		main_menu_popup.add_item("Shop", 1)
@@ -399,6 +364,12 @@ func update_display():
 	score_label.text = "%d" % GameManager.score
 	level_label.text = "Lv %d" % GameManager.level
 	moves_label.text = "%d" % GameManager.moves_left
+
+	# Set correct color for moves (don't leave it red from previous level)
+	if GameManager.moves_left <= 5:
+		moves_label.modulate = Color.RED
+	else:
+		moves_label.modulate = Color.WHITE
 
 	# Update progress bar and target label based on level type
 	if GameManager.unmovable_target > 0:
@@ -850,8 +821,6 @@ func _advance_to_next_level():
 	await _load_level_by_number(next_level_num)
 	return
 
-# ...existing code...
-
 func _load_level_by_number(level_num: int):
 	print("[GameUI] Loading level by number: %d" % level_num)
 
@@ -1132,11 +1101,29 @@ func _on_menu_pressed():
 	# Play UI click sound
 	AudioManager.play_sfx("ui_click")
 
-	# Show the popup menu anchored to the menu button
-	if main_menu_popup and menu_button:
-		main_menu_popup.set_position(menu_button.get_global_position())
-		main_menu_popup.popup()
-		print("[GameUI] Main menu popup opened")
+	# Toggle the expandable panel
+	menu_expanded = !menu_expanded
+	_animate_menu_toggle()
+
+func _animate_menu_toggle():
+	"""Animate the expandable panel opening or closing"""
+	if not expandable_panel:
+		return
+
+	if menu_expanded:
+		# Show and fade in the panel
+		expandable_panel.visible = true
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(expandable_panel, "modulate", Color(1, 1, 1, 1), 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		# Start position is 54 (below the 44px MenuButton), animate to 54 (same position)
+		# The panel position is relative to FloatingMenu parent
+	else:
+		# Fade out and hide the panel
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(expandable_panel, "modulate", Color(1, 1, 1, 0), 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		tween.finished.connect(func(): expandable_panel.visible = false)
 
 func restart_game():
 	# Reset GameManager completely (just like starting fresh)
@@ -2477,6 +2464,10 @@ func _on_startpage_start_pressed():
 
 func _on_startpage_map_pressed():
 	"""Called when StartPage requests to open the World Map."""
+	_show_worldmap_fullscreen()
+
+func _show_worldmap_fullscreen():
+	"""Show the world map as a fullscreen UI"""
 	AudioManager.play_sfx("ui_click")
 
 	# Try to find existing WorldMap node
@@ -2544,3 +2535,75 @@ func _on_worldmap_level_selected(level_num: int):
 
 	# Use centralized level loader (handles both DLC and built-in levels)
 	await _load_level_by_number(level_num)
+
+func _on_map_button_pressed():
+	"""Handle map button press from floating menu"""
+	print("[GameUI] Map button pressed from floating menu")
+	AudioManager.play_sfx("ui_click")
+
+	# Close the menu
+	menu_expanded = false
+	_animate_menu_toggle()
+
+	# Show world map
+	_show_worldmap_fullscreen()
+
+func _on_audio_button_pressed():
+	"""Handle audio settings button press from floating menu"""
+	print("[GameUI] Audio settings button pressed from floating menu")
+	AudioManager.play_sfx("ui_click")
+
+	# Close the menu
+	menu_expanded = false
+	_animate_menu_toggle()
+
+	# Show settings dialog (side panel)
+	_show_settings_side()
+
+func _on_shop_menu_button_pressed():
+	"""Handle shop button press from floating menu"""
+	print("[GameUI] Shop button pressed from floating menu")
+	AudioManager.play_sfx("ui_click")
+
+	# Close the menu
+	menu_expanded = false
+	_animate_menu_toggle()
+
+	# Show shop (side panel)
+	_show_shop_side()
+
+func _start_menu_glow_animations():
+	"""Start pulsing glow animations for all menu button glow circles"""
+	# Animate menu button glow
+	if menu_button and menu_button.has_node("Glow"):
+		var glow = menu_button.get_node("Glow")
+		_animate_glow_pulse(glow, Color(0.2, 0.6, 1, 0.3), Color(0.2, 0.6, 1, 0.6), 1.5, 0.0)
+
+	# Animate map button glow
+	if map_button and map_button.has_node("Glow"):
+		var glow = map_button.get_node("Glow")
+		_animate_glow_pulse(glow, Color(0.3, 0.8, 0.3, 0.3), Color(0.3, 0.8, 0.3, 0.6), 1.5, 0.2)
+
+	# Animate audio button glow
+	if audio_button and audio_button.has_node("Glow"):
+		var glow = audio_button.get_node("Glow")
+		_animate_glow_pulse(glow, Color(1, 0.6, 0.2, 0.3), Color(1, 0.6, 0.2, 0.6), 1.5, 0.4)
+
+	# Animate shop button glow
+	if shop_menu_button and shop_menu_button.has_node("Glow"):
+		var glow = shop_menu_button.get_node("Glow")
+		_animate_glow_pulse(glow, Color(0.8, 0.3, 0.8, 0.3), Color(0.8, 0.3, 0.8, 0.6), 1.5, 0.6)
+
+func _animate_glow_pulse(glow_rect: ColorRect, color_from: Color, color_to: Color, duration: float, delay: float):
+	"""Create a pulsing glow animation for a ColorRect"""
+	if not glow_rect:
+		return
+
+	# Wait for delay
+	await get_tree().create_timer(delay).timeout
+
+	# Create infinite pulsing animation
+	var tween = create_tween()
+	tween.set_loops()
+	tween.tween_property(glow_rect, "color", color_to, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(glow_rect, "color", color_from, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)

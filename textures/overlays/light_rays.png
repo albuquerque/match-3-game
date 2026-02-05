@@ -1,0 +1,14 @@
+<svg width="720" height="1280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#FFD700;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+  <rect width="720" height="1280" fill="url(#glow)"/>
+  <g opacity="0.3">
+    <polygon points="360,0 380,640 340,640" fill="#FFD700"/>
+    <polygon points="360,0 300,640 280,640" fill="#FFD700"/>
+    <polygon points="360,0 440,640 420,640" fill="#FFD700"/>
+  </g>
+</svg>

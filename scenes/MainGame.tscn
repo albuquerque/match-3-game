@@ -1,10 +1,14 @@
-[gd_scene load_steps=8 format=3 uid="uid://pu3wcj43djjh"]
+[gd_scene load_steps=12 format=3 uid="uid://pu3wcj43djjh"]
 
 [ext_resource type="Script" uid="uid://doc3oxaambqkj" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
 [ext_resource type="Script" uid="uid://clght4j2ys21n" path="res://scripts/GameUI.gd" id="2_4y7z1"]
 [ext_resource type="Script" uid="uid://b7r5vfqaywpue" path="res://scripts/ShopUI.gd" id="3_shopui"]
 [ext_resource type="Script" uid="uid://bbqp6ba2mgrmw" path="res://scripts/OutOfLivesDialog.gd" id="4_outoflivesdialog"]
 [ext_resource type="Script" uid="uid://daaqxkt41gscs" path="res://scripts/RewardNotification.gd" id="5_rewardnotification"]
+[ext_resource type="Texture2D" path="res://textures/menu_hamburger.svg" id="6_menu"]
+[ext_resource type="Texture2D" path="res://textures/map.png" id="7_map"]
+[ext_resource type="Texture2D" path="res://textures/audio_settings.png" id="8_audio"]
+[ext_resource type="Texture2D" path="res://textures/shop.png" id="9_shop"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
 bg_color = Color(0.2, 0.2, 0.3, 0.8)
@@ -131,26 +135,7 @@ horizontal_alignment = 1
 [node name="TargetProgress" type="ProgressBar" parent="GameUI/VBoxContainer/TopPanel/TargetContainer"]
 layout_mode = 2
 
-[node name="MenuButton" type="TextureButton" parent="GameUI/VBoxContainer/TopPanel"]
-custom_minimum_size = Vector2(44, 44)
-layout_mode = 2
-focus_mode = 0
 
-[node name="Icon" type="TextureRect" parent="GameUI/VBoxContainer/TopPanel/MenuButton"]
-custom_minimum_size = Vector2(24, 24)
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -12.0
-offset_top = -12.0
-offset_right = 12.0
-offset_bottom = 12.0
-grow_horizontal = 2
-grow_vertical = 2
-stretch_mode = 2
 
 [node name="Spacer" type="Control" parent="GameUI/VBoxContainer"]
 layout_mode = 2
@@ -689,5 +674,192 @@ layout_mode = 2
 text = "Awesome!"
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="GameUI/RewardNotification"]
+
+[node name="FloatingMenu" type="Control" parent="GameUI"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -85.0
+offset_top = 80.0
+offset_right = -10.0
+offset_bottom = 380.0
+grow_horizontal = 0
+
+[node name="MenuButton" type="TextureButton" parent="GameUI/FloatingMenu"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -70.0
+offset_right = 0.0
+offset_bottom = 70.0
+grow_horizontal = 0
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="GameUI/FloatingMenu/MenuButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.2, 0.6, 1, 0.3)
+
+[node name="Icon" type="TextureRect" parent="GameUI/FloatingMenu/MenuButton"]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("6_menu")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ExpandablePanel" type="VBoxContainer" parent="GameUI/FloatingMenu"]
+modulate = Color(1, 1, 1, 0)
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -70.0
+offset_top = 80.0
+offset_right = 0.0
+offset_bottom = 320.0
+grow_horizontal = 0
+theme_override_constants/separation = 10
+
+[node name="MapButton" type="TextureButton" parent="GameUI/FloatingMenu/ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="GameUI/FloatingMenu/ExpandablePanel/MapButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.3, 0.8, 0.3, 0.3)
+
+[node name="Icon" type="TextureRect" parent="GameUI/FloatingMenu/ExpandablePanel/MapButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("7_map")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="AudioButton" type="TextureButton" parent="GameUI/FloatingMenu/ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="GameUI/FloatingMenu/ExpandablePanel/AudioButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 0.6, 0.2, 0.3)
+
+[node name="Icon" type="TextureRect" parent="GameUI/FloatingMenu/ExpandablePanel/AudioButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("8_audio")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ShopButton" type="TextureButton" parent="GameUI/FloatingMenu/ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="GameUI/FloatingMenu/ExpandablePanel/ShopButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.8, 0.3, 0.8, 0.3)
+
+[node name="Icon" type="TextureRect" parent="GameUI/FloatingMenu/ExpandablePanel/ShopButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("9_shop")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="MainMenuPopup" type="PopupMenu" parent="GameUI"]
