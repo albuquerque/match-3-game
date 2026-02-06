@@ -16,6 +16,8 @@
 - **BOOSTERS_IMPLEMENTATION.md** - Booster system
 - **AUDIO_SYSTEM.md** - Audio & music system
 - **THEME_SYSTEM_README.md** - Visual theme system
+- **LEVEL_TRANSITION_THEMING.md** - Level complete screen theming
+- **NARRATIVE_STAGE_IMPLEMENTATION.md** - ⭐ Narrative stage system (NEW!)
 - **WORLD_MAP_FULL.md** - World map & level selection
 
 ---
@@ -26,6 +28,10 @@
 |-----------|--------------|
 | Test narrative effects | `COMPLETE_TESTING_SUMMARY.md` |
 | Create level effects | `NARRATIVE_EFFECTS_COMPLETE.md` (Quick Start section) |
+| Create narrative stage | `NARRATIVE_STAGE_GUIDE.md` (Quick Start section) |
+| Image specs for narrative | `NARRATIVE_STAGE_GUIDE.md` (Image Specifications) |
+| Theme level complete screen | `LEVEL_TRANSITION_GUIDE.md` (Quick Start) |
+| Add DLC backgrounds | `LEVEL_TRANSITION_GUIDE.md` (DLC Integration) |
 | Understand all effects | `NARRATIVE_EFFECTS_COMPLETE.md` |
 | Understand DLC system | `DLC_SYSTEM_COMPLETE.md` |
 | Implement spreaders | `SPREADER_TILES.md` |
@@ -43,6 +49,7 @@
 - FEATURES.md
 - GALLERY_FULL.md
 - LEVELS_FULL.md
+- LEVEL_TRANSITION_THEMING.md
 - LONG_TERM_ENGAGEMENT_COMPLETE.md
 - MULTIPLIER_SYSTEM.md
 - REWARD_SYSTEM_README.md

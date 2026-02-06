@@ -34,6 +34,7 @@ AssetRegistry="*res://scripts/AssetRegistry.gd"
 VisualAnchorManager="*res://scripts/VisualAnchorManager.gd"
 DLCConfig="*res://scripts/DLCConfig.gd"
 DLCManager="*res://scripts/DLCManager.gd"
+NarrativeStageManager="*res://scripts/NarrativeStageManager.gd"
 
 [display]
 

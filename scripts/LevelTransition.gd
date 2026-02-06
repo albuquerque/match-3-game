@@ -31,6 +31,40 @@ var bangers_font  # Bangers font resource for consistent styling
 # Preload gold star texture for consistent cross-platform rendering
 var gold_star_texture = preload("res://textures/gold_star.svg")
 
+# ============================================
+# THEME CONFIGURATION
+# Customize these per theme for different visual styles
+# ============================================
+
+# Theme color schemes - can be set based on level theme
+# Each theme can have a "background_image" path (optional)
+var theme_colors = {
+	"modern": {
+		"background": Color(0.05, 0.05, 0.1, 1.0),      # Dark blue-gray
+		"title": Color(1.0, 0.9, 0.3, 1.0),             # Gold
+		"score": Color(0.9, 0.9, 1.0, 1.0),             # Light blue-white
+		"rewards_title": Color(1.0, 1.0, 1.0, 1.0),     # White
+		"continue_button": Color(0.3, 1.0, 0.3, 1.0),   # Green
+		"replay_button": Color(0.3, 0.9, 1.0, 1.0),     # Cyan
+		# Optional: "background_image": "res://textures/backgrounds/modern_bg.png"
+	},
+	"legacy": {
+		"background": Color(0.1, 0.05, 0.0, 1.0),       # Dark brown
+		"title": Color(1.0, 0.8, 0.2, 1.0),             # Warm gold
+		"score": Color(1.0, 0.95, 0.85, 1.0),           # Cream
+		"rewards_title": Color(0.95, 0.9, 0.8, 1.0),    # Warm white
+		"continue_button": Color(0.4, 0.9, 0.3, 1.0),   # Warm green
+		"replay_button": Color(0.4, 0.8, 0.9, 1.0),     # Warm cyan
+		# Optional: "background_image": "res://textures/backgrounds/legacy_bg.png"
+	}
+}
+
+# Current theme being used
+var _current_theme: String = "modern"
+
+# Background image TextureRect (if using image instead of solid color)
+var background_image: TextureRect = null
+
 # Multiplier zone configuration [start%, end%, multiplier, color]
 var _multiplier_config = [
 	[0.0, 0.15, 1.0, Color(0.5, 0.5, 0.5, 1.0)],      # Gray - 1x
@@ -43,16 +77,67 @@ var _multiplier_config = [
 ]
 
 func _ready():
-	# Create fullscreen opaque background
+	# Get current theme from ThemeManager
+	_current_theme = ThemeManager.get_theme_name()
+	print("[LevelTransition] Using theme: ", _current_theme)
+
+	# Get theme colors (with fallback to modern if theme not defined)
+	var colors = theme_colors.get(_current_theme, theme_colors["modern"])
+
+	# Create fullscreen opaque background with theme color
 	background = ColorRect.new()
 	background.name = "Background"
-	background.color = Color(0.05, 0.05, 0.1, 1.0)  # Dark opaque background
+	background.color = colors["background"]
 	background.anchor_left = 0
 	background.anchor_top = 0
 	background.anchor_right = 1
 	background.anchor_bottom = 1
 	background.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(background)
+
+	# If theme has a background image, create TextureRect on top of color background
+	if colors.has("background_image") and colors["background_image"] != "":
+		var bg_image_path = colors["background_image"]
+		var texture_to_load = null
+
+		# Check if it's a DLC asset ID (format: "chapter_id:asset_name")
+		if bg_image_path.contains(":"):
+			var parts = bg_image_path.split(":")
+			var chapter_id = parts[0]
+			var asset_name = parts[1]
+
+			# Try to load from AssetRegistry (supports DLC)
+			var asset_registry = get_node_or_null("/root/AssetRegistry")
+			if asset_registry and asset_registry.has_method("get_texture"):
+				texture_to_load = asset_registry.get_texture(chapter_id, asset_name)
+				if texture_to_load:
+					print("[LevelTransition] Loaded DLC background: ", chapter_id, ":", asset_name)
+				else:
+					print("[LevelTransition] DLC background not found: ", chapter_id, ":", asset_name)
+			else:
+				print("[LevelTransition] AssetRegistry not available for DLC backgrounds")
+		else:
+			# Standard resource path (bundled with game)
+			if ResourceLoader.exists(bg_image_path):
+				texture_to_load = load(bg_image_path)
+				print("[LevelTransition] Loaded bundled background: ", bg_image_path)
+			else:
+				print("[LevelTransition] Background image not found: ", bg_image_path)
+
+		# Create TextureRect if we have a texture
+		if texture_to_load:
+			background_image = TextureRect.new()
+			background_image.name = "BackgroundImage"
+			background_image.texture = texture_to_load
+			background_image.anchor_left = 0
+			background_image.anchor_top = 0
+			background_image.anchor_right = 1
+			background_image.anchor_bottom = 1
+			background_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			background_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			background_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(background_image)
+			print("[LevelTransition] Background image applied successfully")
 
 	# Create content container
 	content_container = VBoxContainer.new()
@@ -64,7 +149,7 @@ func _ready():
 	content_container.add_theme_constant_override("separation", 20)
 	add_child(content_container)
 
-	# Title label
+	# Title label with theme color
 	title_label = Label.new()
 	title_label.name = "TitleLabel"
 	title_label.text = "🎉 Level Complete! 🎉"
@@ -73,7 +158,7 @@ func _ready():
 	# Apply Bangers font for impactful display
 	bangers_font = load("res://fonts/Bangers/Bangers-Regular.ttf")
 	ThemeManager.apply_bangers_font(title_label, 48)
-	title_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))  # Gold color
+	title_label.add_theme_color_override("font_color", colors["title"])
 	content_container.add_child(title_label)
 
 	# Star rating container (will be populated dynamically)
@@ -83,12 +168,13 @@ func _ready():
 	star_container.add_theme_constant_override("separation", 15)
 	content_container.add_child(star_container)
 
-	# Score label
+	# Score label with theme color
 	score_label = Label.new()
 	score_label.name = "ScoreLabel"
 	score_label.text = "Score: 0"
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(score_label, 32)
+	score_label.add_theme_color_override("font_color", colors["score"])
 	content_container.add_child(score_label)
 
 	# Rewards container
@@ -101,6 +187,7 @@ func _ready():
 	rewards_title.text = "Rewards Earned:"
 	rewards_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(rewards_title, 28)
+	rewards_title.add_theme_color_override("font_color", colors["rewards_title"])
 	rewards_container.add_child(rewards_title)
 
 	# Spacer
@@ -118,23 +205,23 @@ func _ready():
 	button_container.add_theme_constant_override("separation", 20)
 	content_container.add_child(button_container)
 
-	# Replay button
+	# Replay button with theme color
 	var replay_button = Button.new()
 	replay_button.name = "ReplayButton"
 	replay_button.text = "🔄 REPLAY"
 	ThemeManager.apply_bangers_font_to_button(replay_button, 22)
 	replay_button.custom_minimum_size = Vector2(200, 80)
-	replay_button.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))  # Cyan
+	replay_button.add_theme_color_override("font_color", colors["replay_button"])
 	replay_button.pressed.connect(_on_replay_pressed)
 	button_container.add_child(replay_button)
 
-	# Continue button
+	# Continue button with theme color
 	continue_button = Button.new()
 	continue_button.name = "ContinueButton"
 	continue_button.text = "▶ NEXT LEVEL"
 	ThemeManager.apply_bangers_font_to_button(continue_button, 22)
 	continue_button.custom_minimum_size = Vector2(200, 80)
-	continue_button.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))  # Green
+	continue_button.add_theme_color_override("font_color", colors["continue_button"])
 	continue_button.pressed.connect(_on_continue_pressed)
 	button_container.add_child(continue_button)
 
@@ -272,6 +359,100 @@ func _on_multiplier_tap_area_input(event):
 		_on_multiplier_tapped()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_on_multiplier_tapped()
+
+func apply_theme_colors(theme_name: String = ""):
+	"""
+	Apply theme colors and background image to the transition screen.
+	Call this to refresh theme if it changes.
+	If theme_name is empty, uses current ThemeManager theme.
+	"""
+	if theme_name == "":
+		theme_name = ThemeManager.get_theme_name()
+
+	_current_theme = theme_name
+	var colors = theme_colors.get(_current_theme, theme_colors["modern"])
+
+	# Update background color
+	if background:
+		background.color = colors["background"]
+
+	# Update or create background image
+	if colors.has("background_image") and colors["background_image"] != "":
+		var bg_image_path = colors["background_image"]
+		var texture_to_load = null
+
+		# Check if it's a DLC asset ID (format: "chapter_id:asset_name")
+		if bg_image_path.contains(":"):
+			var parts = bg_image_path.split(":")
+			var chapter_id = parts[0]
+			var asset_name = parts[1]
+
+			# Try to load from AssetRegistry (supports DLC)
+			var asset_registry = get_node_or_null("/root/AssetRegistry")
+			if asset_registry and asset_registry.has_method("get_texture"):
+				texture_to_load = asset_registry.get_texture(chapter_id, asset_name)
+				if texture_to_load:
+					print("[LevelTransition] Loaded DLC background: ", chapter_id, ":", asset_name)
+				else:
+					print("[LevelTransition] DLC background not found: ", chapter_id, ":", asset_name)
+		else:
+			# Standard resource path (bundled with game)
+			if ResourceLoader.exists(bg_image_path):
+				texture_to_load = load(bg_image_path)
+				print("[LevelTransition] Loaded bundled background: ", bg_image_path)
+
+		# Create or update background image
+		if texture_to_load:
+			# Remove old background image if it exists
+			if background_image and is_instance_valid(background_image):
+				background_image.queue_free()
+
+			# Create new background image
+			background_image = TextureRect.new()
+			background_image.name = "BackgroundImage"
+			background_image.texture = texture_to_load
+			background_image.anchor_left = 0
+			background_image.anchor_top = 0
+			background_image.anchor_right = 1
+			background_image.anchor_bottom = 1
+			background_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			background_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			background_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			# Insert after background but before content
+			add_child(background_image)
+			move_child(background_image, 1)
+			print("[LevelTransition] Applied background image successfully")
+	else:
+		# No background image in this theme - remove if exists
+		if background_image and is_instance_valid(background_image):
+			background_image.queue_free()
+			background_image = null
+
+	# Update title color
+	if title_label:
+		title_label.add_theme_color_override("font_color", colors["title"])
+
+	# Update score color
+	if score_label:
+		score_label.add_theme_color_override("font_color", colors["score"])
+
+	# Update rewards title
+	if rewards_container and rewards_container.get_child_count() > 0:
+		var rewards_title = rewards_container.get_child(0)
+		if rewards_title is Label:
+			rewards_title.add_theme_color_override("font_color", colors["rewards_title"])
+
+	# Update button colors
+	var button_container = content_container.get_node_or_null("ButtonContainer")
+	if button_container:
+		var replay_btn = button_container.get_node_or_null("ReplayButton")
+		if replay_btn:
+			replay_btn.add_theme_color_override("font_color", colors["replay_button"])
+
+		if continue_button:
+			continue_button.add_theme_color_override("font_color", colors["continue_button"])
+
+	print("[LevelTransition] Theme colors applied: ", _current_theme)
 
 func show_transition(completed_level: int, final_score: int, coins_earned: int, gems_earned: int, has_next_level: bool = true, stars: int = 1):
 	"""Show the level transition screen with rewards and star rating"""

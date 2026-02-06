@@ -334,6 +334,11 @@ func load_current_level():
 	if collectible_target > 0:
 		call_deferred("emit_signal", "collectibles_changed", collectibles_collected, collectible_target)
 
+	# Load narrative stage for this level if available
+	var narrative_manager = get_node_or_null("/root/NarrativeStageManager")
+	if narrative_manager:
+		narrative_manager.load_stage_for_level(level)
+
 	print("[GameManager] ✓ load_current_level() completed, initialized =", initialized)
 
 

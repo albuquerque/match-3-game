@@ -1,0 +1,70 @@
+{
+  "id": "exodus_sea_parting",
+  "name": "The Parting of the Red Sea",
+  "description": "Watch as Moses parts the Red Sea during gameplay",
+  "anchors": ["top_banner"],
+  "states": [
+    {
+      "name": "intro",
+      "asset": "moses_full_sea.png",
+      "position": "top_banner",
+      "description": "Moses stands before the full sea"
+    },
+    {
+      "name": "progress_25",
+      "asset": "water_rippling.svg",
+      "position": "top_banner",
+      "description": "Water begins to ripple"
+    },
+    {
+      "name": "progress_50",
+      "asset": "water_shifting.svg",
+      "position": "top_banner",
+      "description": "Water shifts and parts slightly"
+    },
+    {
+      "name": "progress_75",
+      "asset": "water_parting.svg",
+      "position": "top_banner",
+      "description": "Water dramatically parting"
+    },
+    {
+      "name": "goal_complete",
+      "asset": "sea_parted.svg",
+      "position": "top_banner",
+      "description": "Sea fully parted with path visible"
+    }
+  ],
+  "transitions": [
+    {
+      "event": "level_start",
+      "to": "intro",
+      "description": "Level starts"
+    },
+    {
+      "event": "progress_25",
+      "to": "progress_25",
+      "description": "25% progress reached"
+    },
+    {
+      "event": "progress_50",
+      "to": "progress_50",
+      "description": "50% progress reached"
+    },
+    {
+      "event": "progress_75",
+      "to": "progress_75",
+      "description": "75% progress reached"
+    },
+    {
+      "event": "goal_complete",
+      "to": "goal_complete",
+      "description": "Goal completed"
+    },
+    {
+      "event": "level_complete",
+      "to": "goal_complete",
+      "description": "Level completed"
+    }
+  ]
+}
