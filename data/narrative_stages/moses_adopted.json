@@ -1,0 +1,22 @@
+{
+  "id": "moses_adopted",
+  "name": "Moses Adopted",
+  "description": "Moses Adopted",
+  "anchor": "fullscreen",
+  "background_color": "#FFD700",
+  "text_color": "#8B4513",
+  "states": [
+    {
+      "name": "main",
+      "text": "Pharaoh's daughter raised Moses\nas her own son.\n\nA Hebrew prince in Egypt's palace.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

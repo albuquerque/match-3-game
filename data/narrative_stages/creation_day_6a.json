@@ -1,0 +1,22 @@
+{
+  "id": "creation_day_6a",
+  "name": "Day 6: Animals",
+  "description": "Day 6: Animals",
+  "anchor": "fullscreen",
+  "background_color": "#4A3C28",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "God made the beasts of the earth,\nthe livestock, and everything that creeps on the ground.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

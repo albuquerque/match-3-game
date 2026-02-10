@@ -1,0 +1,22 @@
+{
+  "id": "exodus_begins",
+  "name": "The Exodus Begins",
+  "description": "The Exodus Begins",
+  "anchor": "fullscreen",
+  "background_color": "#4682B4",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Pharaoh finally let them go.\n\nIsrael left Egypt with great wealth,\na pillar of cloud leading them.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

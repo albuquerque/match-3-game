@@ -1,0 +1,23 @@
+{
+  "id": "creation_day_2",
+  "name": "The Second Day",
+  "description": "God separates the waters",
+  "anchor": "fullscreen",
+  "background_color": "#001144",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "intro",
+      "asset": "res://textures/narrative/creation_day_2.svg",
+      "text": "And God said, 'Let there be a vault between the waters to separate water from water.'",
+      "duration": 5.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "intro",
+      "event": "stage_loaded"
+    }
+  ]
+}

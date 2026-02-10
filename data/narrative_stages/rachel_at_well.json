@@ -1,0 +1,22 @@
+{
+  "id": "rachel_at_well",
+  "name": "Rachel at the Well",
+  "description": "Rachel at the Well",
+  "anchor": "fullscreen",
+  "background_color": "#4682B4",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Jacob met Rachel at a well\nand fell in love immediately.\n\nHe would work fourteen years to marry her.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

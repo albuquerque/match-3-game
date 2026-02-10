@@ -1,0 +1,22 @@
+{
+  "id": "the_fall",
+  "name": "The Fall",
+  "description": "The Fall",
+  "anchor": "fullscreen",
+  "background_color": "#1A1A1A",
+  "text_color": "#FF6B6B",
+  "states": [
+    {
+      "name": "main",
+      "text": "The serpent deceived them, and they ate the forbidden fruit.\n\nSin entered the world,\nand they were cast from the garden.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

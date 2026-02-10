@@ -1,0 +1,22 @@
+{
+  "id": "stolen_blessing",
+  "name": "The Stolen Blessing",
+  "description": "The Stolen Blessing",
+  "anchor": "fullscreen",
+  "background_color": "#2F2F2F",
+  "text_color": "#FFE4C4",
+  "states": [
+    {
+      "name": "main",
+      "text": "Jacob disguised himself as Esau\nand stole his father's blessing.\n\nDeception brought blessing, but also exile.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

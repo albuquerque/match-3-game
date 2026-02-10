@@ -1,0 +1,22 @@
+{
+  "id": "plagues_continue",
+  "name": "Plagues Continue",
+  "description": "Plagues Continue",
+  "anchor": "fullscreen",
+  "background_color": "#2F2F2F",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "Gnats, flies, and pestilence\nstruck the land of Egypt.\n\nYet Pharaoh would not relent.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "cain_and_abel",
+  "name": "Cain and Abel",
+  "description": "Cain and Abel",
+  "anchor": "fullscreen",
+  "background_color": "#2C0E0E",
+  "text_color": "#FFCCCC",
+  "states": [
+    {
+      "name": "main",
+      "text": "Abel's offering was accepted,\nbut Cain's was not.\n\nJealousy led to tragedy.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

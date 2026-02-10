@@ -1,0 +1,22 @@
+{
+  "id": "israel_multiplies",
+  "name": "Israel Multiplies",
+  "description": "Israel Multiplies",
+  "anchor": "fullscreen",
+  "background_color": "#2E5C3F",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "The Israelites were fruitful\nand multiplied greatly.\n\nThe land of Egypt was filled with them.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

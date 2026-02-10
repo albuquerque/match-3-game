@@ -1,0 +1,22 @@
+{
+  "id": "plagues_livestock_boils",
+  "name": "Livestock and Boils",
+  "description": "Livestock and Boils",
+  "anchor": "fullscreen",
+  "background_color": "#4B0000",
+  "text_color": "#FFA07A",
+  "states": [
+    {
+      "name": "main",
+      "text": "The livestock died,\nand painful boils broke out on all Egyptians.\n\nThe plagues grew worse.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "let_my_people_go",
+  "name": "Let My People Go",
+  "description": "Let My People Go",
+  "anchor": "fullscreen",
+  "background_color": "#8B0000",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Moses and Aaron stood before Pharaoh:\n\n'Thus says the Lord:\nLet My people go!'",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "rebekah_at_well",
+  "name": "Rebekah at the Well",
+  "description": "Rebekah at the Well",
+  "anchor": "fullscreen",
+  "background_color": "#6B8E23",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Abraham's servant prayed for a sign,\nand Rebekah appeared at the well.\n\nShe would become Isaac's wife.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

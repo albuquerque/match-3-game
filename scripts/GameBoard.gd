@@ -64,9 +64,13 @@ const BORDER_WIDTH = 3.0
 var background_image_path: String = ""  # Set this to enable background image
 var background_sprite = null  # TextureRect for the background image
 
+# Guard against concurrent visual grid creation
+var creating_visual_grid: bool = false
+
 @onready var background = $Background
 var border_container: Node2D  # Container for all border lines
 var tile_area_overlay: Control = null  # Container for semi-transparent overlay pieces over tiles
+var board_container: Node2D = null  # Master container for ALL board visual elements (tiles, borders, overlays)
 
 func _ready():
 	# Safely connect to GameManager signals if GameManager autoload is present
@@ -78,10 +82,19 @@ func _ready():
 	else:
 		print("[GameBoard] WARNING: GameManager autoload not available at _ready(); will wait for level_loaded signal")
 
-	# Create border container
+	# Create master board container to hold ALL visual elements
+	# This allows hiding/showing the entire board area with one call
+	board_container = Node2D.new()
+	board_container.name = "BoardContainer"
+	board_container.z_index = 0  # Standard game layer
+	add_child(board_container)
+	print("[GameBoard] Created BoardContainer to group all visual elements")
+
+	# Create border container (will be added to board_container)
 	border_container = Node2D.new()
 	border_container.name = "BorderContainer"
-	add_child(border_container)
+	board_container.add_child(border_container)
+	print("[GameBoard] BorderContainer added to BoardContainer")
 
 	# ========== CUSTOMIZATION EXAMPLES ==========
 	# Uncomment and modify these lines to customize appearance:
@@ -168,9 +181,41 @@ func setup_background():
 func setup_tile_area_overlay():
 	"""Create a semi-transparent overlay covering only the active tile area (within borders)"""
 	# Remove existing overlay if any
-	if tile_area_overlay:
+	if tile_area_overlay and is_instance_valid(tile_area_overlay):
+		print("[GameBoard] Removing existing tile_area_overlay")
+		var parent_node = tile_area_overlay.get_parent()
+		if parent_node:
+			parent_node.remove_child(tile_area_overlay)
 		tile_area_overlay.queue_free()
 		tile_area_overlay = null
+
+	# CRITICAL: Also check parent for any old TileAreaOverlay nodes
+	# These can accumulate if cleanup didn't work properly
+	var parent = get_parent()
+	if parent:
+		var old_overlays = []
+		for child in parent.get_children():
+			if child and is_instance_valid(child) and child.name == "TileAreaOverlay":
+				old_overlays.append(child)
+				print("[GameBoard] Found orphaned TileAreaOverlay in parent - removing")
+
+		# Remove all old overlays immediately
+		for old_overlay in old_overlays:
+			if is_instance_valid(old_overlay):
+				parent.remove_child(old_overlay)
+				old_overlay.queue_free()
+
+	# ALSO check this node for any old TileAreaOverlay children
+	var local_old_overlays = []
+	for child in get_children():
+		if child and is_instance_valid(child) and child.name == "TileAreaOverlay":
+			local_old_overlays.append(child)
+			print("[GameBoard] Found orphaned TileAreaOverlay as direct child - removing")
+
+	for old_overlay in local_old_overlays:
+		if is_instance_valid(old_overlay):
+			remove_child(old_overlay)
+			old_overlay.queue_free()
 
 	# Create a container for the overlay pieces
 	tile_area_overlay = Control.new()
@@ -194,14 +239,13 @@ func setup_tile_area_overlay():
 
 				tile_area_overlay.add_child(tile_overlay)
 
-	# Add to parent (MainGame)
-	var parent = get_parent()
+	# Add to parent (MainGame) - use deferred to avoid "parent busy" error during _ready()
 	if parent:
 		parent.call_deferred("add_child", tile_area_overlay)
-		print("[GameBoard] Tile area overlay created with individual tile overlays")
+		print("[GameBoard] Tile area overlay created with %d ColorRects, added to parent (deferred) (%s)" % [tile_area_overlay.get_child_count(), parent.name])
 	else:
 		call_deferred("add_child", tile_area_overlay)
-		print("[GameBoard] Tile area overlay created (added to self)")
+		print("[GameBoard] Tile area overlay created with %d ColorRects (added to self, deferred)" % tile_area_overlay.get_child_count())
 
 func setup_background_image():
 	"""Setup a fullscreen background image behind the game board"""
@@ -323,31 +367,109 @@ func show_tile_overlay():
 		background.visible = false  # Keep hidden - we use tile overlays instead
 		print("[GameBoard] Background ColorRect remains hidden (using tile overlays)")
 
+func hide_board_group():
+	"""Hide the entire board visual group (tiles, borders, overlay)
+	This is the master control for hiding all middle zone game board elements"""
+	print("[GameBoard] Hiding entire board group")
+
+	# Hide the board container (contains tiles and borders)
+	if board_container and is_instance_valid(board_container):
+		board_container.visible = false
+		print("[GameBoard]   - BoardContainer hidden (tiles + borders)")
+
+	# Hide the tile area overlay (semi-transparent backgrounds)
+	if tile_area_overlay and is_instance_valid(tile_area_overlay):
+		tile_area_overlay.visible = false
+		print("[GameBoard]   - TileAreaOverlay hidden (translucent backgrounds)")
+
+	print("[GameBoard] ✓ All board visual elements hidden")
+
+func show_board_group():
+	"""Show the entire board visual group (tiles, borders, overlay)
+	This is the master control for showing all middle zone game board elements"""
+	print("[GameBoard] Showing entire board group")
+
+	# Show the board container (contains tiles and borders)
+	if board_container and is_instance_valid(board_container):
+		board_container.visible = true
+		print("[GameBoard]   - BoardContainer shown (tiles + borders)")
+
+	# Show the tile area overlay (semi-transparent backgrounds)
+	if tile_area_overlay and is_instance_valid(tile_area_overlay):
+		tile_area_overlay.visible = true
+		print("[GameBoard]   - TileAreaOverlay shown (translucent backgrounds)")
+
+	print("[GameBoard] ✓ All board visual elements shown")
+
+func set_board_group_visibility(is_visible: bool):
+	"""Convenience method to show or hide the entire board group
+	Args:
+		is_visible: true to show, false to hide"""
+	if is_visible:
+		show_board_group()
+	else:
+		hide_board_group()
+
 func clear_tiles():
 	print("[CLEAR_TILES] Starting tile cleanup")
 	# Remove all Tile instances created by this board
 	# We need to collect them first to avoid modifying the array while iterating
 	var tiles_to_remove = []
+
+	# IMPORTANT: Check BOTH locations to handle all cases:
+	# 1. New tiles in board_container (after grouping feature)
+	# 2. Old tiles as direct children (before grouping feature or during transition)
+
+	# Check board_container (where new tiles are added)
+	if board_container and is_instance_valid(board_container):
+		print("[CLEAR_TILES] Checking board_container for tiles...")
+		for child in board_container.get_children():
+			# Skip BorderContainer - only remove actual tiles
+			if child and is_instance_valid(child) and child.name != "BorderContainer" and child.has_method("setup"):
+				tiles_to_remove.append(child)
+				print("[CLEAR_TILES]   Found tile in board_container: ", child.name)
+
+	# ALSO check direct children (legacy tiles or stragglers)
+	print("[CLEAR_TILES] Checking direct children for tiles...")
 	for child in get_children():
-		if child and child.has_method("setup"):
-			# Likely a Tile instance
+		# Skip known non-tile children
+		if child and is_instance_valid(child) and child.name not in ["Background", "BorderContainer", "BoardContainer", "TileAreaOverlay"] and child.has_method("setup"):
 			tiles_to_remove.append(child)
+			print("[CLEAR_TILES]   Found tile in direct children: ", child.name)
 
-	# Now remove them
+	# Now remove them all
+	print("[CLEAR_TILES] Removing ", tiles_to_remove.size(), " tiles...")
 	for tile in tiles_to_remove:
-		remove_child(tile)
-		tile.queue_free()
+		if tile and is_instance_valid(tile):
+			var parent = tile.get_parent()
+			if parent and is_instance_valid(parent):
+				parent.remove_child(tile)
+			tile.queue_free()
 
-	print("[CLEAR_TILES] Cleared ", tiles_to_remove.size(), " tiles from scene")
+	print("[CLEAR_TILES] ✓ Cleared ", tiles_to_remove.size(), " tiles from scene")
 
 func create_visual_grid():
+	# Guard against concurrent execution
+	if creating_visual_grid:
+		print("[GameBoard] ⚠️  create_visual_grid already in progress - skipping duplicate call")
+		return
+
+	creating_visual_grid = true
+	print("[GameBoard] create_visual_grid: Starting (flag set)")
+
 	clear_tiles()
+
+	# CRITICAL: Wait one frame for queue_free() to actually process
+	# This ensures old tiles are COMPLETELY removed before creating new ones
+	await get_tree().process_frame
+
 	tiles.clear()
 
 	print("[GameBoard] Creating visual grid for ", GameManager.GRID_WIDTH, "x", GameManager.GRID_HEIGHT, " board")
 
 	if GameManager.grid.size() == 0:
 		print("[GameBoard] ERROR: GameManager.grid is empty! Cannot create tiles.")
+		creating_visual_grid = false  # Reset flag
 		return
 
 	# Calculate scale factor for tiles based on dynamic tile size
@@ -421,11 +543,28 @@ func create_visual_grid():
 					tile.configure_spreader(GameManager.spreader_grace_default, GameManager.spreader_type, textures)
 					print("[GameBoard] Configured tile at (", x, ",", y, ") as spreader type '", GameManager.spreader_type, "' with grace: ", GameManager.spreader_grace_default, " textures: ", textures.size())
 
-			add_child(tile)
+			# Add tile to board_container instead of directly to GameBoard
+			# This keeps all visual elements grouped together
+			if board_container:
+				board_container.add_child(tile)
+			else:
+				add_child(tile)  # Fallback if container not created
 			tiles[x].append(tile)
 			tiles_created += 1
 
 	print("[GameBoard] Created ", tiles_created, " tiles on the board")
+	creating_visual_grid = false  # Reset flag
+	print("[GameBoard] create_visual_grid: Complete (flag reset)")
+
+	# Show entire board group now that tiles are created (prevents blank screen flash)
+	show_board_group()
+	print("[GameBoard] Board group made visible after tiles created")
+
+	# CRITICAL: Also show UI elements now that level is ready
+	var game_ui = get_node_or_null("../GameUI")
+	if game_ui and game_ui.has_method("show_gameplay_ui"):
+		game_ui.show_gameplay_ui()
+		print("[GameBoard] UI elements shown - level ready")
 
 # Collectible spawning and handling
 func spawn_collectible_visual(x: int, y: int, coll_type: String = "coin"):
@@ -1511,10 +1650,26 @@ func _on_game_over():
 
 func _on_level_complete():
 	print("[GameBoard] Level Complete")
+
+	# CRITICAL: Hide board immediately to prevent old overlay from showing during transition
+	# The transition screen should show cleanly without the game board visible
+	hide_board_group()
+	print("[GameBoard] Board group hidden for clean transition to next level")
+
+	# CRITICAL: Also hide UI elements (booster panel, HUD) to prevent showing old level state
+	var game_ui = get_node_or_null("../GameUI")
+	if game_ui and game_ui.has_method("hide_gameplay_ui"):
+		game_ui.hide_gameplay_ui()
+		print("[GameBoard] UI elements hidden for clean transition")
+
 	# Actions to perform on level completion, e.g. showing a summary, transitioning to next level, etc.
 
 func _on_level_loaded():
 	print("[GameBoard] _on_level_loaded called - initializing visuals")
+
+	# Hide entire board group (tiles, borders, AND overlay) immediately to prevent blank screen flash
+	hide_board_group()
+	print("[GameBoard] Board group hidden - will be shown after tiles are created")
 
 	# Safety: clear any lingering processing/transition flags so board is interactive
 	if typeof(GameManager) != TYPE_NIL:
@@ -1527,9 +1682,23 @@ func _on_level_loaded():
 		GameManager.reset_combo()
 		print("[GameBoard] Safety reset: processing_moves/level_transitioning/pending flags cleared")
 
+	# CRITICAL: Clean up old tile area overlay from previous level
+	# This prevents visual artifacts from old theme showing through
+	if tile_area_overlay and is_instance_valid(tile_area_overlay):
+		print("[GameBoard] Cleaning up old tile area overlay from previous level")
+		tile_area_overlay.queue_free()
+		tile_area_overlay = null
+
 	# Recalculate layout and setup visuals immediately (we rely on create_visual_grid/draw_board_borders guards)
 	calculate_responsive_layout()
 	setup_background()
+
+	# CRITICAL: Hide the newly created tile_area_overlay immediately
+	# setup_background() calls setup_tile_area_overlay() which creates it visible by default
+	if tile_area_overlay and is_instance_valid(tile_area_overlay):
+		tile_area_overlay.visible = false
+		print("[GameBoard] Hid newly created tile_area_overlay to prevent flash")
+
 	setup_background_image()
 
 	# Create visual grid and draw borders (deferred to avoid parent busy errors)
@@ -2214,11 +2383,11 @@ func activate_swap_booster(x1: int, y1: int, x2: int, y2: int):
 	GameManager.grid[x2][y2] = temp
 
 	# Animate swap
-	var pos1 = grid_to_world_position(Vector2(x1, y1))
-	var pos2 = grid_to_world_position(Vector2(x2, y2))
+	var target_pos1 = grid_to_world_position(Vector2(x2, y2))
+	var target_pos2 = grid_to_world_position(Vector2(x1, y1))
 
-	var tween1 = tile1.animate_swap_to(pos2)
-	var tween2 = tile2.animate_swap_to(pos1)
+	var tween1 = tile1.animate_swap_to(target_pos1)
+	var tween2 = tile2.animate_swap_to(target_pos2)
 
 	# Update grid references
 	tiles[x1][y1] = tile2
@@ -2231,6 +2400,9 @@ func activate_swap_booster(x1: int, y1: int, x2: int, y2: int):
 		await tween1.finished
 	if tween2:
 		await tween2.finished
+
+	# CRITICAL: Check if collectibles reached bottom after swap
+	_check_collectibles_at_bottom()
 
 	# Check for matches after swap
 	var matches = GameManager.find_matches()
@@ -2616,6 +2788,9 @@ func activate_row_clear_booster(row: int):
 					else:
 						# Tile was destroyed without reveal, clear it
 						GameManager.grid[gx][gy] = 0
+						if not tile_instance.is_queued_for_deletion():
+							tile_instance.queue_free()
+						tiles[gx][gy] = null
 						scoring_count += 1
 				# else tile still has hits remaining, don't clear it from grid
 				# Handle soft unmovables
@@ -2694,6 +2869,9 @@ func activate_column_clear_booster(column: int):
 					else:
 						# Tile was destroyed without reveal, clear it
 						GameManager.grid[gx][gy] = 0
+						if not tile_instance.is_queued_for_deletion():
+							tile_instance.queue_free()
+						tiles[gx][gy] = null
 						scoring_count += 1
 				# else tile still has hits remaining, don't clear it from grid
 				# Handle soft unmovables

@@ -1,0 +1,22 @@
+{
+  "id": "moses_flees",
+  "name": "Moses Flees",
+  "description": "Moses Flees",
+  "anchor": "fullscreen",
+  "background_color": "#8B7355",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Moses killed an Egyptian taskmaster\nand fled to Midian.\n\nHe became a shepherd in the wilderness.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

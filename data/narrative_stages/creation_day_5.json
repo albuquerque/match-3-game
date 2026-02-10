@@ -1,0 +1,22 @@
+{
+  "id": "creation_day_5",
+  "name": "Day 5: Sea Creatures and Birds",
+  "description": "Day 5: Sea Creatures and Birds",
+  "anchor": "fullscreen",
+  "background_color": "#0C4A6E",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "God created the great sea creatures\nand every living thing that moves in the waters,\nand every winged bird.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

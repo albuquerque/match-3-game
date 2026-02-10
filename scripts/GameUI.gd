@@ -123,12 +123,68 @@ var _level_loaded_awaited = false
 func _level_loaded_signal():
 	_level_loaded_flag = true
 
+func _input(event):
+	"""Debug: Check if any input is reaching GameUI"""
+	if event is InputEventMouseButton and event.pressed:
+		print("[GameUI] ===== MOUSE CLICK DETECTED =====")
+		print("[GameUI] Position: %s" % str(event.position))
+		print("[GameUI] BoosterPanel visible: %s" % str(booster_panel.visible if booster_panel else "null"))
+		if booster_panel and booster_panel.visible:
+			var rect = booster_panel.get_global_rect()
+			print("[GameUI] BoosterPanel rect: %s" % str(rect))
+			var in_bounds = rect.has_point(event.position)
+			print("[GameUI] Click in BoosterPanel bounds: %s" % str(in_bounds))
+
+			# Check each button
+			var hbox = booster_panel.get_node_or_null("HBoxContainer")
+			if hbox:
+				print("[GameUI] Checking %d buttons:" % hbox.get_child_count())
+				for child in hbox.get_children():
+					if child is Button:
+						var btn_rect = child.get_global_rect()
+						var btn_hit = btn_rect.has_point(event.position)
+						print("[GameUI]   - %s: rect=%s, hit=%s, disabled=%s" % [child.name, str(btn_rect), str(btn_hit), str(child.disabled)])
+
+						# WORKAROUND: Manually trigger handler since Button.pressed signal won't fire!
+						if btn_hit and not child.disabled:
+							print("[GameUI] !!! MANUAL CLICK HANDLER TRIGGERED for %s !!!" % child.name)
+							# Extract booster_id from button name
+							var booster_id = child.name.replace("Button", "").replace(" ", "_").to_lower()
+							# Convert from display name to internal name
+							if booster_id == "row_clear":
+								booster_id = "row_clear"
+							elif booster_id == "column_clear":
+								booster_id = "column_clear"
+							elif booster_id == "chain_reaction":
+								booster_id = "chain_reaction"
+							elif booster_id == "bomb_3x_3":
+								booster_id = "bomb_3x3"
+							elif booster_id == "extra_moves":
+								booster_id = "extra_moves"
+							elif booster_id == "tile_squasher":
+								booster_id = "tile_squasher"
+							elif booster_id == "line_blast":
+								booster_id = "line_blast"
+							else:
+								# For simple names like shuffle, hammer, swap
+								booster_id = booster_id.replace("_", "")
+
+							print("[GameUI] Calling _on_booster_button_pressed with: %s" % booster_id)
+							_on_booster_button_pressed(booster_id)
+							get_viewport().set_input_as_handled()
+							break
+		print("[GameUI] ================================")
+
 func _ready():
 	# Debug: print initial global state to help diagnose inadvertent Game Over
 	print("[GameUI] _ready() — initial states: GameManager.score=", GameManager.score, ", moves_left=", GameManager.moves_left, ", target=", GameManager.target_score)
 
 	# Reorganize HUD for better gameplay layout
 	_reorganize_hud()
+
+	# Phase 12.3: Migrate existing save to ExperienceState if needed
+	if ExperienceDirector and ExperienceDirector.has_method("migrate_existing_save_to_experience_state"):
+		ExperienceDirector.migrate_existing_save_to_experience_state()
 
 	# Connect to RewardManager signals
 	RewardManager.connect("coins_changed", _on_coins_changed)
@@ -388,6 +444,50 @@ func update_display():
 		target_progress.value = min(progress * 100, 100)
 		target_label.text = "Goal: %d" % GameManager.target_score
 
+func hide_gameplay_ui():
+	"""Hide gameplay UI elements (HUD and booster panel) during level transitions
+	This prevents showing old level state while loading next level"""
+	print("[GameUI] Hiding gameplay UI elements")
+
+	# Hide HUD elements (top panel with score, moves, target)
+	if get_node_or_null("VBoxContainer/TopPanel"):
+		get_node("VBoxContainer/TopPanel").visible = false
+		print("[GameUI]   - TopPanel hidden")
+
+	# Hide booster panel
+	if booster_panel:
+		booster_panel.visible = false
+		print("[GameUI]   - BoosterPanel hidden")
+
+	# Hide currency panel
+	if get_node_or_null("VBoxContainer/CurrencyPanel"):
+		get_node("VBoxContainer/CurrencyPanel").visible = false
+		print("[GameUI]   - CurrencyPanel hidden")
+
+	print("[GameUI] ✓ All gameplay UI elements hidden")
+
+func show_gameplay_ui():
+	"""Show gameplay UI elements when level is ready
+	This ensures UI appears cleanly with new level state"""
+	print("[GameUI] Showing gameplay UI elements")
+
+	# Show HUD elements
+	if get_node_or_null("VBoxContainer/TopPanel"):
+		get_node("VBoxContainer/TopPanel").visible = true
+		print("[GameUI]   - TopPanel shown")
+
+	# Show booster panel
+	if booster_panel:
+		booster_panel.visible = true
+		print("[GameUI]   - BoosterPanel shown")
+
+	# Show currency panel
+	if get_node_or_null("VBoxContainer/CurrencyPanel"):
+		get_node("VBoxContainer/CurrencyPanel").visible = true
+		print("[GameUI]   - CurrencyPanel shown")
+
+	print("[GameUI] ✓ All gameplay UI elements shown")
+
 func _on_score_changed(new_score: int):
 	score_label.text = "%d" % new_score
 
@@ -602,18 +702,12 @@ func _on_level_complete():
 	_pending_reward_gems = base_gems
 	_reward_multiplied = false
 
-	# Hide the game board immediately
+	# DON'T hide the game board - leave it visible in the background
+	# The transition screen will overlay on top with the finished board visible
 	var board = get_node_or_null("../GameBoard")
 	if board:
-		board.visible = false
-		board.hide()
-		print("[GameUI] Hidden game board for transition")
-
-		await get_tree().create_timer(0.1).timeout
-		if board.visible:
-			print("[GameUI] WARNING: Game board still visible after hide()")
-			board.visible = false
-			board.hide()
+		print("[GameUI] Keeping game board visible in background for transition screen")
+		# Board stays visible but is in a "finished" state (processing_moves is false)
 
 	# Check if there's a next level
 	var level_manager = get_node_or_null("/root/LevelManager")
@@ -682,30 +776,46 @@ func _on_level_complete():
 	# ALWAYS hide the old level complete panel (and ensure it STAYS hidden)
 	if level_complete_panel:
 		level_complete_panel.visible = false
-		level_complete_panel.hide()  # Double-ensure it's hidden
-		level_complete_panel.z_index = -1000  # Move it way behind everything
-		print("[GameUI] 🚫 Hidden old level_complete_panel (visible=%s, z_index=%d)" % [level_complete_panel.visible, level_complete_panel.z_index])
+		level_complete_panel.hide()
+		level_complete_panel.z_index = -1000
+		print("[GameUI] 🚫 Hidden old level_complete_panel")
 
-	# game_over_panel has been removed from the scene - no need to hide it
+	# Check if there are bonus rewards from flow (reward nodes)
+	var bonus_rewards = {}
+	if ExperienceDirector and ExperienceDirector.has_method("get_next_node_rewards"):
+		bonus_rewards = ExperienceDirector.get_next_node_rewards()
+		if bonus_rewards.get("has_rewards", false):
+			print("[GameUI] 🎁 Found bonus rewards from flow: ", bonus_rewards.get("reward_id"))
 
-	# Show the NEW enhanced transition screen with rewards and stars
+	# Show the transition screen with both level rewards AND bonus flow rewards
 	if level_transition:
-		print("[GameUI] 🎯 Calling level_transition.show_transition()")
+		print("[GameUI] 🎯 Showing transition screen with rewards")
 		print("[GameUI]    Level: %d, Score: %d, Coins: %d, Gems: %d, Stars: %d" % [completed_level_number, GameManager.score, base_coins, base_gems, stars])
-		level_transition.show_transition(
-			completed_level_number,
-			GameManager.score,
-			base_coins,
-			base_gems,
-			has_next_level,
-			stars  # Pass star rating
-		)
-		print("[GameUI] ✅ Transition screen shown for level %d with rewards: %d coins, %d gems, %d stars" % [completed_level_number, base_coins, base_gems, stars])
-		print("[GameUI] level_transition.visible = ", level_transition.visible)
-		print("[GameUI] level_transition.z_index = ", level_transition.z_index)
+
+		# Pass bonus rewards to transition screen
+		if level_transition.has_method("show_transition_with_bonus"):
+			level_transition.show_transition_with_bonus(
+				completed_level_number,
+				GameManager.score,
+				base_coins,
+				base_gems,
+				has_next_level,
+				stars,
+				bonus_rewards
+			)
+		else:
+			# Fallback to old method
+			level_transition.show_transition(
+				completed_level_number,
+				GameManager.score,
+				base_coins,
+				base_gems,
+				has_next_level,
+				stars
+			)
+		print("[GameUI] ✅ Transition screen shown")
 	else:
-		print("[GameUI] ❌ ERROR: LevelTransition is null! This should never happen!")
-		print("[GameUI] ERROR: Cannot show level complete screen - transition screen missing")
+		print("[GameUI] ❌ ERROR: LevelTransition is null!")
 
 func _calculate_level_coins() -> int:
 	# Base coins from score (1 coin per 100 points)
@@ -793,7 +903,20 @@ func _on_continue_pressed():
 
 	hide_panel(level_complete_panel)
 
-	# Advance to next level
+	# Phase 12.1: Route through ExperienceDirector when available
+	if ExperienceDirector:
+		if not ExperienceDirector.current_flow.is_empty():
+			print("[GameUI] Advancing through ExperienceDirector flow")
+			ExperienceDirector.advance_to_next_node()
+			return
+		elif ExperienceDirector.load_flow("main_story"):
+			print("[GameUI] Loaded main_story flow, starting from next level")
+			var current_level_num = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
+			var next_level_num = current_level_num + 1
+			ExperienceDirector.start_flow_at_level(next_level_num)
+			return
+
+	# Fallback to manual progression
 	_advance_to_next_level()
 
 func _on_transition_rewards_claimed():
@@ -806,11 +929,38 @@ func _on_transition_continue():
 	"""Called when player presses continue on the transition screen"""
 	print("[GameUI] Transition continue pressed")
 
-	# Advance to next level
+	# Phase 12.1: Primary path is always through ExperienceDirector
+	if ExperienceDirector:
+		# Check if a flow is active
+		if not ExperienceDirector.current_flow.is_empty():
+			print("[GameUI] ExperienceDirector active - advancing to next node in flow")
+			ExperienceDirector.advance_to_next_node()
+			# ExperienceDirector will handle everything (rewards, narratives, levels)
+			return
+		else:
+			# No flow active - try to load and start main story flow
+			print("[GameUI] No active flow - attempting to load main_story flow")
+			if ExperienceDirector.load_flow("main_story"):
+				print("[GameUI] main_story flow loaded - starting from current level")
+				# Start from the next level after the one just completed
+				var current_level_num = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
+				var next_level_num = current_level_num + 1
+				ExperienceDirector.start_flow_at_level(next_level_num)
+				return
+			else:
+				print("[GameUI] ⚠️ Failed to load main_story flow - falling back to manual progression")
+
+	# Fallback: If ExperienceDirector unavailable or flow fails, manually advance to next level
+	print("[GameUI] Using fallback manual level progression")
 	_advance_to_next_level()
 
 func _advance_to_next_level():
-	print("[GameUI] Advancing to next level")
+	"""
+	Phase 12.1: Legacy fallback for manual level progression.
+	This function is now used only when ExperienceDirector is unavailable or fails.
+	Primary progression path should be through ExperienceDirector.
+	"""
+	print("[GameUI] [FALLBACK] Advancing to next level manually")
 
 	var current_level_num = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
 	var next_level_num = current_level_num + 1
@@ -822,7 +972,20 @@ func _advance_to_next_level():
 	return
 
 func _load_level_by_number(level_num: int):
+	"""
+	Phase 12.1: Core level loading function.
+	Called by:
+	  - ExperienceDirector._process_level_node() (primary path)
+	  - _advance_to_next_level() (fallback only)
+	  - _on_worldmap_level_selected() (fallback only)
+	"""
 	print("[GameUI] Loading level by number: %d" % level_num)
+
+	# Hide the transition screen if it's still visible
+	# (It stays visible during reward processing, but should be hidden when actually loading next level)
+	if level_transition and level_transition.visible:
+		level_transition.visible = false
+		print("[GameUI] Hidden transition screen before loading level %d" % level_num)
 
 	# Ensure HUD is visible (in case previous level's effects hid it)
 	var hud_container = $VBoxContainer/TopPanel/HUD
@@ -1012,8 +1175,8 @@ func _load_level_by_number(level_num: int):
 		board = get_node_or_null("../GameBoard")
 	if board:
 		board.visible = true
-		if board.has_method("_on_level_loaded"):
-			board._on_level_loaded()
+		# NOTE: _on_level_loaded() is automatically called via signal connection
+		# when GameManager emits level_loaded - no need to call it manually here!
 		if board.has_method("draw_board_borders"):
 			board.draw_board_borders()
 		if board.has_method("show_tile_overlay"):
@@ -1499,10 +1662,13 @@ func _on_out_of_lives_closed():
 
 func _on_hammer_pressed():
 	"""Handle hammer button press"""
+	print("[GameUI] _on_hammer_pressed CALLED")
 	AudioManager.play_sfx("ui_click")
 	if RewardManager.get_booster_count("hammer") > 0:
 		activate_booster("hammer")
 		print("[GameUI] Hammer activated")
+	else:
+		print("[GameUI] WARNING: Hammer count is 0, cannot activate")
 
 func _on_shuffle_pressed():
 	"""Handle shuffle button press - immediately shuffles board"""
@@ -1683,9 +1849,13 @@ func _rebuild_dynamic_booster_panel():
 	else:
 		print("[GameUI] Found existing HBoxContainer, clearing %d children" % hbox.get_child_count())
 
-	# Clear all children
+	# CRITICAL: Immediately remove and hide old children to prevent ghost clicks
 	for child in hbox.get_children():
-		child.queue_free()
+		hbox.remove_child(child)  # Remove from parent immediately
+		child.visible = false  # Hide it
+		child.queue_free()  # Mark for deletion
+
+	print("[GameUI] Old buttons removed and hidden")
 
 	# Style the booster panel
 	_style_booster_panel()
@@ -1799,13 +1969,19 @@ func _create_booster_button(booster_id: String) -> Button:
 		button.modulate = Color(0.7, 0.7, 0.7, 0.8)
 
 	# Connect button press to booster handler
-	button.pressed.connect(_on_booster_button_pressed.bind(booster_id))
+	button.pressed.connect(Callable(self, "_on_booster_button_pressed").bind(booster_id))
+	print("[GameUI]   Connected signal for %s button (callable method)" % booster_id)
 
 	return button
 
 func _on_booster_button_pressed(booster_id: String):
 	"""Handle dynamic booster button press"""
-	print("[GameUI] Booster pressed: %s" % booster_id)
+	print("============================================================")
+	print("[GameUI] ✓ BOOSTER BUTTON PRESSED: %s" % booster_id)
+	print("[GameUI] booster_mode_active: %s" % booster_mode_active)
+	print("[GameUI] GameManager.processing_moves: %s" % GameManager.processing_moves)
+	print("[GameUI] Booster count: %d" % RewardManager.get_booster_count(booster_id))
+	print("============================================================")
 
 	# Call appropriate handler based on booster type
 	match booster_id:
@@ -1850,11 +2026,14 @@ func _update_single_booster(button, icon, count_label, booster_type: String):
 	"""Helper function to update a single booster button"""
 	var count = RewardManager.get_booster_count(booster_type)
 
+	print("[GameUI] _update_single_booster: %s, count=%d, button=%s, icon=%s, label=%s" % [booster_type, count, str(button != null), str(icon != null), str(count_label != null)])
+
 	if count_label:
 		count_label.text = "%d" % count
 
 	if button:
 		button.disabled = (count <= 0)
+		print("[GameUI]   Button disabled: %s" % str(button.disabled))
 		# Grey out when unavailable (0 count)
 		if icon:
 			if count > 0:
@@ -2333,6 +2512,38 @@ func _on_startpage_start_pressed():
 	AudioManager.play_sfx("ui_click")
 	AudioManager.play_music("game", 1.0)
 
+	# Initialize Experience Director if not already loaded
+	if ExperienceDirector:
+		# Load main story flow if not already loaded
+		if ExperienceDirector.current_flow.is_empty():
+			print("[GameUI] Loading Experience Director main_story flow...")
+			if ExperienceDirector.load_flow("main_story"):
+				print("[GameUI] ✓ Experience Director flow loaded")
+			else:
+				print("[GameUI] ⚠️ Experience Director flow failed to load - continuing without it")
+
+		# Start the flow at the current level based on progress
+		if not ExperienceDirector.current_flow.is_empty():
+			# Determine which level to start based on progress
+			var current_level_num = RewardManager.levels_completed + 1  # Next level to play
+
+			print("[GameUI] Starting Experience Director flow at level ", current_level_num, " (based on levels_completed=", RewardManager.levels_completed, ")")
+
+			# Use start_flow_at_level to jump to the correct level (includes narrative if present)
+			ExperienceDirector.start_flow_at_level(current_level_num)
+
+			print("[GameUI] ✅ Flow started at level ", current_level_num, " - ExperienceDirector will control level loading")
+			print("[GameUI] Hiding StartPage and exiting - waiting for flow to process")
+
+			# Hide StartPage
+			if start_page:
+				start_page.visible = false
+
+			# ✅ CRITICAL: Return here! Don't load level manually - flow controls it!
+			return
+
+	print("[GameUI] No ExperienceDirector flow active - continuing with manual level load")
+
 	# Immediately hide StartPage to prevent board borders being drawn on top of it
 	if start_page:
 		start_page.visible = false
@@ -2533,8 +2744,31 @@ func _on_worldmap_level_selected(level_num: int):
 	print("[GameUI] WorldMap level selected: %d" % level_num)
 	AudioManager.play_sfx("ui_click")
 
-	# Use centralized level loader (handles both DLC and built-in levels)
-	await _load_level_by_number(level_num)
+	# Close the WorldMap first
+	var world_map = get_node_or_null("WorldMap")
+	if world_map:
+		world_map.queue_free()
+		print("[GameUI] WorldMap closed")
+
+	# Check if Experience Director flow is active
+	if ExperienceDirector and not ExperienceDirector.current_flow.is_empty():
+		print("[GameUI] ExperienceDirector flow already active")
+
+		# Jump to the selected level in the flow
+		print("[GameUI] Jumping to level %d in current flow" % level_num)
+		ExperienceDirector.start_flow_at_level(level_num)
+	else:
+		# Flow not active - initialize it
+		print("[GameUI] Loading Experience Director main_story flow from WorldMap...")
+		if ExperienceDirector.load_flow("main_story"):
+			print("[GameUI] ✓ Experience Director flow loaded")
+			print("[GameUI] Starting at level %d..." % level_num)
+			# Jump to the selected level instead of starting from beginning
+			ExperienceDirector.start_flow_at_level(level_num)
+		else:
+			print("[GameUI] ⚠️ Experience Director flow failed to load - loading level directly")
+			# Fallback: load level directly if flow fails
+			await _load_level_by_number(level_num)
 
 func _on_map_button_pressed():
 	"""Handle map button press from floating menu"""

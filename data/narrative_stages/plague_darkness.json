@@ -1,0 +1,22 @@
+{
+  "id": "plague_darkness",
+  "name": "Ninth Plague: Darkness",
+  "description": "Ninth Plague: Darkness",
+  "anchor": "fullscreen",
+  "background_color": "#000000",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Darkness covered Egypt for three days,\nso thick it could be felt.\n\nBut Israel had light in their dwellings.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

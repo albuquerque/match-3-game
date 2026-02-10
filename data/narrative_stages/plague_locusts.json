@@ -1,0 +1,22 @@
+{
+  "id": "plague_locusts",
+  "name": "Eighth Plague: Locusts",
+  "description": "Eighth Plague: Locusts",
+  "anchor": "fullscreen",
+  "background_color": "#1A1A1A",
+  "text_color": "#90EE90",
+  "states": [
+    {
+      "name": "main",
+      "text": "Locusts covered the ground\nuntil the land was black.\n\nThey devoured everything the hail had left.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

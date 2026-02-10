@@ -1,0 +1,22 @@
+{
+  "id": "tower_of_babel",
+  "name": "Tower of Babel",
+  "description": "Tower of Babel",
+  "anchor": "fullscreen",
+  "background_color": "#8B4513",
+  "text_color": "#FFE4B5",
+  "states": [
+    {
+      "name": "main",
+      "text": "Mankind tried to build a tower to heaven.\n\nGod confused their language\nand scattered them across the earth.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

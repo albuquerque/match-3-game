@@ -19,6 +19,11 @@ func _ready():
 	visible = false
 	close_button.pressed.connect(_on_close_pressed)
 
+	# CRITICAL: Set very high z-index to ensure notification appears above everything
+	# Including the transition screen which might be visible when rewards show
+	z_index = 1000
+	print("[RewardNotification] Set z_index to 1000 to appear above all other UI")
+
 func show_reward(reward_type: String, amount: int, description: String = ""):
 	"""Show a reward notification"""
 	var reward_data = {
@@ -130,6 +135,12 @@ func _display_reward(reward_data: Dictionary):
 		modulate = Color.TRANSPARENT
 		var tween = create_tween()
 		tween.tween_property(self, "modulate", Color.WHITE, 0.3)
+
+	# Auto-dismiss after 1.5 seconds to prevent notification hanging around
+	# This ensures the notification is gone before the next level loads
+	await get_tree().create_timer(1.5).timeout
+	if is_showing:  # Only dismiss if still showing (not manually closed)
+		_close_notification()
 
 func _on_close_pressed():
 	_close_notification()

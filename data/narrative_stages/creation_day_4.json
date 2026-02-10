@@ -1,0 +1,22 @@
+{
+  "id": "creation_day_4",
+  "name": "Day 4: Sun, Moon, and Stars",
+  "description": "Day 4: Sun, Moon, and Stars",
+  "anchor": "fullscreen",
+  "background_color": "#1A1A3A",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "God created two great lights—\nthe greater light to rule the day,\nand the lesser light to rule the night.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

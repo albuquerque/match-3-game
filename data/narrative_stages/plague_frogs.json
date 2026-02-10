@@ -1,0 +1,22 @@
+{
+  "id": "plague_frogs",
+  "name": "Second Plague: Frogs",
+  "description": "Second Plague: Frogs",
+  "anchor": "fullscreen",
+  "background_color": "#228B22",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Frogs covered the land of Egypt,\nin houses, bedrooms, and ovens.\n\nStill Pharaoh refused.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

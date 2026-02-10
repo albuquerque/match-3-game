@@ -1,0 +1,35 @@
+{
+  "id": "creation_day_1",
+  "name": "Day 1: Light",
+  "description": "God creates light and separates it from darkness",
+  "anchor": "fullscreen",
+  "background_color": "#000000",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "darkness",
+      "text": "The earth was formless and empty,\nand darkness covered the deep waters...",
+      "duration": 3.0
+    },
+    {
+      "name": "light",
+      "background_color": "#FFFFFF",
+      "text_color": "#000000",
+      "text": "And God said, 'Let there be light,'\nand there was light.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "darkness",
+      "event": "stage_loaded"
+    },
+    {
+      "from": "darkness",
+      "to": "light",
+      "event": "auto_advance",
+      "delay": 3.0
+    }
+  ]
+}

@@ -9,12 +9,20 @@ signal rewarded_ad_closed
 signal rewarded_ad_failed_to_show(error_message: String)
 signal user_earned_reward(reward_type: String, reward_amount: int)
 
+# Interstitial ad signals
+signal interstitial_ad_loaded
+signal interstitial_ad_failed_to_load(error_message: String)
+signal interstitial_ad_opened
+signal interstitial_ad_closed
+signal interstitial_ad_failed_to_show(error_message: String)
+
 # Consent signals
 signal consent_ready
 
 var admob = null  # AdMob instance (created at runtime)
 var is_initialized = false
 var is_rewarded_ad_loaded = false
+var is_interstitial_ad_loaded = false
 var pending_reward_callback: Callable
 var consent_completed = false
 
@@ -74,6 +82,10 @@ func _initialize_admob():
 	admob.ad_closed.connect(_on_ad_closed)
 	admob.rewarded.connect(_on_user_earned_reward)
 
+	# Connect interstitial ad signals
+	admob.interstitial_loaded.connect(_on_interstitial_loaded)
+	admob.interstitial_failed_to_load.connect(_on_interstitial_failed_to_load)
+
 	print("[AdMobManager] AdMob wrapper initialized, signals connected")
 	print("[AdMobManager] Starting GDPR consent flow...")
 
@@ -118,6 +130,7 @@ func _complete_consent_flow():
 
 	await get_tree().create_timer(1.0).timeout
 	load_rewarded_ad()
+	load_interstitial_ad()
 
 func load_rewarded_ad():
 	if not is_initialized or not admob:
@@ -243,3 +256,94 @@ func _on_test_ad_complete():
 		pending_reward_callback.call()
 		pending_reward_callback = Callable()
 
+# ============================================================================
+# INTERSTITIAL AD METHODS
+# ============================================================================
+
+func load_interstitial_ad():
+	"""Load an interstitial ad (full-screen, non-rewarded)"""
+	if not is_initialized or not admob:
+		print("[AdMobManager] Interstitial ad - test mode")
+		is_interstitial_ad_loaded = true
+		interstitial_ad_loaded.emit()
+		return
+
+	var ad_unit_id = admob.get_test_interstitial_ad_unit()
+	print("[AdMobManager] Loading interstitial ad with unit ID: ", ad_unit_id)
+	admob.load_interstitial(ad_unit_id)
+	is_interstitial_ad_loaded = false
+
+func show_interstitial_ad():
+	"""Show a loaded interstitial ad"""
+	print("[AdMobManager] show_interstitial_ad called")
+	print("[AdMobManager] is_initialized: ", is_initialized)
+	print("[AdMobManager] admob exists: ", admob != null)
+
+	if not is_initialized or not admob:
+		print("[AdMobManager] Test mode - simulating interstitial ad")
+		_start_test_interstitial_simulation()
+		return
+
+	print("[AdMobManager] is_interstitial_ad_loaded: ", is_interstitial_ad_loaded)
+	if is_interstitial_ad_loaded:
+		print("[AdMobManager] Showing interstitial ad...")
+		admob.show_interstitial()
+	else:
+		print("[AdMobManager] Interstitial ad not loaded yet, trying to load...")
+		interstitial_ad_failed_to_show.emit("Ad not loaded")
+		load_interstitial_ad()  # Try to load for next time
+
+func is_interstitial_ad_ready() -> bool:
+	"""Check if interstitial ad is loaded and ready"""
+	if not is_initialized or not admob:
+		return is_interstitial_ad_loaded
+	return admob.is_interstitial_loaded()
+
+func _on_interstitial_loaded():
+	"""Called when interstitial ad loads successfully"""
+	print("[AdMobManager] Interstitial ad loaded successfully!")
+	is_interstitial_ad_loaded = true
+	interstitial_ad_loaded.emit()
+
+func _on_interstitial_failed_to_load(error_message: String):
+	"""Called when interstitial ad fails to load"""
+	print("[AdMobManager] Interstitial ad failed to load: ", error_message)
+	is_interstitial_ad_loaded = false
+	interstitial_ad_failed_to_load.emit(error_message)
+
+func _on_interstitial_opened():
+	"""Called when interstitial ad opens"""
+	print("[AdMobManager] Interstitial ad opened")
+	interstitial_ad_opened.emit()
+
+func _on_interstitial_closed():
+	"""Called when interstitial ad closes"""
+	print("[AdMobManager] Interstitial ad closed")
+	interstitial_ad_closed.emit()
+	is_interstitial_ad_loaded = false
+	load_interstitial_ad()  # Preload next ad
+
+func _on_interstitial_failed_to_show(error_message: String):
+	"""Called when interstitial ad fails to show"""
+	print("[AdMobManager] Interstitial ad failed to show: ", error_message)
+	interstitial_ad_failed_to_show.emit(error_message)
+	is_interstitial_ad_loaded = false
+
+func _start_test_interstitial_simulation():
+	"""Simulate interstitial ad in test mode"""
+	print("[AdMobManager] Test interstitial simulation started (1.5 seconds)...")
+	interstitial_ad_opened.emit()
+
+	if not test_ad_timer:
+		test_ad_timer = Timer.new()
+		add_child(test_ad_timer)
+		test_ad_timer.timeout.connect(_on_test_interstitial_complete)
+
+	test_ad_timer.wait_time = 1.5
+	test_ad_timer.one_shot = true
+	test_ad_timer.start()
+
+func _on_test_interstitial_complete():
+	"""Called when test interstitial simulation completes"""
+	print("[AdMobManager] Test mode - Interstitial ad closed")
+	interstitial_ad_closed.emit()

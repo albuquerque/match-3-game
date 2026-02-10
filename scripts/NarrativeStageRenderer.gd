@@ -5,6 +5,7 @@ extends Control
 ## Manages sprites, animations, particles, and transitions
 
 var current_visual: Node = null
+var current_text_label: Label = null  # Text overlay for narratives
 var anchor_name: String = "top_banner"
 var asset_cache: Dictionary = {}
 
@@ -14,7 +15,12 @@ var fade_in_duration: float = 0.3
 var fade_out_duration: float = 0.3
 
 func _ready():
-	print("[NarrativeStageRenderer] Ready")
+	print("[NarrativeStageRenderer] === RENDERER READY ===")
+	print("[NarrativeStageRenderer] Parent: ", get_parent().name if get_parent() else "NO PARENT")
+	print("[NarrativeStageRenderer] Path: ", get_path())
+	print("[NarrativeStageRenderer] Position: ", position)
+	print("[NarrativeStageRenderer] Size: ", size)
+	print("[NarrativeStageRenderer] Anchors: L=", anchor_left, " T=", anchor_top, " R=", anchor_right, " B=", anchor_bottom)
 
 	# Set up as fullscreen control for anchoring
 	anchor_left = 0
@@ -22,6 +28,9 @@ func _ready():
 	anchor_right = 1
 	anchor_bottom = 1
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	print("[NarrativeStageRenderer] ✓ Configured as fullscreen (anchors set to 0,0,1,1)")
+	print("[NarrativeStageRenderer] === RENDERER READY COMPLETE ===")
 
 func render_state(state_data: Dictionary):
 	"""Render a narrative stage state"""
@@ -49,12 +58,24 @@ func clear():
 
 	if current_visual:
 		# Fade out and remove
+		var visual_to_remove = current_visual
+		current_visual = null
 		var tween = create_tween()
-		tween.tween_property(current_visual, "modulate:a", 0.0, fade_out_duration)
+		tween.tween_property(visual_to_remove, "modulate:a", 0.0, fade_out_duration)
 		tween.tween_callback(func():
-			if current_visual and is_instance_valid(current_visual):
-				current_visual.queue_free()
-			current_visual = null
+			if visual_to_remove and is_instance_valid(visual_to_remove):
+				visual_to_remove.queue_free()
+		)
+
+	if current_text_label:
+		# Fade out and remove text label
+		var label_to_remove = current_text_label
+		current_text_label = null
+		var tween2 = create_tween()
+		tween2.tween_property(label_to_remove, "modulate:a", 0.0, fade_out_duration)
+		tween2.tween_callback(func():
+			if label_to_remove and is_instance_valid(label_to_remove):
+				label_to_remove.queue_free()
 		)
 
 func set_visual_anchor(anchor: String):
@@ -71,7 +92,8 @@ func _load_asset(asset_path: String) -> Texture2D:
 	var texture: Texture2D = null
 
 	# Check if it's a DLC asset (format: "chapter_id:asset_name")
-	if asset_path.contains(":"):
+	# But NOT a res:// path (which also contains :)
+	if asset_path.contains(":") and not asset_path.begins_with("res://"):
 		texture = _load_dlc_asset(asset_path)
 	else:
 		# Bundled asset
@@ -131,11 +153,30 @@ func _load_bundled_asset(asset_path: String) -> Texture2D:
 
 func _display_texture(texture: Texture2D, state_data: Dictionary):
 	"""Display texture in the narrative stage area"""
-	# Get anchor position
-	var anchor_node = _get_anchor_node()
-	if not anchor_node:
-		print("[NarrativeStageRenderer] Anchor not found: ", anchor_name)
-		anchor_node = self  # Fallback to self
+	print("[NarrativeStageRenderer] === DISPLAYING TEXTURE ===")
+
+	# Configure based on anchor name (set via set_visual_anchor from narrative stage JSON)
+	# Fall back to state data position, then default to top_banner
+	var position_mode = anchor_name if anchor_name != "" else state_data.get("position", "top_banner")
+	print("[NarrativeStageRenderer] 📍 Position mode: ", position_mode)
+	print("[NarrativeStageRenderer] 📍 anchor_name variable: ", anchor_name)
+	print("[NarrativeStageRenderer] 📍 Renderer parent: ", get_parent().name if get_parent() else "NO PARENT")
+	print("[NarrativeStageRenderer] 📍 Renderer path: ", get_path())
+
+	# For fullscreen mode, add directly to this Control (which is fullscreen)
+	# For other modes, use the visual anchor system
+	var anchor_node = self
+	if position_mode != "fullscreen":
+		anchor_node = _get_anchor_node()
+		if not anchor_node:
+			print("[NarrativeStageRenderer] ⚠️ Anchor not found: ", anchor_name)
+			anchor_node = self  # Fallback to self
+		else:
+			print("[NarrativeStageRenderer] Using anchor node: ", anchor_node.name, " at ", anchor_node.get_path())
+	else:
+		print("[NarrativeStageRenderer] ✓ Using fullscreen mode - adding to renderer Control (self)")
+		print("[NarrativeStageRenderer] ✓ Self size: ", size)
+		print("[NarrativeStageRenderer] ✓ Self global position: ", global_position)
 
 	# Fade out old visual if exists
 	if current_visual:
@@ -152,24 +193,45 @@ func _display_texture(texture: Texture2D, state_data: Dictionary):
 	tex_rect.name = "NarrativeVisual"
 	tex_rect.texture = texture
 
-	# Configure based on anchor or state data
-	var position_mode = state_data.get("position", "top_banner")
 	_configure_texture_rect(tex_rect, position_mode)
 
 	# Add to scene
 	anchor_node.add_child(tex_rect)
 	current_visual = tex_rect
 
+	print("[NarrativeStageRenderer] ✓ TextureRect added to: ", anchor_node.name)
+	print("[NarrativeStageRenderer] ✓ TextureRect path: ", tex_rect.get_path())
+	print("[NarrativeStageRenderer] ✓ TextureRect size: ", tex_rect.size)
+	print("[NarrativeStageRenderer] ✓ TextureRect global position: ", tex_rect.global_position)
+	print("[NarrativeStageRenderer] ✓ TextureRect anchors: L=", tex_rect.anchor_left, " T=", tex_rect.anchor_top, " R=", tex_rect.anchor_right, " B=", tex_rect.anchor_bottom)
+	print("[NarrativeStageRenderer] ✓ TextureRect z_index: ", tex_rect.z_index)
+
+	# Add text overlay if text is provided
+	var text_content = state_data.get("text", "")
+	if text_content != "":
+		_add_text_overlay(text_content, position_mode, anchor_node)
+
 	# Fade in
 	tex_rect.modulate.a = 0.0
 	var tween = create_tween()
 	tween.tween_property(tex_rect, "modulate:a", 1.0, fade_in_duration)
 
-	print("[NarrativeStageRenderer] Displayed texture")
+	print("[NarrativeStageRenderer] === TEXTURE DISPLAY COMPLETE ===")
 
 func _configure_texture_rect(tex_rect: TextureRect, position_mode: String):
 	"""Configure TextureRect based on position mode"""
 	match position_mode:
+		"fullscreen":
+			# Full screen cinematic overlay
+			tex_rect.anchor_left = 0
+			tex_rect.anchor_top = 0
+			tex_rect.anchor_right = 1
+			tex_rect.anchor_bottom = 1
+			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			tex_rect.z_index = 100  # Above everything for fullscreen experience
+			print("[NarrativeStageRenderer] Configured as FULLSCREEN")
+
 		"top_banner":
 			# Full area from top of screen to top of board (HUD overlays on top)
 			tex_rect.anchor_left = 0
@@ -178,7 +240,7 @@ func _configure_texture_rect(tex_rect: TextureRect, position_mode: String):
 			tex_rect.anchor_bottom = 0.25  # Extend to ~25% (fills to board)
 			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED  # Centered, shows full image
-			tex_rect.z_index = -10  # Behind HUD, can hide HUD with effects if needed
+			tex_rect.z_index = -5  # Above ALL background effects (brightness overlay is -75), below HUD
 
 		"left_panel":
 			# Panel on left side
@@ -267,3 +329,98 @@ func clear_cache():
 	"""Clear asset cache to free memory"""
 	asset_cache.clear()
 	print("[NarrativeStageRenderer] Asset cache cleared")
+
+func _add_text_overlay(text_content: String, position_mode: String, parent_node: Node):
+	"""Add text overlay for narrative content"""
+
+	print("[NarrativeStageRenderer] === ADDING TEXT OVERLAY ===")
+	print("[NarrativeStageRenderer] Text: ", text_content)
+	print("[NarrativeStageRenderer] Position mode: ", position_mode)
+	print("[NarrativeStageRenderer] Parent node: ", parent_node.name)
+
+	# Remove old text label if exists
+	if current_text_label and is_instance_valid(current_text_label):
+		current_text_label.queue_free()
+		current_text_label = null
+
+	# Create text label
+	var label = Label.new()
+	label.name = "NarrativeText"
+	label.text = text_content
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+	# Configure based on position mode
+	match position_mode:
+		"fullscreen":
+			# Text at bottom third of screen for fullscreen narratives
+			label.anchor_left = 0
+			label.anchor_top = 0.7
+			label.anchor_right = 1
+			label.anchor_bottom = 1
+			label.offset_left = 40
+			label.offset_top = 0
+			label.offset_right = -40
+			label.offset_bottom = -40
+			label.add_theme_font_size_override("font_size", 32)
+			label.add_theme_color_override("font_color", Color.WHITE)
+			label.add_theme_color_override("font_outline_color", Color.BLACK)
+			label.add_theme_constant_override("outline_size", 8)
+			label.z_index = 101  # Above the image
+
+			# Try to apply Bangers font
+			var theme_manager = get_node_or_null("/root/ThemeManager")
+			if theme_manager and theme_manager.has_method("apply_bangers_font"):
+				theme_manager.apply_bangers_font(label, 32)
+
+			print("[NarrativeStageRenderer] ✓ Configured fullscreen text")
+			print("[NarrativeStageRenderer]   Anchors: ", label.anchor_left, ",", label.anchor_top, ",", label.anchor_right, ",", label.anchor_bottom)
+			print("[NarrativeStageRenderer]   Offsets: ", label.offset_left, ",", label.offset_top, ",", label.offset_right, ",", label.offset_bottom)
+
+		"top_banner":
+			# ...existing code...
+			label.anchor_left = 0
+			label.anchor_top = 0
+			label.anchor_right = 1
+			label.anchor_bottom = 1
+			label.offset_left = 20
+			label.offset_top = 20
+			label.offset_right = -20
+			label.offset_bottom = -20
+			label.add_theme_font_size_override("font_size", 24)
+			label.add_theme_color_override("font_color", Color.WHITE)
+			label.add_theme_color_override("font_outline_color", Color.BLACK)
+			label.add_theme_constant_override("outline_size", 4)
+			label.z_index = 1
+
+			print("[NarrativeStageRenderer] ✓ Configured banner text")
+
+		_:
+			# ...existing code...
+			label.anchor_left = 0
+			label.anchor_top = 0
+			label.anchor_right = 1
+			label.anchor_bottom = 1
+			label.offset_left = 40
+			label.offset_top = 40
+			label.offset_right = -40
+			label.offset_bottom = -40
+			label.add_theme_font_size_override("font_size", 20)
+			label.add_theme_color_override("font_color", Color.WHITE)
+
+	# Add to parent
+	parent_node.add_child(label)
+	current_text_label = label
+
+	print("[NarrativeStageRenderer] ✓ Label added to: ", parent_node.name)
+	print("[NarrativeStageRenderer] ✓ Label path: ", label.get_path())
+	print("[NarrativeStageRenderer] ✓ Label size: ", label.size)
+	print("[NarrativeStageRenderer] ✓ Label global position: ", label.global_position)
+	print("[NarrativeStageRenderer] ✓ Label z_index: ", label.z_index)
+	print("[NarrativeStageRenderer] === TEXT OVERLAY COMPLETE ===")
+
+	# Fade in
+	label.modulate.a = 0.0
+	var tween = create_tween()
+	tween.tween_property(label, "modulate:a", 1.0, fade_in_duration)

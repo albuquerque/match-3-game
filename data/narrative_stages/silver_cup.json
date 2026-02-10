@@ -1,0 +1,22 @@
+{
+  "id": "silver_cup",
+  "name": "The Silver Cup",
+  "description": "The Silver Cup",
+  "anchor": "fullscreen",
+  "background_color": "#2F4F4F",
+  "text_color": "#C0C0C0",
+  "states": [
+    {
+      "name": "main",
+      "text": "Joseph tested his brothers\nby hiding his cup in Benjamin's sack.\n\nWould they abandon him as they did Joseph?",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

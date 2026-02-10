@@ -1,0 +1,22 @@
+{
+  "id": "joseph_final_days",
+  "name": "Joseph's Final Days",
+  "description": "Joseph's Final Days",
+  "anchor": "fullscreen",
+  "background_color": "#2F2F2F",
+  "text_color": "#E0E0E0",
+  "states": [
+    {
+      "name": "main",
+      "text": "Joseph lived to see his great-grandchildren.\n\nBefore dying, he made them promise:\n'Carry my bones from this place.'",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

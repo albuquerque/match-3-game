@@ -1,0 +1,22 @@
+{
+  "id": "pharaohs_dreams",
+  "name": "Pharaoh's Dreams",
+  "description": "Pharaoh's Dreams",
+  "anchor": "fullscreen",
+  "background_color": "#FFD700",
+  "text_color": "#8B4513",
+  "states": [
+    {
+      "name": "main",
+      "text": "Pharaoh dreamed of seven fat cows\nand seven lean cows.\n\nJoseph alone could interpret it.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

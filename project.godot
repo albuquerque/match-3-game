@@ -35,6 +35,9 @@ VisualAnchorManager="*res://scripts/VisualAnchorManager.gd"
 DLCConfig="*res://scripts/DLCConfig.gd"
 DLCManager="*res://scripts/DLCManager.gd"
 NarrativeStageManager="*res://scripts/NarrativeStageManager.gd"
+ExperienceDirector="*res://scripts/ExperienceDirector.gd"
+CollectionManager="*res://scripts/CollectionManager.gd"
+VibrationManager="*res://scripts/VibrationManager.gd"
 
 [display]
 

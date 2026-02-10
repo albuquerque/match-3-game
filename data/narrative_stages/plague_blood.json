@@ -1,0 +1,22 @@
+{
+  "id": "plague_blood",
+  "name": "First Plague: Blood",
+  "description": "First Plague: Blood",
+  "anchor": "fullscreen",
+  "background_color": "#8B0000",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Aaron struck the Nile with his staff,\nand all the water turned to blood.\n\nBut Pharaoh's heart was hardened.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

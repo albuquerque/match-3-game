@@ -1,0 +1,22 @@
+{
+  "id": "joseph_revealed",
+  "name": "Joseph Reveals Himself",
+  "description": "Joseph Reveals Himself",
+  "anchor": "fullscreen",
+  "background_color": "#4682B4",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "'I am Joseph, your brother,\nwhom you sold into Egypt.'\n\nTears and forgiveness followed.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

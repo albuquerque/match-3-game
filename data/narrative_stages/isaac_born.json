@@ -1,0 +1,22 @@
+{
+  "id": "isaac_born",
+  "name": "Isaac is Born",
+  "description": "Isaac is Born",
+  "anchor": "fullscreen",
+  "background_color": "#FFE5B4",
+  "text_color": "#2C1810",
+  "states": [
+    {
+      "name": "main",
+      "text": "Sarah laughed when told she would have a son.\n\nBut God kept His promise,\nand Isaac was born.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "garden_of_eden",
+  "name": "The Garden of Eden",
+  "description": "The Garden of Eden",
+  "anchor": "fullscreen",
+  "background_color": "#1B5E20",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "The Lord God planted a garden in Eden,\nand there He placed the man He had formed.\n\nA place of perfect peace.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

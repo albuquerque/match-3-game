@@ -1,0 +1,22 @@
+{
+  "id": "noah_called",
+  "name": "Noah's Call",
+  "description": "Noah's Call",
+  "anchor": "fullscreen",
+  "background_color": "#1E3A5F",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "God saw the wickedness of mankind\nand decided to flood the earth.\n\nBut Noah found favor in God's eyes.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "experience_id": "phase_9_test",
+  "version": "1.0.0",
+  "name": "Phase 9 Monetization Test Flow",
+  "description": "Test flow for ad rewards and premium gates",
+  "flow": [
+    {
+      "type": "level",
+      "id": "level_01",
+      "description": "First level"
+    },
+    {
+      "type": "reward",
+      "id": "level_01_complete",
+      "rewards": [
+        { "type": "coins", "amount": 100 }
+      ]
+    },
+    {
+      "type": "ad_reward",
+      "id": "bonus_coins_after_level_1",
+      "ad_type": "rewarded",
+      "reward": {
+        "type": "coins",
+        "amount": 500
+      },
+      "required": false,
+      "description": "Optional bonus coins for watching ad"
+    },
+    {
+      "type": "level",
+      "id": "level_02",
+      "description": "Second level"
+    },
+    {
+      "type": "reward",
+      "id": "level_02_complete",
+      "rewards": [
+        { "type": "gems", "amount": 10 }
+      ]
+    },
+    {
+      "type": "ad_reward",
+      "id": "interstitial_after_level_2",
+      "ad_type": "interstitial",
+      "required": false,
+      "description": "Interstitial ad (no reward)"
+    },
+    {
+      "type": "level",
+      "id": "level_03",
+      "description": "Third level"
+    },
+    {
+      "type": "premium_gate",
+      "id": "premium_content_gate",
+      "required_status": "premium",
+      "on_fail": "skip",
+      "description": "Gate to premium-only content (will skip for free users)"
+    },
+    {
+      "type": "reward",
+      "id": "premium_bonus",
+      "rewards": [
+        { "type": "gems", "amount": 50 },
+        { "type": "coins", "amount": 1000 }
+      ],
+      "description": "Premium user bonus (only granted if gate passed)"
+    },
+    {
+      "type": "level",
+      "id": "level_04",
+      "description": "Fourth level (available to all)"
+    },
+    {
+      "type": "ad_reward",
+      "id": "bonus_booster_offer",
+      "ad_type": "rewarded",
+      "reward": {
+        "type": "booster",
+        "booster_type": "hammer",
+        "amount": 3
+      },
+      "required": false,
+      "description": "Bonus hammer boosters for watching ad"
+    }
+  ]
+}

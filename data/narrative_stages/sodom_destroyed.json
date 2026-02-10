@@ -1,0 +1,22 @@
+{
+  "id": "sodom_destroyed",
+  "name": "Sodom Destroyed",
+  "description": "Sodom Destroyed",
+  "anchor": "fullscreen",
+  "background_color": "#000000",
+  "text_color": "#FF4500",
+  "states": [
+    {
+      "name": "main",
+      "text": "The cities of Sodom and Gomorrah were wicked.\n\nFire and brimstone rained down,\nbut Lot and his daughters escaped.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

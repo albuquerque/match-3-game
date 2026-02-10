@@ -8,6 +8,9 @@ extends Panel
 @onready var sfx_toggle = $VBoxContainer/SfxHBox/SfxToggle
 @onready var sfx_volume_label = $VBoxContainer/SfxHBox/VolumeLabel
 
+# Vibration toggle (created dynamically)
+var vibration_toggle: CheckButton = null
+
 const MUSIC_SETTING = "match3/audio/music_volume"
 const SFX_SETTING = "match3/audio/sfx_volume"
 const MUSIC_ENABLED_SETTING = "match3/audio/music_enabled"
@@ -15,6 +18,10 @@ const SFX_ENABLED_SETTING = "match3/audio/sfx_enabled"
 
 func _ready():
 	visible = false
+
+	# Create vibration toggle if on mobile or for testing
+	_create_vibration_toggle()
+
 	# Connect close
 	close_button.pressed.connect(_on_close_pressed)
 
@@ -69,6 +76,45 @@ func _ready():
 
 	# Do NOT call _apply_audio_settings() here to avoid muting the game on open
 	# Controls now reflect the current runtime state; changes will be applied by handlers
+
+func _create_vibration_toggle():
+	"""Create vibration toggle UI dynamically"""
+	var vbox = get_node_or_null("VBoxContainer")
+	if not vbox:
+		print("[SettingsDialog] WARNING: VBoxContainer not found, can't add vibration toggle")
+		return
+
+	# Create HBoxContainer for vibration setting
+	var vibration_hbox = HBoxContainer.new()
+	vibration_hbox.name = "VibrationHBox"
+
+	# Add label
+	var label = Label.new()
+	label.text = "📳 Vibration:"
+	label.custom_minimum_size = Vector2(150, 0)
+	ThemeManager.apply_bangers_font(label, 18)
+	vibration_hbox.add_child(label)
+
+	# Add spacer
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(20, 0)
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vibration_hbox.add_child(spacer)
+
+	# Create toggle button
+	vibration_toggle = CheckButton.new()
+	vibration_toggle.name = "VibrationToggle"
+	vibration_toggle.text = "On" if VibrationManager.is_vibration_enabled() else "Off"
+	vibration_toggle.button_pressed = VibrationManager.is_vibration_enabled()
+	ThemeManager.apply_bangers_font_to_button(vibration_toggle, 16)
+	vibration_toggle.toggled.connect(_on_vibration_toggled)
+	vibration_hbox.add_child(vibration_toggle)
+
+	# Add to VBox (after SFX controls)
+	vbox.add_child(vibration_hbox)
+	vbox.move_child(vibration_hbox, vbox.get_child_count() - 2)  # Before close button
+
+	print("[SettingsDialog] Vibration toggle created")
 
 func show_dialog():
 	visible = true
@@ -142,6 +188,16 @@ func _on_music_toggled(pressed: bool):
 func _on_sfx_toggled(pressed: bool):
 	_update_toggle_visual(sfx_toggle, pressed)
 	_apply_audio_settings()
+
+func _on_vibration_toggled(pressed: bool):
+	"""Handle vibration toggle"""
+	if VibrationManager:
+		VibrationManager.set_vibration_enabled(pressed)
+		vibration_toggle.text = "On" if pressed else "Off"
+		# Give haptic feedback when toggling on
+		if pressed:
+			VibrationManager.vibrate_button_press()
+		print("[SettingsDialog] Vibration %s" % ("enabled" if pressed else "disabled"))
 
 func get_volume() -> float:
 	return music_slider.value

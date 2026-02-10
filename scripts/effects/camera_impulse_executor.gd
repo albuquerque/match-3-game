@@ -28,6 +28,10 @@ func execute(context: Dictionary) -> void:
 
 	print("[CameraImpulseExecutor] Applying screen shake: strength=%s, duration=%s" % [strength, duration])
 
+	# Trigger haptic vibration on mobile devices
+	if VibrationManager:
+		VibrationManager.vibrate_screenshake()
+
 	if not viewport:
 		print("[CameraImpulseExecutor] No viewport - skipping shake")
 		return

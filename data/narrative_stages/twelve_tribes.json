@@ -1,0 +1,22 @@
+{
+  "id": "twelve_tribes",
+  "name": "The Twelve Sons",
+  "description": "The Twelve Sons",
+  "anchor": "fullscreen",
+  "background_color": "#2C5F2D",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "Jacob had twelve sons,\nwho would become the twelve tribes of Israel.\n\nGod's promise was multiplying.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

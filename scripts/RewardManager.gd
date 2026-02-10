@@ -44,6 +44,9 @@ var unlocked_themes: Array = ["legacy"]
 var selected_theme: String = "legacy"
 var unlocked_gallery_images: Array = []  # Array of unlocked image IDs
 
+# Premium status
+var is_premium_user: bool = false  # Premium/VIP status (removes ads, bonus content)
+
 # Achievement tracking
 var achievements_unlocked: Array = []
 var total_matches: int = 0
@@ -456,6 +459,8 @@ func save_progress():
 		"total_tiles_cleared": total_tiles_cleared,
 		"perfect_levels": perfect_levels,
 		"achievements_progress": achievements_progress,
+		# Premium status
+		"is_premium_user": is_premium_user,
 		"audio": {
 			"music_volume": audio_music_volume,
 			"sfx_volume": audio_sfx_volume,
@@ -538,6 +543,9 @@ func load_progress():
 			perfect_levels = data.get("perfect_levels", 0)
 			achievements_progress = data.get("achievements_progress", achievements_progress)
 
+			# Load premium status
+			is_premium_user = data.get("is_premium_user", false)
+
 			# Load audio settings
 			var audio_data = data.get("audio", {})
 			audio_music_volume = audio_data.get("music_volume", audio_music_volume)
@@ -545,6 +553,13 @@ func load_progress():
 			audio_music_enabled = audio_data.get("music_enabled", audio_music_enabled)
 			audio_sfx_enabled = audio_data.get("sfx_enabled", audio_sfx_enabled)
 			audio_muted = audio_data.get("muted", audio_muted)
+
+			# Load ExperienceState data if ExperienceDirector is available
+			var experience_director = get_node_or_null("/root/ExperienceDirector")
+			if experience_director and experience_director.has_method("load_state_data"):
+				var experience_state_data = data.get("experience_state", null)
+				if experience_state_data:
+					experience_director.load_state_data(experience_state_data)
 
 			print("[RewardManager] Progress loaded successfully")
 		else:
@@ -992,3 +1007,30 @@ func track_booster_used(booster_type: String):
 	# Update booster explorer achievement (use 5 different types)
 	_update_achievement_progress("booster_explorer", unique_boosters_used.size())
 	save_progress()
+
+# ============================================================================
+# PREMIUM STATUS MANAGEMENT
+# ============================================================================
+
+func unlock_premium():
+	"""Unlock premium status for the player (removes ads, bonus content)"""
+	if not is_premium_user:
+		is_premium_user = true
+		save_progress()
+		print("[RewardManager] Premium status unlocked!")
+		# TODO: Emit signal or trigger UI update if needed
+	else:
+		print("[RewardManager] User already has premium status")
+
+func check_premium() -> bool:
+	"""Check if player has premium status"""
+	return is_premium_user
+
+func revoke_premium():
+	"""Revoke premium status (for testing or refunds)"""
+	if is_premium_user:
+		is_premium_user = false
+		save_progress()
+		print("[RewardManager] Premium status revoked")
+	else:
+		print("[RewardManager] User doesn't have premium status")

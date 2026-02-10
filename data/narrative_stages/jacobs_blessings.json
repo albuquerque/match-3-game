@@ -1,0 +1,22 @@
+{
+  "id": "jacobs_blessings",
+  "name": "Jacob Blesses His Sons",
+  "description": "Jacob Blesses His Sons",
+  "anchor": "fullscreen",
+  "background_color": "#4B0082",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "Before he died, Jacob blessed each of his sons,\nprophesying their futures.\n\nJudah would bring forth kings.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

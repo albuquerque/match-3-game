@@ -1,0 +1,51 @@
+{
+  "experience_id": "test_flow_complete",
+  "version": "1.0.0",
+  "name": "Complete System Test",
+  "description": "Tests all Experience Director features",
+  "flow": [
+    {
+      "type": "narrative_stage",
+      "id": "test_intro",
+      "description": "Test narrative stage",
+      "auto_advance_delay": 2.0,
+      "skippable": true
+    },
+    {
+      "type": "level",
+      "id": "level_01",
+      "description": "Test level 1"
+    },
+    {
+      "type": "reward",
+      "id": "test_reward_1",
+      "rewards": [
+        { "type": "coins", "amount": 100 },
+        { "type": "gems", "amount": 25 }
+      ]
+    },
+    {
+      "type": "level",
+      "id": "level_02",
+      "description": "Test level 2"
+    },
+    {
+      "type": "reward",
+      "id": "test_reward_card",
+      "rewards": [
+        {
+          "type": "card",
+          "collection_id": "creation_story_cards",
+          "card_id": "creation_day_1",
+          "card_name": "Day 1: Light"
+        },
+        { "type": "coins", "amount": 50 }
+      ]
+    },
+    {
+      "type": "level",
+      "id": "level_03",
+      "description": "Test level 3"
+    }
+  ]
+}
