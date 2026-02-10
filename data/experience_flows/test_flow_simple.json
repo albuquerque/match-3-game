@@ -17,6 +17,19 @@
       ]
     },
     {
+      "type": "conditional",
+      "condition": { "reward_unlocked": "test_reward_1" },
+      "then": {
+        "type": "cutscene",
+        "id": "reward_cutscene",
+        "params": { "duration": 2.0 }
+      },
+      "else": {
+        "type": "narrative_stage",
+        "id": "skip_reward_story"
+      }
+    },
+    {
       "type": "level",
       "id": "level_02",
       "description": "Test level 2"
