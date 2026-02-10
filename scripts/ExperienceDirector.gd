@@ -70,19 +70,20 @@ func _create_components():
 func _connect_events():
 	"""Connect to EventBus signals for automatic progression"""
 
-	if not EventBus:
+	var eb = get_node_or_null("/root/EventBus")
+	if not eb:
 		print("[ExperienceDirector] WARNING: EventBus not available")
 		return
 
-	# Listen to game events
-	if EventBus.has_signal("level_complete"):
-		EventBus.level_complete.connect(_on_level_complete)
+	# Listen to game events safely using has_signal and connect
+	if eb.has_signal("level_complete"):
+		eb.connect("level_complete", Callable(self, "_on_level_complete"))
 
-	if EventBus.has_signal("level_failed"):
-		EventBus.level_failed.connect(_on_level_failed)
+	if eb.has_signal("level_failed"):
+		eb.connect("level_failed", Callable(self, "_on_level_failed"))
 
-	if EventBus.has_signal("narrative_stage_complete"):
-		EventBus.narrative_stage_complete.connect(_on_narrative_stage_complete)
+	if eb.has_signal("narrative_stage_complete"):
+		eb.connect("narrative_stage_complete", Callable(self, "_on_narrative_stage_complete"))
 
 	print("[ExperienceDirector] Connected to EventBus")
 
@@ -323,6 +324,13 @@ func advance_to_next_node():
 		print("[ExperienceDirector] ERROR: No flow loaded")
 		return
 
+	# Safety check: if we're still processing, this is likely a bug
+	if processing_node:
+		print("[ExperienceDirector] WARNING: Still processing previous node when advance_to_next_node called")
+		print("[ExperienceDirector] Current node: ", parser.node_to_string(current_node) if not current_node.is_empty() else "none")
+		print("[ExperienceDirector] Forcing processing_node = false to recover")
+		processing_node = false
+
 	var flow_length = parser.get_flow_length(current_flow)
 	print("[ExperienceDirector] Current index: ", state.current_level_index)
 	print("[ExperienceDirector] Flow length: ", flow_length)
@@ -350,7 +358,9 @@ func _process_current_node():
 	print("============================================================")
 
 	if processing_node:
-		print("[ExperienceDirector] WARNING: Already processing a node")
+		print("[ExperienceDirector] ERROR: Already processing a node - aborting to prevent infinite loop")
+		print("[ExperienceDirector] Current node: ", parser.node_to_string(current_node) if not current_node.is_empty() else "none")
+		print("[ExperienceDirector] This indicates a logic error - node should complete before processing next")
 		return
 
 	print("[ExperienceDirector] Getting node at index: ", state.current_level_index)
@@ -553,256 +563,107 @@ func _process_cutscene_node(node: Dictionary):
 	var cutscene_id = node.get("id", "")
 	print("[ExperienceDirector] Playing cutscene: ", cutscene_id)
 
-	# TODO: Implement cutscene system
-	# For now, just complete the node
+	# Use CutsceneExecutor if available
+	var executor = CutsceneExecutor.new()
+	add_child(executor)  # CRITICAL: Must add to tree for await to work
+
+	var context = {
+		"params": node.get("params", {})
+	}
+
+	# Run executor asynchronously and wait for completion
+	await executor.execute(context)
+
+	# Clean up executor
+	if is_instance_valid(executor):
+		remove_child(executor)
+		executor.queue_free()
+
 	_complete_current_node()
 
-func _process_unlock_node(node: Dictionary):
-	"""Process an unlock node"""
+func _evaluate_condition(condition: Dictionary) -> bool:
+	"""Evaluate a simple condition dictionary.
 
-	var unlock_id = node.get("id", "")
-	print("[ExperienceDirector] Processing unlock: ", unlock_id)
+	Supported conditions:
+	- has_seen_narrative: {"has_seen_narrative": "stage_id"}
+	- reward_unlocked: {"reward_unlocked": "reward_id"}
+	- state_flag: {"state_flag": "flag_name", "value": true}
+	- custom: placeholder for future custom checks
+	"""
+	if condition is Dictionary:
+		# has_seen_narrative
+		if condition.has("has_seen_narrative"):
+			var stage_id = condition.get("has_seen_narrative", "")
+			if stage_id == "":
+				return false
+			return state.has_seen_narrative_stage(stage_id)
 
-	# TODO: Implement unlock system (themes, boosters, etc.)
-	# For now, just complete the node
-	_complete_current_node()
+		# reward_unlocked
+		if condition.has("reward_unlocked"):
+			var reward_id = condition.get("reward_unlocked", "")
+			if reward_id == "":
+				return false
+			return state.is_reward_unlocked(reward_id)
 
-func _process_ad_reward_node(node: Dictionary):
-	"""Process an ad reward node - shows ad and grants reward on completion"""
+		# state_flag (generic) - check for boolean flags on state
+		if condition.has("state_flag"):
+			var flag_name = condition.get("state_flag", "")
+			var desired = condition.get("value", true)
+			# allow checking known flags: auto_advance, waiting_for_level_complete
+			if flag_name == "auto_advance":
+				return auto_advance == desired
+			if flag_name == "waiting_for_level_complete":
+				return waiting_for_level_complete == desired
+			# Unknown flags return false for safety
+			return false
 
-	print("============================================================")
-	print("[ExperienceDirector] *** PROCESSING AD REWARD NODE ***")
-	print("============================================================")
+		# custom checks - always false for now
+		if condition.has("custom"):
+			return false
 
-	var ad_id = node.get("id", "")
-	var ad_type = node.get("ad_type", "rewarded")  # rewarded or interstitial
-	var reward_data = node.get("reward", {})
-	var required = node.get("required", false)  # If true, must watch ad to continue
+	# Unknown condition type
+	return false
 
-	print("[ExperienceDirector] Ad ID: ", ad_id)
-	print("[ExperienceDirector] Ad Type: ", ad_type)
-	print("[ExperienceDirector] Required: ", required)
-	print("[ExperienceDirector] Reward: ", JSON.stringify(reward_data, "\t"))
+func _process_conditional_node(node: Dictionary):
+	"""Process a conditional node with 'condition', 'then' and optional 'else' branches"""
 
-	# Check if AdMobManager is available
-	var admob_manager = get_node_or_null("/root/AdMobManager")
-	if not admob_manager:
-		print("[ExperienceDirector] WARNING: AdMobManager not available, skipping ad")
+	var condition = node.get("condition", {})
+	var then_branch = node.get("then", null)
+	var else_branch = node.get("else", null)
+
+	print("[ExperienceDirector] Evaluating conditional node")
+
+	var result = _evaluate_condition(condition)
+	print("[ExperienceDirector] Condition result: ", result)
+
+	# If result true, insert 'then' branch nodes after current index else insert 'else' branch
+	var branch = then_branch if result else else_branch
+
+	if branch == null:
+		print("[ExperienceDirector] No branch to execute - completing node")
 		_complete_current_node()
 		return
 
-	# Set waiting flag
-	waiting_for_ad_complete = true
-
-	# Connect to appropriate ad signals based on type
-	if ad_type == "rewarded":
-		# Connect to rewarded ad signals
-		if not admob_manager.rewarded_ad_closed.is_connected(_on_ad_closed):
-			admob_manager.rewarded_ad_closed.connect(_on_ad_closed, CONNECT_ONE_SHOT)
-
-		# For rewarded ads, also connect to the reward signal
-		if reward_data and not reward_data.is_empty():
-			if not admob_manager.user_earned_reward.is_connected(_on_ad_reward_earned):
-				admob_manager.user_earned_reward.connect(_on_ad_reward_earned, CONNECT_ONE_SHOT)
-
-		print("[ExperienceDirector] Showing rewarded ad...")
-		admob_manager.show_rewarded_ad()
-
-	elif ad_type == "interstitial":
-		# Connect to interstitial ad signals
-		if not admob_manager.interstitial_ad_closed.is_connected(_on_ad_closed):
-			admob_manager.interstitial_ad_closed.connect(_on_ad_closed, CONNECT_ONE_SHOT)
-
-		print("[ExperienceDirector] Showing interstitial ad...")
-		admob_manager.show_interstitial_ad()
-
+	# Branch can be a single node or an array of nodes
+	var branch_nodes = []
+	if typeof(branch) == TYPE_ARRAY:
+		branch_nodes = branch
+	elif typeof(branch) == TYPE_DICTIONARY:
+		branch_nodes = [branch]
 	else:
-		print("[ExperienceDirector] ERROR: Unknown ad type: ", ad_type)
-		waiting_for_ad_complete = false
+		print("[ExperienceDirector] Invalid branch type, skipping")
 		_complete_current_node()
+		return
 
-func _on_ad_closed():
-	"""Called when ad is closed (for both rewarded and interstitial)"""
-	print("[ExperienceDirector] Ad closed")
+	# Insert branch nodes into current_flow after current index
+	var insert_index = state.current_level_index + 1
+	for i in range(branch_nodes.size()):
+		current_flow["flow"].insert(insert_index + i, branch_nodes[i])
 
-	if waiting_for_ad_complete:
-		waiting_for_ad_complete = false
-		_complete_current_node()
+	print("[ExperienceDirector] Inserted %d branch node(s) at index %d" % [branch_nodes.size(), insert_index])
 
-func _on_ad_reward_earned(reward_type: String, reward_amount: int):
-	"""Called when user earns reward from watching ad"""
-	print("[ExperienceDirector] Ad reward earned: ", reward_type, " x", reward_amount)
-
-	# Grant the reward specified in the node
-	var reward_data = current_node.get("reward", {})
-	if not reward_data.is_empty():
-		var type = reward_data.get("type", "")
-		var amount = reward_data.get("amount", 0)
-
-		match type:
-			"coins":
-				if RewardManager:
-					RewardManager.add_coins(amount)
-					print("[ExperienceDirector] Granted %d coins from ad" % amount)
-			"gems":
-				if RewardManager:
-					RewardManager.add_gems(amount)
-					print("[ExperienceDirector] Granted %d gems from ad" % amount)
-			"booster":
-				var booster_type = reward_data.get("booster_type", "")
-				if RewardManager and not booster_type.is_empty():
-					RewardManager.add_booster(booster_type, amount)
-					print("[ExperienceDirector] Granted %d x %s from ad" % [amount, booster_type])
-			"life":
-				if RewardManager:
-					RewardManager.add_life(amount)
-					print("[ExperienceDirector] Granted %d life/lives from ad" % amount)
-			_:
-				print("[ExperienceDirector] Unknown reward type: ", type)
-
-func _process_premium_gate_node(node: Dictionary):
-	"""Process a premium gate node - checks if user has premium access"""
-
-	print("============================================================")
-	print("[ExperienceDirector] *** PROCESSING PREMIUM GATE NODE ***")
-	print("============================================================")
-
-	var gate_id = node.get("id", "")
-	var required_status = node.get("required_status", "premium")
-	var on_fail = node.get("on_fail", "skip")  # skip, block, or offer
-
-	print("[ExperienceDirector] Gate ID: ", gate_id)
-	print("[ExperienceDirector] Required Status: ", required_status)
-	print("[ExperienceDirector] On Fail: ", on_fail)
-
-	# Check premium status
-	var has_premium = false
-	if RewardManager and RewardManager.has_method("check_premium"):
-		has_premium = RewardManager.check_premium()
-
-	print("[ExperienceDirector] User has premium: ", has_premium)
-
-	# Evaluate gate
-	if required_status == "premium" and has_premium:
-		# User has premium, allow through
-		print("[ExperienceDirector] ✓ Premium gate passed - user has premium access")
-		_complete_current_node()
-
-	elif required_status == "free" and not has_premium:
-		# User is free tier, allow through (inverted gate)
-		print("[ExperienceDirector] ✓ Free gate passed - user is on free tier")
-		_complete_current_node()
-
-	else:
-		# User doesn't meet requirement
-		print("[ExperienceDirector] ⚠️ Premium gate failed - user doesn't have required status")
-
-		match on_fail:
-			"skip":
-				# Skip this gate and continue to next node
-				print("[ExperienceDirector] Skipping premium gate, continuing flow")
-				advance_to_next_node()
-
-			"block":
-				# Stop flow progression
-				print("[ExperienceDirector] Premium gate blocked - stopping flow")
-				processing_node = false
-				# TODO: Show UI message to user about premium requirement
-
-			"offer":
-				# Show premium purchase offer (future implementation)
-				print("[ExperienceDirector] Would show premium purchase offer")
-				# TODO: Integrate with IAP system to show purchase UI
-				# For now, just skip
-				_complete_current_node()
-
-			_:
-				# Unknown behavior, default to skip
-				print("[ExperienceDirector] Unknown on_fail behavior: ", on_fail, " - skipping")
-				advance_to_next_node()
-
-func _process_dlc_flow_node(node: Dictionary):
-	"""Process a DLC flow node"""
-
-	var dlc_flow_id = node.get("id", "")
-	var required = node.get("required", false)
-	var fallback = node.get("fallback", "continue")
-
-	print("[ExperienceDirector] Processing DLC flow: ", dlc_flow_id)
-
-	# TODO: Integrate with DLCManager
-	# For now, check if DLC flow exists
-	var dlc_path = "res://data/experience_flows/%s.json" % dlc_flow_id
-
-	if FileAccess.file_exists(dlc_path):
-		# Push current flow and load DLC flow
-		state.push_flow(dlc_flow_id)
-		load_flow(dlc_flow_id)
-		start_flow()
-	else:
-		print("[ExperienceDirector] DLC flow not found: ", dlc_flow_id)
-		if required:
-			print("[ExperienceDirector] ERROR: Required DLC flow missing!")
-		# Continue with fallback
-		_complete_current_node()
-
-func _process_conditional_node(node: Dictionary):
-	"""Process a conditional node"""
-
-	var condition = node.get("condition", {})
-	var then_branch = node.get("then", {})
-	var else_branch = node.get("else", {})
-
-	print("[ExperienceDirector] Evaluating conditional...")
-
-	# TODO: Implement condition evaluation
-	# For now, just take the 'then' branch
+	# Complete the conditional node and continue (which will process inserted nodes next)
 	_complete_current_node()
-
-# Event handlers
-func _on_level_complete(level_id: String, context: Dictionary):
-	"""Called when a level is completed"""
-
-	print("============================================================")
-	print("[ExperienceDirector] *** LEVEL_COMPLETE EVENT ***")
-	print("============================================================")
-	print("[ExperienceDirector] Level complete: ", level_id)
-	print("[ExperienceDirector] Context: ", JSON.stringify(context, "\t"))
-	print("[ExperienceDirector] waiting_for_level_complete: ", waiting_for_level_complete)
-
-	if waiting_for_level_complete:
-		print("[ExperienceDirector] Level completion confirmed - advancing to next node")
-		waiting_for_level_complete = false
-		_complete_current_node()
-	else:
-		print("[ExperienceDirector] Level completed but not waiting for it (wrong timing?)")
-
-func _on_level_failed(level_id: String, context: Dictionary):
-	"""Called when a level is failed"""
-
-	print("[ExperienceDirector] Level failed: ", level_id)
-
-	if waiting_for_level_complete:
-		# Don't advance on failure - let player retry
-		waiting_for_level_complete = false
-		processing_node = false
-		print("[ExperienceDirector] Waiting for level retry...")
-
-func _on_narrative_stage_complete(stage_id: String):
-	"""Called when a narrative stage is completed"""
-
-	print("============================================================")
-	print("[ExperienceDirector] *** NARRATIVE_STAGE_COMPLETE EVENT ***")
-	print("============================================================")
-	print("[ExperienceDirector] Narrative stage complete: ", stage_id)
-	print("[ExperienceDirector] waiting_for_narrative_complete: ", waiting_for_narrative_complete)
-
-	if waiting_for_narrative_complete:
-		print("[ExperienceDirector] Narrative completion confirmed - advancing to next node")
-		waiting_for_narrative_complete = false
-		_complete_current_node()
-	else:
-		print("[ExperienceDirector] Narrative completed but not waiting for it (wrong timing?)")
 # Node completion
 func _complete_current_node():
 	"""Mark current node as complete and advance if auto_advance is enabled"""
@@ -911,7 +772,7 @@ func debug_reset_progress():
 	print("[DEBUG] Resetting all progress...")
 	if state:
 		state.current_level_index = 0
-		state.completed_nodes.clear()
+		state.completed_experience_nodes.clear()
 		state.unlocked_rewards.clear()
 		state.seen_narrative_stages.clear()
 	reset_flow()
@@ -949,7 +810,7 @@ func debug_info():
 	# Progress
 	if state:
 		print("\n[PROGRESS]")
-		print("  Completed Nodes: ", state.completed_nodes.size())
+		print("  Completed Nodes: ", state.completed_experience_nodes.size())
 		print("  Unlocked Rewards: ", state.unlocked_rewards.size())
 		print("  Seen Narratives: ", state.seen_narrative_stages.size())
 
@@ -961,3 +822,129 @@ func debug_info():
 	print("  Completion: ", "%.1f%%" % total_progress.completion_percentage)
 
 	print("\n" + "=".repeat(60) + "\n")
+
+func _process_unlock_node(node: Dictionary):
+	"""Process an unlock node (basic implementation)."""
+	var unlock_id = node.get("id", "")
+	print("[ExperienceDirector] Processing unlock: ", unlock_id)
+	# Example: unlock a theme or feature - placeholder
+	# If integrating with ThemeManager or RewardManager, call necessary APIs
+	_complete_current_node()
+
+func _process_ad_reward_node(node: Dictionary):
+	"""Process an ad reward node - shows ad and grants reward on completion (basic)."""
+	print("[ExperienceDirector] Processing ad_reward node: ", JSON.stringify(node, "\t"))
+
+	var ad_id = node.get("id", "")
+	var ad_type = node.get("ad_type", "rewarded")
+	var reward_data = node.get("reward", {})
+	var required = node.get("required", false)
+
+	# If AdMobManager isn't available, just skip
+	var admob_manager = get_node_or_null("/root/AdMobManager")
+	if not admob_manager:
+		print("[ExperienceDirector] AdMobManager not available - skipping ad node")
+		_complete_current_node()
+		return
+
+	waiting_for_ad_complete = true
+
+	if ad_type == "rewarded":
+		if not admob_manager.rewarded_ad_closed.is_connected(Callable(self, "_on_ad_closed")):
+			admob_manager.rewarded_ad_closed.connect(Callable(self, "_on_ad_closed"), CONNECT_ONE_SHOT)
+		if reward_data and not reward_data.is_empty():
+			if not admob_manager.user_earned_reward.is_connected(Callable(self, "_on_ad_reward_earned")):
+				admob_manager.user_earned_reward.connect(Callable(self, "_on_ad_reward_earned"), CONNECT_ONE_SHOT)
+		print("[ExperienceDirector] Showing rewarded ad...")
+		admob_manager.show_rewarded_ad()
+	else:
+		if not admob_manager.interstitial_ad_closed.is_connected(Callable(self, "_on_ad_closed")):
+			admob_manager.interstitial_ad_closed.connect(Callable(self, "_on_ad_closed"), CONNECT_ONE_SHOT)
+		print("[ExperienceDirector] Showing interstitial ad...")
+		admob_manager.show_interstitial_ad()
+
+func _on_ad_closed():
+	"""Called when ad is closed (for both rewarded and interstitial)"""
+	print("[ExperienceDirector] Ad closed")
+
+	if waiting_for_ad_complete:
+		waiting_for_ad_complete = false
+		_complete_current_node()
+
+func _on_ad_reward_earned(reward_type: String, reward_amount: int):
+	"""Called when user earns reward from watching ad"""
+	print("[ExperienceDirector] Ad reward earned: ", reward_type, " x", reward_amount)
+
+	# Grant the reward specified in the node
+	var reward_data = current_node.get("reward", {})
+	if not reward_data.is_empty():
+		var type = reward_data.get("type", "")
+		var amount = reward_data.get("amount", 0)
+
+		match type:
+			"coins":
+				if RewardManager:
+					RewardManager.add_coins(amount)
+					print("[ExperienceDirector] Granted %d coins from ad" % amount)
+			"gems":
+				if RewardManager:
+					RewardManager.add_gems(amount)
+					print("[ExperienceDirector] Granted %d gems from ad" % amount)
+			"booster":
+				var booster_type = reward_data.get("booster_type", "")
+				if RewardManager and not booster_type.is_empty():
+					RewardManager.add_booster(booster_type, amount)
+					print("[ExperienceDirector] Granted %d x %s from ad" % [amount, booster_type])
+			_:
+				print("[ExperienceDirector] Unknown reward type: ", type)
+
+func _process_premium_gate_node(node: Dictionary):
+	"""Process a premium gate node - checks if user has premium access (basic)."""
+	var gate_id = node.get("id", "")
+	var required_status = node.get("required_status", "premium")
+	var on_fail = node.get("on_fail", "skip")
+
+	print("[ExperienceDirector] Processing premium gate: ", gate_id)
+
+	var has_premium = false
+	if RewardManager and RewardManager.has_method("check_premium"):
+		has_premium = RewardManager.check_premium()
+
+	if required_status == "premium" and has_premium:
+		print("[ExperienceDirector] Premium gate passed")
+		_complete_current_node()
+	elif required_status == "free" and not has_premium:
+		print("[ExperienceDirector] Free gate passed")
+		_complete_current_node()
+	else:
+		print("[ExperienceDirector] Premium gate failed - behavior: ", on_fail)
+		match on_fail:
+			"skip":
+				advance_to_next_node()
+			"block":
+				processing_node = false
+				# optionally display UI
+			"offer":
+				# TODO: show offer UI
+				_complete_current_node()
+			_:
+				advance_to_next_node()
+
+func _process_dlc_flow_node(node: Dictionary):
+	"""Process a DLC flow node - basic fallback behavior."""
+	var dlc_flow_id = node.get("id", "")
+	var required = node.get("required", false)
+	print("[ExperienceDirector] Processing DLC flow: ", dlc_flow_id)
+
+	var dlc_path = "res://data/experience_flows/%s.json" % dlc_flow_id
+	if FileAccess.file_exists(dlc_path):
+		# Push and load new DLC flow
+		state.push_flow(dlc_flow_id)
+		load_flow(dlc_flow_id)
+		start_flow()
+	else:
+		print("[ExperienceDirector] DLC flow not found: ", dlc_flow_id)
+		if required:
+			print("[ExperienceDirector] ERROR: Required DLC missing")
+		# Continue
+		_complete_current_node()

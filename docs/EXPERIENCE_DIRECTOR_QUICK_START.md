@@ -147,14 +147,52 @@ Create a JSON file in `data/experience_flows/`:
 1. ✅ **level** - Loads a match-3 level
 2. ✅ **narrative_stage** - Shows a narrative stage
 3. ✅ **reward** - Grants rewards to player (via RewardOrchestrator)
+4. ✅ **cutscene** - Plays a cutscene (simple executor present)
+5. ✅ **conditional** - Branching logic based on ExperienceState
 
 **Planned for Future:**
-4. **cutscene** - Plays a cutscene
-5. **unlock** - Unlocks features
-6. **ad_reward** - Shows ad with reward
-7. **premium_gate** - Checks premium status
-8. **dlc_flow** - Loads DLC content
-9. **conditional** - Branching logic
+6. **unlock** - Unlocks features
+7. **ad_reward** - Shows ad with reward
+8. **premium_gate** - Checks premium status
+9. **dlc_flow** - Loads DLC content
+
+---
+
+### Example: Cutscene Node
+
+```json
+{
+  "type": "cutscene",
+  "id": "intro_cutscene",
+  "params": {
+    "duration": 4.0,
+    "target_path": "MainGame/IntroScene",
+    "animation": "intro_anim"
+  }
+}
+```
+
+The `CutsceneExecutor` will attempt to play the named animation on the target node's `AnimationPlayer` or fall back to waiting the specified `duration`.
+
+### Example: Conditional Node
+
+```json
+{
+  "type": "conditional",
+  "condition": { "reward_unlocked": "test_reward_1" },
+  "then": {
+    "type": "cutscene",
+    "id": "reward_cutscene",
+    "params": { "duration": 2.0 }
+  },
+  "else": {
+    "type": "narrative_stage",
+    "id": "skip_reward_story"
+  }
+}
+```
+
+The `conditional` node evaluates the `condition` and inserts either the `then` or `else` branch nodes into the flow immediately after the conditional node, which are then processed next.
 
 ---
 
