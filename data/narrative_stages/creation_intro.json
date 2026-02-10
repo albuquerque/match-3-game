@@ -1,0 +1,23 @@
+{
+  "id": "creation_intro",
+  "name": "In the Beginning",
+  "description": "The creation story begins",
+  "anchor": "fullscreen",
+  "background_color": "#000033",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "intro",
+      "asset": "res://textures/narrative/creation_intro.svg",
+      "text": "In the beginning, God created the heavens and the earth...",
+      "duration": 5.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "intro",
+      "event": "stage_loaded"
+    }
+  ]
+}

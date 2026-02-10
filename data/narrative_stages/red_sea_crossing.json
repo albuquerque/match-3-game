@@ -1,0 +1,22 @@
+{
+  "id": "red_sea_crossing",
+  "name": "Crossing the Red Sea",
+  "description": "Crossing the Red Sea",
+  "anchor": "fullscreen",
+  "background_color": "#0C4A6E",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "God parted the Red Sea,\nand Israel walked through on dry ground.\n\nThe waters covered Pharaoh's army.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

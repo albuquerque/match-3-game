@@ -13,6 +13,10 @@ func execute(context: Dictionary) -> void:
 
 	print("[ScreenFlashExecutor] Flashing '%s' for %ss at intensity %.2f" % [flash_color, duration, intensity])
 
+	# Trigger vibration for high-intensity flashes (like lightning)
+	if VibrationManager and intensity >= 0.5:
+		VibrationManager.vibrate_lightning()
+
 	var flash = ColorRect.new()
 	flash.name = "ScreenFlash"
 	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE

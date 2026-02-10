@@ -1,0 +1,22 @@
+{
+  "id": "prison_dreams",
+  "name": "Dreams in Prison",
+  "description": "Dreams in Prison",
+  "anchor": "fullscreen",
+  "background_color": "#2F4F4F",
+  "text_color": "#F0E68C",
+  "states": [
+    {
+      "name": "main",
+      "text": "Joseph interpreted the dreams\nof Pharaoh's cupbearer and baker.\n\nEverything happened as he said.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

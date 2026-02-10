@@ -1,0 +1,22 @@
+{
+  "id": "joseph_sold",
+  "name": "Joseph Sold",
+  "description": "Joseph Sold",
+  "anchor": "fullscreen",
+  "background_color": "#2C1810",
+  "text_color": "#CD853F",
+  "states": [
+    {
+      "name": "main",
+      "text": "Joseph's brothers sold him to traders\nand told their father he was dead.\n\nBetrayal by blood.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

@@ -113,7 +113,9 @@ func _play_runtime_animation(context: Dictionary, animation_id: String, board_no
 	temp_player.add_animation_library("", anim_library)
 	temp_player.play("runtime_anim")
 	if temp_player.has_signal("animation_finished"):
-		temp_player.animation_finished.connect(Callable(temp_player, "queue_free"))
+		# animation_finished passes animation name, but queue_free takes no args
+		# Use lambda to ignore the argument
+		temp_player.animation_finished.connect(func(_anim_name): temp_player.queue_free())
 	print("[PlayAnimationExecutor] Played runtime animation '%s' (track=%s, parent=%s)" % [animation_id, str(track_path), parent_target.name if parent_target else "(none)"])
 	print("[NARR:PLAY_ANIM_DONE] animation_id=%s parent=%s track=%s" % [animation_id, parent_target.name if parent_target else "(none)", str(track_path)])
 

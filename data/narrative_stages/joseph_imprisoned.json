@@ -1,0 +1,22 @@
+{
+  "id": "joseph_imprisoned",
+  "name": "Joseph Imprisoned",
+  "description": "Joseph Imprisoned",
+  "anchor": "fullscreen",
+  "background_color": "#1A1A1A",
+  "text_color": "#A0A0A0",
+  "states": [
+    {
+      "name": "main",
+      "text": "Falsely accused, Joseph was thrown into prison.\n\nYet even there, the Lord was with him.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

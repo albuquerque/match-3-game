@@ -1,0 +1,22 @@
+{
+  "id": "moses_in_basket",
+  "name": "Moses in the Basket",
+  "description": "Moses in the Basket",
+  "anchor": "fullscreen",
+  "background_color": "#4682B4",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "A mother placed her baby in a basket\nand set him in the Nile.\n\nPharaoh's daughter found him.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "binding_of_isaac",
+  "name": "The Binding of Isaac",
+  "description": "The Binding of Isaac",
+  "anchor": "fullscreen",
+  "background_color": "#4A3728",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "God tested Abraham:\n'Take your son Isaac and offer him as a sacrifice.'\n\nAbraham obeyed, but God provided a ram instead.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

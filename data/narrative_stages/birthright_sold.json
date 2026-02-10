@@ -1,0 +1,22 @@
+{
+  "id": "birthright_sold",
+  "name": "The Birthright Sold",
+  "description": "The Birthright Sold",
+  "anchor": "fullscreen",
+  "background_color": "#8B4513",
+  "text_color": "#FFA07A",
+  "states": [
+    {
+      "name": "main",
+      "text": "Esau sold his birthright to Jacob\nfor a bowl of stew.\n\nA moment's hunger cost him everything.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

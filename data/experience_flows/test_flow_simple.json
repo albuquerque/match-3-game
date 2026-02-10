@@ -1,0 +1,33 @@
+{
+  "experience_id": "test_flow_simple",
+  "version": "1.0.0",
+  "name": "Simple Test Flow",
+  "description": "A simple test flow with just a few nodes for testing the Experience Director",
+  "flow": [
+    {
+      "type": "level",
+      "id": "level_01",
+      "description": "Test level 1"
+    },
+    {
+      "type": "reward",
+      "id": "test_reward_1",
+      "rewards": [
+        { "type": "coins", "amount": 100 }
+      ]
+    },
+    {
+      "type": "level",
+      "id": "level_02",
+      "description": "Test level 2"
+    },
+    {
+      "type": "reward",
+      "id": "test_reward_2",
+      "rewards": [
+        { "type": "coins", "amount": 200 },
+        { "type": "gems", "amount": 5 }
+      ]
+    }
+  ]
+}

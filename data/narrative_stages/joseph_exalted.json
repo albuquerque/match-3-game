@@ -1,0 +1,22 @@
+{
+  "id": "joseph_exalted",
+  "name": "Joseph Exalted",
+  "description": "Joseph Exalted",
+  "anchor": "fullscreen",
+  "background_color": "#4A148C",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "Pharaoh made Joseph second-in-command\nover all of Egypt.\n\nFrom prisoner to prince in one day.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

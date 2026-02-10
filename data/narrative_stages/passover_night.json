@@ -1,0 +1,22 @@
+{
+  "id": "passover_night",
+  "name": "The Passover",
+  "description": "The Passover",
+  "anchor": "fullscreen",
+  "background_color": "#8B0000",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "The final plague came at midnight.\n\nBut the angel passed over every house\nmarked with lamb's blood.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

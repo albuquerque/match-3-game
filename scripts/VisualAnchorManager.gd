@@ -42,6 +42,7 @@ func _register_default_anchors():
 
 	if game_ui:
 		register_anchor("ui", game_ui)
+		register_anchor("top_banner", game_ui)  # Narrative stages use GameUI as anchor
 		# Note: 'hud' anchor is now registered by GameUI's HUD container in _reorganize_hud()
 		print("[VisualAnchorManager] ✓ Registered UI anchors")
 

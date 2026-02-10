@@ -1,0 +1,22 @@
+{
+  "id": "burning_bush",
+  "name": "The Burning Bush",
+  "description": "The Burning Bush",
+  "anchor": "fullscreen",
+  "background_color": "#000000",
+  "text_color": "#FF4500",
+  "states": [
+    {
+      "name": "main",
+      "text": "God spoke to Moses from a bush\nthat burned but was not consumed:\n\n'I will send you to Pharaoh.'",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

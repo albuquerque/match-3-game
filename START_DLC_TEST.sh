@@ -1,0 +1,22 @@
+#!/bin/bash
+# Quick start script for DLC testing
+echo "=========================================="
+echo "  DLC Testing Quick Start"
+echo "=========================================="
+echo ""
+echo "Starting HTTP server on port 8000..."
+echo "Server URL: http://192.168.0.110:8000/dlc/"
+echo ""
+echo "To test:"
+echo "  1. Keep this terminal open"
+echo "  2. Open Godot"
+echo "  3. Create new scene with Control root"
+echo "  4. Attach script: res://scripts/DLCDownloadTest.gd"
+echo "  5. Run scene (F6)"
+echo "  6. Click 'Download Demo Chapter'"
+echo ""
+echo "Press Ctrl+C to stop server"
+echo "=========================================="
+echo ""
+cd "$(dirname "$0")/dlc_server"
+python3 start_server.py

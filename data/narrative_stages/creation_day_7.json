@@ -1,0 +1,22 @@
+{
+  "id": "creation_day_7",
+  "name": "Day 7: Rest",
+  "description": "Day 7: Rest",
+  "anchor": "fullscreen",
+  "background_color": "#2C2C54",
+  "text_color": "#E6E6FA",
+  "states": [
+    {
+      "name": "main",
+      "text": "On the seventh day God finished His work,\nand He rested.\n\nGod blessed the seventh day and made it holy.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

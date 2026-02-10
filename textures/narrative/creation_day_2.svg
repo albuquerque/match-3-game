@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="720" height="1280" viewBox="0 0 720 1280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#001144;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#1E3A5F;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#4682B4;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#1E3A5F;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#003366;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="waterTop" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#87CEEB;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#4682B4;stop-opacity:0.8" />
+    </linearGradient>
+    <linearGradient id="waterBottom" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E90FF;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#003366;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="textBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#001144;stop-opacity:0" />
+      <stop offset="50%" style="stop-color:#001144;stop-opacity:0.7" />
+      <stop offset="100%" style="stop-color:#001144;stop-opacity:0.9" />
+    </linearGradient>
+  </defs>
+  <rect width="720" height="1280" fill="url(#skyGradient)"/>
+  <ellipse cx="150" cy="180" rx="120" ry="40" fill="url(#waterTop)" opacity="0.7"/>
+  <ellipse cx="450" cy="150" rx="150" ry="50" fill="url(#waterTop)" opacity="0.6"/>
+  <ellipse cx="600" cy="220" rx="100" ry="35" fill="url(#waterTop)" opacity="0.7"/>
+  <ellipse cx="250" cy="280" rx="130" ry="45" fill="url(#waterTop)" opacity="0.6"/>
+  <ellipse cx="520" cy="320" rx="110" ry="40" fill="url(#waterTop)" opacity="0.7"/>
+  <line x1="0" y1="640" x2="720" y2="640" stroke="#FFFFFF" stroke-width="3" opacity="0.5"/>
+  <line x1="0" y1="640" x2="720" y2="640" stroke="#87CEEB" stroke-width="8" opacity="0.3"/>
+  <line x1="0" y1="640" x2="720" y2="640" stroke="#4682B4" stroke-width="15" opacity="0.2"/>
+  <polygon points="200,640 210,400 190,400" fill="#FFFFFF" opacity="0.1"/>
+  <polygon points="520,640 530,400 510,400" fill="#FFFFFF" opacity="0.1"/>
+  <ellipse cx="200" cy="900" rx="180" ry="60" fill="url(#waterBottom)" opacity="0.7"/>
+  <ellipse cx="500" cy="950" rx="200" ry="70" fill="url(#waterBottom)" opacity="0.6"/>
+  <ellipse cx="350" cy="1000" rx="220" ry="65" fill="url(#waterBottom)" opacity="0.7"/>
+  <ellipse cx="150" cy="1050" rx="160" ry="55" fill="url(#waterBottom)" opacity="0.6"/>
+  <ellipse cx="550" cy="1100" rx="190" ry="60" fill="url(#waterBottom)" opacity="0.7"/>
+  <path d="M 0,850 Q 120,830 240,850 T 480,850 T 720,850" fill="none" stroke="#87CEEB" stroke-width="2" opacity="0.4"/>
+  <path d="M 0,880 Q 120,860 240,880 T 480,880 T 720,880" fill="none" stroke="#4682B4" stroke-width="2" opacity="0.3"/>
+  <path d="M 0,920 Q 120,900 240,920 T 480,920 T 720,920" fill="none" stroke="#1E90FF" stroke-width="2" opacity="0.4"/>
+  <circle cx="100" cy="100" r="1.5" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="300" cy="80" r="1" fill="#FFFFFF" opacity="0.7"/>
+  <circle cx="550" cy="120" r="1.5" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="650" cy="90" r="1" fill="#FFFFFF" opacity="0.7"/>
+  <rect y="980" width="720" height="300" fill="url(#textBg)"/>
+</svg>

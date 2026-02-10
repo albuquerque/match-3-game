@@ -2,9 +2,90 @@
 
 All notable changes to the Match-3 Game project.
 
-## [Unreleased] - February 2026
+## [Unreleased] - February 10, 2026
+
+### Added - Phase 12 Complete ✅
+
+#### Experience Director System
+- **Complete Biblical Narrative Progression** - 62 levels from Genesis through Exodus
+  - `ExperienceDirector.gd` - Main flow controller with state management
+  - `ExperienceState.gd` - Persistent state tracking and save integration
+  - `ExperienceFlowParser.gd` - JSON flow parsing and validation
+  - `RewardOrchestrator.gd` - Centralized reward timing and distribution
+  - `CollectionManager.gd` - Collectible cards system
+  - Main story flow: `data/experience_flows/main_story.json`
+  - 62 narrative stages: `data/narrative_stages/*.json`
+  - Automatic migration of existing player saves
+  - Seamless integration with existing game systems
+
+#### Haptic Vibration System (Mobile)
+- **VibrationManager** - Complete mobile vibration feedback system
+  - Global autoload singleton with platform detection
+  - Multiple vibration patterns (light, medium, heavy, double, triple)
+  - User-configurable toggle in Settings dialog (📳 Vibration: On/Off)
+  - Persistent preference storage
+  - Android/iOS platform detection
+  - Integrated with screen shake effects
+  - Integrated with lightning/flash effects
+  - Android VIBRATE permission added to manifest
+  - Verified working on Android devices
+
+#### Settings Enhancements
+- Vibration toggle with haptic feedback when enabling
+- Dynamic UI creation for mobile-specific settings
+- Persistent user preferences across restarts
+
+### Fixed - Critical Bugs ✅
+
+#### Dynamic Button Signal Workaround
+- **Godot 4.5 Button Bug Fix** - Manual click detection for all dynamic buttons
+  - Booster buttons now 100% reliable (GameUI)
+  - Continue button fixed (LevelTransition)
+  - Multiplier tap button fixed (LevelTransition)
+  - Implemented `_input()` handler pattern for rect-based click detection
+  - Bypasses broken `pressed` signal emission in Godot 4.5
+
+#### UI/UX Improvements
+- **Clean Level Transitions** - Eliminated UI artifacts during level transitions
+  - Hide gameplay UI (HUD, booster bar) on level complete
+  - Show gameplay UI when level ready
+  - Hide board group and overlay during transitions
+  - Professional, polished transition experience
+
+#### Gameplay Fixes
+- **Swap Booster Collectibles** - Collectibles now properly collected when swapped to bottom row
+- **Ghost Button Fix** - Old buttons immediately removed to prevent click interception
+- **Platform Detection** - Fixed mobile detection (android/ios instead of "mobile")
+
+### Changed
+
+#### Android Configuration
+- Added VIBRATE permission to AndroidManifest.xml
+- Platform detection updated for Godot 4.5 compatibility
+
+#### Code Quality
+- Enhanced debug logging throughout for troubleshooting
+- Proper error handling in all new systems
+- Platform-aware implementations (auto-disable on desktop)
+- Comprehensive documentation
+
+### Documentation
+- `docs/VIBRATION_SYSTEM.md` - Complete vibration system guide
+- `docs/COMPLETE_SESSION_SUMMARY_FEB_10.md` - Phase 12 session summary
+
+---
+
+## [Previous] - February 2026
 
 ### Added
+- **Phase 12.1: ExperienceDirector Production Integration** ✅
+  - Replaced hardcoded level progression with ExperienceDirector routing
+  - Auto-loads main_story flow when completing levels
+  - Maintains backward compatibility with fallback mechanism
+  - All "Continue" button presses now route through ExperienceDirector
+  - Documentation: `docs/PHASE_12_1_IMPLEMENTATION.md`
+  - Testing guide: `docs/PHASE_12_1_TESTING_GUIDE.md`
+
 - **Narrative Effects System** - Complete implementation for local and DLC levels
   - 14 effect executors (background_dim, vignette, screen_flash, camera_impulse, shader_param_lerp, play_animation, timeline_sequence, state_swap, screen_overlay, narrative_dialogue, spawn_particles, foreground_dim, background_tint, progressive_brightness)
   - Screen overlay with texture and tint support

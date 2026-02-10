@@ -1,0 +1,22 @@
+{
+  "id": "plague_hail",
+  "name": "Seventh Plague: Hail",
+  "description": "Seventh Plague: Hail",
+  "anchor": "fullscreen",
+  "background_color": "#000080",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Hail and fire rained from the sky,\ndestroying crops and killing cattle.\n\nEgypt had never seen such devastation.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

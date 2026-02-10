@@ -1,0 +1,22 @@
+{
+  "id": "three_visitors",
+  "name": "Three Visitors",
+  "description": "Three Visitors",
+  "anchor": "fullscreen",
+  "background_color": "#3A3A2A",
+  "text_color": "#FFFACD",
+  "states": [
+    {
+      "name": "main",
+      "text": "Three mysterious visitors came to Abraham.\n\nThey promised that Sarah would bear a son,\ndespite her old age.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

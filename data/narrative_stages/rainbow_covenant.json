@@ -1,0 +1,22 @@
+{
+  "id": "rainbow_covenant",
+  "name": "The Rainbow Covenant",
+  "description": "The Rainbow Covenant",
+  "anchor": "fullscreen",
+  "background_color": "#4A5568",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "God placed a rainbow in the sky\nas a sign of His promise:\n\n'Never again will I flood the earth.'",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

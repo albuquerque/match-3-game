@@ -1,0 +1,22 @@
+{
+  "id": "midwives_courage",
+  "name": "The Brave Midwives",
+  "description": "The Brave Midwives",
+  "anchor": "fullscreen",
+  "background_color": "#4A5568",
+  "text_color": "#FFE4E1",
+  "states": [
+    {
+      "name": "main",
+      "text": "Pharaoh ordered all Hebrew boys killed,\nbut the midwives feared God\nand let them live.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

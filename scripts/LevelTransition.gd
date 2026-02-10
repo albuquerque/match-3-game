@@ -27,6 +27,7 @@ var _pointer_position = 0.0
 var _pointer_direction = 1.0
 var _pointer_speed = 200.0  # pixels per second
 var _selected_multiplier = 1.0
+var _bonus_rewards = {}  # Bonus rewards from flow (reward nodes)
 var bangers_font  # Bangers font resource for consistent styling
 # Preload gold star texture for consistent cross-platform rendering
 var gold_star_texture = preload("res://textures/gold_star.svg")
@@ -234,6 +235,27 @@ func _ready():
 
 	# Connect to AdMobManager signals if available
 	_connect_admob_signals()
+
+func _input(event):
+	"""Manual click detection for buttons - workaround for Godot 4.5 signal bug"""
+	if event is InputEventMouseButton and event.pressed and visible:
+		# Check if continue button was clicked
+		if continue_button and is_instance_valid(continue_button) and continue_button.visible and not continue_button.disabled:
+			var btn_rect = continue_button.get_global_rect()
+			if btn_rect.has_point(event.position):
+				print("[LevelTransition] !!! MANUAL CLICK - Continue button !!!")
+				_on_continue_pressed()
+				get_viewport().set_input_as_handled()
+				return
+
+		# Check if tap instruction button was clicked (multiplier game)
+		if tap_instruction_button and is_instance_valid(tap_instruction_button) and tap_instruction_button.visible and not tap_instruction_button.disabled:
+			var btn_rect = tap_instruction_button.get_global_rect()
+			if btn_rect.has_point(event.position):
+				print("[LevelTransition] !!! MANUAL CLICK - Tap instruction button !!!")
+				_on_multiplier_tapped()
+				get_viewport().set_input_as_handled()
+				return
 
 func _create_multiplier_ui():
 	"""Create the interactive multiplier mini-game UI"""
@@ -454,6 +476,15 @@ func apply_theme_colors(theme_name: String = ""):
 
 	print("[LevelTransition] Theme colors applied: ", _current_theme)
 
+func show_transition_with_bonus(completed_level: int, final_score: int, coins_earned: int, gems_earned: int, has_next_level: bool, stars: int, bonus_rewards: Dictionary):
+	"""Show transition with bonus rewards from flow highlighted"""
+
+	# Store bonus rewards for display
+	_bonus_rewards = bonus_rewards
+
+	# Call regular show_transition
+	show_transition(completed_level, final_score, coins_earned, gems_earned, has_next_level, stars)
+
 func show_transition(completed_level: int, final_score: int, coins_earned: int, gems_earned: int, has_next_level: bool = true, stars: int = 1):
 	"""Show the level transition screen with rewards and star rating"""
 	print("=".repeat(60))
@@ -479,7 +510,7 @@ func show_transition(completed_level: int, final_score: int, coins_earned: int, 
 
 	# Add subtle pulsing animation to title
 	var title_tween = create_tween()
-	title_tween.set_loops()
+	title_tween.set_loops(0)  # 0 = infinite loop (but properly configured)
 	title_tween.tween_property(title_label, "scale", Vector2(1.05, 1.05), 0.8)
 	title_tween.tween_property(title_label, "scale", Vector2(1.0, 1.0), 0.8)
 
@@ -637,6 +668,120 @@ func _update_rewards_display(coins: int, gems: int):
 		gems_display.move_child(prefix_label, 0)
 
 		rewards_container.add_child(gems_display)
+
+	# Display BONUS REWARDS from flow (if any) with special highlighting
+	if _bonus_rewards.get("has_rewards", false):
+		var bonus_list = _bonus_rewards.get("rewards", [])
+		if not bonus_list.is_empty():
+			# Add separator
+			var spacer = Control.new()
+			spacer.custom_minimum_size = Vector2(0, 15)
+			rewards_container.add_child(spacer)
+
+			# Add "Bonus Rewards!" header
+			var bonus_header = Label.new()
+			bonus_header.text = "🎁 BONUS REWARDS! 🎁"
+			bonus_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			ThemeManager.apply_bangers_font(bonus_header, 26)
+			bonus_header.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0, 1.0))  # Gold
+			rewards_container.add_child(bonus_header)
+
+			# Add pulse animation to bonus header
+			var pulse_tween = create_tween()
+			pulse_tween.set_loops(0)  # 0 = infinite loop (but properly configured)
+			pulse_tween.tween_property(bonus_header, "scale", Vector2(1.1, 1.1), 0.5)
+			pulse_tween.tween_property(bonus_header, "scale", Vector2(1.0, 1.0), 0.5)
+
+		# Display each bonus reward with appropriate formatting for type
+		for bonus in bonus_list:
+				var bonus_type = bonus.get("type", "")
+				var bonus_amount = bonus.get("amount", 0)
+
+				match bonus_type:
+					"coins":
+						if bonus_amount > 0:
+							var bonus_coins = ThemeManager.create_currency_display("coins", bonus_amount, 32, 28, Color(1.0, 0.84, 0.0, 1.0))
+							bonus_coins.name = "BonusCoins"
+							bonus_coins.alignment = BoxContainer.ALIGNMENT_CENTER
+
+							var prefix = Label.new()
+							prefix.text = "+"
+							ThemeManager.apply_bangers_font(prefix, 28)
+							prefix.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0, 1.0))
+							bonus_coins.add_child(prefix)
+							bonus_coins.move_child(prefix, 0)
+
+							rewards_container.add_child(bonus_coins)
+
+					"gems":
+						if bonus_amount > 0:
+							var bonus_gems = ThemeManager.create_currency_display("gems", bonus_amount, 32, 28, Color(0.3, 0.9, 1.0, 1.0))
+							bonus_gems.name = "BonusGems"
+							bonus_gems.alignment = BoxContainer.ALIGNMENT_CENTER
+
+							var prefix = Label.new()
+							prefix.text = "+"
+							ThemeManager.apply_bangers_font(prefix, 28)
+							prefix.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0, 1.0))
+							bonus_gems.add_child(prefix)
+							bonus_gems.move_child(prefix, 0)
+
+							rewards_container.add_child(bonus_gems)
+
+					"booster":
+						var booster_type = bonus.get("booster_type", "")
+						var booster_name = booster_type.capitalize().replace("_", " ")
+						var bonus_label = Label.new()
+						bonus_label.text = "🚀 +%d %s Booster" % [bonus_amount, booster_name]
+						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+						ThemeManager.apply_bangers_font(bonus_label, 26)
+						bonus_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.2, 1.0))
+						rewards_container.add_child(bonus_label)
+
+					"gallery_image":
+						var image_name = bonus.get("image_name", "Mystery Image")
+						var bonus_label = Label.new()
+						bonus_label.text = "🖼️ Gallery Unlocked: %s" % image_name
+						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+						ThemeManager.apply_bangers_font(bonus_label, 26)
+						bonus_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.9, 1.0))
+						rewards_container.add_child(bonus_label)
+
+					"video":
+						var video_name = bonus.get("video_name", "Special Video")
+						var bonus_label = Label.new()
+						bonus_label.text = "🎬 Video Unlocked: %s" % video_name
+						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+						ThemeManager.apply_bangers_font(bonus_label, 26)
+						bonus_label.add_theme_color_override("font_color", Color(0.9, 0.3, 0.9, 1.0))
+						rewards_container.add_child(bonus_label)
+
+					"card":
+						var card_name = bonus.get("card_name", "Special Card")
+						var bonus_label = Label.new()
+						bonus_label.text = "🃏 Card Unlocked: %s" % card_name
+						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+						ThemeManager.apply_bangers_font(bonus_label, 26)
+						bonus_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.3, 1.0))
+						rewards_container.add_child(bonus_label)
+
+					"theme":
+						var theme_name = bonus.get("theme_name", "New Theme")
+						var bonus_label = Label.new()
+						bonus_label.text = "🎨 Theme Unlocked: %s" % theme_name
+						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+						ThemeManager.apply_bangers_font(bonus_label, 26)
+						bonus_label.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5, 1.0))
+						rewards_container.add_child(bonus_label)
+
+					_:
+						# Generic reward display for unknown types
+						var bonus_label = Label.new()
+						bonus_label.text = "🎁 %s Unlocked!" % bonus_type.capitalize()
+						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+						ThemeManager.apply_bangers_font(bonus_label, 26)
+						bonus_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+						rewards_container.add_child(bonus_label)
 
 func _check_and_show_gallery_unlock(level: int):
 	"""Check if this level unlocked a gallery image and show notification"""
@@ -897,8 +1042,9 @@ func _on_continue_pressed():
 		rm.add_coins(_base_coins)
 		rm.add_gems(_base_gems)
 
-	# Hide this screen
+	# Hide this screen immediately (rewards already shown on level board)
 	visible = false
+	print("[LevelTransition] Transition screen hidden - proceeding to next level")
 
 	# Emit signal for GameUI to handle
 	emit_signal("continue_pressed")

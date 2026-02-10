@@ -1,0 +1,22 @@
+{
+  "id": "slavery_begins",
+  "name": "Slavery Begins",
+  "description": "Slavery Begins",
+  "anchor": "fullscreen",
+  "background_color": "#654321",
+  "text_color": "#D2691E",
+  "states": [
+    {
+      "name": "main",
+      "text": "The Egyptians made the Israelites slaves,\nforcing them to make bricks and build cities.\n\nTheir cry rose up to God.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

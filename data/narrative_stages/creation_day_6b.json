@@ -1,0 +1,22 @@
+{
+  "id": "creation_day_6b",
+  "name": "Day 6: Humanity",
+  "description": "Day 6: Humanity",
+  "anchor": "fullscreen",
+  "background_color": "#5C3A1F",
+  "text_color": "#FFE4B5",
+  "states": [
+    {
+      "name": "main",
+      "text": "God created mankind in His own image,\nmale and female He created them.\n\nAnd it was very good.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

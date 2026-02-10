@@ -1,0 +1,22 @@
+{
+  "id": "israel_to_egypt",
+  "name": "Israel Goes to Egypt",
+  "description": "Israel Goes to Egypt",
+  "anchor": "fullscreen",
+  "background_color": "#CD853F",
+  "text_color": "#000000",
+  "states": [
+    {
+      "name": "main",
+      "text": "Jacob and his entire family\nmoved to Egypt.\n\nSeventy souls, who would become a great nation.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

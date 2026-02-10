@@ -1,0 +1,22 @@
+{
+  "id": "abraham_called",
+  "name": "Abram's Call",
+  "description": "Abram's Call",
+  "anchor": "fullscreen",
+  "background_color": "#2C1810",
+  "text_color": "#F4A460",
+  "states": [
+    {
+      "name": "main",
+      "text": "God called Abram to leave his homeland:\n\n'Go to the land I will show you,\nand I will make you a great nation.'",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

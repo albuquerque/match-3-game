@@ -1,0 +1,22 @@
+{
+  "id": "the_flood",
+  "name": "The Great Flood",
+  "description": "The Great Flood",
+  "anchor": "fullscreen",
+  "background_color": "#0D1B2A",
+  "text_color": "#89CFF0",
+  "states": [
+    {
+      "name": "main",
+      "text": "Rain fell for forty days and forty nights.\n\nThe waters covered the earth,\nbut the ark kept Noah and his family safe.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

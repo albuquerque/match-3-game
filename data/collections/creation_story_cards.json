@@ -1,0 +1,70 @@
+{
+  "collection_id": "creation_story_cards",
+  "name": "Creation Story Cards",
+  "description": "Collect all 7 days of creation",
+  "category": "story",
+  "items": [
+    {
+      "id": "creation_day_1",
+      "name": "Day 1: Light",
+      "description": "And God said, 'Let there be light,' and there was light.",
+      "image": "res://textures/cards/creation_day_1.svg",
+      "unlock_condition": "level_01_complete",
+      "rarity": "common"
+    },
+    {
+      "id": "creation_day_2",
+      "name": "Day 2: Sky",
+      "description": "God made the vault and separated the water under the vault from the water above it.",
+      "image": "res://textures/cards/creation_day_2.svg",
+      "unlock_condition": "level_03_complete",
+      "rarity": "common"
+    },
+    {
+      "id": "creation_day_3",
+      "name": "Day 3: Land and Vegetation",
+      "description": "God said, 'Let the land produce vegetation.'",
+      "image": "res://textures/cards/creation_day_3.svg",
+      "unlock_condition": "level_05_complete",
+      "rarity": "common"
+    },
+    {
+      "id": "creation_day_4",
+      "name": "Day 4: Sun, Moon, and Stars",
+      "description": "God made two great lights—the greater light to govern the day and the lesser light to govern the night.",
+      "image": "res://textures/cards/creation_day_4.svg",
+      "unlock_condition": "level_07_complete",
+      "rarity": "rare"
+    },
+    {
+      "id": "creation_day_5",
+      "name": "Day 5: Sea Creatures and Birds",
+      "description": "God created the great creatures of the sea and every living thing with which the water teems.",
+      "image": "res://textures/cards/creation_day_5.svg",
+      "unlock_condition": "level_09_complete",
+      "rarity": "rare"
+    },
+    {
+      "id": "creation_day_6",
+      "name": "Day 6: Land Animals and Humanity",
+      "description": "Then God said, 'Let us make mankind in our image.'",
+      "image": "res://textures/cards/creation_day_6.svg",
+      "unlock_condition": "level_11_complete",
+      "rarity": "epic"
+    },
+    {
+      "id": "creation_day_7",
+      "name": "Day 7: Rest",
+      "description": "By the seventh day God had finished the work he had been doing; so on the seventh day he rested.",
+      "image": "res://textures/cards/creation_day_7.svg",
+      "unlock_condition": "level_13_complete",
+      "rarity": "legendary"
+    }
+  ],
+  "completion_reward": {
+    "type": "gems",
+    "amount": 100,
+    "title": "Creation Complete!",
+    "description": "You've collected all 7 days of creation!"
+  }
+}

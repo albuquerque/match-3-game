@@ -1,0 +1,22 @@
+{
+  "id": "josephs_dreams",
+  "name": "Joseph's Dreams",
+  "description": "Joseph's Dreams",
+  "anchor": "fullscreen",
+  "background_color": "#191970",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "Joseph dreamed that his brothers' sheaves\nbowed down to his.\n\nHis brothers hated him for it.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

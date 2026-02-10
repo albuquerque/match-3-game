@@ -1,0 +1,22 @@
+{
+  "id": "creation_day_3",
+  "name": "Day 3: Land and Plants",
+  "description": "Day 3: Land and Plants",
+  "anchor": "fullscreen",
+  "background_color": "#2E5C3F",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "God said, 'Let the waters be gathered together,\nand let dry land appear.'\n\nAnd God saw that it was good.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

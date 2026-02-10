@@ -1,0 +1,22 @@
+{
+  "id": "new_pharaoh",
+  "name": "A New Pharaoh",
+  "description": "A New Pharaoh",
+  "anchor": "fullscreen",
+  "background_color": "#8B0000",
+  "text_color": "#FFD700",
+  "states": [
+    {
+      "name": "main",
+      "text": "A new king arose over Egypt,\nwho did not know Joseph.\n\nHe feared the Israelites' numbers.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

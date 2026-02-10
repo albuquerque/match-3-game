@@ -1,0 +1,22 @@
+{
+  "id": "jacobs_ladder",
+  "name": "Jacob's Ladder",
+  "description": "Jacob's Ladder",
+  "anchor": "fullscreen",
+  "background_color": "#1A1A3A",
+  "text_color": "#FFFFFF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Jacob dreamed of a ladder reaching to heaven,\nwith angels ascending and descending.\n\nGod renewed His promise there.",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}

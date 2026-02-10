@@ -1,0 +1,22 @@
+{
+  "id": "jacob_wrestles",
+  "name": "Wrestling with God",
+  "description": "Wrestling with God",
+  "anchor": "fullscreen",
+  "background_color": "#1C1C3C",
+  "text_color": "#E0E0FF",
+  "states": [
+    {
+      "name": "main",
+      "text": "Jacob wrestled with a mysterious man all night.\n\nHe received a new name: Israel,\n'one who struggles with God.'",
+      "duration": 3.0
+    }
+  ],
+  "transitions": [
+    {
+      "from": "",
+      "to": "main",
+      "event": "stage_loaded"
+    }
+  ]
+}
