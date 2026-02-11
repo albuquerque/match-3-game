@@ -1601,12 +1601,23 @@ func _attempt_level_complete():
 		return
 
 	# Poll until processing_moves is false, yielding small delays to avoid blocking
-	while processing_moves:
+	# Add timeout protection to prevent infinite wait if processing_moves gets stuck
+	var wait_time = 0.0
+	var max_wait_time = 10.0  # Maximum 10 seconds to wait for processing to complete
+
+	while processing_moves and wait_time < max_wait_time:
 		await get_tree().create_timer(0.1).timeout
+		wait_time += 0.1
 		# If a transition began while waiting, abort
 		if level_transitioning:
 			pending_level_complete = false
 			return
+
+	# If we timed out, force processing_moves to false and log warning
+	if processing_moves and wait_time >= max_wait_time:
+		print("[GameManager] ⚠️ WARNING: Timeout waiting for processing_moves to complete")
+		print("[GameManager] Forcing processing_moves = false to proceed with level completion")
+		processing_moves = false
 
 	# Give a short extra buffer so any last deferred callbacks/tweens complete
 	if get_tree() != null:
@@ -1622,8 +1633,13 @@ func _attempt_level_failed():
 		return
 
 	# Wait until board activity completes
-	while processing_moves:
+	# Add timeout protection to prevent infinite wait
+	var wait_time = 0.0
+	var max_wait_time = 10.0  # Maximum 10 seconds to wait
+
+	while processing_moves and wait_time < max_wait_time:
 		await get_tree().create_timer(0.1).timeout
+		wait_time += 0.1
 		# Check if level completed while waiting based on level type
 		var goal_met = false
 		if use_spreader_objective:
@@ -1638,6 +1654,12 @@ func _attempt_level_failed():
 		if goal_met or level_transitioning:
 			pending_level_failed = false
 			return
+
+	# If we timed out, force processing_moves to false and log warning
+	if processing_moves and wait_time >= max_wait_time:
+		print("[GameManager] ⚠️ WARNING: Timeout waiting for processing_moves in level failure")
+		print("[GameManager] Forcing processing_moves = false to proceed with level failure")
+		processing_moves = false
 
 	# Short buffer
 	if get_tree() != null:
