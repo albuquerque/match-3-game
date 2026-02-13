@@ -305,3 +305,13 @@ func _try_load_dlc_stage(level_num: int) -> bool:
 
 	# Not found in installed DLCs
 	return false
+
+func trigger_event(event_name: String, context: Dictionary = {}):
+	"""Public: trigger an event against the current stage/controller.
+	Used by external systems (e.g., pipeline ShowNarrativeStep) to request transitions like 'auto_advance'."""
+	if controller and controller.has_method("_check_transitions"):
+		controller._check_transitions(event_name, context)
+		print("[NarrativeStageManager] Triggered event for controller: ", event_name)
+		return true
+	print("[NarrativeStageManager] Cannot trigger event; controller missing or method not available: ", event_name)
+	return false

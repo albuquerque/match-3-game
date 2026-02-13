@@ -24,6 +24,9 @@ var _progress_milestones_reached: Dictionary = {
 	"goal_complete": false
 }
 
+var _auto_timer: SceneTreeTimer = null
+var _completion_timer: SceneTreeTimer = null
+
 func _ready():
 	print("[NarrativeStageController] Ready")
 
@@ -41,6 +44,7 @@ func load_stage(stage_data: Dictionary) -> bool:
 		return false
 
 	print("[NarrativeStageController] Loading stage: ", stage_data.get("id"))
+	print("[NarrativeStageController][ts] load start ms=", Time.get_ticks_msec())
 	current_stage_data = stage_data
 
 	# Reset milestone tracking
@@ -81,6 +85,7 @@ func load_stage(stage_data: Dictionary) -> bool:
 
 	_active = true
 	emit_signal("stage_loaded", stage_data.get("id"))
+	print("[NarrativeStageController][ts] load complete ms=", Time.get_ticks_msec())
 	return true
 
 func load_stage_from_file(path: String) -> bool:
@@ -126,6 +131,10 @@ func clear_stage():
 	current_state = ""
 	_active = false
 
+	# Cancel timers
+	_auto_timer = null
+	_completion_timer = null
+
 	# Notify renderer to clear visuals
 	if renderer and renderer.has_method("clear"):
 		renderer.clear()
@@ -142,6 +151,7 @@ func _set_state(state_name: String):
 		return
 
 	print("[NarrativeStageController] State: ", current_state, " -> ", state_name)
+	print("[NarrativeStageController][ts] _set_state called ms=", Time.get_ticks_msec())
 	current_state = state_name
 
 	# Get state data
@@ -152,6 +162,48 @@ func _set_state(state_name: String):
 		renderer.render_state(state_data)
 
 	emit_signal("state_changed", state_name)
+
+	# Cancel any existing auto timer
+	if _auto_timer:
+		_auto_timer = null
+
+	# Schedule auto_advance if defined in transitions for this state
+	for trans in _transitions:
+		print("[NarrativeStageController] Inspect trans: from=", trans.get("from", ""), ", event=", trans.get("event", ""), ", to=", trans.get("to", ""), ", delay=", trans.get("delay", 0.0))
+		if trans.get("from", "") == state_name and trans.get("event", "") == "auto_advance":
+			var delay = trans.get("delay", 0.0)
+			print("[NarrativeStageController] Matched auto_advance transition for state ", state_name, ", delay=", delay)
+			if delay > 0:
+				print("[NarrativeStageController] Scheduling auto_advance in ", delay, "s for state: ", state_name)
+				var tree = get_tree()
+				if tree:
+					_auto_timer = tree.create_timer(delay)
+					print("[NarrativeStageController][ts] auto_advance scheduled ms=", Time.get_ticks_msec(), " will fire after=", delay)
+					_auto_timer.timeout.connect(Callable(self, "_on_auto_advance_timeout"))
+				return
+
+	# If there are no outbound transitions from this state, consider stage complete
+	var has_outbound = false
+	for t in _transitions:
+		if t.get("from", "") == state_name:
+			has_outbound = true
+			break
+	if not has_outbound:
+		print("[NarrativeStageController] No outbound transitions from state: ", state_name, " — marking stage complete")
+		# If state specifies a duration, wait before emitting complete so the state is visible
+		var duration = state_data.get("duration", 0.0)
+		if duration > 0:
+			print("[NarrativeStageController] Scheduling stage completion in ", duration, "s for terminal state: ", state_name)
+			var tree = get_tree()
+			if tree:
+				_completion_timer = tree.create_timer(duration)
+				print("[NarrativeStageController][ts] completion scheduled ms=", Time.get_ticks_msec(), " duration=", duration)
+				_completion_timer.timeout.connect(Callable(self, "_on_completion_timeout"))
+			return
+		# Emit EventBus signal immediately if no duration
+		var eb = get_node_or_null("/root/EventBus")
+		if eb and eb.has_signal("narrative_stage_complete"):
+			eb.emit_signal("narrative_stage_complete", current_stage_data.get("id", ""))
 
 func _check_transitions(event_name: String, context: Dictionary = {}):
 	"""Check if any transitions match the event and trigger state change"""
@@ -255,3 +307,17 @@ func _on_match_cleared(match_size: int, context: Dictionary):
 			_progress_milestones_reached["goal_complete"] = true
 			_check_transitions("goal_complete", context)
 
+func _on_auto_advance_timeout():
+	print("[NarrativeStageController] Auto-advance timer fired for state: ", current_state)
+	print("[NarrativeStageController][ts] auto_advance fired ms=", Time.get_ticks_msec())
+	# Clear timer reference
+	_auto_timer = null
+	_check_transitions("auto_advance", {})
+
+func _on_completion_timeout():
+	print("[NarrativeStageController] Completion timer fired for stage: ", current_stage_data.get("id", ""))
+	print("[NarrativeStageController][ts] completion fired ms=", Time.get_ticks_msec())
+	_completion_timer = null
+	var eb = get_node_or_null("/root/EventBus")
+	if eb and eb.has_signal("narrative_stage_complete"):
+		eb.emit_signal("narrative_stage_complete", current_stage_data.get("id", ""))
