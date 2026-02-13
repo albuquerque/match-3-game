@@ -1,0 +1,14 @@
+{
+  "chapter_id": "test_chapter",
+  "name": "Test Chapter",
+  "version": "1.0.0",
+  "assets": {
+    "textures": {
+      "sea_parted": "assets/narrative/sea_parted.png",
+      "moses_full": "assets/narrative/moses_full_sea.png"
+    },
+    "particles": {
+      "divine_light": "assets/particles/divine_light.json"
+    }
+  }
+}

@@ -83,8 +83,10 @@ func _load_texture(asset_path: String) -> Texture2D:
 	# Try common texture paths
 	var paths_to_try = [
 		asset_path,
-		"res://textures/overlays/%s" % asset_path,
+		"res://data/images/overlays/%s" % asset_path,
+		"res://data/images/%s" % asset_path,
 		"res://assets/textures/overlays/%s" % asset_path,
+		"res://textures/overlays/%s" % asset_path,
 		"res://textures/%s" % asset_path
 	]
 

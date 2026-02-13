@@ -8,7 +8,7 @@
   "states": [
     {
       "name": "intro",
-      "asset": "res://textures/narrative/creation_intro.svg",
+      "asset": "res://data/images/narrative/creation_intro.svg",
       "text": "In the beginning, God created the heavens and the earth...",
       "duration": 5.0
     }

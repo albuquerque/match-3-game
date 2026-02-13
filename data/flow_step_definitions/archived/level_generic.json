@@ -1,0 +1,9 @@
+{
+  "id": "level_generic",
+  "type": "level",
+  "auto_advance_delay": 0,
+  "skippable": false,
+  "metadata": {
+    "description": "Generic level node template - override id with specific level_xx in flow"
+  }
+}

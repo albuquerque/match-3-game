@@ -294,9 +294,10 @@ func _load_image(image_path: String) -> Texture2D:
 	# Try common image paths
 	var paths_to_try = [
 		image_path,
-		"res://textures/dialogue/%s" % image_path,
+		"res://data/images/dialogue/%s" % image_path,
+		"res://data/images/%s" % image_path,
 		"res://assets/textures/dialogue/%s" % image_path,
-		"res://textures/characters/%s" % image_path,
+		"res://textures/dialogue/%s" % image_path,
 		"res://textures/%s" % image_path
 	]
 

@@ -11,7 +11,7 @@
       "params": {
         "title": "The Prophet",
         "message": "Welcome, traveler. The LIGHT awaits those who seek it.",
-        "image": "prophet_wise.svg",
+        "image": "res://data/images/dialogue/prophet_wise.svg",
         "position": "bottom",
         "reveal_mode": "typewriter",
         "typewriter_speed": 25,
@@ -47,7 +47,7 @@
       "params": {
         "title": "The Prophet",
         "message": "Behold! The POWER of divine intervention!",
-        "image": "prophet_amazed.svg",
+        "image": "res://data/images/dialogue/prophet_amazed.svg",
         "position": "center",
         "reveal_mode": "typewriter",
         "emphasis": [
@@ -71,7 +71,7 @@
       "params": {
         "title": "Victory",
         "message": "You have done well. The DARKNESS retreats before your light.",
-        "image": "prophet_proud.svg",
+        "image": "res://data/images/dialogue/prophet_proud.svg",
         "position": "center",
         "reveal_mode": "typewriter",
         "typewriter_speed": 20,
