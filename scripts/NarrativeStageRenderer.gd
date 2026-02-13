@@ -14,6 +14,8 @@ var transition_duration: float = 0.5
 var fade_in_duration: float = 0.3
 var fade_out_duration: float = 0.3
 
+var override_parent: Node = null
+
 func _ready():
 	print("[NarrativeStageRenderer] === RENDERER READY ===")
 	print("[NarrativeStageRenderer] Parent: ", get_parent().name if get_parent() else "NO PARENT")
@@ -38,19 +40,88 @@ func render_state(state_data: Dictionary):
 
 	# Get asset path
 	var asset_path = state_data.get("asset", "")
-	if asset_path == "":
-		print("[NarrativeStageRenderer] No asset specified for state")
+	var text_content = state_data.get("text", "")
+
+	# If there's no asset but there is text/content, render a text-only state
+	if asset_path == "" and text_content != "":
+		print("[NarrativeStageRenderer] Text-only state detected")
+
+		# Clear any existing visuals
 		clear()
+
+		# Determine anchor/parent node
+		var position_mode = anchor_name if anchor_name != "" else state_data.get("position", "top_banner")
+		var anchor_node = self
+		if position_mode != "fullscreen":
+			var candidate_anchor = _get_anchor_node()
+			if candidate_anchor and candidate_anchor.is_inside_tree():
+				anchor_node = candidate_anchor
+			else:
+				anchor_node = self
+
+		# If anchor_node appears to be 'self' (or not in tree), try to find any NarrativeContainer created by pipeline
+		if (anchor_node == self or not anchor_node.is_inside_tree()):
+			var rt = get_tree()
+			if rt:
+				var root = rt.root
+				var pipeline_container = _find_node_recursive(root, "NarrativeContainer")
+				if pipeline_container:
+					anchor_node = pipeline_container
+					print("[NarrativeStageRenderer] Using pipeline NarrativeContainer as anchor: ", anchor_node.get_path())
+
+		# Create a background ColorRect (use background_color if provided)
+		var bg_color_str = state_data.get("background_color", "#000000")
+		var bg_col = _color_from_hex(bg_color_str)
+		var bg = ColorRect.new()
+		bg.name = "NarrativeBackground"
+		# Fullscreen or banner sizing handled similarly to texture configuration
+		match position_mode:
+			"fullscreen":
+				bg.anchor_left = 0
+				bg.anchor_top = 0
+				bg.anchor_right = 1
+				bg.anchor_bottom = 1
+				bg.rect_min_size = Vector2(0,0)
+				bg.z_index = 99
+			"top_banner":
+				bg.anchor_left = 0
+				bg.anchor_top = 0
+				bg.anchor_right = 1
+				bg.anchor_bottom = 0.25
+				bg.z_index = -5
+			_:
+				bg.anchor_left = 0
+				bg.anchor_top = 0
+				bg.anchor_right = 1
+				bg.anchor_bottom = 1
+
+		bg.color = bg_col
+		anchor_node.add_child(bg)
+		current_visual = bg
+
+		# Add the text overlay (pass text_color if provided)
+		var text_color = state_data.get("text_color", "#FFFFFF")
+		_add_text_overlay(text_content, position_mode, anchor_node, text_color)
+
+		print("[NarrativeStageRenderer] ✓ Rendered text-only state: ", state_data.get("name", "unknown"))
 		return
 
 	# Check if this is a DLC asset (format: "chapter_id:asset_name")
-	var texture = _load_asset(asset_path)
-	if not texture:
+	var texture = _load_asset(asset_path) if asset_path != "" else null
+	if asset_path != "" and not texture:
 		print("[NarrativeStageRenderer] Failed to load asset: ", asset_path)
 		return
 
-	# Create or update visual element
-	_display_texture(texture, state_data)
+	# If we have a texture, display it
+	if texture:
+		# Create or update visual element
+		_display_texture(texture, state_data)
+		return
+
+	# No asset and no text -> clear visuals and warn
+	print("[NarrativeStageRenderer] No asset specified for state")
+	clear()
+	return
 
 func clear():
 	"""Clear current visual"""
@@ -62,10 +133,9 @@ func clear():
 		current_visual = null
 		var tween = create_tween()
 		tween.tween_property(visual_to_remove, "modulate:a", 0.0, fade_out_duration)
-		tween.tween_callback(func():
-			if visual_to_remove and is_instance_valid(visual_to_remove):
-				visual_to_remove.queue_free()
-		)
+		# Use callable to queue_free safely
+		var _v = visual_to_remove
+		tween.tween_callback(Callable(_v, "queue_free"))
 
 	if current_text_label:
 		# Fade out and remove text label
@@ -73,231 +143,29 @@ func clear():
 		current_text_label = null
 		var tween2 = create_tween()
 		tween2.tween_property(label_to_remove, "modulate:a", 0.0, fade_out_duration)
-		tween2.tween_callback(func():
-			if label_to_remove and is_instance_valid(label_to_remove):
-				label_to_remove.queue_free()
-		)
+		var _l = label_to_remove
+		tween2.tween_callback(Callable(_l, "queue_free"))
 
 func set_visual_anchor(anchor: String):
 	"""Set which visual anchor to use"""
 	anchor_name = anchor
 	print("[NarrativeStageRenderer] Anchor set to: ", anchor_name)
 
-func _load_asset(asset_path: String) -> Texture2D:
-	"""Load texture from bundled or DLC source"""
-	# Check cache first
-	if asset_cache.has(asset_path):
-		return asset_cache[asset_path]
+func set_render_container(node: Node) -> void:
+	"""Set an explicit parent/container to render visuals into (overrides anchor manager)."""
+	override_parent = node
+	print("[NarrativeStageRenderer] render container override set: ", node.get_path() if node else "null")
 
-	var texture: Texture2D = null
-
-	# Check if it's a DLC asset (format: "chapter_id:asset_name")
-	# But NOT a res:// path (which also contains :)
-	if asset_path.contains(":") and not asset_path.begins_with("res://"):
-		texture = _load_dlc_asset(asset_path)
-	else:
-		# Bundled asset
-		texture = _load_bundled_asset(asset_path)
-
-	# Cache if loaded successfully
-	if texture:
-		asset_cache[asset_path] = texture
-
-	return texture
-
-func _load_dlc_asset(asset_id: String) -> Texture2D:
-	"""Load asset from DLC via AssetRegistry"""
-	var parts = asset_id.split(":")
-	if parts.size() != 2:
-		print("[NarrativeStageRenderer] Invalid DLC asset ID: ", asset_id)
-		return null
-
-	var chapter_id = parts[0]
-	var asset_name = parts[1]
-
-	# Try AssetRegistry first
-	var asset_registry = get_node_or_null("/root/AssetRegistry")
-	if asset_registry and asset_registry.has_method("get_texture"):
-		var texture = asset_registry.get_texture(chapter_id, asset_name)
-		if texture:
-			print("[NarrativeStageRenderer] Loaded DLC asset: ", asset_id)
-			return texture
-
-	# Fallback: try direct path
-	var dlc_path = "user://dlc/chapters/%s/assets/%s" % [chapter_id, asset_name]
-	if FileAccess.file_exists(dlc_path):
-		var image = Image.new()
-		var error = image.load(dlc_path)
-		if error == OK:
-			var texture = ImageTexture.create_from_image(image)
-			print("[NarrativeStageRenderer] Loaded DLC asset from path: ", dlc_path)
-			return texture
-
-	print("[NarrativeStageRenderer] DLC asset not found: ", asset_id)
-	return null
-
-func _load_bundled_asset(asset_path: String) -> Texture2D:
-	"""Load bundled asset from res://"""
-	# Add res:// prefix if not present
-	if not asset_path.begins_with("res://"):
-		asset_path = "res://textures/narrative/" + asset_path
-
-	if ResourceLoader.exists(asset_path):
-		var texture = load(asset_path) as Texture2D
-		if texture:
-			print("[NarrativeStageRenderer] Loaded bundled asset: ", asset_path)
-			return texture
-
-	print("[NarrativeStageRenderer] Bundled asset not found: ", asset_path)
-	return null
-
-func _display_texture(texture: Texture2D, state_data: Dictionary):
-	"""Display texture in the narrative stage area"""
-	print("[NarrativeStageRenderer] === DISPLAYING TEXTURE ===")
-
-	# Configure based on anchor name (set via set_visual_anchor from narrative stage JSON)
-	# Fall back to state data position, then default to top_banner
-	var position_mode = anchor_name if anchor_name != "" else state_data.get("position", "top_banner")
-	print("[NarrativeStageRenderer] 📍 Position mode: ", position_mode)
-	print("[NarrativeStageRenderer] 📍 anchor_name variable: ", anchor_name)
-	print("[NarrativeStageRenderer] 📍 Renderer parent: ", get_parent().name if get_parent() else "NO PARENT")
-	print("[NarrativeStageRenderer] 📍 Renderer path: ", get_path())
-
-	# For fullscreen mode, add directly to this Control (which is fullscreen)
-	# For other modes, use the visual anchor system
-	var anchor_node = self
-	if position_mode != "fullscreen":
-		anchor_node = _get_anchor_node()
-		if not anchor_node:
-			print("[NarrativeStageRenderer] ⚠️ Anchor not found: ", anchor_name)
-			anchor_node = self  # Fallback to self
-		else:
-			print("[NarrativeStageRenderer] Using anchor node: ", anchor_node.name, " at ", anchor_node.get_path())
-	else:
-		print("[NarrativeStageRenderer] ✓ Using fullscreen mode - adding to renderer Control (self)")
-		print("[NarrativeStageRenderer] ✓ Self size: ", size)
-		print("[NarrativeStageRenderer] ✓ Self global position: ", global_position)
-
-	# Fade out old visual if exists
-	if current_visual:
-		var old_visual = current_visual
-		var tween = create_tween()
-		tween.tween_property(old_visual, "modulate:a", 0.0, fade_out_duration)
-		tween.tween_callback(func():
-			if old_visual and is_instance_valid(old_visual):
-				old_visual.queue_free()
-		)
-
-	# Create new TextureRect
-	var tex_rect = TextureRect.new()
-	tex_rect.name = "NarrativeVisual"
-	tex_rect.texture = texture
-
-	_configure_texture_rect(tex_rect, position_mode)
-
-	# Add to scene
-	anchor_node.add_child(tex_rect)
-	current_visual = tex_rect
-
-	print("[NarrativeStageRenderer] ✓ TextureRect added to: ", anchor_node.name)
-	print("[NarrativeStageRenderer] ✓ TextureRect path: ", tex_rect.get_path())
-	print("[NarrativeStageRenderer] ✓ TextureRect size: ", tex_rect.size)
-	print("[NarrativeStageRenderer] ✓ TextureRect global position: ", tex_rect.global_position)
-	print("[NarrativeStageRenderer] ✓ TextureRect anchors: L=", tex_rect.anchor_left, " T=", tex_rect.anchor_top, " R=", tex_rect.anchor_right, " B=", tex_rect.anchor_bottom)
-	print("[NarrativeStageRenderer] ✓ TextureRect z_index: ", tex_rect.z_index)
-
-	# Add text overlay if text is provided
-	var text_content = state_data.get("text", "")
-	if text_content != "":
-		_add_text_overlay(text_content, position_mode, anchor_node)
-
-	# Fade in
-	tex_rect.modulate.a = 0.0
-	var tween = create_tween()
-	tween.tween_property(tex_rect, "modulate:a", 1.0, fade_in_duration)
-
-	print("[NarrativeStageRenderer] === TEXTURE DISPLAY COMPLETE ===")
-
-func _configure_texture_rect(tex_rect: TextureRect, position_mode: String):
-	"""Configure TextureRect based on position mode"""
-	match position_mode:
-		"fullscreen":
-			# Full screen cinematic overlay
-			tex_rect.anchor_left = 0
-			tex_rect.anchor_top = 0
-			tex_rect.anchor_right = 1
-			tex_rect.anchor_bottom = 1
-			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-			tex_rect.z_index = 100  # Above everything for fullscreen experience
-			print("[NarrativeStageRenderer] Configured as FULLSCREEN")
-
-		"top_banner":
-			# Full area from top of screen to top of board (HUD overlays on top)
-			tex_rect.anchor_left = 0
-			tex_rect.anchor_top = 0  # Start at very top
-			tex_rect.anchor_right = 1
-			tex_rect.anchor_bottom = 0.25  # Extend to ~25% (fills to board)
-			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED  # Centered, shows full image
-			tex_rect.z_index = -5  # Above ALL background effects (brightness overlay is -75), below HUD
-
-		"left_panel":
-			# Panel on left side
-			tex_rect.anchor_left = 0
-			tex_rect.anchor_top = 0.2
-			tex_rect.anchor_right = 0
-			tex_rect.anchor_bottom = 0.8
-			tex_rect.offset_right = 300  # Width
-			tex_rect.expand_mode = TextureRect.EXPAND_FIT_HEIGHT
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
-
-		"right_panel":
-			# Panel on right side
-			tex_rect.anchor_left = 1
-			tex_rect.anchor_top = 0.2
-			tex_rect.anchor_right = 1
-			tex_rect.anchor_bottom = 0.8
-			tex_rect.offset_left = -300  # Width (negative for right alignment)
-			tex_rect.expand_mode = TextureRect.EXPAND_FIT_HEIGHT
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
-
-		"background_overlay":
-			# Full screen overlay
-			tex_rect.anchor_left = 0
-			tex_rect.anchor_top = 0
-			tex_rect.anchor_right = 1
-			tex_rect.anchor_bottom = 1
-			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-			tex_rect.z_index = -50  # Behind UI
-
-		"foreground_character":
-			# Character in foreground
-			tex_rect.anchor_left = 0.5
-			tex_rect.anchor_top = 0.5
-			tex_rect.anchor_right = 0.5
-			tex_rect.anchor_bottom = 0.5
-			tex_rect.offset_left = -200
-			tex_rect.offset_top = -300
-			tex_rect.offset_right = 200
-			tex_rect.offset_bottom = 300
-			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
-			tex_rect.z_index = 50  # In front of UI
-
-		_:
-			# Default: top banner
-			tex_rect.anchor_left = 0
-			tex_rect.anchor_top = 0
-			tex_rect.anchor_right = 1
-			tex_rect.anchor_bottom = 0
-			tex_rect.offset_bottom = 200
-			tex_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+func clear_render_container() -> void:
+	override_parent = null
+	print("[NarrativeStageRenderer] render container override cleared")
 
 func _get_anchor_node() -> Node:
 	"""Get the visual anchor node from VisualAnchorManager"""
+	# If an override parent is set (for pipeline-driven overlay), use it first
+	if override_parent and override_parent.is_inside_tree():
+		return override_parent
+
 	var anchor_manager = get_node_or_null("/root/VisualAnchorManager")
 	if anchor_manager and anchor_manager.has_method("get_anchor"):
 		var anchor_node = anchor_manager.get_anchor(anchor_name)
@@ -306,6 +174,41 @@ func _get_anchor_node() -> Node:
 
 	# Fallback to self if anchor not found
 	return self
+
+# Recursive search helper because Node.find_node may not be available
+func _find_node_recursive(start_node: Node, target_name: String) -> Node:
+	if not start_node:
+		return null
+	for child in start_node.get_children():
+		if typeof(child) == TYPE_OBJECT and child is Node:
+			if child.name == target_name:
+				return child
+			var found = _find_node_recursive(child, target_name)
+			if found:
+				return found
+	return null
+
+# Simple hex color parser (#RRGGBB or #RRGGBBAA)
+func _color_from_hex(hex_str: String) -> Color:
+	if not hex_str or hex_str == "":
+		return Color(0,0,0,1)
+	var s = hex_str.strip_edges()
+	if s.begins_with("#"):
+		s = s.substr(1, s.length() - 1)
+	# expect RRGGBB or RRGGBBAA
+	if s.length() == 6:
+		var r = int("0x" + s.substr(0,2))
+		var g = int("0x" + s.substr(2,2))
+		var b = int("0x" + s.substr(4,2))
+		return Color(r/255.0, g/255.0, b/255.0, 1.0)
+	elif s.length() == 8:
+		var r2 = int("0x" + s.substr(0,2))
+		var g2 = int("0x" + s.substr(2,2))
+		var b2 = int("0x" + s.substr(4,2))
+		var a2 = int("0x" + s.substr(6,2))
+		return Color(r2/255.0, g2/255.0, b2/255.0, a2/255.0)
+	# fallback
+	return Color(0,0,0,1)
 
 func preload_assets(stage_data: Dictionary):
 	"""Preload all assets for a stage to improve performance"""
@@ -330,7 +233,7 @@ func clear_cache():
 	asset_cache.clear()
 	print("[NarrativeStageRenderer] Asset cache cleared")
 
-func _add_text_overlay(text_content: String, position_mode: String, parent_node: Node):
+func _add_text_overlay(text_content: String, position_mode: String, parent_node: Node, text_color: String = "#FFFFFF"):
 	"""Add text overlay for narrative content"""
 
 	print("[NarrativeStageRenderer] === ADDING TEXT OVERLAY ===")
@@ -379,7 +282,7 @@ func _add_text_overlay(text_content: String, position_mode: String, parent_node:
 			print("[NarrativeStageRenderer]   Offsets: ", label.offset_left, ",", label.offset_top, ",", label.offset_right, ",", label.offset_bottom)
 
 		"top_banner":
-			# ...existing code...
+			# Full area from top of screen to top of board (HUD overlays on top)
 			label.anchor_left = 0
 			label.anchor_top = 0
 			label.anchor_right = 1
@@ -397,7 +300,7 @@ func _add_text_overlay(text_content: String, position_mode: String, parent_node:
 			print("[NarrativeStageRenderer] ✓ Configured banner text")
 
 		_:
-			# ...existing code...
+			# Default configuration
 			label.anchor_left = 0
 			label.anchor_top = 0
 			label.anchor_right = 1

@@ -50,7 +50,7 @@ func _scale_position(pos: Array) -> Vector2:
 
 func _load_world_map_data():
 	"""Load world map configuration from JSON"""
-	var path = "res://levels/world_map.json"
+	var path = "res://data/levels/world_map.json"
 	if not FileAccess.file_exists(path):
 		print("[WorldMap] world_map.json not found at: %s" % path)
 		_create_fallback_data()

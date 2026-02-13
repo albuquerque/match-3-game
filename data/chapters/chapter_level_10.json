@@ -6,7 +6,7 @@
 
   "assets": {
     "overlays": {
-      "light_rays": "res://textures/overlays/overlay_victory_rays.svg"
+      "light_rays": "res://data/images/overlays/overlay_victory_rays.svg"
     }
   },
 

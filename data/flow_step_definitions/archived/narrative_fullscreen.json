@@ -1,0 +1,10 @@
+{
+  "id": "narrative_fullscreen",
+  "type": "narrative_stage",
+  "auto_advance_delay": 3.5,
+  "skippable": true,
+  "anchor": "fullscreen",
+  "metadata": {
+    "description": "Fullscreen narrative stage with default delay and skippable"
+  }
+}

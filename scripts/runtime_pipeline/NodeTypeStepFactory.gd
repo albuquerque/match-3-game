@@ -1,9 +1,40 @@
 extends RefCounted
 class_name NodeTypeStepFactory
 
+const _DEF_LOADER = preload("res://scripts/runtime_pipeline/FlowStepDefinitionLoader.gd")
+static var _DEF_CACHE: Dictionary = {}
+
 ## NodeTypeStepFactory
 ## Factory that converts flow node dictionaries into pipeline steps
 ## Eliminates conditional logic from ExperienceDirector
+
+static func _load_definition_local(def_id: String) -> Dictionary:
+	if def_id == null or def_id == "":
+		return {}
+	if _DEF_CACHE.has(def_id):
+		return _DEF_CACHE[def_id]
+
+	var paths = ["res://data/flow_step_definitions/%s.json" % def_id, "user://flow_step_definitions/%s.json" % def_id]
+	for p in paths:
+		if FileAccess.file_exists(p):
+			var f = FileAccess.open(p, FileAccess.READ)
+			if f:
+				var txt = f.get_as_text()
+				f.close()
+				var json = JSON.new()
+				var parse_result = json.parse(txt)
+				if parse_result == OK and typeof(json.get_data()) == TYPE_DICTIONARY:
+					_DEF_CACHE[def_id] = json.get_data()
+					return _DEF_CACHE[def_id]
+				else:
+					push_error("[NodeTypeStepFactory] Failed to parse JSON for %s: %s" % [p, json.get_error_message()])
+			else:
+				push_error("[NodeTypeStepFactory] Failed to open file: %s" % p)
+
+	# Not found
+	push_warning("[NodeTypeStepFactory] Definition not found: %s" % def_id)
+	_DEF_CACHE[def_id] = {}
+	return {}
 
 static func create_step_from_node(node: Dictionary) -> PipelineStep:
 	"""Create appropriate pipeline step based on node type
@@ -13,7 +44,8 @@ static func create_step_from_node(node: Dictionary) -> PipelineStep:
 	# Resolve external definition if present
 	var def_id = node.get("definition_id", "")
 	if def_id != "":
-		var def = FlowStepDefinitionLoader.load_definition(def_id)
+		# Use local loader to avoid cross-script compile order issues
+		var def = _load_definition_local(def_id)
 		# Merge: copy def then overwrite with node values
 		var merged = {}
 		for k in def.keys():

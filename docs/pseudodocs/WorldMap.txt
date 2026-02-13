@@ -1,0 +1,108 @@
+✅ **IMPLEMENTED - January 18, 2026**
+
+This design has been successfully implemented in the game.
+See: `/docs/WORLD_MAP_IMPLEMENTATION.md` for full details.
+
+---
+
+**ORIGINAL DESIGN NOTES:**
+
+World Map JSON Structure
+
+This JSON is designed so your AI agent (or your game code) can easily iterate chapters, generate the level buttons, and position them using your chosen coordinates.
+
+{
+  "world_map": {
+    "chapters": [
+      {
+        "id": 1,
+        "title": "Genesis: The Beginning",
+        "level_grid": {
+          "rows": 3,
+          "columns": 5
+        },
+        "levels": [
+          { "level": 1, "pos": [200, 820], "unlocked": true },
+          { "level": 2, "pos": [360, 780], "unlocked": true },
+          { "level": 3, "pos": [520, 820], "unlocked": true },
+          { "level": 4, "pos": [680, 780], "unlocked": false },
+          { "level": 5, "pos": [840, 820], "unlocked": false },
+
+          { "level": 6, "pos": [200, 660], "unlocked": false },
+          { "level": 7, "pos": [360, 620], "unlocked": false },
+          { "level": 8, "pos": [520, 660], "unlocked": false },
+          { "level": 9, "pos": [680, 620], "unlocked": false },
+          { "level": 10, "pos": [840, 660], "unlocked": false }
+        ],
+        "next_chapter_button_pos": [540, 480]
+      },
+
+      {
+        "id": 2,
+        "title": "Exodus: The Journey",
+        "level_grid": {
+          "rows": 3,
+          "columns": 5
+        },
+        "levels": [
+          { "level": 11, "pos": [200, 820], "unlocked": false },
+          { "level": 12, "pos": [360, 780], "unlocked": false },
+          { "level": 13, "pos": [520, 820], "unlocked": false },
+          { "level": 14, "pos": [680, 780], "unlocked": false },
+          { "level": 15, "pos": [840, 820], "unlocked": false },
+
+          { "level": 16, "pos": [200, 660], "unlocked": false },
+          { "level": 17, "pos": [360, 620], "unlocked": false },
+          { "level": 18, "pos": [520, 660], "unlocked": false },
+          { "level": 19, "pos": [680, 620], "unlocked": false },
+          { "level": 20, "pos": [840, 660], "unlocked": false }
+        ],
+        "next_chapter_button_pos": [540, 480]
+      }
+    ]
+  }
+}
+
+
+
+Godot Control Node Layout (Text Description)
+
+This structure is optimized for responsive UI, and uses Godot’s typical hierarchy for full-screen map UI.
+
+WorldMap (Control)
+│
+├── Background (TextureRect)
+│     - anchors fill entire screen
+│     - texture = world_map_background.png
+│
+├── MapContainer (Control)
+│     - anchors: full rect margins 40px
+│     - purpose: holds chapters that scroll vertically
+│
+│    └── ChaptersScroll (ScrollContainer)
+│         └── ChaptersVBox (VBoxContainer)
+│
+│             ├── Chapter1 (Control)
+│             │     ├── ChapterTitle (Label)
+│             │     ├── LevelsContainer (Control)
+│             │     │     - custom positions for level buttons
+│             │     │
+│             │     │     ├── LevelButton1 (TextureButton)
+│             │     │     ├── LevelButton2 (TextureButton)
+│             │     │     ├── ...
+│             │     │     └── LevelButton10 (TextureButton)
+│             │     │
+│             │     └── NextChapterButton (TextureButton)
+│             │
+│             ├── Chapter2 (Control)
+│             │     ├── ChapterTitle (Label)
+│             │     ├── LevelsContainer (Control)
+│             │     │     ├── LevelButton11
+│             │     │     └── LevelButton20
+│             │     └── NextChapterButton
+│             │
+│             └── ...
+│
+└── TopUI (Control)
+      ├── BackButton (TextureButton)
+      ├── Title (Label)

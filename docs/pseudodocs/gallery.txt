@@ -1,0 +1,5 @@
+The Gallery will be used to show the unlocked images, cards, etc. However, this should be viewable only in app. The user should not be able to copy them from the filesystem and view it in another player.
+
+The user will be provided a Download button by playing an Ad option. This will create a copy of the image in their Downloads/<app-name> folder which they can download and probably share.
+
+

@@ -104,19 +104,6 @@ func execute(context: PipelineContext) -> bool:
 			_context.overlay_layer = _overlay_layer
 	print("[ShowNarrativeStep] Overlay created: %s" % (_overlay_layer.get_path() if _overlay_layer else "none"))
 
-	# Create narrative container for content and skip button
-	var narrative_container = Control.new()
-	narrative_container.name = "NarrativeContainer"
-	if narrative_container.has_method("set_anchors_preset"):
-		narrative_container.set_anchors_preset(Control.PRESET_FULL_RECT)
-	else:
-		narrative_container.anchor_left = 0
-		narrative_container.anchor_top = 0
-		narrative_container.anchor_right = 1
-		narrative_container.anchor_bottom = 1
-	_overlay_layer.add_child(narrative_container)
-	print("[ShowNarrativeStep] Narrative container added: %s" % (narrative_container.get_path()))
-
 	# Create a dimmer polygon to fully cover the screen under the narrative (Polygon2D on CanvasLayer)
 	if not _dimmer_poly:
 		_dimmer_poly = Polygon2D.new()
@@ -127,8 +114,25 @@ func execute(context: PipelineContext) -> bool:
 		var vp = get_viewport().get_visible_rect().size if get_viewport() else Vector2.ZERO
 		var poly = [Vector2(0, 0), Vector2(vp.x, 0), Vector2(vp.x, vp.y), Vector2(0, vp.y)]
 		_dimmer_poly.polygon = poly
+		# Ensure dimmer sits behind narrative content
+		_dimmer_poly.z_index = 0
 		# Add to overlay layer (CanvasLayer expects Node2D children)
 		_overlay_layer.add_child(_dimmer_poly)
+
+	# Create narrative container for content and skip button
+	var narrative_container = Control.new()
+	narrative_container.name = "NarrativeContainer"
+	if narrative_container.has_method("set_anchors_preset"):
+		narrative_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	else:
+		narrative_container.anchor_left = 0
+		narrative_container.anchor_top = 0
+		narrative_container.anchor_right = 1
+		narrative_container.anchor_bottom = 1
+	# Ensure narrative container renders above the dimmer
+	narrative_container.z_index = 10
+	_overlay_layer.add_child(narrative_container)
+	print("[ShowNarrativeStep] Narrative container added: %s" % (narrative_container.get_path()))
 
 	# Optional skip button in top-right
 	if skippable:
@@ -170,15 +174,24 @@ func execute(context: PipelineContext) -> bool:
 			event_bus.narrative_stage_complete.connect(Callable(self, "_on_narrative_complete"))
 
 	if narrative_manager.has_method("load_stage_by_id"):
+		# Lock NarrativeStageManager to prevent level-based auto-loads from replacing this pipeline-driven stage
+		if narrative_manager.has_method("lock_stage"):
+			narrative_manager.lock_stage(true)
+			print("[ShowNarrativeStep] Locked NarrativeStageManager for stage: %s" % stage_id)
 		var loaded = narrative_manager.load_stage_by_id(stage_id)
 		print("[ShowNarrativeStep] narrative_manager.load_stage_by_id returned: %s" % str(loaded))
 		if loaded:
+			# Success: ensure auto-advance and safety timers are started
 			if auto_advance_delay > 0:
 				_start_auto_advance_timer()
 			# start a safety timer to avoid indefinite hang
 			_start_safety_timer()
 			return true
 		else:
+			# Unlock manager on failure
+			if narrative_manager.has_method("lock_stage"):
+				narrative_manager.lock_stage(false)
+				print("[ShowNarrativeStep] Unlocked NarrativeStageManager after failed load: %s" % stage_id)
 			push_warning("[ShowNarrativeStep] Failed to load narrative: %s" % stage_id)
 			# restore board visibility on failure
 			if _context and _context.game_board:
@@ -267,15 +280,42 @@ func _on_fade_out_complete():
 	if _context:
 		_context.waiting_for_completion = false
 		_context.completion_type = ""
+	# Unlock NarrativeStageManager now that the pipeline-driven stage is fully finished
+	var tree = get_tree()
+	if tree:
+		var root = tree.root
+		var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
+		if narrative_manager and narrative_manager.has_method("lock_stage"):
+			narrative_manager.lock_stage(false)
+			print("[ShowNarrativeStep] Unlocked NarrativeStageManager after completion: %s" % stage_id)
+			# Clear any active stage so level-specific stage (top_banner) can be loaded by level events
+			if narrative_manager.has_method("clear_stage"):
+				narrative_manager.clear_stage()
+				print("[ShowNarrativeStep] Cleared NarrativeStageManager active stage to allow level-specific stage to load")
+				# Explicitly reset anchor to top_banner so renderer is prepared for per-level banner
+				if narrative_manager.has_method("set_anchor"):
+					narrative_manager.set_anchor("top_banner")
+					print("[ShowNarrativeStep] Reset NarrativeStageManager anchor to 'top_banner'")
 	step_completed.emit(true)
 
 func cleanup():
 	# Disconnect event and restore UI - but only if we're still in the tree
 	if not is_inside_tree():
-		# Step already removed from tree, cannot access EventBus
-		# Just clear our references and return
+		# Step already removed from tree, cannot access EventBus via get_tree()
+		# Just clear our references and attempt a safe fallback to Engine.get_main_loop()
 		_auto_timer = null
 		_safety_timer = null
+		# Try to access the SceneTree safely via Engine.get_main_loop() when node not inside tree
+		var main_loop = Engine.get_main_loop()
+		var tree = null
+		if main_loop and main_loop is SceneTree:
+			tree = main_loop
+		if tree:
+			var root = tree.root
+			var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
+			if narrative_manager and narrative_manager.has_method("lock_stage"):
+				narrative_manager.lock_stage(false)
+				print("[ShowNarrativeStep] Unlocked NarrativeStageManager in cleanup: %s" % stage_id)
 		return
 
 	var root = null
@@ -317,13 +357,17 @@ func cleanup():
 	_cleanup_overlay(_context)
 
 func _cleanup_overlay(context: PipelineContext) -> void:
+	# Remove dimmer polygon if present
 	if _dimmer_poly and _dimmer_poly.is_inside_tree():
 		_dimmer_poly.queue_free()
 		_dimmer_poly = null
-	# Remove overlay layer only if we created it for this context
+		print("[ShowNarrativeStep] Removed dimmer polygon")
+
+	# Remove overlay layer only if we created it or it still exists
 	if _overlay_layer and _overlay_layer.is_inside_tree():
 		_overlay_layer.queue_free()
 		# Clear context.overlay_layer if it referenced this
 		if context and context.overlay_layer == _overlay_layer:
 			context.overlay_layer = null
 		_overlay_layer = null
+		print("[ShowNarrativeStep] Removed overlay layer")

@@ -68,7 +68,7 @@ The Narrative Stage System is a dynamic storytelling layer that sits above the g
 
 **1. Create JSON Configuration**
 
-`data/narrative_stages/level_5.json`:
+`data/narrative_stages/levels/level_5.json`:
 
 ```json
 {
@@ -413,7 +413,7 @@ Add optional conditions to transitions:
 
 **Auto-load for specific level:**
 ```
-data/narrative_stages/level_X.json
+data/narrative_stages/levels/level_X.json
 ```
 
 **Named narrative (manual load):**
@@ -538,7 +538,7 @@ set_visual_anchor(anchor: String)
 ### Narrative Not Showing
 
 **Check:**
-1. JSON file exists in correct location (`data/narrative_stages/level_X.json`)
+1. JSON file exists in correct location (`data/narrative_stages/levels/level_X.json`)
 2. Asset files exist in `textures/narrative/`
 3. Console shows loading messages
 4. `NarrativeStageManager` is in autoload (project.godot)
@@ -689,7 +689,7 @@ textures/narrative/
 - `scripts/NarrativeStageManager.gd` - System coordinator (autoload)
 
 ### Configuration Files (Created)
-- `data/narrative_stages/level_11.json` - Exodus stage (working example)
+- `data/narrative_stages/levels/level_11.json` - Exodus stage (working example)
 - `data/narrative_stages/exodus_sea_parting.json` - Original example
 
 ### Modified Files

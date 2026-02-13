@@ -88,7 +88,7 @@ func load_all_levels():
 func get_level_files() -> Array:
 	"""Get all level JSON files from the levels directory"""
 	var level_files = []
-	var dir = DirAccess.open("res://levels/")
+	var dir = DirAccess.open("res://data/levels/")
 
 	if dir:
 		dir.list_dir_begin()
@@ -98,7 +98,7 @@ func get_level_files() -> Array:
 			if not dir.current_is_dir() and file_name.ends_with(".json"):
 				# Skip world_map.json as it's not a game level
 				if file_name != "world_map.json":
-					level_files.append("res://levels/" + file_name)
+					level_files.append("res://data/levels/" + file_name)
 			file_name = dir.get_next()
 
 		dir.list_dir_end()

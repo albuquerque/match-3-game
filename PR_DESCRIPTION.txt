@@ -1,0 +1,117 @@
+PR Title: Experience runtime pipeline refactor — extract flow step definitions, add schemas & tooling
+
+Branch context
+- This branch was created on top of the "Experience system refactor" commit (the refactor that introduced the initial runtime pipeline). The work here continues that effort: we expanded `NodeTypeStepFactory`, implemented previously stubbed step types, and also added JSON schemas, migration tooling, and documentation to make flows and step definitions first-class and machine-consumable.
+
+PR Description:
+Overview
+- This PR refactors the game's experience runtime pipeline to move step definitions out of inline experience flows into a new `data/flow_step_definitions/` directory and introduces a first-class runtime pipeline implementation under `scripts/runtime_pipeline/`.
+- Adds dedicated step implementations and loaders so flows can reference reusable step definitions by name. This reduces orchestration coupling and prepares the codebase for AI-driven flow generation.
+
+Key changes
+- New runtime pipeline loader and step implementations:
+  - scripts/runtime_pipeline/FlowStepDefinitionLoader.gd (new)
+  - scripts/runtime_pipeline/NodeTypeStepFactory.gd (modified)
+  - scripts/runtime_pipeline/ExperiencePipeline.gd (modified)
+  - scripts/runtime_pipeline/steps/* (new step types: AdRewardStep, ConditionalStep, CutsceneStep, DLCFlowStep, PremiumGateStep, UnlockStep, etc.)
+- Data migration and definition files:
+  - data/flow_step_definitions/ (new) — ad_reward.json, narrative_stage.json, narrative_stage_1/2.json, reward_coins.json, etc.
+  - data/experience_flows/test_definition_flow.json (new) — example flow using external step definitions
+  - tools/migrate_flow_definitions*.py (new) — CLI tools to migrate inline flows to definition files
+- JSON schemas & docs for AI consumption:
+  - docs/schemas/*.json (new) — effect, experience_flow, flow_step_definition, narrative_stage, level, chapter, collection, dlc_manifest
+  - docs/JSON_FILE_ARCHITECTURE.md, docs/JSON_ARCHITECTURE_GUARDRAILS.md (new)
+  - docs/AI_FLOW_PROMPT.md (new) — example prompt tuned for current content (Book of Genesis)
+- Definition auditing & editor tooling:
+  - addons/definition_audit/ and tools/editor/definition_audit.gd (new)
+  - tools/check_definition_refs.py, tools/validate_flow.py, tools/verify_definitions.py (new)
+- Various narrative and flow JSON updates and tests:
+  - data/experience_flows/* (modified/added)
+  - data/narrative_stages/* (modified)
+- Game integration updates:
+  - scripts/ExperienceDirector.gd, scripts/FlowCoordinator.gd — updated to integrate with new pipeline
+  - scenes/TestDefinitionRunner.tscn + scripts/test_definition_runner.gd (new) — test harness
+
+Staged files prepared for commit
+(From `git status --porcelain` at time of writing)
+- Modified (M):
+  - data/experience_flows/phase_9_test.json
+  - data/experience_flows/test_flow_simple.json
+  - data/narrative_stages/exodus_sea_parting.json
+  - data/narrative_stages/levels/level_11.json
+  - docs/ARCHITECTURE_COMPLIANCE_AUDIT.md
+  - docs/ARCHITECTURE_QUICK_REFERENCE.md
+  - docs/ARCHITECTURE_REFACTOR_SUMMARY.md
+  - docs/ARCHITECTURE_REFACTOR_TESTING.md
+  - docs/NARRATIVE_STAGE_GUIDE.md
+  - docs/REFACTOR_PROGRESS.md
+  - project.godot
+  - scripts/ExperienceDirector.gd
+  - scripts/FlowCoordinator.gd
+  - scripts/GameBoard.gd
+  - scripts/GameManager.gd
+  - scripts/runtime_pipeline/ContextBuilder.gd
+  - scripts/runtime_pipeline/ExperiencePipeline.gd
+  - scripts/runtime_pipeline/NodeTypeStepFactory.gd
+  - scripts/runtime_pipeline/steps/LoadLevelStep.gd
+  - scripts/runtime_pipeline/steps/ShowNarrativeStep.gd
+
+- Added (A):
+  - data/experience_flows/test_definition_flow.json
+  - data/flow_step_definitions/ad_reward.json
+  - data/flow_step_definitions/narrative_auto_4_0_skip_true.json
+  - data/flow_step_definitions/narrative_stage.json
+  - data/flow_step_definitions/narrative_stage_1.json
+  - data/flow_step_definitions/narrative_stage_2.json
+  - data/flow_step_definitions/reward_coins.json
+  - docs/AI_FLOW_PROMPT.md
+  - docs/JSON_ARCHITECTURE_GUARDRAILS.md
+  - docs/JSON_FILE_ARCHITECTURE.md
+  - docs/schemas/chapter.json
+  - docs/schemas/collection.json
+  - docs/schemas/dlc_manifest.json
+  - docs/schemas/effect.json
+  - docs/schemas/experience_flow.json
+  - docs/schemas/flow_step_definition.json
+  - docs/schemas/level.json
+  - docs/schemas/narrative_stage.json
+  - scenes/TestDefinitionRunner.tscn
+  - scripts/runtime_pipeline/FlowStepDefinitionLoader.gd
+  - scripts/runtime_pipeline/steps/AdRewardStep.gd
+  - scripts/runtime_pipeline/steps/ConditionalStep.gd
+  - scripts/runtime_pipeline/steps/CutsceneStep.gd
+  - scripts/runtime_pipeline/steps/DLCFlowStep.gd
+  - scripts/runtime_pipeline/steps/PremiumGateStep.gd
+  - scripts/runtime_pipeline/steps/UnlockStep.gd
+  - scripts/test_cutscene_conditional.gd
+  - scripts/test_definition_runner.gd
+  - tools/check_definition_refs.py
+  - tools/editor/definition_audit.gd
+  - tools/migrate_anchors.py
+  - tools/migrate_flow_definitions.py
+  - tools/migrate_flow_definitions_extended.py
+  - tools/report_definition_usage.py
+  - tools/requirements.txt
+  - tools/validate_flow.py
+  - tools/verify_definitions.py
+
+Untracked (??):
+  - COMMIT_SUMMARY.md
+  - PR_DESCRIPTION.txt (this file)
+  - ... (a few uid files, scripts and tooling helpers)
+
+Reference commit
+- Base HEAD SHA: 54686f75e885c788dae8cba3637ac5d00ba0386c
+
+Notes / Testing
+- I restored the original `scripts/GameBoard.gd` border helpers from HEAD and fixed an indentation-related parse error in `_destroy_tiles_immediately`.
+- Please run the project in Godot and smoke-test the following flows:
+  1) Open `scenes/TestDefinitionRunner.tscn` and run the test harness to verify step definitions load correctly.
+  2) Load any narrative stage (e.g. `data/narrative_stages/levels/level_11.json`) and confirm the narrative pipeline shows the full-screen narrative between level load and gameplay.
+  3) Run the migration CLI `tools/migrate_flow_definitions.py` against a test experience flow and inspect `data/flow_step_definitions/` for correct output.
+
+If you want, I can now:
+- Commit these staged changes with a suggested commit message and push to the current branch.
+- Open a draft PR branch and set the PR description accordingly.
+
+-- End of PR description
