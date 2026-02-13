@@ -336,8 +336,11 @@ func setup_background_image():
 func set_border_color(color: Color):
 	"""Set the color for the board borders"""
 	border_color = color
-	# Redraw borders with new color
-	draw_board_borders()
+	# Redraw borders with new color - use deferred safe call to avoid parser/static lookup issues
+	if has_method("draw_board_borders"):
+		call_deferred("draw_board_borders")
+	else:
+		print("[GameBoard] draw_board_borders() not defined yet; will be drawn when available")
 
 func set_background_image(image_path: String):
 	"""Set a background image for the game board screen"""
@@ -433,7 +436,7 @@ func clear_tiles():
 	print("[CLEAR_TILES] Checking direct children for tiles...")
 	for child in get_children():
 		# Skip known non-tile children
-		if child and is_instance_valid(child) and child.name not in ["Background", "BorderContainer", "BoardContainer", "TileAreaOverlay"] and child.has_method("setup"):
+		if child and is_instance_valid(child) and not (child.name in ["Background", "BorderContainer", "BoardContainer", "TileAreaOverlay"]) and child.has_method("setup"):
 			tiles_to_remove.append(child)
 			print("[CLEAR_TILES]   Found tile in direct children: ", child.name)
 
@@ -1528,6 +1531,15 @@ func _destroy_tiles_immediately(positions: Array):
 			# We should still clear the grid value to 0
 			print("[DESTROY_IMMEDIATE] No valid tile instance at (", gx, ",", gy, ") - clearing grid anyway")
 
+			# If the missing instance was a spreader, make sure we still report it
+			if t == GameManager.SPREADER:
+				if GameManager.has_method("report_spreader_destroyed"):
+					GameManager.report_spreader_destroyed(clear_pos)
+				else:
+					GameManager.spreader_count -= 1
+					GameManager.spreader_positions.erase(clear_pos)
+					print("[SPREADER] Missing-instance spreader destroyed at (", gx, ",", gy, ") - Remaining: ", GameManager.spreader_count)
+
 			if tile_instance and "is_unmovable_hard" in tile_instance and tile_instance.is_unmovable_hard:
 				if GameManager.has_method("report_unmovable_destroyed"):
 					GameManager.report_unmovable_destroyed(clear_pos, true)
@@ -1561,8 +1573,13 @@ func _destroy_tiles_immediately(positions: Array):
 		else:
 			# Regular tile or spreader or SPECIAL TILE
 			if t == GameManager.SPREADER:
-				GameManager.spreader_count -= 1
-				GameManager.spreader_positions.erase(clear_pos)
+				# Report via central method so all side-effects (signals, EventBus) are handled
+				if GameManager.has_method("report_spreader_destroyed"):
+					GameManager.report_spreader_destroyed(clear_pos)
+				else:
+					GameManager.spreader_count -= 1
+					GameManager.spreader_positions.erase(clear_pos)
+					print("[SPREADER] Special-destroyed spreader at (", gx, ",", gy, ") - Remaining: ", GameManager.spreader_count)
 			print("[DESTROY_IMMEDIATE] Clearing grid at (", gx, ",", gy, ") - was type ", t)
 			GameManager.grid[gx][gy] = 0
 			print("[DESTROY_IMMEDIATE] Grid cleared - now value: ", GameManager.grid[gx][gy])
@@ -2395,7 +2412,6 @@ func activate_swap_booster(x1: int, y1: int, x2: int, y2: int):
 	tile1.grid_position = Vector2(x2, y2)
 	tile2.grid_position = Vector2(x1, y1)
 
-
 	if tween1:
 		await tween1.finished
 	if tween2:
@@ -2438,6 +2454,7 @@ func activate_chain_reaction_booster(x: int, y: int):
 	for pos in wave1:
 		var gx = int(pos.x)
 		var gy = int(pos.y)
+
 		# Check if this is a hard unmovable
 		var is_unmovable = false
 		if tiles and gx < tiles.size() and tiles[gx] and gy < tiles[gx].size():
@@ -2792,11 +2809,8 @@ func activate_row_clear_booster(row: int):
 							tile_instance.queue_free()
 						tiles[gx][gy] = null
 						scoring_count += 1
-				# else tile still has hits remaining, don't clear it from grid
-				# Handle soft unmovables
-				if tile_instance and tile_instance.is_unmovable:
-					tile_instance.take_hit(1)
-				GameManager.report_unmovable_destroyed(pos)
+				else:
+					print("[GameBoard] Row clear booster hitting hard unmovable at (", gx, ",", gy, ") - not destroyed")
 			else:
 				GameManager.grid[gx][gy] = 0
 				scoring_count += 1
@@ -2873,11 +2887,8 @@ func activate_column_clear_booster(column: int):
 							tile_instance.queue_free()
 						tiles[gx][gy] = null
 						scoring_count += 1
-				# else tile still has hits remaining, don't clear it from grid
-				# Handle soft unmovables
-				if tile_instance and tile_instance.is_unmovable:
-					tile_instance.take_hit(1)
-				GameManager.report_unmovable_destroyed(pos)
+				else:
+					print("[GameBoard] Column clear booster hitting hard unmovable at (", gx, ",", gy, ") - not destroyed")
 			else:
 				GameManager.grid[gx][gy] = 0
 				scoring_count += 1
@@ -2982,7 +2993,7 @@ func activate_special_tile(pos: Vector2):
 		await get_tree().create_timer(0.05).timeout
 
 		# Create vertical beam
-		_create_lightning_beam_vertical(int(pos.x), Color(1.0, 0.5, 1.0))
+		_create_lightning_beam_vertical(int(pos.x), Color(1.0, 0.5, 1.0))  # Magenta
 		var vertical_positions = []
 		for y in range(GameManager.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(int(pos.x), y):
@@ -3113,7 +3124,7 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 		if tile_instance and tile_instance.is_unmovable_hard:
 			var destroyed = tile_instance.take_hit(1)
 			if destroyed:
-				print("[GameBoard] Chain: Hard unmovable destroyed at (", gx, ",", gy, ") - calling report_unmovable_destroyed")
+				print("[GameBoard] Chain unmovable destroyed at (", gx, ",", gy, ") - calling report_unmovable_destroyed")
 
 				# Report destruction to GameManager for counter tracking
 				if GameManager.has_method("report_unmovable_destroyed"):
@@ -3121,7 +3132,7 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 					GameManager.report_unmovable_destroyed(clear_pos, true)
 
 				var is_coll = tile_instance.is_collectible if "is_collectible" in tile_instance else false
-				var tile_type_check = tile_instance.type if "type" in tile_instance else 0
+				var tile_type_check = tile_instance.tile_type if "tile_type" in tile_instance else 0
 				# If destroyed, the tile has already transformed if it had a reveal
 				# Update the grid to match what the tile became
 				if is_coll:
@@ -3138,7 +3149,7 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 					tiles[gx][gy] = null
 					scoring_count += 1
 			else:
-				print("[GameBoard] Chain: Hard unmovable at (", gx, ",", gy, ") took hit but not destroyed yet")
+				print("[GameBoard] Chain unmovable at (", gx, ",", gy, ") took hit but not destroyed yet")
 			# Handle soft unmovables (legacy U tokens)
 			if GameManager.has_method("report_unmovable_destroyed"):
 				GameManager.report_unmovable_destroyed(clear_pos)
@@ -3167,6 +3178,8 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 
 	return
 
+
+# --------------------------- Border drawing helpers ---------------------------
 func _clear_board_borders():
 	"""Remove any previously created border children from the border container."""
 	if border_container == null:

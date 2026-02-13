@@ -981,35 +981,48 @@ func activate_special_tile(pos: Vector2):
 			if not is_cell_blocked(x, int(pos.y)):
 				# Check if this is a spreader before clearing
 				if grid[x][pos.y] == SPREADER:
-					spreader_count -= 1
-					spreader_positions.erase(Vector2(x, pos.y))
-					print("[SPREADER] Special tile destroyed spreader at (", x, ",", pos.y, ") - Remaining: ", spreader_count)
+					# Use centralized reporting method so signals/EventBus are emitted correctly
+					if has_method("report_spreader_destroyed"):
+						report_spreader_destroyed(Vector2(x, pos.y))
+					else:
+						spreader_count -= 1
+						spreader_positions.erase(Vector2(x, pos.y))
+						print("[SPREADER] Special tile destroyed spreader at (", x, ",", pos.y, ") - Remaining: ", spreader_count)
 				grid[x][pos.y] = 0
 	elif tile_type == VERTICAL_ARROW:
 		for y in range(GRID_HEIGHT):
 			if not is_cell_blocked(int(pos.x), y):
 				# Check if this is a spreader before clearing
 				if grid[pos.x][y] == SPREADER:
-					spreader_count -= 1
-					spreader_positions.erase(Vector2(pos.x, y))
-					print("[SPREADER] Special tile destroyed spreader at (", pos.x, ",", y, ") - Remaining: ", spreader_count)
+					if has_method("report_spreader_destroyed"):
+						report_spreader_destroyed(Vector2(pos.x, y))
+					else:
+						spreader_count -= 1
+						spreader_positions.erase(Vector2(pos.x, y))
+						print("[SPREADER] Special tile destroyed spreader at (", pos.x, ",", y, ") - Remaining: ", spreader_count)
 				grid[pos.x][y] = 0
 	elif tile_type == FOUR_WAY_ARROW:
 		for x in range(GRID_WIDTH):
 			if not is_cell_blocked(x, int(pos.y)):
 				# Check if this is a spreader before clearing
 				if grid[x][pos.y] == SPREADER:
-					spreader_count -= 1
-					spreader_positions.erase(Vector2(x, pos.y))
-					print("[SPREADER] Special tile destroyed spreader at (", x, ",", pos.y, ") - Remaining: ", spreader_count)
+					if has_method("report_spreader_destroyed"):
+						report_spreader_destroyed(Vector2(x, pos.y))
+					else:
+						spreader_count -= 1
+						spreader_positions.erase(Vector2(x, pos.y))
+						print("[SPREADER] Special tile destroyed spreader at (", x, ",", pos.y, ") - Remaining: ", spreader_count)
 				grid[x][pos.y] = 0
 		for y in range(GRID_HEIGHT):
 			if not is_cell_blocked(int(pos.x), y):
 				# Check if this is a spreader before clearing
 				if grid[pos.x][y] == SPREADER:
-					spreader_count -= 1
-					spreader_positions.erase(Vector2(pos.x, y))
-					print("[SPREADER] Special tile destroyed spreader at (", pos.x, ",", y, ") - Remaining: ", spreader_count)
+					if has_method("report_spreader_destroyed"):
+						report_spreader_destroyed(Vector2(pos.x, y))
+					else:
+						spreader_count -= 1
+						spreader_positions.erase(Vector2(pos.x, y))
+						print("[SPREADER] Special tile destroyed spreader at (", pos.x, ",", y, ") - Remaining: ", spreader_count)
 				grid[pos.x][y] = 0
 
 	# Emit signal to update UI

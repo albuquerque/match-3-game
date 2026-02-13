@@ -1,0 +1,6 @@
+{
+  "ad_type": "interstitial",
+  "required": false,
+  "id": "ad_reward",
+  "type": "ad_reward"
+}

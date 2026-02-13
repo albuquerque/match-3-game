@@ -75,6 +75,12 @@ func start_flow() -> void:
 	print("[FlowCoordinator] Starting flow: %s" % current_flow_id)
 	emit_signal("flow_started", current_flow_id)
 
+	# IMMEDIATELY hide the old board before building context
+	var old_board = ExecutionContextBuilder._find_game_board() if ExecutionContextBuilder else null
+	if old_board:
+		old_board.visible = false
+		print("[FlowCoordinator] Hidden old GameBoard before starting flow")
+
 	# Build execution context
 	var context = ExecutionContextBuilder.build_from_scene_tree()
 	context.flow_id = current_flow_id
@@ -89,6 +95,10 @@ func start_flow() -> void:
 		return
 
 	# Start pipeline
+	if pipeline.is_running:
+		print("[FlowCoordinator] Pipeline already running - stopping existing pipeline before starting new one")
+		pipeline.stop()
+
 	pipeline.start(context, steps)
 
 func start_flow_at_level(level_num: int) -> void:
@@ -119,6 +129,12 @@ func start_flow_at_level(level_num: int) -> void:
 	# Update state
 	state.current_level_index = target_index
 
+	# IMMEDIATELY hide the old board before building context
+	var old_board = ExecutionContextBuilder._find_game_board() if ExecutionContextBuilder else null
+	if old_board:
+		old_board.visible = false
+		print("[FlowCoordinator] Hidden old GameBoard before starting new flow")
+
 	# Build context and steps
 	var context = ExecutionContextBuilder.build_from_scene_tree()
 	context.flow_id = current_flow_id
@@ -130,6 +146,11 @@ func start_flow_at_level(level_num: int) -> void:
 	if steps.is_empty():
 		push_error("[FlowCoordinator] No valid steps from index %d" % target_index)
 		return
+
+	# Start pipeline
+	if pipeline.is_running:
+		print("[FlowCoordinator] Pipeline already running - stopping existing pipeline before starting new one")
+		pipeline.stop()
 
 	pipeline.start(context, steps)
 

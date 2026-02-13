@@ -1,0 +1,10 @@
+{
+  "rewards": [
+    {
+      "amount": 100,
+      "type": "coins"
+    }
+  ],
+  "id": "reward_coins",
+  "type": "reward"
+}

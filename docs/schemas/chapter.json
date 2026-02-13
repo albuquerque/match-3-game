@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://match3.example.com/schemas/chapter.json",
+  "title": "Chapter",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "chapter_id": { "type": "string" },
+    "name": { "type": "string" },
+    "levels": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "effects": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "required": ["chapter_id"]
+}

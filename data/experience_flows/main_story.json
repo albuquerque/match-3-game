@@ -4,264 +4,1542 @@
   "name": "Genesis to Exodus - Main Story",
   "description": "Primary story-driven progression from Creation through the Red Sea (62 levels).",
   "flow": [
-    { "type": "narrative_stage", "id": "creation_day_1", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_01" },
-    { "type": "reward", "id": "level_01_complete", "rewards": [ { "type": "coins", "amount": 100 } ] },
-
-    { "type": "narrative_stage", "id": "creation_day_2", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_02" },
-    { "type": "reward", "id": "level_02_complete", "rewards": [ { "type": "gems", "amount": 10 }, { "type": "coins", "amount": 150 } ] },
-
-    { "type": "narrative_stage", "id": "creation_day_3", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_03" },
-    { "type": "reward", "id": "level_03_complete", "rewards": [ { "type": "coins", "amount": 150 }, { "type": "booster", "booster_type": "hammer", "amount": 1 } ] },
-
-    { "type": "narrative_stage", "id": "creation_day_4", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_04" },
-    { "type": "reward", "id": "level_04_complete", "rewards": [ { "type": "gems", "amount": 15 }, { "type": "coins", "amount": 200 } ] },
-
-    { "type": "narrative_stage", "id": "creation_day_5", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_05" },
-    { "type": "reward", "id": "level_05_complete", "rewards": [ { "type": "coins", "amount": 200 }, { "type": "booster", "booster_type": "shuffle", "amount": 1 } ] },
-    { "type": "ad_reward", "id": "ad_bonus_coins_05", "ad_type": "rewarded", "reward": { "type": "coins", "amount": 500 }, "required": false },
-
-    { "type": "narrative_stage", "id": "creation_day_6a", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_06" },
-    { "type": "reward", "id": "level_06_complete", "rewards": [ { "type": "coins", "amount": 250 }, { "type": "card", "collection_id": "creation_cards", "card_id": "wild_animals" } ] },
-
-    { "type": "narrative_stage", "id": "creation_day_6b", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_07" },
-    { "type": "reward", "id": "level_07_complete", "rewards": [ { "type": "gems", "amount": 20 }, { "type": "card", "collection_id": "creation_cards", "card_id": "adam_and_eve" } ] },
-
-    { "type": "narrative_stage", "id": "creation_day_7", "auto_advance_delay": 3.0, "skippable": true },
-    { "type": "level", "id": "level_08" },
-    { "type": "reward", "id": "level_08_complete", "rewards": [ { "type": "coins", "amount": 300 } ] },
-
-    { "type": "narrative_stage", "id": "garden_of_eden", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_09" },
-    { "type": "reward", "id": "level_09_complete", "rewards": [ { "type": "gems", "amount": 25 }, { "type": "card", "collection_id": "gallery_cards", "card_id": "garden_of_eden" } ] },
-
-    { "type": "narrative_stage", "id": "the_fall", "auto_advance_delay": 4.5, "skippable": true },
-    { "type": "level", "id": "level_10" },
-    { "type": "reward", "id": "level_10_complete", "rewards": [ { "type": "coins", "amount": 350 }, { "type": "booster", "booster_type": "line_blast", "amount": 1 } ] },
-    { "type": "ad_reward", "id": "ad_interstitial_ch1", "ad_type": "interstitial", "required": false },
-
-    { "type": "narrative_stage", "id": "cain_and_abel", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_11" },
-    { "type": "reward", "id": "level_11_complete", "rewards": [ { "type": "coins", "amount": 400 }, { "type": "card", "collection_id": "patriarchs", "card_id": "cain_and_abel" } ] },
-
-    { "type": "narrative_stage", "id": "noah_called", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_12" },
-    { "type": "reward", "id": "level_12_complete", "rewards": [ { "type": "gems", "amount": 30 }, { "type": "booster", "booster_type": "hammer", "amount": 2 } ] },
-
-    { "type": "narrative_stage", "id": "the_flood", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_13" },
-    { "type": "reward", "id": "level_13_complete", "rewards": [ { "type": "coins", "amount": 450 }, { "type": "card", "collection_id": "patriarchs", "card_id": "noahs_ark" } ] },
-
-    { "type": "narrative_stage", "id": "rainbow_covenant", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_14" },
-    { "type": "reward", "id": "level_14_complete", "rewards": [ { "type": "coins", "amount": 500 }, { "type": "booster", "booster_type": "swap", "amount": 1 } ] },
-
-    { "type": "narrative_stage", "id": "tower_of_babel", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_15" },
-    { "type": "reward", "id": "level_15_complete", "rewards": [ { "type": "gems", "amount": 35 }, { "type": "card", "collection_id": "antiquity", "card_id": "tower_of_babel" } ] },
-    { "type": "ad_reward", "id": "ad_bonus_hammers_15", "ad_type": "rewarded", "reward": { "type": "booster", "booster_type": "hammer", "amount": 3 }, "required": false },
-
-    { "type": "narrative_stage", "id": "abraham_called", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_16" },
-    { "type": "reward", "id": "level_16_complete", "rewards": [ { "type": "coins", "amount": 550 }, { "type": "card", "collection_id": "patriarchs", "card_id": "abraham" } ] },
-
-    { "type": "level", "id": "level_17" },
-    { "type": "reward", "id": "level_17_complete", "rewards": [ { "type": "gems", "amount": 40 }, { "type": "booster", "booster_type": "chain_reaction", "amount": 1 } ] },
-
-    { "type": "narrative_stage", "id": "three_visitors", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_18" },
-    { "type": "reward", "id": "level_18_complete", "rewards": [ { "type": "coins", "amount": 600 }, { "type": "card", "collection_id": "patriarchs", "card_id": "three_angels" } ] },
-
-    { "type": "narrative_stage", "id": "sodom_destroyed", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_19" },
-    { "type": "reward", "id": "level_19_complete", "rewards": [ { "type": "coins", "amount": 650 }, { "type": "booster", "booster_type": "shuffle", "amount": 2 } ] },
-
-    { "type": "narrative_stage", "id": "isaac_born", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_20" },
-    { "type": "reward", "id": "level_20_complete", "rewards": [ { "type": "gems", "amount": 45 }, { "type": "card", "collection_id": "patriarchs", "card_id": "isaac" } ] },
-    { "type": "ad_reward", "id": "ad_interstitial_ch2", "ad_type": "interstitial", "required": false },
-
-    { "type": "narrative_stage", "id": "binding_of_isaac", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_21" },
-    { "type": "reward", "id": "level_21_complete", "rewards": [ { "type": "coins", "amount": 700 }, { "type": "card", "collection_id": "patriarchs", "card_id": "mount_moriah" } ] },
-
-    { "type": "narrative_stage", "id": "rebekah_at_well", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_22" },
-    { "type": "reward", "id": "level_22_complete", "rewards": [ { "type": "gems", "amount": 50 }, { "type": "booster", "booster_type": "hammer", "amount": 3 } ] },
-
-    { "type": "level", "id": "level_23" },
-    { "type": "reward", "id": "level_23_complete", "rewards": [ { "type": "coins", "amount": 750 }, { "type": "card", "collection_id": "patriarchs", "card_id": "jacob_esau" } ] },
-
-    { "type": "narrative_stage", "id": "birthright_sold", "auto_advance_delay": 3.0, "skippable": true },
-    { "type": "level", "id": "level_24" },
-    { "type": "reward", "id": "level_24_complete", "rewards": [ { "type": "coins", "amount": 800 }, { "type": "booster", "booster_type": "bomb_3x3", "amount": 2 } ] },
-
-    { "type": "narrative_stage", "id": "stolen_blessing", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_25" },
-    { "type": "reward", "id": "level_25_complete", "rewards": [ { "type": "gems", "amount": 55 }, { "type": "card", "collection_id": "patriarchs", "card_id": "isaacs_blessing" } ] },
-
-    { "type": "ad_reward", "id": "ad_bonus_coins_25", "ad_type": "rewarded", "reward": { "type": "coins", "amount": 500 }, "required": false },
-
-    { "type": "narrative_stage", "id": "jacobs_ladder", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_26" },
-    { "type": "reward", "id": "level_26_complete", "rewards": [ { "type": "coins", "amount": 850 }, { "type": "card", "collection_id": "patriarchs", "card_id": "jacobs_ladder" } ] },
-
-    { "type": "level", "id": "level_27" },
-    { "type": "reward", "id": "level_27_complete", "rewards": [ { "type": "gems", "amount": 60 }, { "type": "booster", "booster_type": "column_clear", "amount": 1 } ] },
-
-    { "type": "narrative_stage", "id": "rachel_at_well", "auto_advance_delay": 3.0, "skippable": true },
-    { "type": "level", "id": "level_28" },
-    { "type": "reward", "id": "level_28_complete", "rewards": [ { "type": "coins", "amount": 900 }, { "type": "card", "collection_id": "patriarchs", "card_id": "leah_and_rachel" } ] },
-
-    { "type": "narrative_stage", "id": "twelve_tribes", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_29" },
-    { "type": "reward", "id": "level_29_complete", "rewards": [ { "type": "coins", "amount": 950 }, { "type": "booster", "booster_type": "swap", "amount": 2 } ] },
-
-    { "type": "narrative_stage", "id": "jacob_wrestles", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_30" },
-    { "type": "reward", "id": "level_30_complete", "rewards": [ { "type": "gems", "amount": 65 }, { "type": "card", "collection_id": "patriarchs", "card_id": "israel" } ] },
-
-    { "type": "ad_reward", "id": "ad_interstitial_ch3", "ad_type": "interstitial", "required": false },
-
-    { "type": "narrative_stage", "id": "josephs_dreams", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_31" },
-    { "type": "reward", "id": "level_31_complete", "rewards": [ { "type": "coins", "amount": 1000 }, { "type": "card", "collection_id": "joseph", "card_id": "joseph_the_dreamer" } ] },
-
-    { "type": "narrative_stage", "id": "joseph_sold", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_32" },
-    { "type": "reward", "id": "level_32_complete", "rewards": [ { "type": "gems", "amount": 70 }, { "type": "booster", "booster_type": "bomb_3x3", "amount": 3 } ] },
-
-    { "type": "level", "id": "level_33" },
-    { "type": "reward", "id": "level_33_complete", "rewards": [ { "type": "coins", "amount": 1050 }, { "type": "card", "collection_id": "joseph", "card_id": "joseph_in_egypt" } ] },
-
-    { "type": "narrative_stage", "id": "joseph_imprisoned", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_34" },
-    { "type": "reward", "id": "level_34_complete", "rewards": [ { "type": "coins", "amount": 1100 }, { "type": "booster", "booster_type": "chain_reaction", "amount": 2 } ] },
-
-    { "type": "narrative_stage", "id": "prison_dreams", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_35" },
-    { "type": "reward", "id": "level_35_complete", "rewards": [ { "type": "gems", "amount": 75 }, { "type": "card", "collection_id": "joseph", "card_id": "prison_dreams" } ] },
-
-    { "type": "ad_reward", "id": "ad_bonus_bombs_35", "ad_type": "rewarded", "reward": { "type": "booster", "booster_type": "bomb_3x3", "amount": 3 }, "required": false },
-
-    { "type": "narrative_stage", "id": "pharaohs_dreams", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_36" },
-    { "type": "reward", "id": "level_36_complete", "rewards": [ { "type": "coins", "amount": 1150 }, { "type": "booster", "booster_type": "row_clear", "amount": 2 } ] },
-
-    { "type": "narrative_stage", "id": "joseph_exalted", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_37" },
-    { "type": "reward", "id": "level_37_complete", "rewards": [ { "type": "gems", "amount": 80 }, { "type": "card", "collection_id": "joseph", "card_id": "vizier" } ] },
-
-    { "type": "narrative_stage", "id": "brothers_arrive_egypt", "auto_advance_delay": 3.0, "skippable": true },
-    { "type": "level", "id": "level_38" },
-    { "type": "reward", "id": "level_38_complete", "rewards": [ { "type": "coins", "amount": 1200 }, { "type": "booster", "booster_type": "shuffle", "amount": 3 } ] },
-
-    { "type": "narrative_stage", "id": "silver_cup", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_39" },
-    { "type": "reward", "id": "level_39_complete", "rewards": [ { "type": "coins", "amount": 1250 }, { "type": "booster", "booster_type": "hammer", "amount": 4 } ] },
-
-    { "type": "narrative_stage", "id": "joseph_revealed", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_40" },
-    { "type": "reward", "id": "level_40_complete", "rewards": [ { "type": "gems", "amount": 85 }, { "type": "card", "collection_id": "joseph", "card_id": "reconciliation" } ] },
-    { "type": "ad_reward", "id": "ad_interstitial_ch4", "ad_type": "interstitial", "required": false },
-
-    { "type": "narrative_stage", "id": "israel_to_egypt", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_41" },
-    { "type": "reward", "id": "level_41_complete", "rewards": [ { "type": "coins", "amount": 1300 }, { "type": "card", "collection_id": "history", "card_id": "israel_family" } ] },
-
-    { "type": "narrative_stage", "id": "jacobs_blessings", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_42" },
-    { "type": "reward", "id": "level_42_complete", "rewards": [ { "type": "gems", "amount": 90 }, { "type": "booster", "booster_type": "bomb_3x3", "amount": 4 } ] },
-
-    { "type": "narrative_stage", "id": "joseph_final_days", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_43" },
-    { "type": "reward", "id": "level_43_complete", "rewards": [ { "type": "coins", "amount": 1350 }, { "type": "card", "collection_id": "history", "card_id": "joseph_legacy" } ] },
-
-    { "type": "narrative_stage", "id": "israel_multiplies", "auto_advance_delay": 3.0, "skippable": true },
-    { "type": "level", "id": "level_44" },
-    { "type": "reward", "id": "level_44_complete", "rewards": [ { "type": "coins", "amount": 1400 }, { "type": "booster", "booster_type": "line_blast", "amount": 2 } ] },
-
-    { "type": "narrative_stage", "id": "new_pharaoh", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_45" },
-    { "type": "reward", "id": "level_45_complete", "rewards": [ { "type": "gems", "amount": 95 }, { "type": "card", "collection_id": "history", "card_id": "pharaoh_oppression" } ] },
-
-    { "type": "narrative_stage", "id": "slavery_begins", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_46" },
-    { "type": "reward", "id": "level_46_complete", "rewards": [ { "type": "coins", "amount": 1450 }, { "type": "booster", "booster_type": "row_clear", "amount": 3 } ] },
-
-    { "type": "narrative_stage", "id": "midwives_courage", "auto_advance_delay": 3.0, "skippable": true },
-    { "type": "level", "id": "level_47" },
-    { "type": "reward", "id": "level_47_complete", "rewards": [ { "type": "coins", "amount": 1500 }, { "type": "card", "collection_id": "history", "card_id": "midwives" } ] },
-
-    { "type": "narrative_stage", "id": "moses_in_basket", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_48" },
-    { "type": "reward", "id": "level_48_complete", "rewards": [ { "type": "gems", "amount": 100 }, { "type": "booster", "booster_type": "column_clear", "amount": 3 } ] },
-
-    { "type": "narrative_stage", "id": "moses_adopted", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_49" },
-    { "type": "reward", "id": "level_49_complete", "rewards": [ { "type": "coins", "amount": 1550 }, { "type": "card", "collection_id": "history", "card_id": "moses_prince" } ] },
-
-    { "type": "narrative_stage", "id": "moses_flees", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_50" },
-    { "type": "reward", "id": "level_50_complete", "rewards": [ { "type": "gems", "amount": 105 }, { "type": "booster", "booster_type": "extra_moves", "amount": 2 } ] },
-
-    { "type": "ad_reward", "id": "ad_interstitial_ch5", "ad_type": "interstitial", "required": false },
-
-    { "type": "narrative_stage", "id": "burning_bush", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_51" },
-    { "type": "reward", "id": "level_51_complete", "rewards": [ { "type": "coins", "amount": 1600 }, { "type": "card", "collection_id": "exodus", "card_id": "burning_bush" } ] },
-
-    { "type": "narrative_stage", "id": "let_my_people_go", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_52" },
-    { "type": "reward", "id": "level_52_complete", "rewards": [ { "type": "gems", "amount": 110 }, { "type": "booster", "booster_type": "hammer", "amount": 5 } ] },
-
-    { "type": "narrative_stage", "id": "plague_blood", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_53" },
-    { "type": "reward", "id": "level_53_complete", "rewards": [ { "type": "coins", "amount": 1650 }, { "type": "card", "collection_id": "exodus", "card_id": "plague_blood" } ] },
-
-    { "type": "narrative_stage", "id": "plague_frogs", "auto_advance_delay": 3.0, "skippable": true },
-    { "type": "level", "id": "level_54" },
-    { "type": "reward", "id": "level_54_complete", "rewards": [ { "type": "coins", "amount": 1700 }, { "type": "booster", "booster_type": "chain_reaction", "amount": 3 } ] },
-
-    { "type": "narrative_stage", "id": "plagues_continue", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_55" },
-    { "type": "reward", "id": "level_55_complete", "rewards": [ { "type": "gems", "amount": 115 }, { "type": "card", "collection_id": "exodus", "card_id": "plague_swarms" } ] },
-
-    { "type": "narrative_stage", "id": "plagues_livestock_boils", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_56" },
-    { "type": "reward", "id": "level_56_complete", "rewards": [ { "type": "coins", "amount": 1750 }, { "type": "booster", "booster_type": "row_clear", "amount": 4 } ] },
-
-    { "type": "narrative_stage", "id": "plague_hail", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_57" },
-    { "type": "reward", "id": "level_57_complete", "rewards": [ { "type": "coins", "amount": 1800 }, { "type": "card", "collection_id": "exodus", "card_id": "plague_hail" } ] },
-
-    { "type": "narrative_stage", "id": "plague_locusts", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_58" },
-    { "type": "reward", "id": "level_58_complete", "rewards": [ { "type": "gems", "amount": 120 }, { "type": "booster", "booster_type": "shuffle", "amount": 5 } ] },
-
-    { "type": "narrative_stage", "id": "plague_darkness", "auto_advance_delay": 3.5, "skippable": true },
-    { "type": "level", "id": "level_59" },
-    { "type": "reward", "id": "level_59_complete", "rewards": [ { "type": "coins", "amount": 1850 }, { "type": "card", "collection_id": "exodus", "card_id": "plague_darkness" } ] },
-
-    { "type": "narrative_stage", "id": "passover_night", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_60" },
-    { "type": "reward", "id": "level_60_complete", "rewards": [ { "type": "gems", "amount": 125 }, { "type": "card", "collection_id": "exodus", "card_id": "passover" } ] },
-    { "type": "ad_reward", "id": "ad_interstitial_ch6", "ad_type": "interstitial", "required": false },
-
-    { "type": "narrative_stage", "id": "exodus_begins", "auto_advance_delay": 4.0, "skippable": true },
-    { "type": "level", "id": "level_61" },
-    { "type": "reward", "id": "level_61_complete", "rewards": [ { "type": "coins", "amount": 1900 }, { "type": "card", "collection_id": "exodus", "card_id": "the_exodus" } ] },
-
-    { "type": "narrative_stage", "id": "red_sea_crossing", "auto_advance_delay": 5.0, "skippable": true },
-    { "type": "level", "id": "level_62" },
-    { "type": "reward", "id": "level_62_complete", "rewards": [ { "type": "gems", "amount": 150 }, { "type": "booster", "booster_type": "all_boosters", "amount": 3 }, { "type": "card", "collection_id": "exodus", "card_id": "red_sea" } ] },
-
-    { "type": "premium_gate", "id": "wilderness_dlc_gate", "required_status": "premium", "on_fail": "offer", "description": "Unlocks Wilderness Journey DLC" }
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "creation_day_1",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_01"
+    },
+    {
+      "definition_id": "reward_coins",
+      "id": "level_01_complete",
+      "type": "reward"
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "creation_day_2",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_02"
+    },
+    {
+      "type": "reward",
+      "id": "level_02_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 10
+        },
+        {
+          "type": "coins",
+          "amount": 150
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "creation_day_3",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_03"
+    },
+    {
+      "type": "reward",
+      "id": "level_03_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 150
+        },
+        {
+          "type": "booster",
+          "booster_type": "hammer",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "creation_day_4",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_04"
+    },
+    {
+      "type": "reward",
+      "id": "level_04_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 15
+        },
+        {
+          "type": "coins",
+          "amount": 200
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "creation_day_5",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_05"
+    },
+    {
+      "type": "reward",
+      "id": "level_05_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 200
+        },
+        {
+          "type": "booster",
+          "booster_type": "shuffle",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "type": "ad_reward",
+      "id": "ad_bonus_coins_05",
+      "ad_type": "rewarded",
+      "reward": {
+        "type": "coins",
+        "amount": 500
+      },
+      "required": false
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "creation_day_6a",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_06"
+    },
+    {
+      "type": "reward",
+      "id": "level_06_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 250
+        },
+        {
+          "type": "card",
+          "collection_id": "creation_cards",
+          "card_id": "wild_animals"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "creation_day_6b",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_07"
+    },
+    {
+      "type": "reward",
+      "id": "level_07_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 20
+        },
+        {
+          "type": "card",
+          "collection_id": "creation_cards",
+          "card_id": "adam_and_eve"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_2",
+      "id": "creation_day_7",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_08"
+    },
+    {
+      "type": "reward",
+      "id": "level_08_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 300
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "garden_of_eden",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_09"
+    },
+    {
+      "type": "reward",
+      "id": "level_09_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 25
+        },
+        {
+          "type": "card",
+          "collection_id": "gallery_cards",
+          "card_id": "garden_of_eden"
+        }
+      ]
+    },
+    {
+      "type": "narrative_stage",
+      "id": "the_fall",
+      "auto_advance_delay": 4.5,
+      "skippable": true
+    },
+    {
+      "type": "level",
+      "id": "level_10"
+    },
+    {
+      "type": "reward",
+      "id": "level_10_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 350
+        },
+        {
+          "type": "booster",
+          "booster_type": "line_blast",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "definition_id": "ad_reward",
+      "id": "ad_interstitial_ch1",
+      "type": "ad_reward"
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "cain_and_abel",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_11"
+    },
+    {
+      "type": "reward",
+      "id": "level_11_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 400
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "cain_and_abel"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "noah_called",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_12"
+    },
+    {
+      "type": "reward",
+      "id": "level_12_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 30
+        },
+        {
+          "type": "booster",
+          "booster_type": "hammer",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "the_flood",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_13"
+    },
+    {
+      "type": "reward",
+      "id": "level_13_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 450
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "noahs_ark"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "rainbow_covenant",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_14"
+    },
+    {
+      "type": "reward",
+      "id": "level_14_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 500
+        },
+        {
+          "type": "booster",
+          "booster_type": "swap",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "tower_of_babel",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_15"
+    },
+    {
+      "type": "reward",
+      "id": "level_15_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 35
+        },
+        {
+          "type": "card",
+          "collection_id": "antiquity",
+          "card_id": "tower_of_babel"
+        }
+      ]
+    },
+    {
+      "type": "ad_reward",
+      "id": "ad_bonus_hammers_15",
+      "ad_type": "rewarded",
+      "reward": {
+        "type": "booster",
+        "booster_type": "hammer",
+        "amount": 3
+      },
+      "required": false
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "abraham_called",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_16"
+    },
+    {
+      "type": "reward",
+      "id": "level_16_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 550
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "abraham"
+        }
+      ]
+    },
+    {
+      "type": "level",
+      "id": "level_17"
+    },
+    {
+      "type": "reward",
+      "id": "level_17_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 40
+        },
+        {
+          "type": "booster",
+          "booster_type": "chain_reaction",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "three_visitors",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_18"
+    },
+    {
+      "type": "reward",
+      "id": "level_18_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 600
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "three_angels"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "sodom_destroyed",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_19"
+    },
+    {
+      "type": "reward",
+      "id": "level_19_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 650
+        },
+        {
+          "type": "booster",
+          "booster_type": "shuffle",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "isaac_born",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_20"
+    },
+    {
+      "type": "reward",
+      "id": "level_20_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 45
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "isaac"
+        }
+      ]
+    },
+    {
+      "definition_id": "ad_reward",
+      "id": "ad_interstitial_ch2",
+      "type": "ad_reward"
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "binding_of_isaac",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_21"
+    },
+    {
+      "type": "reward",
+      "id": "level_21_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 700
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "mount_moriah"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "rebekah_at_well",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_22"
+    },
+    {
+      "type": "reward",
+      "id": "level_22_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 50
+        },
+        {
+          "type": "booster",
+          "booster_type": "hammer",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "type": "level",
+      "id": "level_23"
+    },
+    {
+      "type": "reward",
+      "id": "level_23_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 750
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "jacob_esau"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_2",
+      "id": "birthright_sold",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_24"
+    },
+    {
+      "type": "reward",
+      "id": "level_24_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 800
+        },
+        {
+          "type": "booster",
+          "booster_type": "bomb_3x3",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "stolen_blessing",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_25"
+    },
+    {
+      "type": "reward",
+      "id": "level_25_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 55
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "isaacs_blessing"
+        }
+      ]
+    },
+    {
+      "type": "ad_reward",
+      "id": "ad_bonus_coins_25",
+      "ad_type": "rewarded",
+      "reward": {
+        "type": "coins",
+        "amount": 500
+      },
+      "required": false
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "jacobs_ladder",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_26"
+    },
+    {
+      "type": "reward",
+      "id": "level_26_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 850
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "jacobs_ladder"
+        }
+      ]
+    },
+    {
+      "type": "level",
+      "id": "level_27"
+    },
+    {
+      "type": "reward",
+      "id": "level_27_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 60
+        },
+        {
+          "type": "booster",
+          "booster_type": "column_clear",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_2",
+      "id": "rachel_at_well",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_28"
+    },
+    {
+      "type": "reward",
+      "id": "level_28_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 900
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "leah_and_rachel"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "twelve_tribes",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_29"
+    },
+    {
+      "type": "reward",
+      "id": "level_29_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 950
+        },
+        {
+          "type": "booster",
+          "booster_type": "swap",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "jacob_wrestles",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_30"
+    },
+    {
+      "type": "reward",
+      "id": "level_30_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 65
+        },
+        {
+          "type": "card",
+          "collection_id": "patriarchs",
+          "card_id": "israel"
+        }
+      ]
+    },
+    {
+      "definition_id": "ad_reward",
+      "id": "ad_interstitial_ch3",
+      "type": "ad_reward"
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "josephs_dreams",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_31"
+    },
+    {
+      "type": "reward",
+      "id": "level_31_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1000
+        },
+        {
+          "type": "card",
+          "collection_id": "joseph",
+          "card_id": "joseph_the_dreamer"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "joseph_sold",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_32"
+    },
+    {
+      "type": "reward",
+      "id": "level_32_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 70
+        },
+        {
+          "type": "booster",
+          "booster_type": "bomb_3x3",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "type": "level",
+      "id": "level_33"
+    },
+    {
+      "type": "reward",
+      "id": "level_33_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1050
+        },
+        {
+          "type": "card",
+          "collection_id": "joseph",
+          "card_id": "joseph_in_egypt"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "joseph_imprisoned",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_34"
+    },
+    {
+      "type": "reward",
+      "id": "level_34_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1100
+        },
+        {
+          "type": "booster",
+          "booster_type": "chain_reaction",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "prison_dreams",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_35"
+    },
+    {
+      "type": "reward",
+      "id": "level_35_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 75
+        },
+        {
+          "type": "card",
+          "collection_id": "joseph",
+          "card_id": "prison_dreams"
+        }
+      ]
+    },
+    {
+      "type": "ad_reward",
+      "id": "ad_bonus_bombs_35",
+      "ad_type": "rewarded",
+      "reward": {
+        "type": "booster",
+        "booster_type": "bomb_3x3",
+        "amount": 3
+      },
+      "required": false
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "pharaohs_dreams",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_36"
+    },
+    {
+      "type": "reward",
+      "id": "level_36_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1150
+        },
+        {
+          "type": "booster",
+          "booster_type": "row_clear",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "joseph_exalted",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_37"
+    },
+    {
+      "type": "reward",
+      "id": "level_37_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 80
+        },
+        {
+          "type": "card",
+          "collection_id": "joseph",
+          "card_id": "vizier"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_2",
+      "id": "brothers_arrive_egypt",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_38"
+    },
+    {
+      "type": "reward",
+      "id": "level_38_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1200
+        },
+        {
+          "type": "booster",
+          "booster_type": "shuffle",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "silver_cup",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_39"
+    },
+    {
+      "type": "reward",
+      "id": "level_39_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1250
+        },
+        {
+          "type": "booster",
+          "booster_type": "hammer",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "joseph_revealed",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_40"
+    },
+    {
+      "type": "reward",
+      "id": "level_40_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 85
+        },
+        {
+          "type": "card",
+          "collection_id": "joseph",
+          "card_id": "reconciliation"
+        }
+      ]
+    },
+    {
+      "definition_id": "ad_reward",
+      "id": "ad_interstitial_ch4",
+      "type": "ad_reward"
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "israel_to_egypt",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_41"
+    },
+    {
+      "type": "reward",
+      "id": "level_41_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1300
+        },
+        {
+          "type": "card",
+          "collection_id": "history",
+          "card_id": "israel_family"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "jacobs_blessings",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_42"
+    },
+    {
+      "type": "reward",
+      "id": "level_42_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 90
+        },
+        {
+          "type": "booster",
+          "booster_type": "bomb_3x3",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "joseph_final_days",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_43"
+    },
+    {
+      "type": "reward",
+      "id": "level_43_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1350
+        },
+        {
+          "type": "card",
+          "collection_id": "history",
+          "card_id": "joseph_legacy"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_2",
+      "id": "israel_multiplies",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_44"
+    },
+    {
+      "type": "reward",
+      "id": "level_44_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1400
+        },
+        {
+          "type": "booster",
+          "booster_type": "line_blast",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "new_pharaoh",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_45"
+    },
+    {
+      "type": "reward",
+      "id": "level_45_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 95
+        },
+        {
+          "type": "card",
+          "collection_id": "history",
+          "card_id": "pharaoh_oppression"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "slavery_begins",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_46"
+    },
+    {
+      "type": "reward",
+      "id": "level_46_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1450
+        },
+        {
+          "type": "booster",
+          "booster_type": "row_clear",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_2",
+      "id": "midwives_courage",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_47"
+    },
+    {
+      "type": "reward",
+      "id": "level_47_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1500
+        },
+        {
+          "type": "card",
+          "collection_id": "history",
+          "card_id": "midwives"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "moses_in_basket",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_48"
+    },
+    {
+      "type": "reward",
+      "id": "level_48_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 100
+        },
+        {
+          "type": "booster",
+          "booster_type": "column_clear",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "moses_adopted",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_49"
+    },
+    {
+      "type": "reward",
+      "id": "level_49_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1550
+        },
+        {
+          "type": "card",
+          "collection_id": "history",
+          "card_id": "moses_prince"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "moses_flees",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_50"
+    },
+    {
+      "type": "reward",
+      "id": "level_50_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 105
+        },
+        {
+          "type": "booster",
+          "booster_type": "extra_moves",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "definition_id": "ad_reward",
+      "id": "ad_interstitial_ch5",
+      "type": "ad_reward"
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "burning_bush",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_51"
+    },
+    {
+      "type": "reward",
+      "id": "level_51_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1600
+        },
+        {
+          "type": "card",
+          "collection_id": "exodus",
+          "card_id": "burning_bush"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "let_my_people_go",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_52"
+    },
+    {
+      "type": "reward",
+      "id": "level_52_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 110
+        },
+        {
+          "type": "booster",
+          "booster_type": "hammer",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "plague_blood",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_53"
+    },
+    {
+      "type": "reward",
+      "id": "level_53_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1650
+        },
+        {
+          "type": "card",
+          "collection_id": "exodus",
+          "card_id": "plague_blood"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_2",
+      "id": "plague_frogs",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_54"
+    },
+    {
+      "type": "reward",
+      "id": "level_54_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1700
+        },
+        {
+          "type": "booster",
+          "booster_type": "chain_reaction",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "plagues_continue",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_55"
+    },
+    {
+      "type": "reward",
+      "id": "level_55_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 115
+        },
+        {
+          "type": "card",
+          "collection_id": "exodus",
+          "card_id": "plague_swarms"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "plagues_livestock_boils",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_56"
+    },
+    {
+      "type": "reward",
+      "id": "level_56_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1750
+        },
+        {
+          "type": "booster",
+          "booster_type": "row_clear",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "plague_hail",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_57"
+    },
+    {
+      "type": "reward",
+      "id": "level_57_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1800
+        },
+        {
+          "type": "card",
+          "collection_id": "exodus",
+          "card_id": "plague_hail"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "plague_locusts",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_58"
+    },
+    {
+      "type": "reward",
+      "id": "level_58_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 120
+        },
+        {
+          "type": "booster",
+          "booster_type": "shuffle",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "plague_darkness",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_59"
+    },
+    {
+      "type": "reward",
+      "id": "level_59_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1850
+        },
+        {
+          "type": "card",
+          "collection_id": "exodus",
+          "card_id": "plague_darkness"
+        }
+      ]
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "passover_night",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_60"
+    },
+    {
+      "type": "reward",
+      "id": "level_60_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 125
+        },
+        {
+          "type": "card",
+          "collection_id": "exodus",
+          "card_id": "passover"
+        }
+      ]
+    },
+    {
+      "definition_id": "ad_reward",
+      "id": "ad_interstitial_ch6",
+      "type": "ad_reward"
+    },
+    {
+      "definition_id": "narrative_stage_1",
+      "id": "exodus_begins",
+      "type": "narrative_stage"
+    },
+    {
+      "type": "level",
+      "id": "level_61"
+    },
+    {
+      "type": "reward",
+      "id": "level_61_complete",
+      "rewards": [
+        {
+          "type": "coins",
+          "amount": 1900
+        },
+        {
+          "type": "card",
+          "collection_id": "exodus",
+          "card_id": "the_exodus"
+        }
+      ]
+    },
+    {
+      "type": "narrative_stage",
+      "id": "red_sea_crossing",
+      "auto_advance_delay": 5.0,
+      "skippable": true
+    },
+    {
+      "type": "level",
+      "id": "level_62"
+    },
+    {
+      "type": "reward",
+      "id": "level_62_complete",
+      "rewards": [
+        {
+          "type": "gems",
+          "amount": 150
+        },
+        {
+          "type": "booster",
+          "booster_type": "all_boosters",
+          "amount": 3
+        },
+        {
+          "type": "card",
+          "collection_id": "exodus",
+          "card_id": "red_sea"
+        }
+      ]
+    },
+    {
+      "type": "premium_gate",
+      "id": "wilderness_dlc_gate",
+      "required_status": "premium",
+      "on_fail": "offer",
+      "description": "Unlocks Wilderness Journey DLC"
+    }
   ]
 }

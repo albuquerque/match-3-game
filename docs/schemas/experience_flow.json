@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://match3.example.com/schemas/experience_flow.json",
+  "title": "Experience Flow",
+  "description": "Root schema for an experience flow used by the game. A flow is an ordered array of nodes (levels, narrative stages, rewards, etc.)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "experience_id": { "type": "string" },
+    "version": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "flow": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/node" }
+    },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "required": ["experience_id", "version", "flow"],
+
+  "definitions": {
+    "node": {
+      "type": "object",
+      "properties": { "type": { "type": "string" } },
+      "required": ["type"],
+      "oneOf": [
+        { "$ref": "#/definitions/level_node" },
+        { "$ref": "#/definitions/narrative_stage_node" },
+        { "$ref": "#/definitions/reward_node" },
+        { "$ref": "#/definitions/cutscene_node" },
+        { "$ref": "#/definitions/unlock_node" },
+        { "$ref": "#/definitions/ad_reward_node" },
+        { "$ref": "#/definitions/premium_gate_node" },
+        { "$ref": "#/definitions/dlc_flow_node" },
+        { "$ref": "#/definitions/conditional_node" }
+      ]
+    },
+
+    "level_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "level" },
+        "id": { "type": "string" },
+        "definition_id": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "id"],
+      "additionalProperties": true
+    },
+
+    "narrative_stage_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "narrative_stage" },
+        "id": { "type": "string" },
+        "definition_id": { "type": "string" },
+        "auto_advance_delay": { "type": "number", "minimum": 0 },
+        "skippable": { "type": "boolean" },
+        "anchor": { "type": "string" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "id"],
+      "additionalProperties": true
+    },
+
+    "reward_item": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["coins", "gems", "booster", "card"] },
+        "amount": { "type": ["number", "integer"] },
+        "booster_type": { "type": "string", "enum": ["all_boosters","bomb_3x3","chain_reaction","column_clear","extra_moves","hammer","line_blast","row_clear","shuffle","swap"] },
+        "collection_id": { "type": "string" },
+        "card_id": { "type": "string" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type"],
+      "additionalProperties": true
+    },
+
+    "reward_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "reward" },
+        "id": { "type": "string" },
+        "definition_id": { "type": "string" },
+        "rewards": { "type": "array", "items": { "$ref": "#/definitions/reward_item" } },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "id"],
+      "additionalProperties": true
+    },
+
+    "cutscene_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "cutscene" },
+        "scene": { "type": "string" },
+        "id": { "type": "string" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "scene"],
+      "additionalProperties": true
+    },
+
+    "unlock_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "unlock" },
+        "id": { "type": "string" },
+        "target": { "type": "string" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "id"],
+      "additionalProperties": true
+    },
+
+    "ad_reward_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "ad_reward" },
+        "id": { "type": "string" },
+        "ad_type": { "type": "string", "enum": ["rewarded", "interstitial", "banner"] },
+        "reward": { "$ref": "#/definitions/reward_item" },
+        "required": { "type": "boolean" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "id", "ad_type"],
+      "additionalProperties": true
+    },
+
+    "premium_gate_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "premium_gate" },
+        "id": { "type": "string" },
+        "required_status": { "type": "string", "enum": ["premium"] },
+        "on_fail": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "id", "required_status"],
+      "additionalProperties": true
+    },
+
+    "dlc_flow_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "dlc_flow" },
+        "id": { "type": "string" },
+        "flow_path": { "type": "string" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "id"],
+      "additionalProperties": true
+    },
+
+    "conditional_node": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "conditional" },
+        "condition": { "type": "string" },
+        "true_branch": { "type": "object", "additionalProperties": true },
+        "false_branch": { "type": "object", "additionalProperties": true },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "condition"],
+      "additionalProperties": true
+    }
+  }
+}

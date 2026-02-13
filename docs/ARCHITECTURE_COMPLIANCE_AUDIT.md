@@ -31,7 +31,7 @@
 - ⚠️ **ExperienceDirector** (~1019 lines) - Contains legacy + new delegation
   - **Mitigation:** New pipeline path is ~200 lines of delegation
   - **Reason:** Kept for rollback capability
-  - **Assessment:** Acceptable - clean separation via USE_NEW_PIPELINE flag
+  - **Assessment:** Acceptable - clean separation via the new pipeline architecture (legacy toggle removed)
 
 **Status:** No violations in new architecture ✅
 

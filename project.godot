@@ -49,7 +49,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/droid_admob/plugin.cfg")
+enabled=PackedStringArray("res://addons/definition_audit/plugin.cfg", "res://addons/droid_admob/plugin.cfg")
 
 [match3]
 

@@ -26,90 +26,44 @@ var waiting_for_level_complete: bool = false
 var waiting_for_narrative_complete: bool = false
 var waiting_for_ad_complete: bool = false
 
-# Compatibility flag - set to false to use old implementation
-# NOTE: Set to false for now due to SceneTree.create_timer() type checking issue
-# The architecture is complete but needs runtime testing
-var USE_NEW_PIPELINE: bool = true
-
 func _ready():
 	print("============================================================")
 	print("[ExperienceDirector] *** STARTING INITIALIZATION ***")
 	print("============================================================")
 
-	if USE_NEW_PIPELINE:
-		print("[ExperienceDirector] Using NEW PIPELINE architecture")
-	else:
-		print("[ExperienceDirector] Using LEGACY implementation")
+	print("[ExperienceDirector] Using NEW PIPELINE architecture (legacy branches removed)")
 
 	# Create components
 	_create_components()
-
-	# Connect to EventBus signals (only for legacy mode)
-	if not USE_NEW_PIPELINE:
-		_connect_events()
 
 	print("============================================================")
 	print("[ExperienceDirector] *** READY AND ACTIVE ***")
 	print("============================================================")
 
 func _create_components():
-	"""Create ExperienceState and FlowCoordinator (or legacy components)"""
+	"""Create ExperienceState and FlowCoordinator (new pipeline)
+	This function always creates the FlowCoordinator and removes legacy parser/reward orchestrator.
+	"""
 
-	# Create ExperienceState (always needed for save/load)
+	# Create ExperienceState (needed for save/load)
 	state = Node.new()
 	state.name = "ExperienceState"
 	state.set_script(preload("res://scripts/ExperienceState.gd"))
 	add_child(state)
 
-	if USE_NEW_PIPELINE:
-		# NEW: Create FlowCoordinator
-		flow_coordinator = Node.new()
-		flow_coordinator.name = "FlowCoordinator"
-		flow_coordinator.set_script(preload("res://scripts/FlowCoordinator.gd"))
-		add_child(flow_coordinator)
+	# Create FlowCoordinator (new pipeline)
+	flow_coordinator = Node.new()
+	flow_coordinator.name = "FlowCoordinator"
+	flow_coordinator.set_script(preload("res://scripts/FlowCoordinator.gd"))
+	add_child(flow_coordinator)
 
-		# Connect FlowCoordinator signals
-		flow_coordinator.connect("flow_started", Callable(self, "_on_flow_coordinator_flow_started"))
-		flow_coordinator.connect("flow_completed", Callable(self, "_on_flow_coordinator_flow_completed"))
-		flow_coordinator.connect("flow_failed", Callable(self, "_on_flow_coordinator_flow_failed"))
+	# Connect FlowCoordinator signals
+	flow_coordinator.connect("flow_started", Callable(self, "_on_flow_coordinator_flow_started"))
+	flow_coordinator.connect("flow_completed", Callable(self, "_on_flow_coordinator_flow_completed"))
+	flow_coordinator.connect("flow_failed", Callable(self, "_on_flow_coordinator_flow_failed"))
 
-		print("[ExperienceDirector] FlowCoordinator created")
-	else:
-		# LEGACY: Create ExperienceFlowParser and RewardOrchestrator
-		parser = Node.new()
-		parser.name = "ExperienceFlowParser"
-		parser.set_script(preload("res://scripts/ExperienceFlowParser.gd"))
-		add_child(parser)
-
-		# Create RewardOrchestrator (legacy)
-		var reward_orchestrator = Node.new()
-		reward_orchestrator.name = "RewardOrchestrator"
-		reward_orchestrator.set_script(preload("res://scripts/RewardOrchestrator.gd"))
-		add_child(reward_orchestrator)
-
-		print("[ExperienceDirector] Legacy components created")
-
+	print("[ExperienceDirector] FlowCoordinator created (legacy components removed)")
 	print("[ExperienceDirector] Components created")
-
-func _connect_events():
-	"""Connect to EventBus signals for automatic progression"""
-
-	var eb = get_node_or_null("/root/EventBus")
-	if not eb:
-		print("[ExperienceDirector] WARNING: EventBus not available")
-		return
-
-	# Listen to game events safely using has_signal and connect
-	if eb.has_signal("level_complete"):
-		eb.connect("level_complete", Callable(self, "_on_level_complete"))
-
-	if eb.has_signal("level_failed"):
-		eb.connect("level_failed", Callable(self, "_on_level_failed"))
-
-	if eb.has_signal("narrative_stage_complete"):
-		eb.connect("narrative_stage_complete", Callable(self, "_on_narrative_stage_complete"))
-
-	print("[ExperienceDirector] Connected to EventBus")
 
 # Phase 12.3: Migration for existing players
 func migrate_existing_save_to_experience_state() -> bool:
@@ -196,36 +150,13 @@ func migrate_existing_save_to_experience_state() -> bool:
 func load_flow(flow_id: String) -> bool:
 	"""Load an experience flow by ID"""
 
-	if USE_NEW_PIPELINE:
-		# NEW: Delegate to FlowCoordinator
-		print("[ExperienceDirector] Delegating load_flow to FlowCoordinator: %s" % flow_id)
-		var success = flow_coordinator.load_flow(flow_id)
-		if success:
-			current_flow = flow_coordinator.current_flow
-			emit_signal("experience_flow_changed", flow_id)
-		return success
-	else:
-		# LEGACY: Original implementation
-		var flow_path = "res://data/experience_flows/%s.json" % flow_id
-
-		print("[ExperienceDirector] Loading flow: ", flow_id, " from ", flow_path)
-
-		current_flow = parser.parse_flow_file(flow_path)
-
-		if current_flow.is_empty():
-			print("[ExperienceDirector] ERROR: Failed to load flow: ", flow_id)
-			return false
-
-		# Update state
-		state.set_flow(flow_id)
-
-		# Debug: Print flow summary
-		parser.print_flow_summary(current_flow)
-
+	# Delegate to FlowCoordinator
+	print("[ExperienceDirector] Delegating load_flow to FlowCoordinator: %s" % flow_id)
+	var success = flow_coordinator.load_flow(flow_id)
+	if success:
+		current_flow = flow_coordinator.current_flow
 		emit_signal("experience_flow_changed", flow_id)
-		print("[ExperienceDirector] Flow loaded: ", flow_id)
-
-		return true
+	return success
 
 func reset_flow():
 	"""Reset the current flow to start from the beginning"""
@@ -248,29 +179,10 @@ func reset_flow():
 func start_flow():
 	"""Start the current flow from the beginning or resume from saved position"""
 
-	if USE_NEW_PIPELINE:
-		# NEW: Delegate to FlowCoordinator
-		print("[ExperienceDirector] Delegating start_flow to FlowCoordinator")
-		flow_coordinator.start_flow()
-		return
-
-	# LEGACY: Original implementation
-	print("============================================================")
-	print("[ExperienceDirector] *** START_FLOW CALLED ***")
-	print("============================================================")
-
-	if current_flow.is_empty():
-		print("[ExperienceDirector] ERROR: No flow loaded")
-		return
-
-	print("[ExperienceDirector] Starting flow at index: ", state.current_level_index)
-	print("[ExperienceDirector] Current flow ID: ", state.current_flow_id)
-	print("[ExperienceDirector] Total nodes in flow: ", parser.get_flow_length(current_flow))
-
-	# Process current node
-	print("[ExperienceDirector] About to call _process_current_node()...")
-	_process_current_node()
-	print("[ExperienceDirector] Returned from _process_current_node()")
+	# Delegate to FlowCoordinator
+	print("[ExperienceDirector] Delegating start_flow to FlowCoordinator")
+	flow_coordinator.start_flow()
+	return
 
 func get_next_node_rewards() -> Dictionary:
 	"""Get reward info from the next node if it's a reward node, otherwise return empty"""
@@ -298,68 +210,10 @@ func get_next_node_rewards() -> Dictionary:
 func start_flow_at_level(level_num: int):
 	"""Start the flow at a specific level number (for world map selection)"""
 
-	if USE_NEW_PIPELINE:
-		# NEW: Delegate to FlowCoordinator
-		print("[ExperienceDirector] Delegating start_flow_at_level(%d) to FlowCoordinator" % level_num)
-		flow_coordinator.start_flow_at_level(level_num)
-		return
-
-	# LEGACY: Original implementation
-	print("============================================================")
-	print("[ExperienceDirector] *** START_FLOW_AT_LEVEL CALLED ***")
-	print("[ExperienceDirector] Target level: ", level_num)
-	print("============================================================")
-
-	if current_flow.is_empty():
-		print("[ExperienceDirector] ERROR: No flow loaded")
-		return
-
-	# Find the node index for this level
-	var level_id = "level_%02d" % level_num  # Format as level_01, level_02, etc.
-	var target_index = -1
-
-	var flow_data = current_flow.get("flow", [])
-	for i in range(flow_data.size()):
-		var node = flow_data[i]
-		if node.get("type") == "level" and node.get("id") == level_id:
-			target_index = i
-			break
-
-	if target_index >= 0:
-		print("[ExperienceDirector] Found level ", level_id, " at index ", target_index)
-
-		# Check if there's a narrative_stage immediately before this level
-		# If so, start from the narrative instead to give full context
-		var start_index = target_index
-		if target_index > 0:
-			var previous_node = flow_data[target_index - 1]
-			if previous_node.get("type") == "narrative_stage":
-				start_index = target_index - 1
-				print("[ExperienceDirector] Found narrative_stage before level at index ", start_index)
-				print("[ExperienceDirector] Will start from narrative: ", previous_node.get("id"))
-
-		# CRITICAL: Reset processing_node flag to allow the new level to load
-		# This is intentional - we're interrupting the current flow to jump to a new level
-		if processing_node:
-			print("[ExperienceDirector] Resetting processing_node flag (was: true)")
-		processing_node = false
-
-		# Reset wait flags to ensure we're not stuck waiting for a previous node
-		waiting_for_level_complete = false
-		waiting_for_narrative_complete = false
-
-		state.current_level_index = start_index
-		print("[ExperienceDirector] Starting flow from index: ", state.current_level_index)
-		_process_current_node()
-	else:
-		print("[ExperienceDirector] WARNING: Level ", level_id, " not found in flow")
-		print("[ExperienceDirector] Available level nodes:")
-		for i in range(flow_data.size()):
-			var node = flow_data[i]
-			if node.get("type") == "level":
-				print("  [", i, "] ", node.get("id"))
-		print("[ExperienceDirector] Falling back to start of flow")
-		start_flow()
+	# Delegate to FlowCoordinator
+	print("[ExperienceDirector] Delegating start_flow_at_level(%d) to FlowCoordinator" % level_num)
+	flow_coordinator.start_flow_at_level(level_num)
+	return
 
 func advance_to_next_node():
 	"""Move to the next node in the flow"""
@@ -368,47 +222,14 @@ func advance_to_next_node():
 	print("[ExperienceDirector] *** ADVANCE TO NEXT NODE ***")
 	print("============================================================")
 
-	# Delegate to FlowCoordinator if using new pipeline
-	if USE_NEW_PIPELINE:
-		print("[ExperienceDirector] Using new pipeline - delegating to FlowCoordinator")
-		if flow_coordinator:
-			print("[ExperienceDirector] FlowCoordinator will handle advancement via pipeline")
-			# In the new pipeline, the pipeline handles all advancement automatically
-			# This manual call shouldn't be needed, but we'll log it for debugging
-			print("[ExperienceDirector] Note: Pipeline should advance automatically after level completion")
-		else:
-			push_error("[ExperienceDirector] FlowCoordinator not available!")
-		return
+	# In the new pipeline the pipeline handles advancement automatically.
+	# We keep a no-op delegation for compatibility and logging.
+	if flow_coordinator:
+		print("[ExperienceDirector] Pipeline manages advancement; no manual action required")
+	else:
+		print("[ExperienceDirector] FlowCoordinator not available - nothing to advance")
+	return
 
-	if current_flow.is_empty():
-		print("[ExperienceDirector] ERROR: No flow loaded")
-		return
-
-	# Safety check: if we're still processing, this is likely a bug
-	if processing_node:
-		print("[ExperienceDirector] WARNING: Still processing previous node when advance_to_next_node called")
-		print("[ExperienceDirector] Current node: ", parser.node_to_string(current_node) if not current_node.is_empty() else "none")
-		print("[ExperienceDirector] Forcing processing_node = false to recover")
-		processing_node = false
-
-	var flow_length = parser.get_flow_length(current_flow)
-	print("[ExperienceDirector] Current index: ", state.current_level_index)
-	print("[ExperienceDirector] Flow length: ", flow_length)
-
-	# Check if we've reached the end
-	if state.current_level_index >= flow_length - 1:
-		print("[ExperienceDirector] Flow complete!")
-		emit_signal("experience_flow_complete", current_flow.get("experience_id", "unknown"))
-		return
-
-	# Advance index
-	print("[ExperienceDirector] Advancing from index ", state.current_level_index, "...")
-	state.advance_level_index()
-	print("[ExperienceDirector] New index: ", state.current_level_index)
-
-	# Process next node
-	print("[ExperienceDirector] Processing next node...")
-	_process_current_node()
 
 func _process_current_node():
 	"""Process the current node based on its type"""
