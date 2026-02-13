@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://match3.example.com/schemas/collection.json",
+  "title": "Collection",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "items": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+  },
+  "required": ["id"]
+}

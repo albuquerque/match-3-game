@@ -24,8 +24,9 @@ func _init():
 ## Start pipeline execution with the given context and steps
 func start(ctx: PipelineContext, steps: Array) -> void:
 	if is_running:
-		push_warning("[ExperiencePipeline] Pipeline already running - aborting new start")
-		return
+		print("[ExperiencePipeline] Pipeline already running - stopping existing pipeline and restarting")
+		stop()
+		# fall through to start new pipeline
 
 	if not ctx or not ctx.is_valid():
 		push_error("[ExperiencePipeline] Invalid context - cannot start pipeline")
@@ -61,19 +62,26 @@ func _execute_next_step() -> void:
 	if not step.is_inside_tree():
 		add_child(step)
 
-	# Connect to step completion signal
-	if not step.step_completed.is_connected(_on_step_completed):
-		step.step_completed.connect(_on_step_completed)
+	# Connect to step completion signal using Callable to ensure Godot 4 binds correctly
+	var handler = Callable(self, "_on_step_completed")
+	if not step.step_completed.is_connected(handler):
+		step.step_completed.connect(handler)
 
 	# Execute step
 	var success = step.execute(context)
 
 	# If step completed synchronously
 	if not context.waiting_for_completion:
+		# If step completed synchronously, call the handler directly with the success flag
 		_on_step_completed(success)
 
 ## Called when a step signals completion
 func _on_step_completed(success: bool) -> void:
+	# Defensive: ensure current index is valid
+	if current_step_index < 0 or current_step_index >= current_steps.size():
+		print("[ExperiencePipeline] _on_step_completed called but current_step_index out of range")
+		return
+
 	var step: PipelineStep = current_steps[current_step_index]
 
 	print("[ExperiencePipeline] Step completed: %s (success: %s)" % [step.step_name, success])
@@ -83,8 +91,14 @@ func _on_step_completed(success: bool) -> void:
 	step.cleanup()
 
 	# Reset waiting flag
-	context.waiting_for_completion = false
-	context.completion_type = ""
+	if context:
+		context.waiting_for_completion = false
+		context.completion_type = ""
+
+	# Disconnect the completion handler for this step
+	var handler = Callable(self, "_on_step_completed")
+	if step and step.step_completed.is_connected(handler):
+		step.step_completed.disconnect(handler)
 
 	if not success:
 		_fail_pipeline("step_failed: %s" % step.step_name)

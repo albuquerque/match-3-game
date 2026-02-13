@@ -2,7 +2,7 @@
   "id": "exodus_sea_parting",
   "name": "The Parting of the Red Sea",
   "description": "Watch as Moses parts the Red Sea during gameplay",
-  "anchors": ["top_banner"],
+  "anchor": "top_banner",
   "states": [
     {
       "name": "intro",

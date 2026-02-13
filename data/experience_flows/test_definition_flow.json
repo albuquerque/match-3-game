@@ -1,0 +1,28 @@
+{
+  "experience_id": "test_definitions",
+  "version": "1.0",
+  "name": "Test Flow for Definitions",
+  "description": "A tiny flow demonstrating definition_id usage",
+  "flow": [
+    {
+      "definition_id": "narrative_stage",
+      "id": "test_stage_1",
+      "type": "narrative_stage"
+    },
+    {
+      "definition_id": "narrative_auto_4_0_skip_true",
+      "id": "test_stage_2",
+      "type": "narrative_stage",
+      "auto_advance_delay": 5.0
+    },
+    {
+      "type": "level",
+      "id": "level_01"
+    },
+    {
+      "definition_id": "narrative_stage",
+      "id": "test_stage_3",
+      "type": "narrative_stage"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ func execute(context: PipelineContext) -> bool:
 	context.completion_type = "level"
 
 	# Connect to level completion events
+	print("[LoadLevelStep] Connecting to EventBus for level_complete/level_failed (EventBus available: %s)" % (EventBus != null))
 	if EventBus:
 		if not EventBus.level_complete.is_connected(_on_level_complete):
 			EventBus.level_complete.connect(_on_level_complete)
@@ -31,10 +32,18 @@ func execute(context: PipelineContext) -> bool:
 			EventBus.level_failed.connect(_on_level_failed)
 
 	# Load level via GameUI
+	print("[LoadLevelStep] Attempting to load level via GameUI (has game_ui: %s)" % (context.game_ui != null))
 	if context.game_ui and context.game_ui.has_method("_load_level_by_number"):
-		context.game_ui._load_level_by_number(level_number)
+		print("[LoadLevelStep] Calling GameUI._load_level_by_number(%d)" % level_number)
+		var res = context.game_ui._load_level_by_number(level_number)
+		# If the loader returns a GDScriptFunctionState, detect by class name and await it to ensure the level load completes
+		if typeof(res) == TYPE_OBJECT and res and res.get_class() == "GDScriptFunctionState":
+			print("[LoadLevelStep] Awaiting GameUI loader result for level %d" % level_number)
+			await res
+			print("[LoadLevelStep] GameUI loader completed for level %d" % level_number)
 		return true
 	elif GameManager:
+		print("[LoadLevelStep] Setting GameManager.level = %d" % level_number)
 		GameManager.level = level_number
 		return true
 	else:

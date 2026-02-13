@@ -173,19 +173,6 @@ No need to modify ExperienceDirector or FlowCoordinator.
 
 ---
 
-## Toggle Between Old and New
-
-```gdscript
-# scripts/ExperienceDirector.gd (line ~30)
-
-var USE_NEW_PIPELINE: bool = true  # ← Change this
-
-# true  = New pipeline architecture
-# false = Legacy implementation (instant rollback)
-```
-
----
-
 ## Debugging
 
 ### Enable Verbose Logs
@@ -254,8 +241,6 @@ context.game_board  # No search! Instant access
 - [ ] Narrative stages show
 - [ ] Rewards granted
 - [ ] State saves
-- [ ] Can toggle USE_NEW_PIPELINE flag
-- [ ] Legacy mode works
 - [ ] No console errors
 - [ ] Performance acceptable
 

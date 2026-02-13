@@ -7,12 +7,9 @@
 
 ## Test Setup
 
-The refactor introduces a new pipeline architecture while maintaining backward compatibility. You can switch between old and new implementations using the `USE_NEW_PIPELINE` flag in ExperienceDirector.
+The refactor introduces a new pipeline architecture. The new pipeline is the default and legacy mode has been removed from the codebase.
 
-### Current State
-
-✅ **NEW Pipeline** is active by default (`USE_NEW_PIPELINE = true`)
-🔄 **LEGACY Implementation** available as fallback (`USE_NEW_PIPELINE = false`)
+✅ NEW Pipeline is active by default and should be used for all testing.
 
 ---
 
@@ -63,24 +60,13 @@ You should see:
 ### If Game Doesn't Start
 
 1. Check console for errors
-2. Switch to legacy mode by setting `USE_NEW_PIPELINE = false` in ExperienceDirector.gd
-3. Report errors in console output
+2. Report errors in console output
 
 ### If Levels Don't Load
 
 1. Check that FlowCoordinator is created successfully
 2. Verify pipeline steps are being created
 3. Check EventBus connections in LoadLevelStep
-
-### Fallback to Legacy
-
-If the new pipeline has issues, you can immediately fallback:
-
-1. Open `scripts/ExperienceDirector.gd`
-2. Change line ~30: `var USE_NEW_PIPELINE: bool = false`
-3. Save and restart game
-
-This will use the original implementation.
 
 ---
 
@@ -136,9 +122,19 @@ Once basic functionality is verified:
 
 ## Rollback Plan
 
-If critical issues are found:
+If critical issues are found, revert the refactor using your VCS to the pre-refactor commit/branch that contains the legacy ExperienceDirector implementation (for example: `git checkout <pre-refactor-commit>`), then rebuild/run the project.
 
-1. Set `USE_NEW_PIPELINE = false` in ExperienceDirector.gd
-2. Game immediately uses legacy implementation
-3. No code changes needed
-4. File a bug report with console output
+Example (replace `<pre-refactor-commit>` with the commit SHA or branch name):
+
+```bash
+# create a branch from the pre-refactor commit and switch to it
+# (using the commit SHA)
+git checkout -b pre-refactor 54686f75e885c788dae8cba3637ac5d00ba0386c
+
+# Alternatively, use the created tag (recommended):
+# create a branch from the tag and switch to it
+git checkout -b pre-refactor pre-refactor-2026-02-13
+
+# or, if a branch already exists:
+git checkout pre-refactor
+```

@@ -10,19 +10,21 @@
       "description": "Test level 1"
     },
     {
-      "type": "reward",
+      "definition_id": "reward_coins",
       "id": "test_reward_1",
-      "rewards": [
-        { "type": "coins", "amount": 100 }
-      ]
+      "type": "reward"
     },
     {
       "type": "conditional",
-      "condition": { "reward_unlocked": "test_reward_1" },
+      "condition": {
+        "reward_unlocked": "test_reward_1"
+      },
       "then": {
         "type": "cutscene",
         "id": "reward_cutscene",
-        "params": { "duration": 2.0 }
+        "params": {
+          "duration": 2.0
+        }
       },
       "else": {
         "type": "narrative_stage",
@@ -38,8 +40,14 @@
       "type": "reward",
       "id": "test_reward_2",
       "rewards": [
-        { "type": "coins", "amount": 200 },
-        { "type": "gems", "amount": 5 }
+        {
+          "type": "coins",
+          "amount": 200
+        },
+        {
+          "type": "gems",
+          "amount": 5
+        }
       ]
     }
   ]

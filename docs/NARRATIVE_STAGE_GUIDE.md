@@ -354,7 +354,7 @@ tex_rect.texture = anim_texture
   "id": "unique_narrative_id",
   "name": "Display Name",
   "description": "Optional description",
-  "anchors": ["top_banner"],
+  "anchor": "top_banner",
   "states": [
     {
       "name": "state_name",
@@ -707,7 +707,7 @@ textures/narrative/
   "id": "exodus_sea_parting",
   "name": "The Parting of the Red Sea",
   "description": "Watch as Moses parts the Red Sea during gameplay",
-  "anchors": ["top_banner"],
+  "anchor": "top_banner",
   "states": [
     {
       "name": "intro",

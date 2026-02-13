@@ -32,14 +32,14 @@
 ✅ **Testability** - Each step independently testable  
 ✅ **Extensibility** - Add new steps without modifying orchestrator  
 ✅ **Clarity** - Explicit execution pipeline  
-✅ **Backward Compatibility** - Can toggle between old/new instantly  
+✅ **Backward Compatibility** - Legacy behavior preserved where necessary
 
 ### Backward Compatibility
 
 - All existing ExperienceDirector APIs preserved
 - GameUI integration unchanged
 - State management unchanged
-- Can rollback by setting `USE_NEW_PIPELINE = false`
+- Legacy toggle removed — the new pipeline is the default implementation.
 
 ### Migration
 
@@ -47,8 +47,8 @@ No migration needed! The refactor maintains full backward compatibility:
 
 - All saves work unchanged
 - All existing code works unchanged
-- New pipeline architecture is opt-in via flag
-- Legacy code paths remain for safety
+- New pipeline architecture is the canonical implementation
+- Legacy code paths have been removed in favor of the pipeline
 
 ### Performance Improvements
 
@@ -79,7 +79,7 @@ scripts/
     steps/
       LoadLevelStep.gd                    # Level loading step
       ShowNarrativeStep.gd                # Narrative display step
-      GrantRewardsStep.gd                 # Reward granting step
+      GrantRewardsStep.gd                # Reward granting step
 ```
 
 ### Files Modified
@@ -105,11 +105,23 @@ Quick test:
 
 ### Rollback
 
-If issues occur:
-1. Open `scripts/ExperienceDirector.gd`
-2. Set `USE_NEW_PIPELINE = false`
-3. Restart game
-4. System uses original implementation
+The legacy toggle has been removed from the codebase. If you need to revert to the pre-refactor implementation, use your VCS to check out the commit or branch that contains the legacy ExperienceDirector implementation (for example: `git checkout <pre-refactor-commit>`), then rebuild/run the project.
+
+Example (replace `<pre-refactor-commit>` with the commit SHA or branch name):
+
+```bash
+# create a branch from the pre-refactor commit and switch to it
+# (using the commit SHA)
+git checkout -b pre-refactor 54686f75e885c788dae8cba3637ac5d00ba0386c
+
+# Alternatively, use the created tag (recommended):
+# create a branch from the tag and switch to it
+git checkout -b pre-refactor pre-refactor-2026-02-13
+
+# or, if a branch already exists:
+git checkout pre-refactor
+```
+
 
 ### Next Steps
 
@@ -126,7 +138,7 @@ None! This is a non-breaking refactor with full backward compatibility.
 
 ### Deprecation Warnings
 
-None yet. Legacy code paths will be marked deprecated in future updates after thorough testing confirms the new pipeline is stable.
+None yet. Legacy code paths will be removed in future updates after thorough testing confirms the new pipeline is stable.
 
 ---
 
@@ -134,4 +146,4 @@ None yet. Legacy code paths will be marked deprecated in future updates after th
 **Backward Compatible:** Yes  
 **Performance Impact:** Positive (+30-50% faster)  
 **Testing Required:** Yes (see testing guide)  
-**Rollback Available:** Yes (instant via flag)
+**Rollback Available:** Yes (via VCS revert)

@@ -1,0 +1,52 @@
+{
+  "effects": [
+    {
+      "id": "progressive_brightness",
+      "description": "Gradually adjusts screen or layer brightness over time",
+      "params": {
+        "start": { "type": "number", "description": "starting brightness (0..1)", "example": 0.0 },
+        "end": { "type": "number", "description": "ending brightness (0..1)", "example": 0.6 },
+        "duration": { "type": "number", "description": "seconds", "example": 1.5 }
+      },
+      "example": { "start": 0.0, "end": 0.6, "duration": 1.5 }
+    },
+    {
+      "id": "screen_flash",
+      "description": "A quick flash overlay with a color",
+      "params": {
+        "color": { "type": "string", "description": "hex or color name", "example": "#ffffff" },
+        "intensity": { "type": "number", "description": "0..1", "example": 0.9 },
+        "duration": { "type": "number", "description": "seconds", "example": 0.2 }
+      },
+      "example": { "color": "#ffffff", "intensity": 0.9, "duration": 0.2 }
+    },
+    {
+      "id": "background_tint",
+      "description": "Applies a tint to the background layer",
+      "params": {
+        "color": { "type": "string", "example": "#002244" },
+        "strength": { "type": "number", "example": 0.35 }
+      },
+      "example": { "color": "#002244", "strength": 0.35 }
+    },
+    {
+      "id": "camera_shake",
+      "description": "Small camera shake effect",
+      "params": {
+        "magnitude": { "type": "number", "example": 4.0 },
+        "duration": { "type": "number", "example": 0.6 }
+      },
+      "example": { "magnitude": 4.0, "duration": 0.6 }
+    },
+    {
+      "id": "particle_burst",
+      "description": "Spawn a burst of particles",
+      "params": {
+        "particle_type": { "type": "string", "example": "spark" },
+        "count": { "type": "integer", "example": 30 },
+        "duration": { "type": "number", "example": 1.0 }
+      },
+      "example": { "particle_type": "spark", "count": 30, "duration": 1.0 }
+    }
+  ]
+}

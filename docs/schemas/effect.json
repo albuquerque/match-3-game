@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://match3.example.com/schemas/effect.json",
+  "title": "Effect",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "type": { "type": "string", "enum": ["progressive_brightness","screen_flash","background_tint","camera_shake","particle_burst"] },
+    "params": { "type": "object" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "required": ["id","type"],
+
+  "oneOf": [
+    {
+      "properties": {
+        "type": { "const": "progressive_brightness" },
+        "params": {
+          "type": "object",
+          "properties": {
+            "start": { "type": "number", "minimum": 0, "maximum": 1 },
+            "end": { "type": "number", "minimum": 0, "maximum": 1 },
+            "duration": { "type": "number", "minimum": 0 }
+          },
+          "required": ["start","end"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["params"]
+    },
+    {
+      "properties": {
+        "type": { "const": "screen_flash" },
+        "params": {
+          "type": "object",
+          "properties": {
+            "color": { "type": "string" },
+            "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "duration": { "type": "number", "minimum": 0 }
+          },
+          "required": ["color","duration"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "background_tint" },
+        "params": {
+          "type": "object",
+          "properties": {
+            "color": { "type": "string" },
+            "strength": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "required": ["color"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "camera_shake" },
+        "params": {
+          "type": "object",
+          "properties": {
+            "magnitude": { "type": "number", "minimum": 0 },
+            "duration": { "type": "number", "minimum": 0 }
+          },
+          "required": ["magnitude"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "particle_burst" },
+        "params": {
+          "type": "object",
+          "properties": {
+            "particle_type": { "type": "string" },
+            "count": { "type": "integer", "minimum": 0 },
+            "duration": { "type": "number", "minimum": 0 }
+          },
+          "required": ["particle_type","count"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+
+  ,
+  "$comment": "See data/effects/effects_registry.json for human-readable descriptions and examples of supported effect types.",
+  "examples": [
+    {
+      "id": "effect_brightness_intro",
+      "type": "progressive_brightness",
+      "params": { "start": 0.0, "end": 0.6, "duration": 1.5 }
+    },
+    {
+      "id": "effect_screen_flash_hit",
+      "type": "screen_flash",
+      "params": { "color": "#ffffff", "intensity": 0.9, "duration": 0.2 }
+    },
+    {
+      "id": "effect_bg_tint_night",
+      "type": "background_tint",
+      "params": { "color": "#002244", "strength": 0.35 }
+    },
+    {
+      "id": "effect_camera_shake_small",
+      "type": "camera_shake",
+      "params": { "magnitude": 4.0, "duration": 0.6 }
+    },
+    {
+      "id": "effect_particle_burst_spark",
+      "type": "particle_burst",
+      "params": { "particle_type": "spark", "count": 30, "duration": 1.0 }
+    }
+  ]
+}

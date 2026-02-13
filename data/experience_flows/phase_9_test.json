@@ -10,11 +10,9 @@
       "description": "First level"
     },
     {
-      "type": "reward",
+      "definition_id": "reward_coins",
       "id": "level_01_complete",
-      "rewards": [
-        { "type": "coins", "amount": 100 }
-      ]
+      "type": "reward"
     },
     {
       "type": "ad_reward",
@@ -36,7 +34,10 @@
       "type": "reward",
       "id": "level_02_complete",
       "rewards": [
-        { "type": "gems", "amount": 10 }
+        {
+          "type": "gems",
+          "amount": 10
+        }
       ]
     },
     {
@@ -62,8 +63,14 @@
       "type": "reward",
       "id": "premium_bonus",
       "rewards": [
-        { "type": "gems", "amount": 50 },
-        { "type": "coins", "amount": 1000 }
+        {
+          "type": "gems",
+          "amount": 50
+        },
+        {
+          "type": "coins",
+          "amount": 1000
+        }
       ],
       "description": "Premium user bonus (only granted if gate passed)"
     },
