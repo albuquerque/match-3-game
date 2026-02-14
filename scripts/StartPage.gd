@@ -1,4 +1,4 @@
-extends Control
+extends "res://scripts/ui/ScreenBase.gd"
 
 signal start_pressed
 signal booster_selected(booster_id: String)
@@ -8,25 +8,8 @@ signal achievements_pressed
 signal map_pressed
 
 func _ready():
-	# Fullscreen anchors
-	anchor_left = 0
-	anchor_top = 0
-	anchor_right = 1
-	anchor_bottom = 1
-	visible = true
-
-	# Add opaque background so StartPage is an independent screen
-	var bg = ColorRect.new()
-	bg.name = "Background"
-	bg.color = Color(0.04, 0.04, 0.04, 1.0)
-	bg.anchor_left = 0
-	bg.anchor_top = 0
-	bg.anchor_right = 1
-	bg.anchor_bottom = 1
-	bg.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(bg)
-
-
+	# Call ScreenBase ready setup
+	ensure_fullscreen()
 	# Create a simple layout programmatically so the scene file isn't required here
 	var vbox = VBoxContainer.new()
 	vbox.name = "VBox"
@@ -116,6 +99,9 @@ func _ready():
 
 	# Lives system removed - no checks needed
 	print("[StartPage] Start button enabled - no lives restrictions")
+	# ensure hidden until explicitly shown
+	visible = false
+	modulate = Color(1,1,1,0)
 
 func set_level_info(level_number: int, description: String):
 	var btn = get_node_or_null("VBox/LevelButton")
@@ -126,8 +112,8 @@ func set_level_info(level_number: int, description: String):
 		dl.text = description
 
 func close():
-	visible = false
-	queue_free()
+	hide_screen()
+	# queue_free delegated to caller when desired
 
 func _on_start_pressed():
 	emit_signal("start_pressed")

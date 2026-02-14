@@ -10,7 +10,7 @@ var skippable: bool = true
 
 # Runtime UI pieces
 var _overlay_layer: CanvasLayer = null
-var _dimmer_poly: Polygon2D = null
+var _dimmer_rect: ColorRect = null
 var _board_prev_visible: bool = true
 var _context: PipelineContext = null
 var _auto_timer = null
@@ -19,10 +19,12 @@ var _hud_prev_visible: bool = true
 var _booster_panel_prev_visible: bool = true
 var _floating_menu_prev_visible: bool = true
 var _controller_conn: Object = null
+var _skip_button: Button = null
 var _finished: bool = false
 var _exec_start_time: int = 0
 var _pending_state_timers: Dictionary = {}
 var _state_timer_seq: int = 0
+var _overlay_watchdog: Timer = null
 
 func _init(stg_id: String = "", delay: float = 3.0, skip: bool = true):
 	super("show_narrative")
@@ -109,25 +111,12 @@ func execute(context: PipelineContext) -> bool:
 		_overlay_layer.name = "NarrativeOverlay"
 		# Add to root so it's always on top
 		root.add_child(_overlay_layer)
+		# Make sure overlay is above other CanvasLayers
+		_overlay_layer.layer = 1000
 		if _context:
 			_context.overlay_layer = _overlay_layer
 	print("[ShowNarrativeStep] Overlay created: %s" % (_overlay_layer.get_path() if _overlay_layer else "none"))
 	print("[ShowNarrativeStep][ts] overlay created ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-
-	# Create a dimmer polygon to fully cover the screen under the narrative (Polygon2D on CanvasLayer)
-	if not _dimmer_poly:
-		_dimmer_poly = Polygon2D.new()
-		_dimmer_poly.name = "NarrativeDimmer"
-		# Set color with alpha
-		_dimmer_poly.color = Color(0, 0, 0, 0.6)
-		# Build fullscreen polygon based on viewport size
-		var vp = get_viewport().get_visible_rect().size if get_viewport() else Vector2.ZERO
-		var poly = [Vector2(0, 0), Vector2(vp.x, 0), Vector2(vp.x, vp.y), Vector2(0, vp.y)]
-		_dimmer_poly.polygon = poly
-		# Ensure dimmer sits behind narrative content
-		_dimmer_poly.z_index = 0
-		# Add to overlay layer (CanvasLayer expects Node2D children)
-		_overlay_layer.add_child(_dimmer_poly)
 
 	# Create narrative container for content and skip button
 	var narrative_container = Control.new()
@@ -141,11 +130,49 @@ func execute(context: PipelineContext) -> bool:
 		narrative_container.anchor_bottom = 1
 	# Ensure narrative container renders above the dimmer
 	narrative_container.z_index = 10
+	# Prevent clicks from falling through the narrative container
+	narrative_container.mouse_filter = Control.MOUSE_FILTER_STOP
 	_overlay_layer.add_child(narrative_container)
 	print("[ShowNarrativeStep] Narrative container added: %s" % (narrative_container.get_path()))
+	# Debug: log children of narrative_container after creation
+	print("[ShowNarrativeStep] _inline children after_creation for: ", narrative_container.get_path())
+	for _c in narrative_container.get_children():
+		if typeof(_c) == TYPE_OBJECT and _c is Node:
+			print("  - child: ", _c.name, " (path:", _c.get_path(), ") type:", _c.get_class())
+
+	# Overlay watchdog: give renderer/background time to attach (0.6s), then verify meaningful visuals exist
+	_overlay_watchdog = Timer.new()
+	_overlay_watchdog.one_shot = true
+	_overlay_watchdog.wait_time = 0.6
+	_overlay_watchdog.connect("timeout", Callable(self, "_on_overlay_watchdog"))
+	narrative_container.add_child(_overlay_watchdog)
+	_overlay_watchdog.start()
+
+	# Create a ColorRect dimmer inside the narrative container so it shares the same Control hierarchy
+	if not _dimmer_rect:
+		_dimmer_rect = ColorRect.new()
+		_dimmer_rect.name = "NarrativeDimmer"
+		# Fill the full rect
+		if _dimmer_rect.has_method("set_anchors_preset"):
+			_dimmer_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		else:
+			_dimmer_rect.anchor_left = 0
+			_dimmer_rect.anchor_top = 0
+			_dimmer_rect.anchor_right = 1
+			_dimmer_rect.anchor_bottom = 1
+		# Default: fully transparent; stage JSON may opt-in to a dimmer
+		_dimmer_rect.color = Color(0, 0, 0, 0.0)
+		# Ensure dimmer sits behind narrative content within the container
+		_dimmer_rect.z_index = 0
+		# Let underlying controls still receive mouse events through the container policy; dimmer itself ignores mouse
+		_dimmer_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		narrative_container.add_child(_dimmer_rect)
+		print("[ShowNarrativeStep] Added ColorRect dimmer to NarrativeContainer")
 
 	# Optional skip button in top-right
+	print("[ShowNarrativeStep] skippable = %s" % skippable)
 	if skippable:
+		print("[ShowNarrativeStep] Creating skip button...")
 		var skip_btn = Button.new()
 		skip_btn.text = "Skip"
 		skip_btn.name = "SkipButton"
@@ -158,9 +185,64 @@ func execute(context: PipelineContext) -> bool:
 		skip_btn.offset_top = 20
 		skip_btn.offset_right = -20
 		skip_btn.offset_bottom = 60
+		# Ensure the skip button sits above any rendered image and captures input
+		skip_btn.z_index = 2000
+		skip_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+
+		# Add styling to make button visible and attractive
+		var style_normal = StyleBoxFlat.new()
+		style_normal.bg_color = Color(0.2, 0.2, 0.2, 0.8)  # Semi-transparent dark background
+		style_normal.border_width_left = 2
+		style_normal.border_width_right = 2
+		style_normal.border_width_top = 2
+		style_normal.border_width_bottom = 2
+		style_normal.border_color = Color(0.8, 0.8, 0.8, 1.0)  # Light border
+		style_normal.corner_radius_top_left = 5
+		style_normal.corner_radius_top_right = 5
+		style_normal.corner_radius_bottom_left = 5
+		style_normal.corner_radius_bottom_right = 5
+		skip_btn.add_theme_stylebox_override("normal", style_normal)
+
+		var style_hover = StyleBoxFlat.new()
+		style_hover.bg_color = Color(0.3, 0.3, 0.3, 0.9)  # Brighter on hover
+		style_hover.border_width_left = 2
+		style_hover.border_width_right = 2
+		style_hover.border_width_top = 2
+		style_hover.border_width_bottom = 2
+		style_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)  # White border on hover
+		style_hover.corner_radius_top_left = 5
+		style_hover.corner_radius_top_right = 5
+		style_hover.corner_radius_bottom_left = 5
+		style_hover.corner_radius_bottom_right = 5
+		skip_btn.add_theme_stylebox_override("hover", style_hover)
+
+		var style_pressed = StyleBoxFlat.new()
+		style_pressed.bg_color = Color(0.1, 0.1, 0.1, 0.9)  # Darker when pressed
+		style_pressed.border_width_left = 2
+		style_pressed.border_width_right = 2
+		style_pressed.border_width_top = 2
+		style_pressed.border_width_bottom = 2
+		style_pressed.border_color = Color(0.6, 0.6, 0.6, 1.0)
+		style_pressed.corner_radius_top_left = 5
+		style_pressed.corner_radius_top_right = 5
+		style_pressed.corner_radius_bottom_left = 5
+		style_pressed.corner_radius_bottom_right = 5
+		skip_btn.add_theme_stylebox_override("pressed", style_pressed)
+
+		# Set text color to be visible
+		skip_btn.add_theme_color_override("font_color", Color.WHITE)
+		skip_btn.add_theme_color_override("font_hover_color", Color.YELLOW)
+		skip_btn.add_theme_color_override("font_pressed_color", Color.GRAY)
+
 		narrative_container.add_child(skip_btn)
-		if not skip_btn.is_connected("pressed", Callable(self, "_on_skip_pressed")):
-			skip_btn.connect("pressed", Callable(self, "_on_skip_pressed"))
+		print("[ShowNarrativeStep] ✓ Skip button created and added to NarrativeContainer")
+		# store persistent reference so we can raise it after visuals areadded by renderer
+		_skip_button = skip_btn
+		if not _skip_button.is_connected("pressed", Callable(self, "_on_skip_pressed")):
+			_skip_button.connect("pressed", Callable(self, "_on_skip_pressed"))
+			print("[ShowNarrativeStep] ✓ Skip button connected to _on_skip_pressed")
+	else:
+		print("[ShowNarrativeStep] Skip button disabled (skippable = false)")
 
 	# Fade-in the narrative container (not the CanvasLayer)
 	narrative_container.modulate = Color(1,1,1,0)
@@ -169,11 +251,61 @@ func execute(context: PipelineContext) -> bool:
 
 	var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
 	if not narrative_manager:
-		push_error("[ShowNarrativeStep] NarrativeStageManager not found")
-		# still proceed but warn
-		# ensure we can still auto-advance
-		if auto_advance_delay > 0:
-			_start_auto_advance_timer()
+		print("[ShowNarrativeStep] NarrativeStageManager not found - attempting local renderer fallback")
+		# Try to load the renderer script dynamically and render the stage ourselves as a fallback
+		var rs = load("res://scripts/NarrativeStageRenderer.gd")
+		var local_renderer = null
+		if rs and rs is Script:
+			local_renderer = Control.new()
+			local_renderer.name = "LocalNarrativeRenderer"
+			local_renderer.set_script(rs)
+			# add to our narrative container so visuals appear above dimmer
+			narrative_container.add_child(local_renderer)
+			print("[ShowNarrativeStep] Local renderer instantiated and added to NarrativeContainer")
+
+		# Load stage JSON directly and render its first state as a best-effort
+		var stage_path_f = "res://data/narrative_stages/%s.json" % stage_id
+		if FileAccess.file_exists(stage_path_f):
+			var f = FileAccess.open(stage_path_f, FileAccess.READ)
+			if f:
+				var txt = f.get_as_text()
+				f.close()
+				var parsed = JSON.parse_string(txt)
+				if typeof(parsed) == TYPE_DICTIONARY and parsed.has("result"):
+					var sd = parsed.get("result")
+					if sd and sd.has("states") and sd["states"].size() > 0:
+						var first_state = sd["states"][0]
+						# If we have a renderer instance, ask it to render the full state (text+asset)
+						if local_renderer and local_renderer.has_method("render_state"):
+							local_renderer.render_state(first_state)
+							print("[ShowNarrativeStep] Local renderer rendered first state of stage: ", stage_id)
+							# apply dimmer alpha if specified
+							if sd.has("dimmer_alpha"):
+								var ca = sd.get("dimmer_alpha", 0.0)
+								if _dimmer_rect and _dimmer_rect.is_inside_tree():
+									var cc = _dimmer_rect.color
+									cc.a = float(ca)
+									_dimmer_rect.color = cc
+									print("[ShowNarrativeStep] Applied local dimmer alpha:", ca)
+							# Schedule safety timer based on total durations
+							var total_dur = 0.0
+							for st in sd["states"]:
+								total_dur += float(st.get("duration", 0.0))
+							if total_dur <= 0.0:
+								total_dur = auto_advance_delay if auto_advance_delay > 0 else 3.0
+							_start_safety_timer(total_dur + 1.0)
+						else:
+							print("[ShowNarrativeStep] Stage JSON missing states for: ", stage_id)
+				else:
+					print("[ShowNarrativeStep] Failed to parse stage JSON for fallback: ", stage_path_f)
+			else:
+				print("[ShowNarrativeStep] Could not open stage file for fallback: ", stage_path_f)
+		else:
+			print("[ShowNarrativeStep] Fallback renderer script not available; cannot show narrative (will auto-advance)")
+			# start auto advance as last resort
+			if auto_advance_delay > 0:
+				_start_auto_advance_timer()
+		# Continue - let the pipeline wait for completion; step will finish when timer or skip triggers
 		return true
 
 	var event_bus = root.get_node_or_null("/root/EventBus")
@@ -188,383 +320,288 @@ func execute(context: PipelineContext) -> bool:
 		if narrative_manager.has_method("lock_stage"):
 			narrative_manager.lock_stage(true)
 			print("[ShowNarrativeStep] Locked NarrativeStageManager for stage: %s" % stage_id)
+		# If renderer supports rendering into a provided container, prefer to render into our NarrativeContainer
+		if narrative_manager.renderer != null and narrative_container != null:
+			if narrative_manager.renderer.has_method("set_render_container"):
+				# set the render container so visuals are added inside the overlay layer (above dimmer)
+				narrative_manager.renderer.set_render_container(narrative_container)
+				print("[ShowNarrativeStep] Set renderer render_container to NarrativeContainer")
+
 		var loaded = narrative_manager.load_stage_by_id(stage_id)
 		print("[ShowNarrativeStep] narrative_manager.load_stage_by_id returned: %s" % str(loaded))
 		print("[ShowNarrativeStep][ts] load_stage_by_id return ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
 		if loaded:
-			# Success: compute conservative safety timeout based on stage definition (so we don't cut off later states)
-			var computed_safety: float = 0.0
-			var stage_path = "res://data/narrative_stages/%s.json" % stage_id
-			if FileAccess.file_exists(stage_path):
-				var f = FileAccess.open(stage_path, FileAccess.READ)
-				if f:
-					var txt = f.get_as_text()
-					f.close()
-					# try parse JSON and sum durations
-					var j = JSON.parse_string(txt)
-					if typeof(j) == TYPE_DICTIONARY:
-						var parse_err = j.get("error", null)
-						var parse_res = j.get("result", null)
-						if parse_err == OK and parse_res and typeof(parse_res) == TYPE_DICTIONARY:
-							var sd = parse_res
-							if sd.has("states"):
-								for st in sd["states"]:
-									computed_safety += float(st.get("duration", 0.0))
-								# add a small slack so minor jitter won't cut off
-								computed_safety += 1.0
-								print("[ShowNarrativeStep] Computed safety timeout from stage JSON: ", computed_safety)
-							else:
-								print("[ShowNarrativeStep] Stage JSON has no 'states' array: ", stage_path)
-						else:
-							var msg = j.get("error_message", "(no message)")
-							print("[ShowNarrativeStep] Failed to parse stage JSON for safety computation: ", stage_path, " parse_err=", parse_err, " msg=", msg)
-					else:
-						print("[ShowNarrativeStep] Unexpected JSON.parse_string result type for: ", stage_path)
-				else:
-					print("[ShowNarrativeStep] Could not open stage file for safety computation: ", stage_path)
-			else:
-				print("[ShowNarrativeStep] Stage file not found for safety computation: ", stage_path)
-
-			# Start safety timer using computed value if available; otherwise fallback to default
-			if computed_safety > 0.0:
-				_start_safety_timer(computed_safety)
-			else:
-				_start_safety_timer()
-
-			# Connect to the manager's controller state_changed so we can observe transitions
-			if narrative_manager and narrative_manager.controller != null:
+			# Force-render current controller state into our narrative_container if controller set a state but visuals didn't appear due to ordering races
+			if narrative_manager.controller != null and narrative_manager.renderer != null:
 				var ctrl = narrative_manager.controller
-				if ctrl and ctrl.has_signal("state_changed") and not ctrl.state_changed.is_connected(Callable(self, "_on_controller_state_changed")):
-					ctrl.state_changed.connect(Callable(self, "_on_controller_state_changed"))
-					_controller_conn = ctrl
-					# Immediately inspect current state to schedule duration if controller already set it (avoid race)
-					if ctrl.current_state != "":
-						var cur = ctrl.current_state
-						print("[ShowNarrativeStep] Controller current_state at connect: ", cur, " ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-						if cur != "":
-							_on_controller_state_changed(cur)
-					# If controller has stage data, ensure safety timer isn't shorter than controller-internal estimate
-					if ctrl.current_stage_data and ctrl.current_stage_data.has("states"):
-						var total_ctrl: float = 0.0
-						for s in ctrl.current_stage_data["states"]:
-							total_ctrl += float(s.get("duration", 0.0))
-						# add slack
-						total_ctrl += 1.0
-						# if controller estimate is longer than file-based safety, replace timer
-						if total_ctrl > computed_safety:
-							_start_safety_timer(total_ctrl)
-			# Also rely on EventBus.narrative_stage_complete (connected earlier)
-			return true
+				var rdr = narrative_manager.renderer
+				# If controller has a current_state and renderer exposes render_state, attempt to render it explicitly
+				if ctrl.current_state != "" and rdr.has_method("render_state"):
+					# Find the state definition in controller.current_stage_data
+					var csd = ctrl.current_stage_data if ctrl else null
+					var state_def = null
+					if csd and csd.has("states"):
+						for s in csd["states"]:
+							if s.get("name", "") == ctrl.current_state:
+								state_def = s
+								break
+					# Prepare render_state_data similar to controller._set_state (inject anchor if missing)
+					if state_def != null:
+						var render_state_data = {}
+						for k in state_def.keys():
+							render_state_data[k] = state_def[k]
+						if not render_state_data.has("position"):
+							var stag_anchor = ctrl.current_stage_data.get("anchor", "")
+							if stag_anchor != "":
+								render_state_data["position"] = stag_anchor
+						print("[ShowNarrativeStep] Forcing renderer to render current_state=", ctrl.current_state, " with asset=", render_state_data.get("asset", "(none)"))
+						# Call render_state on renderer now
+						rdr.render_state(render_state_data)
+						# If renderer created visuals under a different parent (race), move them into narrative_container
+						if rdr.current_visual and rdr.current_visual.is_inside_tree():
+							var vis_parent = rdr.current_visual.get_parent()
+							print("[ShowNarrativeStep] Renderer placed visual under: ", vis_parent.name if vis_parent else "(no parent)")
+							if vis_parent != narrative_container:
+								# Reparent visual into our overlay container
+								if vis_parent:
+									vis_parent.remove_child(rdr.current_visual)
+								narrative_container.add_child(rdr.current_visual)
+								rdr.current_visual.z_index = 100
+								print("[ShowNarrativeStep] Moved renderer visual into NarrativeContainer")
 
-		# Unlock manager on failure
-		if narrative_manager.has_method("lock_stage"):
-			narrative_manager.lock_stage(false)
-			print("[ShowNarrativeStep] Unlocked NarrativeStageManager after failed load: %s" % stage_id)
-		push_warning("[ShowNarrativeStep] Failed to load narrative: %s" % stage_id)
-		# restore board visibility on failure
-		if _context and _context.game_board:
-			_context.game_board.visible = _board_prev_visible
-		# remove overlay if we created it
-		_cleanup_overlay(_context)
-		return false
+							# CRITICAL: Ensure skip button is above visuals by moving it to front
+							if _skip_button and _skip_button.is_inside_tree():
+								narrative_container.move_child(_skip_button, -1)  # Move to end (rendered last = on top)
+								print("[ShowNarrativeStep] Moved skip button to front (above visuals)")
+							# Also move renderer's current_text_label if present
+							if rdr.current_text_label and rdr.current_text_label.is_inside_tree():
+								var tpar = rdr.current_text_label.get_parent()
+								if tpar != narrative_container:
+									if tpar:
+										tpar.remove_child(rdr.current_text_label)
+										narrative_container.add_child(rdr.current_text_label)
+									print("[ShowNarrativeStep] Moved renderer text label into NarrativeContainer")
+									# Ensure skip button is still on top after text is added
+									if _skip_button and _skip_button.is_inside_tree():
+										narrative_container.move_child(_skip_button, -1)
+										print("[ShowNarrativeStep] Re-raised skip button after text label")
+						else:
+							print("[ShowNarrativeStep] Renderer did not create a visual (current_visual null) after render_state call")
+							# Fallback: try to ask renderer to load and display the state's asset directly
+							var fallback_asset = null
+							if state_def and state_def.has("asset"):
+								fallback_asset = state_def.get("asset")
+							elif ctrl.current_stage_data and ctrl.current_stage_data.has("states") and ctrl.current_stage_data["states"].size() > 0:
+								fallback_asset = ctrl.current_stage_data["states"][0].get("asset", null)
+							if fallback_asset and fallback_asset != "":
+								print("[ShowNarrativeStep] Fallback: attempting to load asset via renderer: ", fallback_asset)
+								# Use public API (display_asset) to show asset; this will also set z_index appropriately
+								if rdr.has_method("display_asset"):
+									var pos_mode = state_def.get("position", ctrl.current_stage_data.get("anchor", "top_banner")) if state_def else ctrl.current_stage_data.get("anchor", "top_banner")
+									var ok = rdr.display_asset(fallback_asset, pos_mode)
+									if ok:
+										print("[ShowNarrativeStep] Fallback: renderer.display_asset succeeded for: ", fallback_asset)
+										# If renderer created visuals under a different parent, move them into narrative_container
+										if rdr.current_visual and rdr.current_visual.is_inside_tree():
+											var pv = rdr.current_visual.get_parent()
+											if pv != narrative_container:
+												if pv:
+													pv.remove_child(rdr.current_visual)
+												narrative_container.add_child(rdr.current_visual)
+												rdr.current_visual.z_index = 100
+												print("[ShowNarrativeStep] Fallback: moved renderer visual into NarrativeContainer")
+										# Move text if present
+										if rdr.current_text_label and rdr.current_text_label.is_inside_tree():
+											var tpp = rdr.current_text_label.get_parent()
+											if tpp and tpp != narrative_container:
+												tpp.remove_child(rdr.current_text_label)
+												narrative_container.add_child(rdr.current_text_label)
+											print("[ShowNarrativeStep] Fallback: moved renderer text label into NarrativeContainer")
+										# CRITICAL: Ensure skip button is on top after all visuals
+										if _skip_button and _skip_button.is_inside_tree():
+											narrative_container.move_child(_skip_button, -1)
+											print("[ShowNarrativeStep] Fallback: raised skip button to front")
+									else:
+										print("[ShowNarrativeStep] Fallback: renderer.display_asset failed for: ", fallback_asset)
+								else:
+									print("[ShowNarrativeStep] Fallback: renderer missing display_asset method")
+							else:
+								print("[ShowNarrativeStep] Fallback: no asset available to attempt fallback render")
 
-	# Fallback
-	return false
+	# Success! Narrative is now showing
+	# IMPORTANT: Keep waiting_for_completion = true so pipeline waits for the narrative to finish
+	# The narrative will complete via EventBus signal or safety/watchdog timers
+	_context.waiting_for_completion = true
+	return true
 
 func _start_auto_advance_timer():
-	var tree: SceneTree = get_tree()
-	if tree:
-		_auto_timer = tree.create_timer(auto_advance_delay)
-		print("[ShowNarrativeStep] Auto-advance timer started for %.2fs ms=" % auto_advance_delay, Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-		# use Callable to connect the timeout signal
-		_auto_timer.timeout.connect(Callable(self, "_on_auto_advance_timeout"))
-
-func _start_safety_timer(override_seconds: float = 0.0):
-	var tree: SceneTree = get_tree()
-	if not tree:
+	if auto_advance_delay <= 0:
 		return
-	var safety: float = 0.0
-	if override_seconds > 0.0:
-		safety = override_seconds
-	else:
-		# default conservative safety
-		safety = max(3.0, auto_advance_delay + 1.0)
-	# If we already have a safety timer, disconnect its signal to avoid duplicate callbacks
-	if _safety_timer:
-		# try to disconnect previous signal safely
-		if _safety_timer.timeout and _safety_timer.timeout.is_connected(Callable(self, "_on_safety_timeout")):
-			_safety_timer.timeout.disconnect(Callable(self, "_on_safety_timeout"))
-	# create new timer
-	_safety_timer = tree.create_timer(safety)
-	_safety_timer.timeout.connect(Callable(self, "_on_safety_timeout"))
-	print("[ShowNarrativeStep] Safety timer started for %.2fs" % safety)
+
+	print("[ShowNarrativeStep] Starting auto-advance timer (delay: %.1fs)" % auto_advance_delay)
+	if _auto_timer:
+		_auto_timer.stop()
+	_auto_timer = Timer.new()
+	_auto_timer.wait_time = auto_advance_delay
+	_auto_timer.one_shot = true
+	_auto_timer.connect("timeout", Callable(self, "_on_auto_advance_timeout"))
+	add_child(_auto_timer)
+	_auto_timer.start()
 
 func _on_auto_advance_timeout():
-	print("[ShowNarrativeStep] Auto-advance timeout fired ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-	# Instead of finishing the pipeline immediately, try multiple ways to advance the narrative stage
-	var tree = get_tree()
-	if tree:
-		var root = tree.root
-		print("[ShowNarrativeStep] root: ", root, " ms=", Time.get_ticks_msec())
-		var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
-		print("[ShowNarrativeStep] narrative_manager: ", narrative_manager)
-		if narrative_manager:
-			print("[ShowNarrativeStep] narrative_manager has trigger_event: ", narrative_manager.has_method("trigger_event"))
-			if narrative_manager.has_method("trigger_event"):
-				narrative_manager.trigger_event("auto_advance", {})
-				print("[ShowNarrativeStep] Requested NarrativeStageManager to auto_advance via trigger_event ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-				return
-			# Fallback: try to access controller directly
-			if narrative_manager.controller != null:
-				var ctrl = narrative_manager.controller
-				print("[ShowNarrativeStep] narrative_manager.controller: ", ctrl)
-				if ctrl and ctrl.has_method("_check_transitions"):
-					ctrl._check_transitions("auto_advance", {})
-					print("[ShowNarrativeStep] Requested controller to auto_advance via _check_transitions ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-					return
-			# If manager exists but we couldn't invoke it, wait a short grace period before finishing to avoid races
-			print("[ShowNarrativeStep] Manager present but could not invoke transition; waiting grace period before finishing")
-			var grace = 0.5
-			var gtimer = tree.create_timer(grace)
-			gtimer.timeout.connect(Callable(self, "_finish_and_emit"))
-			return
+	print("[ShowNarrativeStep] Auto-advance timer expired")
+	_finish_narrative_stage()
 
-	# Fallback: no manager/controller available -> finish step
-	print("[ShowNarrativeStep] NarrativeStageManager/controller not available, finishing step ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-	_finish_and_emit()
-
-func _on_safety_timeout():
-	var now = Time.get_ticks_msec()
-	print("[ShowNarrativeStep] Safety timeout fired at ms=", now, " checking pending_state_timers=", _pending_state_timers)
-	# If there are pending state timers, compute remaining time and reschedule safety timer instead of forcing completion
-	if _pending_state_timers.size() > 0:
-		var min_remaining: float = -1.0
-		for key in _pending_state_timers.keys():
-			var entry = _pending_state_timers[key]
-			if typeof(entry) == TYPE_DICTIONARY and entry.has("expiry"):
-				var expiry = int(entry["expiry"])
-				var remaining = float(expiry - now) / 1000.0
-				if remaining > 0.0:
-					if min_remaining < 0.0 or remaining < min_remaining:
-						min_remaining = remaining
-		# If we found a pending expiry in the future, reschedule safety timer to wait until then + small slack
-		if min_remaining > 0.0:
-			var wait = min_remaining + 0.25 # 250ms slack
-			print("[ShowNarrativeStep] Deferring safety completion, rescheduling safety timer for ", wait, "s (min_remaining=", min_remaining, ")")
-			_start_safety_timer(wait)
-			return
-	# No relevant pending timers -> force completion
-	print("[ShowNarrativeStep] No pending state timers or all expired; forcing completion now")
-	_finish_and_emit()
-
-func _on_narrative_complete(stg_id: String):
+func _finish_narrative_stage():
 	if _finished:
 		return
-	if stg_id == stage_id:
-		print("[ShowNarrativeStep] Narrative completed: %s" % stg_id)
-		_finish_and_emit()
-
-func _on_controller_state_changed(new_state: String):
-	print("[ShowNarrativeStep] Controller state changed: ", new_state, " ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-	# When controller advances to a new state, if that state has a duration, ensure we wait that duration before finishing
-	var tree = get_tree()
-	if not tree:
-		return
-	# get narrative manager and controller state data
-	var root = tree.root
-	var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
-	if not narrative_manager:
-		return
-	if narrative_manager.controller == null:
-		return
-	var ctrl = narrative_manager.controller
-	if not ctrl:
-		return
-	# find state data in controller.current_stage_data (if available)
-	if ctrl.current_stage_data:
-		var sd = ctrl.current_stage_data
-		if sd and sd.has("states"):
-			for s in sd["states"]:
-				if s.get("name", "") == new_state:
-					var dur = s.get("duration", 0.0)
-					print("[ShowNarrativeStep] Found state duration for ", new_state, ": ", dur, " ms=", Time.get_ticks_msec(), " delta=", Time.get_ticks_msec() - _exec_start_time)
-					if dur > 0:
-						if _finished:
-							return
-						# increment seq and schedule a timer bound to this seq
-						_state_timer_seq += 1
-						var seq = _state_timer_seq
-						# clear previous pending timers (we only care about the most recent sequence)
-						_pending_state_timers.clear()
-						var expiry = Time.get_ticks_msec() + int(dur * 1000)
-						_pending_state_timers[seq] = {"state": new_state, "expiry": expiry}
-						var t = tree.create_timer(dur)
-						# bind seq to the callback so we can validate which timer fired
-						t.timeout.connect(Callable(self, "_on_controller_state_duration_complete").bind(seq))
-						print("[ShowNarrativeStep] Scheduled controller state duration timer seq=", seq, " for ", new_state, " ms=", Time.get_ticks_msec(), " duration=", dur)
-						return
-
-func _on_controller_state_duration_complete(seq: int) -> void:
-	if _finished:
-		return
-	var tree = get_tree()
-	var root = tree.root if tree else null
-	var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager") if root else null
-	var ctrl = null
-	if narrative_manager and narrative_manager.controller != null:
-		ctrl = narrative_manager.controller
-	var cur_state = ctrl.current_state if ctrl and ctrl.current_state != null else ""
-	var now = Time.get_ticks_msec()
-	var entry = _pending_state_timers.get(seq, null)
-	print("[ShowNarrativeStep] State-duration timer fired; seq=", seq, ", now=", now, ", cur_state=", cur_state, ", entry=", entry)
-	if entry == null:
-		print("[ShowNarrativeStep] No pending entry for seq=", seq, " - ignoring")
-		return
-	var expected_state = entry.get("state", "")
-	var expiry = entry.get("expiry", 0)
-	# Only finish if the controller's current state matches and we've reached expiry
-	if cur_state == expected_state and expiry != 0 and now >= expiry:
-		_pending_state_timers.erase(seq)
-		print("[ShowNarrativeStep] Controller state duration complete (seq=", seq, ", state=", cur_state, "), finishing step ms=", now, " delta=", now - _exec_start_time)
-		_finish_and_emit()
-	else:
-		print("[ShowNarrativeStep] Ignoring timer seq=", seq, " because state mismatch or expiry not reached (expected=", expected_state, ", cur=", cur_state, ", expiry=", expiry, ")")
-		return
-
-func _finish_and_emit():
-	# Start fade-out, then emit completion when finished
-	# Use stored _context reference
-	if _context:
-		_context.waiting_for_completion = true
-	else:
-		# No context available; still proceed
-		pass
-
-	# Find the narrative container to fade it out
-	var narrative_container = null
-	if _overlay_layer and _overlay_layer.is_inside_tree():
-		narrative_container = _overlay_layer.get_node_or_null("NarrativeContainer")
-
-	if narrative_container and narrative_container is Control:
-		var tween = get_tree().create_tween()
-		tween.tween_property(narrative_container, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		tween.connect("finished", Callable(self, "_on_fade_out_complete"))
-	else:
-		# No container to fade, just complete immediately
-		step_completed.emit(true)
-
-func _on_fade_out_complete():
-	print("[ShowNarrativeStep] Fade-out complete")
-	# Cleanup overlay then emit
-	_cleanup_overlay(_context)
-	# stop timers if active
-	if _auto_timer:
-		_auto_timer = null
-	if _safety_timer:
-		_safety_timer = null
-	# Disconnect controller signal if connected
-	if _controller_conn and _controller_conn.has_signal("state_changed"):
-		if _controller_conn.state_changed.is_connected(Callable(self, "_on_controller_state_changed")):
-			_controller_conn.state_changed.disconnect(Callable(self, "_on_controller_state_changed"))
-		_controller_conn = null
-	if _context:
-		_context.waiting_for_completion = false
-		_context.completion_type = ""
-	# Unlock NarrativeStageManager now that the pipeline-driven stage is fully finished
-	var tree = get_tree()
-	if tree:
-		var root = tree.root
-		var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
-		if narrative_manager and narrative_manager.has_method("lock_stage"):
-			narrative_manager.lock_stage(false)
-			print("[ShowNarrativeStep] Unlocked NarrativeStageManager after completion: %s" % stage_id)
-			# Clear any active stage so level-specific stage (top_banner) can be loaded by level events
-			if narrative_manager and narrative_manager.has_method("clear_stage"):
-				narrative_manager.clear_stage()
-				print("[ShowNarrativeStep] Cleared NarrativeStageManager active stage to allow level-specific stage to load")
-				# Explicitly reset anchor to top_banner so renderer is prepared for per-level banner
-				if narrative_manager and narrative_manager.has_method("set_anchor"):
-					narrative_manager.set_anchor("top_banner")
-					print("[ShowNarrativeStep] Reset NarrativeStageManager anchor to 'top_banner'")
 	_finished = true
-	step_completed.emit(true)
 
-func cleanup():
-	# Disconnect event and restore UI - but only if we're still in the tree
-	if not is_inside_tree():
-		# Step already removed from tree, cannot access EventBus via get_tree()
-		# Just clear our references and attempt a safe fallback to Engine.get_main_loop()
-		_auto_timer = null
+	print("[ShowNarrativeStep] Finishing narrative stage: %s" % stage_id)
+
+	# Stop watchdog timer if it's still running
+	if _overlay_watchdog and is_instance_valid(_overlay_watchdog):
+		_overlay_watchdog.stop()
+		_overlay_watchdog = null
+		print("[ShowNarrativeStep] Stopped overlay watchdog timer")
+
+	# Stop safety timer if it's still running
+	if _safety_timer and is_instance_valid(_safety_timer):
+		_safety_timer.stop()
 		_safety_timer = null
-		# Try to access the SceneTree safely via Engine.get_main_loop() when node not inside tree
-		var main_loop = Engine.get_main_loop()
-		var tree = null
-		if main_loop and main_loop is SceneTree:
-			tree = main_loop
-		if tree:
-			var root = tree.root
-			var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
-			if narrative_manager and narrative_manager.has_method("lock_stage"):
-				narrative_manager.lock_stage(false)
-				print("[ShowNarrativeStep] Unlocked NarrativeStageManager in cleanup: %s" % stage_id)
-		return
+		print("[ShowNarrativeStep] Stopped safety timer")
 
-	var root = null
-	var tree = get_tree()
-	if tree:
-		root = tree.root
-	if root:
-		var event_bus = root.get_node_or_null("/root/EventBus")
-		if event_bus and event_bus.has_signal("narrative_stage_complete"):
-			if event_bus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
-				event_bus.narrative_stage_complete.disconnect(Callable(self, "_on_narrative_complete"))
+	# Stop auto-advance timer if it's still running
+	if _auto_timer and is_instance_valid(_auto_timer):
+		_auto_timer.stop()
+		_auto_timer = null
+		print("[ShowNarrativeStep] Stopped auto-advance timer")
 
-	# stop and clear timers
-	_auto_timer = null
-	_safety_timer = null
+	var root = get_tree().root
+	var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
+	if narrative_manager and narrative_manager.has_method("unlock_stage"):
+		narrative_manager.unlock_stage()
+		print("[ShowNarrativeStep] Unlocked NarrativeStageManager")
 
-	# Disconnect controller signal if connected
-	if _controller_conn and _controller_conn.has_signal("state_changed"):
-		if _controller_conn.state_changed.is_connected(Callable(self, "_on_controller_state_changed")):
-			_controller_conn.state_changed.disconnect(Callable(self, "_on_controller_state_changed"))
-		_controller_conn = null
+	# Cleanup context visibility
+	if _context:
+		# Don't restore board visibility - the LoadLevelStep will handle showing the board
+		# when it loads the new level. Restoring the old visibility state would interfere.
+		# var board = _context.game_board
+		# if board:
+		# 	board.visible = _board_prev_visible
 
-	# Restore board visibility
-	if _context and _context.game_board:
-		_context.game_board.visible = _board_prev_visible
+		var game_ui = _context.game_ui
+		if game_ui:
+			# Restore HUD
+			var hud = game_ui.get_node_or_null("VBoxContainer/TopPanel/HUD")
+			if hud:
+				hud.visible = _hud_prev_visible
 
-	# Restore GameUI elements visibility
-	if _context and _context.game_ui:
-		var hud = _context.game_ui.get_node_or_null("VBoxContainer/TopPanel/HUD")
-		if hud:
-			hud.visible = _hud_prev_visible
-			print("[ShowNarrativeStep] Restored HUD visibility")
+			# Restore BoosterPanel
+			var booster_panel = game_ui.get_node_or_null("BoosterPanel")
+			if booster_panel:
+				booster_panel.visible = _booster_panel_prev_visible
 
-		var booster_panel = _context.game_ui.get_node_or_null("BoosterPanel")
-		if booster_panel:
-			booster_panel.visible = _booster_panel_prev_visible
-			print("[ShowNarrativeStep] Restored BoosterPanel visibility")
+			# Restore FloatingMenu
+			var floating_menu = game_ui.get_node_or_null("FloatingMenu")
+			if floating_menu:
+				floating_menu.visible = _floating_menu_prev_visible
 
-		var floating_menu = _context.game_ui.get_node_or_null("FloatingMenu")
-		if floating_menu:
-			floating_menu.visible = _floating_menu_prev_visible
-			print("[ShowNarrativeStep] Restored FloatingMenu visibility")
-
-	# Remove overlay/dimmer if we created them
-	_cleanup_overlay(_context)
-
-func _cleanup_overlay(context: PipelineContext) -> void:
-	# Remove dimmer polygon if present
-	if _dimmer_poly and _dimmer_poly.is_inside_tree():
-		_dimmer_poly.queue_free()
-		_dimmer_poly = null
-		print("[ShowNarrativeStep] Removed dimmer polygon")
-
-	# Remove overlay layer only if we created it or it still exists
+	# Remove narrative overlay and its children
 	if _overlay_layer and _overlay_layer.is_inside_tree():
 		_overlay_layer.queue_free()
-		# Clear context.overlay_layer if it referenced this
-		if context and context.overlay_layer == _overlay_layer:
-			context.overlay_layer = null
-		_overlay_layer = null
-		print("[ShowNarrativeStep] Removed overlay layer")
+		print("[ShowNarrativeStep] Removed narrative overlay")
+	else:
+		print("[ShowNarrativeStep] Narrative overlay not found or already removed")
+
+	# Disconnect from event bus if connected
+	var event_bus = null
+	var tree = get_tree()
+	if tree:
+		var root2 = tree.root
+		event_bus = root2.get_node_or_null("/root/EventBus")
+	if event_bus and event_bus.has_signal("narrative_stage_complete"):
+		if event_bus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
+			event_bus.narrative_stage_complete.disconnect(Callable(self, "_on_narrative_complete"))
+			print("[ShowNarrativeStep] Disconnected from EventBus.narrative_stage_complete")
+
+	print("[ShowNarrativeStep] Finished")
+
+	# CRITICAL: Emit step_completed signal to tell pipeline this step is done
+	step_completed.emit(true)
+
+func _on_skip_pressed() -> void:
+	print("[ShowNarrativeStep] Skip pressed by user at ms=", Time.get_ticks_msec())
+	# Skip should immediately finish the narrative stage, bypassing any timers or transitions
+	print("[ShowNarrativeStep] Forcibly finishing narrative stage due to skip")
+
+	# CRITICAL: Stop the controller's timers before finishing to prevent ghost state transitions
+	var root = get_tree().root
+	var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
+	if narrative_manager:
+		var controller = narrative_manager.get_node_or_null("NarrativeStageController")
+		if controller:
+			# Stop auto-advance timer
+			if controller.has_method("stop_all_timers"):
+				controller.stop_all_timers()
+				print("[ShowNarrativeStep] Stopped controller timers via stop_all_timers()")
+			# Clear stage to stop any ongoing transitions
+			if narrative_manager.has_method("clear_stage"):
+				narrative_manager.clear_stage(true)  # Force clear
+				print("[ShowNarrativeStep] Force-cleared narrative stage to stop transitions")
+
+	_finish_narrative_stage()
+
+func _start_safety_timer(duration: float) -> void:
+	if _safety_timer:
+		_safety_timer.stop()
+	_safety_timer = Timer.new()
+	_safety_timer.wait_time = duration
+	_safety_timer.one_shot = true
+	_safety_timer.connect("timeout", Callable(self, "_on_safety_timeout"))
+	add_child(_safety_timer)
+	_safety_timer.start()
+	print("[ShowNarrativeStep] Safety timer started for ", duration, "s")
+
+func _on_safety_timeout() -> void:
+	print("[ShowNarrativeStep] Safety timer expired; forcing finish of narrative: ", stage_id)
+	_finish_narrative_stage()
+
+func _on_overlay_watchdog() -> void:
+	print("[ShowNarrativeStep] Overlay watchdog triggered; verifying visuals before cleanup")
+	# Don't do anything if we've already finished
+	if _finished:
+		print("[ShowNarrativeStep] Already finished - ignoring watchdog")
+		return
+	if not _overlay_layer or not _overlay_layer.is_inside_tree():
+		print("[ShowNarrativeStep] No overlay layer present - nothing to do")
+		return
+	var nc = _overlay_layer.get_node_or_null("NarrativeContainer")
+	if not nc:
+		print("[ShowNarrativeStep] NarrativeContainer missing - finishing to be safe")
+		_finish_narrative_stage()
+		return
+	# Determine if any meaningful visual was added (exclude dimmer and skip button)
+	var meaningful = false
+	for c in nc.get_children():
+		if not (c.name == "NarrativeDimmer" or c.name == "SkipButton" or c is Timer):
+			# Treat TextureRect, Label, Control, or custom nodes as meaningful visuals
+			meaningful = true
+			break
+	if meaningful:
+		print("[ShowNarrativeStep] Visuals found in NarrativeContainer - keeping overlay")
+		return
+	# No meaningful visuals - finish the narrative step to restore UI/board
+	print("[ShowNarrativeStep] No visuals created after watchdog - finishing narrative step to restore UI/board")
+	_finish_narrative_stage()
+
+func _on_narrative_complete(stage_id: String) -> void:
+	"""Callback when narrative stage completes via EventBus signal"""
+	print("[ShowNarrativeStep] Received narrative_stage_complete for: ", stage_id)
+	# Only finish if this matches our stage_id
+	if stage_id == self.stage_id:
+		print("[ShowNarrativeStep] Stage ID matches - finishing narrative")
+		_finish_narrative_stage()
+	else:
+		print("[ShowNarrativeStep] Stage ID mismatch (expected: ", self.stage_id, ", got: ", stage_id, ") - ignoring")

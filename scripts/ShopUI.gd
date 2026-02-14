@@ -1,4 +1,4 @@
-extends Control
+extends "res://scripts/ui/ScreenBase.gd"
 
 # Shop UI for purchasing boosters and lives
 
@@ -35,6 +35,9 @@ func _compute_responsive():
 	return _panel_width
 
 func _ready():
+	# Base class handles fullscreen anchors and background
+	ensure_fullscreen()
+
 	visible = false
 
 	if close_button:
@@ -166,14 +169,10 @@ func show_shop():
 		self.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	visible = true
-	modulate = Color.TRANSPARENT
-
+	# Use ScreenBase animation
 	_update_currency_display(0)  # Update display
 	_setup_shop_items()  # Refresh items to show owned counts
-
-	var tween = create_tween()
-	tween.tween_property(self, "modulate", Color.WHITE, 0.3)
-
+	show_screen(0.3)
 	print("[Shop] Shop opened (responsive), panel_width=" + str(_panel_width))
 
 func _update_currency_display(_amount: int = 0):
@@ -257,9 +256,10 @@ func _show_insufficient_funds(cost_type: String):
 
 func _on_close_pressed():
 	"""Close the shop"""
-	var tween = create_tween()
-	tween.tween_property(self, "modulate", Color.TRANSPARENT, 0.3)
-	tween.tween_callback(_on_shop_close_complete)
+	hide_screen(0.3)
+	# Schedule close complete after hide duration
+	var t = get_tree().create_timer(0.3)
+	t.timeout.connect(Callable(self, "_on_shop_close_complete"))
 
 func _on_shop_close_complete():
 	visible = false

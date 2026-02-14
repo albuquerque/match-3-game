@@ -82,6 +82,12 @@ func _ready():
 	else:
 		print("[GameBoard] WARNING: GameManager autoload not available at _ready(); will wait for level_loaded signal")
 
+	# Also listen to EventBus.level_loaded to be robust against load-order timing
+	var eb = get_node_or_null("/root/EventBus")
+	if eb and eb.has_signal("level_loaded"):
+		eb.level_loaded.connect(Callable(self, "_on_eventbus_level_loaded"))
+		print("[GameBoard] Connected to EventBus.level_loaded for robustness")
+
 	# Create master board container to hold ALL visual elements
 	# This allows hiding/showing the entire board area with one call
 	board_container = Node2D.new()
@@ -123,6 +129,9 @@ func _ready():
 		# Borders will be drawn when level_loaded triggers _on_level_loaded
 	else:
 		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
+
+	# Defer a short-check in case level was loaded before we connected
+	call_deferred("_deferred_check_initialization")
 
 func calculate_responsive_layout():
 	var viewport = get_viewport()
@@ -312,22 +321,29 @@ func setup_background_image():
 	# Use call_deferred because parent is busy during _ready()
 	var parent = get_parent()
 	if parent:
-		# Hide or make transparent the existing Background ColorRect in MainGame
-		var existing_bg = parent.get_node_or_null("Background")
-		if existing_bg and existing_bg is ColorRect:
-			# Make it invisible so our background image shows through
-			existing_bg.visible = false
-			print("[GameBoard] Hidden existing MainGame background to show image")
-
-		# Defer both add_child and move_child
-		parent.call_deferred("add_child", background_rect)
-		parent.call_deferred("move_child", background_rect, 0)
-		print("[GameBoard] Background will be added to parent (deferred): ", parent.name)
+		# Defer attaching of the background and hiding existing bg to avoid race conditions
+		call_deferred("_deferred_attach_background", background_rect, parent)
+		print("[GameBoard] Background will be attached to parent (deferred): ", parent.name)
 	else:
-		# Fallback: add to self if no parent
+		# Fallback: add to self if no parent (deferred)
 		call_deferred("add_child", background_rect)
 		call_deferred("move_child", background_rect, 0)
 		print("[GameBoard] Background will be added to self (deferred, no parent found)")
+
+func _deferred_attach_background(background_rect: Node, parent: Node) -> void:
+	# This runs deferred to avoid hiding the main background before the new background is attached.
+	if not parent or not background_rect:
+		print("[GameBoard] _deferred_attach_background: missing parent or background_rect")
+		return
+	# Add and move to bottom
+	parent.add_child(background_rect)
+	parent.move_child(background_rect, 0)
+	# Hide existing MainGame Background ColorRect if present
+	var existing_bg = parent.get_node_or_null("Background")
+	if existing_bg and existing_bg is ColorRect:
+		existing_bg.visible = false
+		print("[GameBoard] Hidden existing MainGame background to show image (deferred)")
+	print("[GameBoard] Background attached to parent: ", parent.name)
 
 	print("[GameBoard] Background image successfully loaded and will be added to scene!")
 	print("[GameBoard] Background z_index: ", background_rect.z_index)
@@ -3180,6 +3196,13 @@ func activate_special_tile_chain(pos: Vector2, tile_type: int):
 
 
 # --------------------------- Border drawing helpers ---------------------------
+func _deferred_check_initialization():
+	"""Check if GameManager was initialized before we connected to its signals"""
+	var gm = get_node_or_null("/root/GameManager")
+	if gm and gm.initialized and tiles.size() == 0:
+		print("[GameBoard] Deferred check: GameManager was already initialized, creating visual grid now")
+		create_visual_grid()
+
 func _clear_board_borders():
 	"""Remove any previously created border children from the border container."""
 	if border_container == null:
@@ -3400,3 +3423,7 @@ func draw_corner_arc(corner_pos: Vector2, corner_type: String, radius: float) ->
 	line.default_color = border_color
 	line.antialiased = true
 	border_container.add_child(line)
+
+
+
+
