@@ -6,6 +6,7 @@ class_name LoadLevelStep
 
 var level_id: String = ""
 var level_number: int = 0
+var pipeline_context: PipelineContext = null  # Store reference to pass completion data
 
 func _init(lvl_id: String = ""):
 	super("load_level")
@@ -18,6 +19,9 @@ func execute(context: PipelineContext) -> bool:
 		return false
 
 	print("[LoadLevelStep] Loading level %d (%s)" % [level_number, level_id])
+
+	# Store pipeline context reference
+	pipeline_context = context
 
 	# Set waiting flag
 	context.waiting_for_completion = true
@@ -51,11 +55,33 @@ func execute(context: PipelineContext) -> bool:
 		return false
 
 func _on_level_complete(lvl_id: String, context: Dictionary = {}):
-	print("[LoadLevelStep] Level completed: %s" % lvl_id)
+	print("[LoadLevelStep] Level completed: %s, context: %s" % [lvl_id, context])
+
+	# Store completion data in pipeline context for ShowRewardsStep
+	if pipeline_context:
+		pipeline_context.set_result("current_level", level_number)
+		pipeline_context.set_result("level_completed", true)
+		pipeline_context.set_result("score", context.get("score", 0))
+		pipeline_context.set_result("stars", context.get("stars", 0))
+		pipeline_context.set_result("coins_earned", context.get("coins_earned", 0))
+		pipeline_context.set_result("gems_earned", context.get("gems_earned", 0))
+		print("[LoadLevelStep] Stored completion data in pipeline context")
+
 	step_completed.emit(true)
 
 func _on_level_failed(lvl_id: String, context: Dictionary = {}):
-	print("[LoadLevelStep] Level failed: %s" % lvl_id)
+	print("[LoadLevelStep] Level failed: %s, context: %s" % [lvl_id, context])
+
+	# Store failure data in pipeline context
+	if pipeline_context:
+		pipeline_context.set_result("current_level", level_number)
+		pipeline_context.set_result("level_completed", false)
+		pipeline_context.set_result("score", context.get("score", 0))
+		pipeline_context.set_result("stars", 0)  # No stars on failure
+		pipeline_context.set_result("coins_earned", 0)  # No rewards on failure
+		pipeline_context.set_result("gems_earned", 0)
+		print("[LoadLevelStep] Stored failure data in pipeline context")
+
 	step_completed.emit(false)
 
 func cleanup():

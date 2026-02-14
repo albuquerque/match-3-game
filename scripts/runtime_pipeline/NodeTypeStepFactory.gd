@@ -94,6 +94,11 @@ static func _create_reward_step(node: Dictionary) -> PipelineStep:
 	var rewards = node.get("rewards", [])
 	return GrantRewardsStep.new(reward_id, rewards)
 
+static func _create_show_rewards_step(node: Dictionary) -> PipelineStep:
+	var level_num = node.get("level_number", 0)
+	var completed = node.get("completed", true)
+	return ShowRewardsStep.new(level_num, completed)
+
 static func _create_cutscene_step(node: Dictionary) -> PipelineStep:
 	var scene_path = node.get("scene", "")
 	return CutsceneStep.new(scene_path)
