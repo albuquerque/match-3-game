@@ -4,7 +4,6 @@
 [ext_resource type="Script" uid="uid://clght4j2ys21n" path="res://scripts/GameUI.gd" id="2_4y7z1"]
 [ext_resource type="Script" uid="uid://b7r5vfqaywpue" path="res://scripts/ShopUI.gd" id="3_shopui"]
 [ext_resource type="Script" uid="uid://bbqp6ba2mgrmw" path="res://scripts/OutOfLivesDialog.gd" id="4_outoflivesdialog"]
-[ext_resource type="Script" uid="uid://daaqxkt41gscs" path="res://scripts/RewardNotification.gd" id="5_rewardnotification"]
 [ext_resource type="Texture2D" path="res://textures/menu_hamburger.svg" id="6_menu"]
 [ext_resource type="Texture2D" path="res://textures/map.png" id="7_map"]
 [ext_resource type="Texture2D" path="res://textures/audio_settings.png" id="8_audio"]
@@ -623,58 +622,6 @@ text = "Watch Ad (+1 ❤️)"
 [node name="WaitButton" type="Button" parent="GameUI/OutOfLivesDialog/Panel/VBoxContainer/ButtonContainer"]
 layout_mode = 2
 text = "Wait"
-
-[node name="RewardNotification" type="Control" parent="GameUI"]
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("5_rewardnotification")
-
-[node name="Panel" type="Panel" parent="GameUI/RewardNotification"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -150.0
-offset_right = 200.0
-offset_bottom = 150.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="VBoxContainer" type="VBoxContainer" parent="GameUI/RewardNotification/Panel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="IconContainer" type="CenterContainer" parent="GameUI/RewardNotification/Panel/VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="RewardLabel" type="Label" parent="GameUI/RewardNotification/Panel/VBoxContainer"]
-layout_mode = 2
-text = "+100 Coins"
-horizontal_alignment = 1
-
-[node name="DescriptionLabel" type="Label" parent="GameUI/RewardNotification/Panel/VBoxContainer"]
-layout_mode = 2
-text = "Level completion reward"
-horizontal_alignment = 1
-
-[node name="CloseButton" type="Button" parent="GameUI/RewardNotification/Panel/VBoxContainer"]
-layout_mode = 2
-text = "Awesome!"
-
-[node name="AnimationPlayer" type="AnimationPlayer" parent="GameUI/RewardNotification"]
 
 [node name="FloatingMenu" type="Control" parent="GameUI"]
 layout_mode = 1
