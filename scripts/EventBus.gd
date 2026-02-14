@@ -15,6 +15,9 @@ signal special_tile_activated(entity_id: String, context: Dictionary)
 signal spreader_tick(entity_id: String, context: Dictionary)
 signal spreader_destroyed(entity_id: String, context: Dictionary)
 
+# Narrative system signals
+signal narrative_stage_complete(stage_id: String)
+
 # Generic event emission for extensibility
 signal custom_event(event_name: String, entity_id: String, context: Dictionary)
 

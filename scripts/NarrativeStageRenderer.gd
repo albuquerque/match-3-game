@@ -56,14 +56,23 @@ func render_state(state_data: Dictionary):
 		clear()
 
 		# Determine anchor/parent node
-		var position_mode = anchor_name if anchor_name != "" else state_data.get("position", "top_banner")
+		# Prefer explicit state position if provided, otherwise fall back to renderer anchor_name, then default to top_banner
+		var position_mode = state_data.get("position", "").strip_edges()
+		if position_mode == "":
+			position_mode = anchor_name if anchor_name != "" else state_data.get("position", "top_banner")
+
 		var anchor_node = self
-		if position_mode != "fullscreen":
-			var candidate_anchor = _get_anchor_node()
-			if candidate_anchor and candidate_anchor.is_inside_tree():
-				anchor_node = candidate_anchor
-			else:
-				anchor_node = self
+		# Prefer override_parent (set by ShowNarrativeStep) for all modes if present so pipeline overlay captures visuals
+		if override_parent and override_parent.is_inside_tree():
+			anchor_node = override_parent
+		else:
+			# if not overriding parent, and not fullscreen, try anchor manager
+			if position_mode != "fullscreen":
+				var candidate_anchor = _get_anchor_node()
+				if candidate_anchor and candidate_anchor.is_inside_tree():
+					anchor_node = candidate_anchor
+				else:
+					anchor_node = self
 
 		# If anchor_node appears to be 'self' (or not in tree), try to find any NarrativeContainer created by pipeline
 		if (anchor_node == self or not anchor_node.is_inside_tree()):
@@ -305,7 +314,11 @@ func _add_text_overlay(text_content: String, position_mode: String, parent_node:
 			label.add_theme_color_override("font_color", parsed_color)
 			label.add_theme_color_override("font_outline_color", outline_col)
 			label.add_theme_constant_override("outline_size", 4)
-			label.z_index = 1
+			# If parent is override_parent (overlay), place text above dimmer
+			if parent_node == override_parent:
+				label.z_index = 101
+			else:
+				label.z_index = 1
 
 			print("[NarrativeStageRenderer] ✓ Configured banner text")
 
@@ -418,13 +431,33 @@ func _load_bundled_asset(asset_path: String) -> Texture2D:
 	print("[NarrativeStageRenderer] Bundled asset not found: ", asset_path)
 	return null
 
+func display_asset(asset_path: String, position_mode: String = "") -> bool:
+	"""Public API: load the given asset and render it into the renderer using the provided position mode.
+	This is safe for external callers and wraps the internal load+display logic.
+	Returns true if asset was loaded and a visual was created, false otherwise.
+	"""
+	if asset_path == null or asset_path == "":
+		return false
+	var tex = _load_asset(asset_path)
+	if not tex:
+		print("[NarrativeStageRenderer] display_asset: failed to load asset: ", asset_path)
+		return false
+	var state = {"asset": asset_path}
+	if position_mode and position_mode != "":
+		state["position"] = position_mode
+	# Use internal display path so existing layout/config is applied
+	_display_texture(tex, state)
+	return true
+
 func _display_texture(texture: Texture2D, state_data: Dictionary):
 	"""Display texture in the narrative stage area"""
 	print("[NarrativeStageRenderer] === DISPLAYING TEXTURE ===")
 
 	# Configure based on anchor name (set via set_visual_anchor from narrative stage JSON)
 	# Fall back to state data position, then default to top_banner
-	var position_mode = anchor_name if anchor_name != "" else state_data.get("position", "top_banner")
+	var position_mode = state_data.get("position", "").strip_edges()
+	if position_mode == "":
+		position_mode = anchor_name if anchor_name != "" else "top_banner"
 	print("[NarrativeStageRenderer] 📍 Position mode: ", position_mode)
 	print("[NarrativeStageRenderer] 📍 anchor_name variable: ", anchor_name)
 	print("[NarrativeStageRenderer] 📍 Renderer parent: ", get_parent().name if get_parent() else "NO PARENT")
@@ -433,12 +466,18 @@ func _display_texture(texture: Texture2D, state_data: Dictionary):
 	# For fullscreen mode, add directly to this Control (which is fullscreen)
 	# For other modes, use the visual anchor system
 	var anchor_node = self
-	if position_mode != "fullscreen":
-		var candidate = _get_anchor_node()
-		if candidate and candidate.is_inside_tree():
-			anchor_node = candidate
-		else:
-			anchor_node = self
+	var rendering_into_overlay: bool = false
+	# Prefer explicit override_parent (set by ShowNarrativeStep) if present
+	if override_parent and override_parent.is_inside_tree():
+		anchor_node = override_parent
+		rendering_into_overlay = true
+	else:
+		if position_mode != "fullscreen":
+			var candidate = _get_anchor_node()
+			if candidate and candidate.is_inside_tree():
+				anchor_node = candidate
+			else:
+				anchor_node = self
 
 	# Fade out old visual if exists
 	if current_visual:
@@ -454,6 +493,11 @@ func _display_texture(texture: Texture2D, state_data: Dictionary):
 	tex_rect.texture = texture
 
 	_configure_texture_rect(tex_rect, position_mode)
+	# If rendering into the pipeline overlay, ensure the visual is above the dimmer
+	if rendering_into_overlay:
+		if tex_rect.z_index <= 0:
+			tex_rect.z_index = 100
+			print("[NarrativeStageRenderer] Adjusted tex_rect z_index for overlay rendering to:", tex_rect.z_index)
 
 	# Add to scene
 	anchor_node.add_child(tex_rect)
@@ -555,4 +599,3 @@ func _configure_texture_rect(tex_rect: TextureRect, position_mode: String):
 			tex_rect.offset_bottom = 200
 			tex_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH
 			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-

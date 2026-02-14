@@ -3,6 +3,7 @@
 ## Developer Guidelines
 - Develop using GdScript in Godot Engine 4.5+
 - Follow existing code style and architecture patterns
+- Use tabs for indentation, not spaces
 - Focus on modular, testable code
 - Prioritize maintainability and extensibility
 - Ensure new code is well-documented and covered by tests

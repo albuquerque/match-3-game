@@ -228,11 +228,18 @@ func cleanup_visual_overlays():
 		"ScreenFlash"
 	]
 
+	# Search in both cached_viewport (root) and MainGame
+	var search_locations = [cached_viewport]
+	var main_game = cached_viewport.get_node_or_null("MainGame")
+	if main_game:
+		search_locations.append(main_game)
+
 	for overlay_name in overlay_names:
-		var overlay = cached_viewport.get_node_or_null(overlay_name)
-		if overlay and is_instance_valid(overlay):
-			print("[EffectResolver] Removing overlay: %s" % overlay_name)
-			overlay.queue_free()
+		for location in search_locations:
+			var overlay = location.get_node_or_null(overlay_name)
+			if overlay and is_instance_valid(overlay):
+				print("[EffectResolver] Removing overlay: %s from %s" % [overlay_name, location.name])
+				overlay.queue_free()
 
 	print("[EffectResolver] ✓ Visual overlays cleaned up")
 

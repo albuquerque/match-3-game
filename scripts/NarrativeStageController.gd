@@ -47,6 +47,13 @@ func load_stage(stage_data: Dictionary) -> bool:
 	print("[NarrativeStageController][ts] load start ms=", Time.get_ticks_msec())
 	current_stage_data = stage_data
 
+	# If renderer is set and stage specifies an anchor, apply it so visuals render in the correct area
+	if renderer and renderer.has_method("set_visual_anchor"):
+		var anchor_val = stage_data.get("anchor", "")
+		if anchor_val != "":
+			renderer.set_visual_anchor(anchor_val)
+			print("[NarrativeStageController] Applied stage anchor to renderer: ", anchor_val)
+
 	# Reset milestone tracking
 	_progress_milestones_reached = {
 		"progress_25": false,
@@ -70,22 +77,39 @@ func load_stage(stage_data: Dictionary) -> bool:
 		_transitions = stage_data["transitions"]
 		print("[NarrativeStageController]   Transitions: ", _transitions.size())
 
-	# Set initial state
+	# Set initial state. Do this regardless of whether transitions exist so stages without transitions still render.
+	# Check for stage_loaded or level_start transitions, otherwise fall back to first declared state.
+	var initial_set: bool = false
 	if _transitions.size() > 0:
-		# Find level_start transition or first transition
+		# First check for level_start transitions (legacy)
 		for trans in _transitions:
 			if trans.get("event") == "level_start":
 				_set_state(trans.get("to", ""))
+				initial_set = true
 				break
 
-		# If no level_start, use first state
-		if current_state == "" and _states.size() > 0:
-			var first_state_name = _states.keys()[0]
-			_set_state(first_state_name)
+		# If no level_start, check for stage_loaded transitions
+		if not initial_set:
+			for trans in _transitions:
+				if trans.get("event") == "stage_loaded":
+					# Found stage_loaded transition - will be triggered after activation
+					initial_set = true
+					break
+
+	# If we didn't find any matching transitions, fall back to the first declared state
+	if not initial_set and _states.size() > 0:
+		var first_state_name = _states.keys()[0]
+		_set_state(first_state_name)
 
 	_active = true
 	emit_signal("stage_loaded", stage_data.get("id"))
 	print("[NarrativeStageController][ts] load complete ms=", Time.get_ticks_msec())
+
+	# CRITICAL: After activation, check for stage_loaded transitions to trigger initial state
+	# This allows stages to define their initial state via transition event
+	_check_transitions("stage_loaded", {})
+
+	return true
 	return true
 
 func load_stage_from_file(path: String) -> bool:
@@ -157,9 +181,26 @@ func _set_state(state_name: String):
 	# Get state data
 	var state_data = _states[state_name]
 
+	# Ensure the renderer knows about the stage-level anchor/position.
+	# We prefer an explicit state 'position' if present, otherwise fall back to the stage's top-level 'anchor'.
+	var render_state_data = {}
+	for k in state_data.keys():
+		render_state_data[k] = state_data[k]
+	# If state doesn't include 'position', copy from current_stage_data.anchor
+	if not render_state_data.has("position"):
+		var stage_anchor = current_stage_data.get("anchor", "")
+		if stage_anchor != "":
+			render_state_data["position"] = stage_anchor
+			print("[NarrativeStageController] Injected stage anchor into state position: ", stage_anchor)
+
 	# Notify renderer
 	if renderer and renderer.has_method("render_state"):
-		renderer.render_state(state_data)
+		print("[NarrativeStageController] About to call renderer.render_state. renderer=", renderer.name, ", has_method(render_state)=", renderer.has_method("render_state"))
+		print("[NarrativeStageController] render_state_data keys: ", render_state_data.keys())
+		print("[NarrativeStageController] render_state_data asset: ", render_state_data.get("asset", "(none)"), " position: ", render_state_data.get("position", "(none)"))
+		renderer.render_state(render_state_data)
+	else:
+		print("[NarrativeStageController] Renderer not available or missing render_state method. renderer=", renderer)
 
 	emit_signal("state_changed", state_name)
 
@@ -310,6 +351,12 @@ func _on_match_cleared(match_size: int, context: Dictionary):
 func _on_auto_advance_timeout():
 	print("[NarrativeStageController] Auto-advance timer fired for state: ", current_state)
 	print("[NarrativeStageController][ts] auto_advance fired ms=", Time.get_ticks_msec())
+
+	# Guard: Don't execute if controller was deactivated (e.g., by skip)
+	if not _active:
+		print("[NarrativeStageController] Controller inactive - ignoring auto-advance")
+		return
+
 	# Clear timer reference
 	_auto_timer = null
 	_check_transitions("auto_advance", {})
@@ -317,7 +364,30 @@ func _on_auto_advance_timeout():
 func _on_completion_timeout():
 	print("[NarrativeStageController] Completion timer fired for stage: ", current_stage_data.get("id", ""))
 	print("[NarrativeStageController][ts] completion fired ms=", Time.get_ticks_msec())
+
+	# Guard: Don't execute if controller was deactivated (e.g., by skip)
+	if not _active:
+		print("[NarrativeStageController] Controller inactive - ignoring completion")
+		return
+
 	_completion_timer = null
 	var eb = get_node_or_null("/root/EventBus")
 	if eb and eb.has_signal("narrative_stage_complete"):
 		eb.emit_signal("narrative_stage_complete", current_stage_data.get("id", ""))
+
+func stop_all_timers():
+	"""Stop all active timers (auto-advance and completion)"""
+	if _auto_timer and is_instance_valid(_auto_timer):
+		# SceneTreeTimer doesn't have a stop method, but we can disconnect the timeout signal
+		# Actually, we can't easily stop a SceneTreeTimer, so just clear the reference
+		_auto_timer = null
+		print("[NarrativeStageController] Cleared auto-advance timer reference")
+
+	if _completion_timer and is_instance_valid(_completion_timer):
+		_completion_timer = null
+		print("[NarrativeStageController] Cleared completion timer reference")
+
+	# Reset state to prevent any further transitions
+	_active = false
+	print("[NarrativeStageController] Deactivated controller (timers stopped)")
+

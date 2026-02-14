@@ -1,4 +1,4 @@
-extends Control
+extends "res://scripts/ui/ScreenBase.gd"
 
 # Gallery UI for viewing unlocked images
 
@@ -26,16 +26,20 @@ const GALLERY_IMAGES = {
 var current_viewing_image: TextureRect = null
 var http_request: HTTPRequest = null
 
-@onready var title_label = $Panel/VBoxContainer/TitleLabel
-@onready var close_button = $Panel/VBoxContainer/TopBar/CloseButton
-@onready var scroll_container = $Panel/VBoxContainer/ScrollContainer
-@onready var grid_container = $Panel/VBoxContainer/ScrollContainer/GridContainer
-@onready var viewer_panel = $ViewerPanel
-@onready var viewer_image = $ViewerPanel/VBoxContainer/ImageRect
-@onready var viewer_title = $ViewerPanel/VBoxContainer/ImageTitle
-@onready var viewer_close = $ViewerPanel/VBoxContainer/CloseViewerButton
+# UI elements - will be created if not present in scene
+var title_label: Label = null
+var close_button: Button = null
+var scroll_container: ScrollContainer = null
+var grid_container: GridContainer = null
+var viewer_panel: Panel = null
+var viewer_image: TextureRect = null
+var viewer_title: Label = null
+var viewer_close: Button = null
 
 func _ready():
+	# Check if UI exists in scene, otherwise create it
+	_setup_ui()
+
 	# Setup UI
 	if close_button:
 		close_button.pressed.connect(_on_close_pressed)
@@ -54,6 +58,121 @@ func _ready():
 
 	# Populate gallery
 	populate_gallery()
+
+	# Ensure fullscreen anchors and background from ScreenBase
+	ensure_fullscreen()
+	visible = false
+
+func _setup_ui():
+	"""Setup UI elements - either find them in scene or create them"""
+	# Try to find existing nodes first
+	title_label = get_node_or_null("Panel/VBoxContainer/TitleLabel")
+	close_button = get_node_or_null("Panel/VBoxContainer/TopBar/CloseButton")
+	scroll_container = get_node_or_null("Panel/VBoxContainer/ScrollContainer")
+	grid_container = get_node_or_null("Panel/VBoxContainer/ScrollContainer/GridContainer")
+	viewer_panel = get_node_or_null("ViewerPanel")
+	viewer_image = get_node_or_null("ViewerPanel/VBoxContainer/ImageRect")
+	viewer_title = get_node_or_null("ViewerPanel/VBoxContainer/ImageTitle")
+	viewer_close = get_node_or_null("ViewerPanel/VBoxContainer/CloseViewerButton")
+
+	# If nodes don't exist, create them programmatically
+	if not title_label:
+		_create_ui_programmatically()
+
+func _create_ui_programmatically():
+	"""Create the gallery UI programmatically when scene doesn't exist"""
+	print("[GalleryUI] Creating UI programmatically")
+
+	# Main panel
+	var panel = Panel.new()
+	panel.name = "Panel"
+	panel.anchor_left = 0.1
+	panel.anchor_top = 0.1
+	panel.anchor_right = 0.9
+	panel.anchor_bottom = 0.9
+	add_child(panel)
+
+	# VBox container
+	var vbox = VBoxContainer.new()
+	vbox.name = "VBoxContainer"
+	vbox.anchor_right = 1.0
+	vbox.anchor_bottom = 1.0
+	panel.add_child(vbox)
+
+	# Title label
+	title_label = Label.new()
+	title_label.name = "TitleLabel"
+	title_label.text = "Gallery"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 32)
+	vbox.add_child(title_label)
+
+	# Top bar with close button
+	var top_bar = HBoxContainer.new()
+	top_bar.name = "TopBar"
+	vbox.add_child(top_bar)
+
+	var spacer = Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_bar.add_child(spacer)
+
+	close_button = Button.new()
+	close_button.name = "CloseButton"
+	close_button.text = "Close"
+	close_button.custom_minimum_size = Vector2(100, 40)
+	top_bar.add_child(close_button)
+
+	# Scroll container
+	scroll_container = ScrollContainer.new()
+	scroll_container.name = "ScrollContainer"
+	scroll_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll_container)
+
+	# Grid container
+	grid_container = GridContainer.new()
+	grid_container.name = "GridContainer"
+	grid_container.columns = IMAGES_PER_ROW
+	grid_container.add_theme_constant_override("h_separation", SPACING)
+	grid_container.add_theme_constant_override("v_separation", SPACING)
+	scroll_container.add_child(grid_container)
+
+	# Viewer panel (for full image view)
+	viewer_panel = Panel.new()
+	viewer_panel.name = "ViewerPanel"
+	viewer_panel.anchor_right = 1.0
+	viewer_panel.anchor_bottom = 1.0
+	viewer_panel.visible = false
+	add_child(viewer_panel)
+
+	var viewer_vbox = VBoxContainer.new()
+	viewer_vbox.name = "VBoxContainer"
+	viewer_vbox.anchor_left = 0.1
+	viewer_vbox.anchor_top = 0.1
+	viewer_vbox.anchor_right = 0.9
+	viewer_vbox.anchor_bottom = 0.9
+	viewer_panel.add_child(viewer_vbox)
+
+	viewer_title = Label.new()
+	viewer_title.name = "ImageTitle"
+	viewer_title.text = ""
+	viewer_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	viewer_title.add_theme_font_size_override("font_size", 24)
+	viewer_vbox.add_child(viewer_title)
+
+	viewer_image = TextureRect.new()
+	viewer_image.name = "ImageRect"
+	viewer_image.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	viewer_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	viewer_image.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	viewer_vbox.add_child(viewer_image)
+
+	viewer_close = Button.new()
+	viewer_close.name = "CloseViewerButton"
+	viewer_close.text = "Close"
+	viewer_close.custom_minimum_size = Vector2(100, 40)
+	viewer_vbox.add_child(viewer_close)
+
+	print("[GalleryUI] UI created programmatically")
 
 func populate_gallery():
 	"""Populate the gallery grid with thumbnails"""
@@ -229,8 +348,9 @@ func show_gallery():
 	visible = true
 	populate_gallery()
 
-static func get_image_for_level(level: int) -> Dictionary:
-	"""Get gallery image info for a specific level"""
-	if GALLERY_IMAGES.has(level):
-		return GALLERY_IMAGES[level]
-	return {}
+func open_gallery():
+	ensure_fullscreen()
+	_on_open()
+
+func _on_open():
+	show_screen()

@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://pu3wcj43djjh"]
+[gd_scene load_steps=13 format=3 uid="uid://pu3wcj43djjh"]
 
 [ext_resource type="Script" uid="uid://doc3oxaambqkj" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
 [ext_resource type="Script" uid="uid://clght4j2ys21n" path="res://scripts/GameUI.gd" id="2_4y7z1"]
@@ -9,6 +9,7 @@
 [ext_resource type="Texture2D" path="res://textures/map.png" id="7_map"]
 [ext_resource type="Texture2D" path="res://textures/audio_settings.png" id="8_audio"]
 [ext_resource type="Texture2D" path="res://textures/shop.png" id="9_shop"]
+[ext_resource type="Texture2D" path="res://textures/gallery.png" id="10_gallery"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
 bg_color = Color(0.2, 0.2, 0.3, 0.8)
@@ -859,6 +860,45 @@ offset_bottom = 28.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("9_shop")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="GalleryButton" type="TextureButton" parent="GameUI/FloatingMenu/ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="GameUI/FloatingMenu/ExpandablePanel/GalleryButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.3, 0.3, 0.8, 0.3)
+
+[node name="Icon" type="TextureRect" parent="GameUI/FloatingMenu/ExpandablePanel/GalleryButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("10_gallery")
 expand_mode = 1
 stretch_mode = 5
 
