@@ -215,6 +215,13 @@ func start_flow_at_level(level_num: int):
 	flow_coordinator.start_flow_at_level(level_num)
 	return
 
+func is_flow_active() -> bool:
+	"""Check if the experience flow is currently active and running"""
+	if flow_coordinator and flow_coordinator.has_method("is_running"):
+		return flow_coordinator.is_running()
+	# Fallback: check if we have a current flow loaded
+	return not current_flow.is_empty()
+
 func advance_to_next_node():
 	"""Move to the next node in the flow"""
 

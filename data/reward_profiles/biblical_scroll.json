@@ -1,0 +1,83 @@
+{
+  "profile_id": "biblical_scroll",
+  "profile_name": "Ancient Scroll Experience",
+  "description": "Biblical-themed reward reveal with sacred scroll unrolling",
+  "container_type": "SCROLL",
+  "open_method": "auto_open",
+  "animation_profile": "reverent",
+  "stages": [
+    "intro",
+    "spawn_container",
+    "interaction",
+    "reward_reveal",
+    "summary"
+  ],
+  "intro": {
+    "duration_ms": 1500,
+    "effects": [
+      "divine_light_beam",
+      "gentle_fade"
+    ],
+    "text": "Chapter {level_number} Complete"
+  },
+  "spawn_container": {
+    "duration_ms": 1200,
+    "spawn_animation": "descend_with_light",
+    "impact_shake": false,
+    "particle_burst": false,
+    "divine_glow": true
+  },
+  "interaction": {
+    "wait_for_player": false,
+    "auto_open_delay_ms": 1000,
+    "idle_animation": "soft_glow",
+    "unroll_animation": "scroll_unroll",
+    "duration_ms": 1500
+  },
+  "reward_reveal": {
+    "spawn_pattern": "cascade",
+    "delay_between_rewards_ms": 400,
+    "hud_fly_animation": true,
+    "particle_effects": true,
+    "particle_style": "golden_sparkles",
+    "sound_per_reward": true,
+    "rarity_effects": {
+      "rare_threshold": 50,
+      "effects": [
+        "divine_light",
+        "heavenly_choir",
+        "golden_aura"
+      ]
+    }
+  },
+  "summary": {
+    "duration_ms": 2500,
+    "show_total_rewards": true,
+    "show_level_stats": true,
+    "continue_button_delay_ms": 800,
+    "style": "parchment"
+  },
+  "accessibility": {
+    "reduced_motion_profile": {
+      "skip_intro": true,
+      "instant_spawn": true,
+      "no_particles": true,
+      "fast_reveal": true
+    },
+    "skip_button_visible": true,
+    "skip_button_delay_ms": 1500
+  },
+  "performance": {
+    "low_end_mode": {
+      "reduce_particles": true,
+      "simplified_animations": true,
+      "batch_rewards": true
+    },
+    "object_pooling": true
+  },
+  "theme_assets": {
+    "scroll_texture": "res://data/images/containers/ancient_scroll.png",
+    "particle_texture": "res://particles/golden_sparkle.png",
+    "background_overlay": "res://data/images/overlays/divine_light.png"
+  }
+}

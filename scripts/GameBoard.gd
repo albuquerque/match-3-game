@@ -2456,8 +2456,15 @@ func activate_chain_reaction_booster(x: int, y: int):
 	# Play chain reaction booster sound
 	AudioManager.play_sfx("booster_chain")
 
+	# Check if it's a valid tile (not blocked and not a collectible - they are immune)
 	if GameManager.is_cell_blocked(x, y):
 		print("[GameBoard] Cannot use chain reaction on blocked tile!")
+		GameManager.processing_moves = false
+		return
+
+	var tile_at_center = GameManager.get_tile_at(Vector2(x, y))
+	if tile_at_center == GameManager.COLLECTIBLE:
+		print("[GameBoard] Cannot use chain reaction on collectible tile - they are immune!")
 		GameManager.processing_moves = false
 		return
 
@@ -2486,15 +2493,17 @@ func activate_chain_reaction_booster(x: int, y: int):
 
 	await get_tree().create_timer(0.3).timeout
 
-	# Wave 2: Adjacent tiles (4 directions)
+	# Wave 2: Adjacent tiles (4 directions) - skip collectibles
 	var wave2 = []
 	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
 	for dir in directions:
 		var nx = x + int(dir.x)
 		var ny = y + int(dir.y)
 		if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
-			if not GameManager.is_cell_blocked(nx, ny) and GameManager.grid[nx][ny] > 0:
-				wave2.append(Vector2(nx, ny))
+			if not GameManager.is_cell_blocked(nx, ny):
+				var tile_at_pos = GameManager.get_tile_at(Vector2(nx, ny))
+				if tile_at_pos > 0 and tile_at_pos != GameManager.COLLECTIBLE:
+					wave2.append(Vector2(nx, ny))
 
 	# Declare wave3 here so it's in scope for the total calculation later
 	var wave3 = []
@@ -2512,16 +2521,18 @@ func activate_chain_reaction_booster(x: int, y: int):
 
 		await get_tree().create_timer(0.3).timeout
 
-		# Wave 3: Their adjacent tiles
+		# Wave 3: Their adjacent tiles - skip collectibles
 		for pos in wave2:
 			for dir in directions:
 				var nx = int(pos.x) + int(dir.x)
 				var ny = int(pos.y) + int(dir.y)
 				if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
-					if not GameManager.is_cell_blocked(nx, ny) and GameManager.grid[nx][ny] > 0:
-						var vec = Vector2(nx, ny)
-						if not wave3.has(vec):
-							wave3.append(vec)
+					if not GameManager.is_cell_blocked(nx, ny):
+						var tile_at_pos = GameManager.get_tile_at(Vector2(nx, ny))
+						if tile_at_pos > 0 and tile_at_pos != GameManager.COLLECTIBLE:
+							var vec = Vector2(nx, ny)
+							if not wave3.has(vec):
+								wave3.append(vec)
 
 		if wave3.size() > 0:
 			await highlight_special_activation(wave3)
@@ -2561,7 +2572,7 @@ func activate_bomb_3x3_booster(x: int, y: int):
 		GameManager.processing_moves = false
 		return
 
-	# Collect 3x3 area
+	# Collect 3x3 area (skip collectibles - they are immune)
 	var positions_to_clear = []
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
@@ -2569,7 +2580,9 @@ func activate_bomb_3x3_booster(x: int, y: int):
 			var ny = y + dy
 			if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >= 0 and ny < GameManager.GRID_HEIGHT:
 				if not GameManager.is_cell_blocked(nx, ny):
-					positions_to_clear.append(Vector2(nx, ny))
+					var tile_at_pos = GameManager.get_tile_at(Vector2(nx, ny))
+					if tile_at_pos != GameManager.COLLECTIBLE:
+						positions_to_clear.append(Vector2(nx, ny))
 
 	print("[GameBoard] 3x3 Bomb will destroy ", positions_to_clear.size(), " tiles")
 
@@ -2609,22 +2622,26 @@ func activate_line_blast_booster(direction: String, center_x: int, center_y: int
 	var positions_to_clear = []
 
 	if direction == "horizontal":
-		# Clear 3 rows centered on center_y
+		# Clear 3 rows centered on center_y (skip collectibles - they are immune)
 		for row_offset in range(-1, 2):
 			var target_y = center_y + row_offset
 			if target_y >= 0 and target_y < GameManager.GRID_HEIGHT:
 				for x in range(GameManager.GRID_WIDTH):
 					if not GameManager.is_cell_blocked(x, target_y):
-						positions_to_clear.append(Vector2(x, target_y))
+						var tile_at_pos = GameManager.get_tile_at(Vector2(x, target_y))
+						if tile_at_pos != GameManager.COLLECTIBLE:
+							positions_to_clear.append(Vector2(x, target_y))
 
 	elif direction == "vertical":
-		# Clear 3 columns centered on center_x
+		# Clear 3 columns centered on center_x (skip collectibles - they are immune)
 		for col_offset in range(-1, 2):
 			var target_x = center_x + col_offset
 			if target_x >= 0 and target_x < GameManager.GRID_WIDTH:
 				for y in range(GameManager.GRID_HEIGHT):
 					if not GameManager.is_cell_blocked(target_x, y):
-						positions_to_clear.append(Vector2(target_x, y))
+						var tile_at_pos = GameManager.get_tile_at(Vector2(target_x, y))
+						if tile_at_pos != GameManager.COLLECTIBLE:
+							positions_to_clear.append(Vector2(target_x, y))
 
 	print("[GameBoard] Line blast will destroy ", positions_to_clear.size(), " tiles")
 
@@ -2675,9 +2692,15 @@ func activate_hammer_booster(x: int, y: int):
 	# Play hammer sound
 	AudioManager.play_sfx("booster_hammer")
 
-	# Check if it's a valid tile (not blocked)
+	# Check if it's a valid tile (not blocked and not a collectible - they are immune)
 	if GameManager.is_cell_blocked(x, y):
 		print("[GameBoard] Cannot use hammer on blocked tile!")
+		GameManager.processing_moves = false
+		return
+
+	var tile_at_pos = GameManager.get_tile_at(Vector2(x, y))
+	if tile_at_pos == GameManager.COLLECTIBLE:
+		print("[GameBoard] Cannot use hammer on collectible tile - they are immune!")
 		GameManager.processing_moves = false
 		return
 
@@ -2724,6 +2747,12 @@ func activate_tile_squasher_booster(x: int, y: int):
 
 	# Get the tile type at the selected position
 	var target_type = GameManager.get_tile_at(Vector2(x, y))
+
+	# Skip collectibles - they are immune
+	if target_type == GameManager.COLLECTIBLE:
+		print("[GameBoard] Cannot use tile squasher on collectible tiles - they are immune!")
+		GameManager.processing_moves = false
+		return
 
 	# Skip special tiles (types 7, 8, 9)
 	if target_type >= 7:
@@ -2779,7 +2808,9 @@ func activate_row_clear_booster(row: int):
 	var positions_to_clear = []
 	for x in range(GameManager.GRID_WIDTH):
 		if not GameManager.is_cell_blocked(x, row):
-			positions_to_clear.append(Vector2(x, row))
+			var tile_at_pos = GameManager.get_tile_at(Vector2(x, row))
+			if tile_at_pos != GameManager.COLLECTIBLE:
+				positions_to_clear.append(Vector2(x, row))
 
 	if positions_to_clear.size() > 0:
 		# Create lightning beam effect across the row
@@ -2857,7 +2888,9 @@ func activate_column_clear_booster(column: int):
 	var positions_to_clear = []
 	for y in range(GameManager.GRID_HEIGHT):
 		if not GameManager.is_cell_blocked(column, y):
-			positions_to_clear.append(Vector2(column, y))
+			var tile_at_pos = GameManager.get_tile_at(Vector2(column, y))
+			if tile_at_pos != GameManager.COLLECTIBLE:
+				positions_to_clear.append(Vector2(column, y))
 
 	if positions_to_clear.size() > 0:
 		# Create lightning beam effect down the column

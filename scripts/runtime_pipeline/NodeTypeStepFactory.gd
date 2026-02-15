@@ -63,6 +63,8 @@ static func create_step_from_node(node: Dictionary) -> PipelineStep:
 			return _create_narrative_step(node)
 		"reward":
 			return _create_reward_step(node)
+		"show_rewards":
+			return _create_show_rewards_step(node)
 		"cutscene":
 			return _create_cutscene_step(node)
 		"unlock":
