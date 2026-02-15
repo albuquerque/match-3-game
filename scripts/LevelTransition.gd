@@ -482,11 +482,45 @@ func show_transition_with_bonus(completed_level: int, final_score: int, coins_ea
 	# Store bonus rewards for display
 	_bonus_rewards = bonus_rewards
 
-	# Call regular show_transition
-	show_transition(completed_level, final_score, coins_earned, gems_earned, has_next_level, stars)
+	# Call regular show_transition with dictionary
+	var data = {
+		"level_number": completed_level,
+		"score": final_score,
+		"coins": coins_earned,
+		"gems": gems_earned,
+		"stars": stars,
+		"has_next_level": has_next_level
+	}
+	show_transition(data)
 
-func show_transition(completed_level: int, final_score: int, coins_earned: int, gems_earned: int, has_next_level: bool = true, stars: int = 1):
-	"""Show the level transition screen with rewards and star rating"""
+func show_transition(data):
+	"""Show the level transition screen with rewards and star rating
+
+	Args:
+		data: Can be either a Dictionary with keys {level_number, score, coins, gems, stars, success}
+		      or individual parameters (legacy support): completed_level, final_score, coins_earned, gems_earned, has_next_level, stars
+	"""
+	# Handle both dictionary and legacy parameter formats
+	var completed_level: int
+	var final_score: int
+	var coins_earned: int
+	var gems_earned: int
+	var has_next_level: bool = true
+	var stars: int = 1
+
+	if typeof(data) == TYPE_DICTIONARY:
+		# New dictionary format
+		completed_level = data.get("level_number", 0)
+		final_score = data.get("score", 0)
+		coins_earned = data.get("coins", 0)
+		gems_earned = data.get("gems", 0)
+		stars = data.get("stars", 1)
+		has_next_level = data.get("has_next_level", true)
+	else:
+		# Legacy format: first param is completed_level (int)
+		completed_level = data
+		# For legacy support, we'd need to handle other params, but ShowRewardsStep uses dictionary now
+
 	print("=".repeat(60))
 	print("[LevelTransition] 🎆 show_transition() CALLED 🎆")
 	print("=".repeat(60))

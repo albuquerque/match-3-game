@@ -69,7 +69,7 @@ class_name GameUI
 @onready var shop_button = get_node_or_null("VBoxContainer/BottomPanel/ShopButton")
 @onready var shop_ui = get_node_or_null("ShopUI")
 @onready var out_of_lives_dialog = $OutOfLivesDialog
-@onready var reward_notification = $RewardNotification
+@onready var reward_notification = get_node_or_null("RewardNotification")  # Removed from scene, kept for compatibility
 
 # Dialog references
 @onready var settings_dialog = get_node_or_null("SettingsDialog")
@@ -876,9 +876,21 @@ func _on_level_complete():
 		if bonus_rewards.get("has_rewards", false):
 			print("[GameUI] 🎁 Found bonus rewards from flow: ", bonus_rewards.get("reward_id"))
 
-	# Show the transition screen with both level rewards AND bonus flow rewards
+	# Check if experience flow is active and handling rewards
+	var flow_handling_rewards = false
+	if ExperienceDirector and ExperienceDirector.has_method("is_flow_active"):
+		flow_handling_rewards = ExperienceDirector.is_flow_active()
+		print("[GameUI] Experience flow active: %s" % flow_handling_rewards)
+
+	if flow_handling_rewards:
+		print("[GameUI] ✅ Experience flow will handle reward screen via ShowRewardsStep - skipping old transition screen")
+		# The experience flow pipeline will call ShowRewardsStep which will display rewards
+		# ShowRewardsStep will use old transition screen until Phase 2 UI is implemented
+		return
+
+	# Show the transition screen with both level rewards AND bonus flow rewards (manual mode only)
 	if level_transition:
-		print("[GameUI] 🎯 Showing transition screen with rewards")
+		print("[GameUI] 🎯 Showing transition screen with rewards (manual mode - no flow)")
 		print("[GameUI]    Level: %d, Score: %d, Coins: %d, Gems: %d, Stars: %d" % [completed_level_number, GameManager.score, base_coins, base_gems, stars])
 
 		# Pass bonus rewards to transition screen
@@ -893,15 +905,16 @@ func _on_level_complete():
 				bonus_rewards
 			)
 		else:
-			# Fallback to old method
-			level_transition.show_transition(
-				completed_level_number,
-				GameManager.score,
-				base_coins,
-				base_gems,
-				has_next_level,
-				stars
-			)
+			# Use dictionary format
+			var transition_data = {
+				"level_number": completed_level_number,
+				"score": GameManager.score,
+				"coins": base_coins,
+				"gems": base_gems,
+				"stars": stars,
+				"has_next_level": has_next_level
+			}
+			level_transition.show_transition(transition_data)
 		print("[GameUI] ✅ Transition screen shown")
 	else:
 		print("[GameUI] ❌ ERROR: LevelTransition is null!")

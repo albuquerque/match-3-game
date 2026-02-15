@@ -1820,6 +1820,16 @@ func on_level_complete():
 	# Save star rating (only if better than previous)
 	star_manager.save_level_stars(level, stars)
 
+	# Calculate rewards (same formula as RewardManager uses)
+	var coins_earned = 100 + (50 * level)
+	var gems_earned = 0
+	if stars == 3:
+		var first_time = level > RewardManager.levels_completed
+		if first_time:
+			gems_earned = 5
+
+	print("[GameManager] Calculated rewards: %d coins, %d gems" % [coins_earned, gems_earned])
+
 	# Grant rewards through RewardManager to update levels_completed
 	RewardManager.grant_level_completion_reward(level, stars)
 
@@ -1830,9 +1840,16 @@ func on_level_complete():
 	print("[GameManager] Emitting level_complete signal")
 	emit_signal("level_complete")
 
-	# Emit EventBus event for narrative system
+	# Emit EventBus event for narrative system (with coins/gems for ShowRewardsStep)
 	if EventBus:
-		EventBus.emit_level_complete("level_%d" % level, {"level": level, "score": score, "stars": stars})
+		EventBus.emit_level_complete("level_%d" % level, {
+			"level": level,
+			"score": score,
+			"stars": stars,
+			"coins_earned": coins_earned,
+			"gems_earned": gems_earned
+		})
+		print("[GameManager] EventBus level_complete emitted with rewards: %d coins, %d gems" % [coins_earned, gems_earned])
 	else:
 		print("[GameManager] ⚠️ EventBus not available - cannot emit level_complete event")
 

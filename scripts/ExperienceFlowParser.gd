@@ -9,6 +9,7 @@ const VALID_NODE_TYPES = [
 	"level",
 	"narrative_stage",
 	"reward",
+	"show_rewards",
 	"cutscene",
 	"unlock",
 	"ad_reward",
@@ -126,6 +127,11 @@ func validate_node(node: Dictionary, index: int, file_path: String = "") -> bool
 			if not node.has("id"):
 				print("[ExperienceFlowParser] ERROR: 'reward' node at index ", index, " missing 'id' in ", file_path)
 				return false
+
+		"show_rewards":
+			# Optional: validate level_number and completed fields
+			# These have defaults in ShowRewardsStep, so not required
+			pass
 
 		"dlc_flow":
 			if not node.has("id"):

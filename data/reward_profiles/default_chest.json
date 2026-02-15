@@ -1,0 +1,75 @@
+{
+  "profile_id": "default_chest",
+  "profile_name": "Default Chest Experience",
+  "description": "Standard reward reveal with treasure chest",
+  "container_type": "CHEST",
+  "open_method": "tap",
+  "animation_profile": "dramatic",
+  "stages": [
+    "intro",
+    "spawn_container",
+    "interaction",
+    "reward_reveal",
+    "summary"
+  ],
+  "intro": {
+    "duration_ms": 1000,
+    "effects": [
+      "banner_slide",
+      "camera_zoom"
+    ],
+    "text": "Level {level_number} Complete!"
+  },
+  "spawn_container": {
+    "duration_ms": 800,
+    "spawn_animation": "drop_from_above",
+    "impact_shake": true,
+    "particle_burst": true
+  },
+  "interaction": {
+    "wait_for_player": true,
+    "auto_open_delay_ms": 3000,
+    "idle_animation": "glow_pulse",
+    "hover_animation": "scale_up",
+    "tap_prompt": "Tap to open!"
+  },
+  "reward_reveal": {
+    "spawn_pattern": "arc",
+    "delay_between_rewards_ms": 250,
+    "hud_fly_animation": true,
+    "particle_effects": true,
+    "sound_per_reward": true,
+    "rarity_effects": {
+      "rare_threshold": 20,
+      "effects": [
+        "screen_flash",
+        "slow_motion",
+        "special_sound"
+      ]
+    }
+  },
+  "summary": {
+    "duration_ms": 2000,
+    "show_total_rewards": true,
+    "show_level_stats": true,
+    "continue_button_delay_ms": 500
+  },
+  "accessibility": {
+    "reduced_motion_profile": {
+      "skip_intro": true,
+      "instant_spawn": true,
+      "no_particles": true,
+      "fast_reveal": true
+    },
+    "skip_button_visible": true,
+    "skip_button_delay_ms": 1000
+  },
+  "performance": {
+    "low_end_mode": {
+      "reduce_particles": true,
+      "simplified_animations": true,
+      "batch_rewards": true
+    },
+    "object_pooling": true
+  }
+}

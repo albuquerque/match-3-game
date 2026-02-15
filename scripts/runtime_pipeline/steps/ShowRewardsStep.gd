@@ -4,6 +4,7 @@ class_name ShowRewardsStep
 ## ShowRewardsStep
 ## Shows the level transition/rewards screen after level completion
 ## Waits for user to press Continue or Replay
+## Now supports new animated reward system with fallback to old transition screen
 
 var level_number: int = 0
 var level_completed: bool = true  # true = success, false = failed
@@ -14,8 +15,10 @@ var gems_earned: int = 0
 var replay_available: bool = true
 
 var transition_screen: Control = null
+var reward_controller: RewardTransitionController = null
 var _continue_pressed: bool = false
 var _replay_pressed: bool = false
+var use_new_system: bool = true  # Phase 2 basic UI implemented - enabled!
 
 func _init(lvl_num: int = 0, completed: bool = true):
 	super("show_rewards")
@@ -41,6 +44,68 @@ func execute(context: PipelineContext) -> bool:
 	level_completed = context.get_result("level_completed", true)
 
 	print("[ShowRewardsStep] Score: %d, Stars: %d, Coins: %d, Gems: %d" % [score, stars, coins_earned, gems_earned])
+
+	# Phase 2: Use new reward system with SimpleRewardUI
+	if use_new_system and _try_new_reward_system(context):
+		print("[ShowRewardsStep] Using new animated reward system")
+		return true
+
+	# Fallback to old transition screen
+	print("[ShowRewardsStep] Falling back to old transition screen")
+	return _use_old_transition_screen(context)
+
+
+func _try_new_reward_system(context: PipelineContext) -> bool:
+	"""Try to use the new RewardTransitionController system"""
+
+	# Get current theme
+	var theme_name = ThemeManager.get_theme_name() if ThemeManager else "modern"
+
+	# Load appropriate profile for theme
+	var profile_id = RewardPresentationProfile.get_profile_for_theme(theme_name)
+	var profile = RewardPresentationProfile.load_profile(profile_id)
+
+	if profile.is_empty():
+		push_warning("[ShowRewardsStep] Could not load reward profile, using old system")
+		return false
+
+	# Create reward data
+	var reward_data = {
+		"level_number": level_number,
+		"score": score,
+		"stars": stars,
+		"coins": coins_earned,
+		"gems": gems_earned,
+		"success": level_completed
+	}
+
+	# Create controller
+	reward_controller = RewardTransitionController.new()
+
+	# Get parent UI
+	var ui_parent = context.game_ui if context.game_ui else null
+	if not ui_parent:
+		push_warning("[ShowRewardsStep] No UI parent available, using old system")
+		return false
+
+	# Add controller to scene tree
+	ui_parent.add_child(reward_controller)
+
+	# Setup controller
+	reward_controller.setup(profile, reward_data, ui_parent)
+
+	# Connect signals
+	if not reward_controller.transition_completed.is_connected(_on_new_system_completed):
+		reward_controller.transition_completed.connect(_on_new_system_completed)
+
+	# Start the reward sequence
+	reward_controller.start()
+
+	print("[ShowRewardsStep] New reward system started with profile: %s" % profile_id)
+	return true
+
+func _use_old_transition_screen(context: PipelineContext) -> bool:
+	"""Use the old LevelTransition screen system"""
 
 	# Create or get the LevelTransition screen
 	if not _get_or_create_transition_screen(context):
@@ -116,8 +181,8 @@ func _get_or_create_transition_screen(context: PipelineContext) -> bool:
 	return false
 
 func _on_continue_pressed():
-	"""User pressed Continue button"""
-	print("[ShowRewardsStep] Continue pressed")
+	"""User pressed Continue button (old system)"""
+	print("[ShowRewardsStep] Continue pressed (old system)")
 	_continue_pressed = true
 
 	# Hide the transition screen
@@ -130,8 +195,16 @@ func _on_continue_pressed():
 	# Signal completion with success
 	step_completed.emit(true)
 
+func _on_new_system_completed():
+	"""New reward system completed"""
+	print("[ShowRewardsStep] New reward system completed")
+	_continue_pressed = true
+
+	# Signal completion with success
+	step_completed.emit(true)
+
 func _on_replay_pressed():
-	"""User pressed Replay button"""
+	"""User pressed Replay button (old system)"""
 	print("[ShowRewardsStep] Replay pressed")
 	_replay_pressed = true
 
@@ -148,6 +221,15 @@ func _on_replay_pressed():
 
 func cleanup():
 	"""Disconnect signals and clean up"""
+
+	# Cleanup new system
+	if reward_controller and is_instance_valid(reward_controller):
+		if reward_controller.transition_completed.is_connected(_on_new_system_completed):
+			reward_controller.transition_completed.disconnect(_on_new_system_completed)
+		reward_controller.queue_free()
+		reward_controller = null
+
+	# Cleanup old system
 	if transition_screen and is_instance_valid(transition_screen):
 		if transition_screen.continue_pressed.is_connected(_on_continue_pressed):
 			transition_screen.continue_pressed.disconnect(_on_continue_pressed)
