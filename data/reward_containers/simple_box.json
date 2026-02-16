@@ -1,0 +1,103 @@
+{
+	"container_id": "simple_reward_box",
+	"description": "Simple animated box - works with any theme",
+	"theme": "universal",
+
+	"visual": {
+		"layers": [
+			{
+				"type": "sprite",
+				"texture": "res://textures/reward_containers/box_base.png",
+				"z_index": 0,
+				"scale": 1.0,
+				"pivot": "center"
+			},
+			{
+				"type": "sprite",
+				"texture": "res://textures/reward_containers/box_lid.png",
+				"z_index": 1,
+				"scale": 1.0,
+				"pivot": "bottom-left",
+				"position": [-100, -75]
+			}
+		],
+		"colors": {
+			"primary": "${theme.primary_color}",
+			"accent": "${theme.accent_color}",
+			"particle": "${theme.particle_color}"
+		}
+	},
+
+	"animations": {
+		"idle": {
+			"type": "float",
+			"amplitude": 5,
+			"duration": 2.0
+		},
+		"opening": {
+			"type": "sequence",
+			"steps": [
+				{
+					"action": "shake",
+					"intensity": 5,
+					"duration": 0.2
+				},
+				{
+					"action": "rotate_layer",
+					"layer": 1,
+					"angle": -90,
+					"duration": 0.6
+				}
+			]
+		},
+		"reveal": {
+			"type": "spawn_rewards",
+			"pattern": "interactive",
+			"anchor": [0, -40],
+			"delay_between": 0.1,
+			"comment": "Interactive reveal - one reward at a time with CLAIM button"
+		},
+		"closing": {
+			"type": "sequence",
+			"steps": [
+				{
+					"action": "rotate_layer",
+					"layer": 1,
+					"angle": 0,
+					"duration": 0.3
+				},
+				{
+					"action": "scale",
+					"from": 1.0,
+					"to": 0.0,
+					"duration": 0.4
+				}
+			]
+		}
+	},
+
+	"particles": {
+		"on_open": {
+			"texture": "res://particles/sparkle.png",
+			"count": 20,
+			"spread": 360,
+			"speed": 100,
+			"lifetime": 1.0,
+			"color": "${theme.particle_color}"
+		},
+		"on_reveal": {
+			"texture": "res://particles/coin_shine.png",
+			"count": 10,
+			"spread": 180,
+			"speed": 50,
+			"lifetime": 0.8,
+			"color": "${theme.gold_color}"
+		}
+	},
+
+	"sounds": {
+		"opening": "booster_bomb_3x3",
+		"reveal": "match",
+		"complete": "combo"
+	}
+}

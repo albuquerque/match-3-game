@@ -29,6 +29,6 @@ func _on_quit_pressed():
 
 func animate_title():
 	var tween = create_tween()
-	tween.set_loops()
+	tween.set_loops(-1)
 	tween.tween_property(title_label, "modulate", Color.YELLOW, 2.0)
 	tween.tween_property(title_label, "modulate", Color.WHITE, 2.0)

@@ -639,10 +639,18 @@ func _on_moves_changed(moves_left: int):
 		moves_label.modulate = Color.WHITE
 
 func _on_game_over():
-	# Defensive: Only show the Game Over panel when the game manager indicates a real failure
+	# OLD GAME OVER HANDLING - Check if experience flow should handle this
 	print("=".repeat(60))
 	print("[GameUI] 💔 _on_game_over() CALLED 💔")
 	print("=".repeat(60))
+
+	# Check if experience flow is active - it handles failure now via ShowLevelFailureStep
+	if ExperienceDirector and ExperienceDirector.is_flow_active():
+		print("[GameUI] ✅ Experience flow active - skipping old game over screen")
+		print("[GameUI] ShowLevelFailureStep will handle failure UI")
+		return
+
+	# Fallback: Only show old screen if experience flow is NOT active
 	print("[GameUI] Game over - verifying state: moves_left=", GameManager.moves_left, ", score=", GameManager.score, ", target=", GameManager.target_score)
 
 	# Consider it a valid game over if no moves left and score < target
@@ -1979,7 +1987,7 @@ func _animate_selected_booster(button: Button):
 
 	# Create pulsing glow animation
 	_booster_animation_tween = create_tween()
-	_booster_animation_tween.set_loops()  # Loop infinitely
+	_booster_animation_tween.set_loops(-1)  # Loop infinitely
 	_booster_animation_tween.set_trans(Tween.TRANS_SINE)
 	_booster_animation_tween.set_ease(Tween.EASE_IN_OUT)
 
@@ -3258,7 +3266,7 @@ func _animate_glow_pulse(glow_rect: ColorRect, color_from: Color, color_to: Colo
 
 	# Create infinite pulsing animation
 	var tween = create_tween()
-	tween.set_loops()
+	tween.set_loops(-1)
 	tween.tween_property(glow_rect, "color", color_to, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(glow_rect, "color", color_from, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 

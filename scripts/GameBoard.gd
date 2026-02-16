@@ -1828,7 +1828,7 @@ func show_skip_bonus_hint():
 
 	# Create pulsing animation
 	var tween = create_tween()
-	tween.set_loops()
+	tween.set_loops(-1)
 	tween.tween_property(skip_bonus_label, "modulate:a", 0.5, 0.5)
 	tween.tween_property(skip_bonus_label, "modulate:a", 1.0, 0.5)
 

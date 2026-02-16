@@ -3,8 +3,8 @@ class_name ShowRewardsStep
 
 ## ShowRewardsStep
 ## Shows the level transition/rewards screen after level completion
-## Waits for user to press Continue or Replay
-## Now supports new animated reward system with fallback to old transition screen
+## Handles level failure by delegating to ShowLevelFailureStep
+## Uses animated reward system with data-driven container selection
 
 var level_number: int = 0
 var level_completed: bool = true  # true = success, false = failed
@@ -12,13 +12,8 @@ var score: int = 0
 var stars: int = 0
 var coins_earned: int = 0
 var gems_earned: int = 0
-var replay_available: bool = true
 
-var transition_screen: Control = null
 var reward_controller: RewardTransitionController = null
-var _continue_pressed: bool = false
-var _replay_pressed: bool = false
-var use_new_system: bool = true  # Phase 2 basic UI implemented - enabled!
 
 func _init(lvl_num: int = 0, completed: bool = true):
 	super("show_rewards")
@@ -27,6 +22,36 @@ func _init(lvl_num: int = 0, completed: bool = true):
 
 func execute(context: PipelineContext) -> bool:
 	print("[ShowRewardsStep] Showing rewards for level %d (completed: %s)" % [level_number, level_completed])
+
+	# Check if level actually failed
+	if context.get_result("level_failed", false):
+		print("[ShowRewardsStep] Level failed - showing failure screen instead of rewards")
+		# Show failure screen instead
+		var failure_step = ShowLevelFailureStep.new(context.get_result("current_level", level_number))
+		# Note: Don't manually set pipeline_context - execute() receives context as parameter
+		var success = await failure_step.execute(context)
+
+		# Check what the user chose
+		if context.get_result("retry_level", false):
+			print("[ShowRewardsStep] User chose RETRY - restarting flow at level %d" % level_number)
+			# Restart the experience flow at the same level
+			# This ensures the pipeline is active for the next attempt
+			var level_to_retry = context.get_result("current_level", level_number)
+			if ExperienceDirector:
+				ExperienceDirector.start_flow_at_level(level_to_retry)
+			else:
+				# Fallback: load directly if no ExperienceDirector
+				if context.game_ui:
+					context.game_ui._load_level_by_number(level_to_retry)
+			return success
+		elif context.get_result("return_to_map", false):
+			print("[ShowRewardsStep] User chose EXIT TO MAP - returning to world map")
+			# Return to world map
+			if context.game_ui:
+				context.game_ui._show_worldmap_fullscreen()
+			return success
+
+		return success
 
 	# Set waiting flag
 	context.waiting_for_completion = true
@@ -45,18 +70,12 @@ func execute(context: PipelineContext) -> bool:
 
 	print("[ShowRewardsStep] Score: %d, Stars: %d, Coins: %d, Gems: %d" % [score, stars, coins_earned, gems_earned])
 
-	# Phase 2: Use new reward system with SimpleRewardUI
-	if use_new_system and _try_new_reward_system(context):
-		print("[ShowRewardsStep] Using new animated reward system")
-		return true
-
-	# Fallback to old transition screen
-	print("[ShowRewardsStep] Falling back to old transition screen")
-	return _use_old_transition_screen(context)
+	# Use new reward system
+	return _show_reward_screen(context)
 
 
-func _try_new_reward_system(context: PipelineContext) -> bool:
-	"""Try to use the new RewardTransitionController system"""
+func _show_reward_screen(context: PipelineContext) -> bool:
+	"""Show the reward screen with animated containers"""
 
 	# Get current theme
 	var theme_name = ThemeManager.get_theme_name() if ThemeManager else "modern"
@@ -66,7 +85,7 @@ func _try_new_reward_system(context: PipelineContext) -> bool:
 	var profile = RewardPresentationProfile.load_profile(profile_id)
 
 	if profile.is_empty():
-		push_warning("[ShowRewardsStep] Could not load reward profile, using old system")
+		push_error("[ShowRewardsStep] Could not load reward profile")
 		return false
 
 	# Create reward data
@@ -85,7 +104,7 @@ func _try_new_reward_system(context: PipelineContext) -> bool:
 	# Get parent UI
 	var ui_parent = context.game_ui if context.game_ui else null
 	if not ui_parent:
-		push_warning("[ShowRewardsStep] No UI parent available, using old system")
+		push_error("[ShowRewardsStep] No UI parent available")
 		return false
 
 	# Add controller to scene tree
@@ -94,151 +113,32 @@ func _try_new_reward_system(context: PipelineContext) -> bool:
 	# Setup controller
 	reward_controller.setup(profile, reward_data, ui_parent)
 
+
+	# Container selection is data-driven via container_selection_rules.json
+	# To force a specific container: reward_controller.container_override = "container_id"
+
 	# Connect signals
-	if not reward_controller.transition_completed.is_connected(_on_new_system_completed):
-		reward_controller.transition_completed.connect(_on_new_system_completed)
+	if not reward_controller.transition_completed.is_connected(_on_reward_completed):
+		reward_controller.transition_completed.connect(_on_reward_completed)
 
 	# Start the reward sequence
 	reward_controller.start()
 
-	print("[ShowRewardsStep] New reward system started with profile: %s" % profile_id)
+	print("[ShowRewardsStep] Reward system started with profile: %s" % profile_id)
 	return true
 
-func _use_old_transition_screen(context: PipelineContext) -> bool:
-	"""Use the old LevelTransition screen system"""
-
-	# Create or get the LevelTransition screen
-	if not _get_or_create_transition_screen(context):
-		push_error("[ShowRewardsStep] Failed to create transition screen")
-		return false
-
-	# Configure the transition screen
-	if transition_screen.has_method("show_transition"):
-		var transition_data = {
-			"level_number": level_number,
-			"score": score,
-			"stars": stars,
-			"coins": coins_earned,
-			"gems": gems_earned,
-			"success": level_completed,
-			"show_replay": replay_available
-		}
-
-		print("[ShowRewardsStep] Calling show_transition with data: ", transition_data)
-		transition_screen.show_transition(transition_data)
-	else:
-		push_error("[ShowRewardsStep] LevelTransition doesn't have show_transition method")
-		return false
-
-	# Connect to transition screen signals
-	if not transition_screen.continue_pressed.is_connected(_on_continue_pressed):
-		transition_screen.continue_pressed.connect(_on_continue_pressed)
-
-	# Check if replay signal exists (it might not on older versions)
-	if transition_screen.has_signal("replay_pressed"):
-		if not transition_screen.is_connected("replay_pressed", Callable(self, "_on_replay_pressed")):
-			transition_screen.connect("replay_pressed", Callable(self, "_on_replay_pressed"))
-
-	return true
-
-func _get_or_create_transition_screen(context: PipelineContext) -> bool:
-	"""Get existing LevelTransition or create a new one"""
-
-	# Try to find existing LevelTransition in GameUI
-	if context.game_ui:
-		transition_screen = context.game_ui.get_node_or_null("LevelTransition")
-
-		if transition_screen and is_instance_valid(transition_screen):
-			print("[ShowRewardsStep] Found existing LevelTransition")
-			return true
-
-	# Try to load from scene
-	var scene_path = "res://scenes/LevelTransitionScene.tscn"
-	if ResourceLoader.exists(scene_path):
-		var packed = load(scene_path)
-		if packed and packed is PackedScene:
-			transition_screen = packed.instantiate()
-			transition_screen.name = "LevelTransition"
-			if context.game_ui:
-				context.game_ui.add_child(transition_screen)
-			print("[ShowRewardsStep] Created LevelTransition from scene")
-			return true
-
-	# Fallback: Create from script
-	var script_path = "res://scripts/LevelTransition.gd"
-	if ResourceLoader.exists(script_path):
-		var script = load(script_path)
-		if script:
-			transition_screen = Control.new()
-			transition_screen.set_script(script)
-			transition_screen.name = "LevelTransition"
-			if context.game_ui:
-				context.game_ui.add_child(transition_screen)
-			print("[ShowRewardsStep] Created LevelTransition from script")
-			return true
-
-	push_error("[ShowRewardsStep] Could not create LevelTransition - no scene or script found")
-	return false
-
-func _on_continue_pressed():
-	"""User pressed Continue button (old system)"""
-	print("[ShowRewardsStep] Continue pressed (old system)")
-	_continue_pressed = true
-
-	# Hide the transition screen
-	if transition_screen and is_instance_valid(transition_screen):
-		if transition_screen.has_method("hide_transition"):
-			transition_screen.hide_transition()
-		else:
-			transition_screen.visible = false
+func _on_reward_completed():
+	"""Reward system completed - user clicked Continue"""
+	print("[ShowRewardsStep] Reward system completed")
 
 	# Signal completion with success
 	step_completed.emit(true)
-
-func _on_new_system_completed():
-	"""New reward system completed"""
-	print("[ShowRewardsStep] New reward system completed")
-	_continue_pressed = true
-
-	# Signal completion with success
-	step_completed.emit(true)
-
-func _on_replay_pressed():
-	"""User pressed Replay button (old system)"""
-	print("[ShowRewardsStep] Replay pressed")
-	_replay_pressed = true
-
-	# Hide the transition screen
-	if transition_screen and is_instance_valid(transition_screen):
-		if transition_screen.has_method("hide_transition"):
-			transition_screen.hide_transition()
-		else:
-			transition_screen.visible = false
-
-	# Signal completion but with a flag for replay
-	# The pipeline/flow coordinator can check context for replay intent
-	step_completed.emit(false)  # false = user wants to replay, not continue
 
 func cleanup():
 	"""Disconnect signals and clean up"""
-
-	# Cleanup new system
 	if reward_controller and is_instance_valid(reward_controller):
-		if reward_controller.transition_completed.is_connected(_on_new_system_completed):
-			reward_controller.transition_completed.disconnect(_on_new_system_completed)
+		if reward_controller.transition_completed.is_connected(_on_reward_completed):
+			reward_controller.transition_completed.disconnect(_on_reward_completed)
 		reward_controller.queue_free()
 		reward_controller = null
 
-	# Cleanup old system
-	if transition_screen and is_instance_valid(transition_screen):
-		if transition_screen.continue_pressed.is_connected(_on_continue_pressed):
-			transition_screen.continue_pressed.disconnect(_on_continue_pressed)
-
-		if transition_screen.has_signal("replay_pressed"):
-			if transition_screen.is_connected("replay_pressed", Callable(self, "_on_replay_pressed")):
-				transition_screen.disconnect("replay_pressed", Callable(self, "_on_replay_pressed"))
-
-		# Don't free the transition screen - it might be reused
-		# Just hide it
-		if transition_screen.visible:
-			transition_screen.visible = false

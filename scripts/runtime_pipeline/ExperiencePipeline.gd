@@ -67,8 +67,8 @@ func _execute_next_step() -> void:
 	if not step.step_completed.is_connected(handler):
 		step.step_completed.connect(handler)
 
-	# Execute step
-	var success = step.execute(context)
+	# Execute step (await since execute is async)
+	var success = await step.execute(context)
 
 	# If step completed synchronously
 	if not context.waiting_for_completion:

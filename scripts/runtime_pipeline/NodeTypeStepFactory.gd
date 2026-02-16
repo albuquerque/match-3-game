@@ -65,6 +65,8 @@ static func create_step_from_node(node: Dictionary) -> PipelineStep:
 			return _create_reward_step(node)
 		"show_rewards":
 			return _create_show_rewards_step(node)
+		"show_level_failure":
+			return _create_show_level_failure_step(node)
 		"cutscene":
 			return _create_cutscene_step(node)
 		"unlock":
@@ -100,6 +102,10 @@ static func _create_show_rewards_step(node: Dictionary) -> PipelineStep:
 	var level_num = node.get("level_number", 0)
 	var completed = node.get("completed", true)
 	return ShowRewardsStep.new(level_num, completed)
+
+static func _create_show_level_failure_step(node: Dictionary) -> PipelineStep:
+	var level_num = node.get("level_number", 0)
+	return ShowLevelFailureStep.new(level_num)
 
 static func _create_cutscene_step(node: Dictionary) -> PipelineStep:
 	var scene_path = node.get("scene", "")
