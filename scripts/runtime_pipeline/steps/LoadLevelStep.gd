@@ -76,13 +76,18 @@ func _on_level_failed(lvl_id: String, context: Dictionary = {}):
 	if pipeline_context:
 		pipeline_context.set_result("current_level", level_number)
 		pipeline_context.set_result("level_completed", false)
+		pipeline_context.set_result("level_failed", true)  # Flag for failure
 		pipeline_context.set_result("score", context.get("score", 0))
+		pipeline_context.set_result("target_score", context.get("target", 0))
+		pipeline_context.set_result("moves_used", context.get("moves_used", 0))
 		pipeline_context.set_result("stars", 0)  # No stars on failure
 		pipeline_context.set_result("coins_earned", 0)  # No rewards on failure
 		pipeline_context.set_result("gems_earned", 0)
 		print("[LoadLevelStep] Stored failure data in pipeline context")
 
-	step_completed.emit(false)
+	# Emit success so pipeline continues to handle failure properly
+	# (The next step should check level_failed flag and show appropriate screen)
+	step_completed.emit(true)
 
 func cleanup():
 	if EventBus:

@@ -742,7 +742,7 @@ func set_selected(selected: bool):
 
 	if selected:
 		var tween = create_tween()
-		tween.set_loops()
+		tween.set_loops(-1)
 		tween.tween_property(selection_ring, "scale", Vector2(1.2, 1.2), 0.5)
 		tween.tween_property(selection_ring, "scale", Vector2(1.0, 1.0), 0.5)
 	else:

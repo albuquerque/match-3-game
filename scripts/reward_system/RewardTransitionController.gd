@@ -21,22 +21,6 @@ enum Stage {
 	EXIT
 }
 
-enum ContainerType {
-	CHEST,
-	SCROLL,
-	TREASURE_PILE,
-	DIVINE_LIGHT,
-	MYSTERY_BOX,
-	CARD_PACK
-}
-
-enum InteractionMode {
-	TAP,
-	HOLD_TO_OPEN,
-	DRAG_TO_OPEN,
-	AUTO_OPEN,
-	MULTI_TAP_BREAK
-}
 
 # Configuration
 var profile: Dictionary = {}
@@ -45,25 +29,15 @@ var stages_to_run: Array = []
 var skip_mode: bool = false
 var reduced_motion: bool = false
 
-# Stage references
-var intro_stage: Node = null
-var container_spawn_stage: Node = null
-var interaction_stage: Node = null
-var reward_reveal_stage: Node = null
-var summary_stage: Node = null
-var exit_stage: Node = null
-
 # Reward data
 var rewards_data: Dictionary = {}
 var level_number: int = 0
 var score: int = 0
 var stars: int = 0
 
-# Container instance
-var container_instance: Node = null
-
-# Simple UI for Phase 2
-var simple_ui: Control = null
+# Animated reward container
+var reward_container: RewardContainer = null
+var container_override: String = ""  # Optional: Override which container config to load
 
 # Parent UI reference
 var ui_parent: Control = null
@@ -135,128 +109,335 @@ func _run_current_stage():
 		Stage.EXIT:
 			_run_exit_stage()
 
-func _run_intro_stage():
-	"""Play intro animation (camera zoom, banner slide, etc.)"""
-	print("[RewardTransitionController] Intro stage: Level %d Complete!" % level_number)
-
-	# Emit analytics event
-	_emit_analytics("intro_started", {"level": level_number})
-
-	# TODO: Add intro animation (camera zoom, banner)
-	# For now, just delay
-	var duration = 1.0 if not skip_mode else 0.1
-	await get_tree().create_timer(duration).timeout
-
-	_on_stage_completed(Stage.INTRO)
-
-func _run_spawn_container_stage():
-	"""Spawn and animate the reward container (chest, scroll, etc.)"""
-	print("[RewardTransitionController] Spawning container")
-
-	var container_type = profile.get("container_type", "CHEST")
-
-	# TODO: Instantiate actual container
-	# For now, placeholder
-	print("[RewardTransitionController] Container type: ", container_type)
-
-	# Emit analytics
-	_emit_analytics("container_spawned", {"type": container_type})
-
-	var duration = 0.8 if not skip_mode else 0.1
-	await get_tree().create_timer(duration).timeout
-
-	_on_stage_completed(Stage.SPAWN_CONTAINER)
-
-func _run_interaction_stage():
-	"""Wait for player interaction to open container"""
-	print("[RewardTransitionController] Waiting for interaction")
-
-	var interaction_mode = profile.get("open_method", "tap")
-
-	# TODO: Implement actual interaction
-	# For now, auto-open after delay
-	print("[RewardTransitionController] Interaction mode: ", interaction_mode)
-
-	if interaction_mode == "auto_open" or skip_mode:
-		var duration = 0.5 if not skip_mode else 0.0
-		await get_tree().create_timer(duration).timeout
-		_on_container_opened()
-	else:
-		# TODO: Set up tap/hold/drag handlers
-		# For now, auto-open after 1 second
-		await get_tree().create_timer(1.0).timeout
-		_on_container_opened()
-
-func _on_container_opened():
-	"""Handle container being opened"""
-	print("[RewardTransitionController] Container opened!")
-	container_opened.emit()
-	_emit_analytics("container_opened", {})
-	_on_stage_completed(Stage.INTERACTION)
-
-func _run_reward_reveal_stage():
-	"""Animate rewards flying out and revealing"""
-	print("[RewardTransitionController] Revealing rewards")
-
-	var reveal_config = profile.get("reward_reveal", {})
-	var spawn_pattern = reveal_config.get("spawn_pattern", "arc")
-	var delay_ms = reveal_config.get("delay_between_rewards_ms", 250)
-
-	# Get rewards from rewards_data
-	var coins = rewards_data.get("coins", 0)
-	var gems = rewards_data.get("gems", 0)
-
-	print("[RewardTransitionController] Coins: %d, Gems: %d" % [coins, gems])
-	print("[RewardTransitionController] Spawn pattern: %s, Delay: %dms" % [spawn_pattern, delay_ms])
-
-	# TODO: Implement actual reward animations
-	# For now, emit signals for each reward
-	if coins > 0:
-		reward_revealed.emit("coins", coins)
-		_emit_analytics("reward_revealed", {"type": "coins", "amount": coins})
-		if not skip_mode:
-			await get_tree().create_timer(delay_ms / 1000.0).timeout
-
-	if gems > 0:
-		reward_revealed.emit("gems", gems)
-		_emit_analytics("reward_revealed", {"type": "gems", "amount": gems})
-		if not skip_mode:
-			await get_tree().create_timer(delay_ms / 1000.0).timeout
-
-	# Check for rare rewards
-	if gems >= 20:
-		_emit_analytics("rare_reward_revealed", {"type": "gems", "amount": gems})
-
-	_on_stage_completed(Stage.REWARD_REVEAL)
 
 func _run_summary_stage():
 	"""Show final summary with total rewards"""
 	print("[RewardTransitionController] Showing summary")
 
-	# Create and show simple UI
-	if not simple_ui:
-		simple_ui = preload("res://scripts/reward_system/SimpleRewardUI.gd").new()
-		simple_ui.name = "SimpleRewardUI"
-		ui_parent.add_child(simple_ui)
+	var container_config: Dictionary = {}
 
-		# Connect continue button
-		if not simple_ui.continue_pressed.is_connected(_on_ui_continue_pressed):
-			simple_ui.continue_pressed.connect(_on_ui_continue_pressed)
+	# Priority 1: Manual override (highest priority)
+	if container_override != "":
+		print("[RewardTransitionController] Using manual override: %s" % container_override)
+		container_config = ContainerConfigLoader.load_container(container_override)
+	else:
+		# Priority 2: Data-driven rules evaluation
+		var rule_container = ContainerSelectionRules.get_container_for_context(
+			level_number,
+			rewards_data.get("coins", 0),
+			rewards_data.get("gems", 0),
+			stars
+		)
 
-		print("[RewardTransitionController] Created SimpleRewardUI")
+		if rule_container != "":
+			print("[RewardTransitionController] Using rule-selected container: %s" % rule_container)
+			container_config = ContainerConfigLoader.load_container(rule_container)
+		else:
+			# Priority 3: Theme-based selection (fallback)
+			var theme_name = ThemeManager.get_theme_name() if ThemeManager else "modern"
+			print("[RewardTransitionController] No rules matched, using theme container for: %s" % theme_name)
+			container_config = ContainerConfigLoader.load_for_theme(theme_name)
 
-	# Show the UI with reward data
-	var ui_data = {
-		"level_number": level_number,
-		"score": score,
-		"stars": stars,
-		"coins": rewards_data.get("coins", 0),
-		"gems": rewards_data.get("gems", 0)
-	}
-	simple_ui.show_rewards(ui_data)
+	if not container_config.is_empty():
+		print("[RewardTransitionController] Using container: %s" % container_config.get("container_id", "unknown"))
+		_show_with_container(container_config)
+	else:
+		push_error("[RewardTransitionController] No container config found!")
+		_on_stage_completed(Stage.SUMMARY)
 
-	# Don't auto-advance - wait for user to click Continue
-	print("[RewardTransitionController] Waiting for user to click Continue...")
+func _show_with_container(config: Dictionary):
+	"""Show rewards using animated container system"""
+	# Create container
+	if not reward_container:
+		reward_container = RewardContainer.new()
+		reward_container.name = "RewardContainer"
+		ui_parent.add_child(reward_container)
+
+		# Center on screen
+		var viewport_size = ui_parent.get_viewport_rect().size
+		reward_container.position = viewport_size / 2
+
+		# Setup with config
+		reward_container.setup(config)
+
+		# Set rewards
+		reward_container.set_rewards(
+			rewards_data.get("coins", 0),
+			rewards_data.get("gems", 0),
+			rewards_data.get("boosters", [])
+		)
+
+		# Connect signals
+		reward_container.all_complete.connect(_on_container_complete)
+
+		print("[RewardTransitionController] Reward container created and configured")
+
+	# Play opening animation
+	reward_container.play_opening_animation()
+
+	# Wait for it to open, then reveal
+	await reward_container.opening_complete
+	await get_tree().create_timer(0.5).timeout
+	reward_container.play_reveal_animation()
+
+	# Wait for reveal to complete
+	await reward_container.revealing_complete
+
+	# Show reward summary with Continue button
+	_show_container_summary()
+
+func _show_container_summary():
+	"""Show reward amounts and Continue button after container animation"""
+	# Create summary overlay with high z-index to ensure visibility
+	var summary_overlay = Control.new()
+	summary_overlay.name = "ContainerSummaryOverlay"
+	summary_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	summary_overlay.z_index = 1000  # Very high to be on top
+	summary_overlay.mouse_filter = Control.MOUSE_FILTER_STOP  # Block input to elements below
+	ui_parent.add_child(summary_overlay)
+
+	# Create semi-transparent background
+	var bg = ColorRect.new()
+	bg.color = Color(0, 0, 0, 0.5)  # Darker so it's visible
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	summary_overlay.add_child(bg)
+
+	# Create summary panel (centered)
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(500, 400)
+	panel.z_index = 1001
+	# Center it properly
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -250  # Half of width
+	panel.offset_top = -200   # Half of height
+	panel.offset_right = 250
+	panel.offset_bottom = 200
+	summary_overlay.add_child(panel)
+
+	# Add a visible background to the panel
+	var panel_bg = panel.get_theme_stylebox("panel", "PanelContainer")
+	if not panel_bg:
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.2, 0.2, 0.3, 0.95)
+		style.border_width_left = 3
+		style.border_width_right = 3
+		style.border_width_top = 3
+		style.border_width_bottom = 3
+		style.border_color = Color(0.8, 0.7, 0.3, 1.0)
+		style.corner_radius_top_left = 10
+		style.corner_radius_top_right = 10
+		style.corner_radius_bottom_left = 10
+		style.corner_radius_bottom_right = 10
+		panel.add_theme_stylebox_override("panel", style)
+
+	# Add content
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 15)
+	panel.add_child(vbox)
+
+	# Add some padding
+	var top_spacer = Control.new()
+	top_spacer.custom_minimum_size = Vector2(0, 20)
+	vbox.add_child(top_spacer)
+
+	# Title
+	var title = Label.new()
+	title.text = "Level Complete!"
+	title.add_theme_font_size_override("font_size", 36)
+	title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Rewards section
+	var rewards_title = Label.new()
+	rewards_title.text = "Rewards Earned"
+	rewards_title.add_theme_font_size_override("font_size", 24)
+	rewards_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(rewards_title)
+
+	# Rewards list - show all reward types
+	var coins = rewards_data.get("coins", 0)
+	var gems = rewards_data.get("gems", 0)
+	var boosters = rewards_data.get("boosters", {})
+	var gallery_images = rewards_data.get("gallery_images", [])
+	var cards = rewards_data.get("cards", [])
+	var themes = rewards_data.get("themes", [])
+	var videos = rewards_data.get("videos", [])
+
+	# Coins
+	if coins > 0:
+		var coins_label = Label.new()
+		coins_label.text = "💰 Coins: +%d" % coins
+		coins_label.add_theme_font_size_override("font_size", 28)
+		coins_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0, 1.0))
+		coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(coins_label)
+
+	# Gems
+	if gems > 0:
+		var gems_label = Label.new()
+		gems_label.text = "💎 Gems: +%d" % gems
+		gems_label.add_theme_font_size_override("font_size", 28)
+		gems_label.add_theme_color_override("font_color", Color(0.3, 0.7, 1.0, 1.0))
+		gems_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(gems_label)
+
+	# Boosters
+	if not boosters.is_empty():
+		for booster_type in boosters.keys():
+			var booster_count = boosters[booster_type]
+			if booster_count > 0:
+				var booster_label = Label.new()
+				var booster_icon = _get_booster_icon(booster_type)
+				booster_label.text = "%s %s: +%d" % [booster_icon, booster_type.capitalize(), booster_count]
+				booster_label.add_theme_font_size_override("font_size", 24)
+				booster_label.add_theme_color_override("font_color", Color(0.9, 0.5, 1.0, 1.0))
+				booster_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				vbox.add_child(booster_label)
+
+	# Gallery Images
+	if not gallery_images.is_empty():
+		var gallery_label = Label.new()
+		gallery_label.text = "🖼️ Gallery Images Unlocked: %d" % gallery_images.size()
+		gallery_label.add_theme_font_size_override("font_size", 24)
+		gallery_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.4, 1.0))
+		gallery_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(gallery_label)
+
+		# Show individual image names if not too many
+		if gallery_images.size() <= 3:
+			for image_name in gallery_images:
+				var img_label = Label.new()
+				img_label.text = "  • %s" % image_name
+				img_label.add_theme_font_size_override("font_size", 18)
+				img_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				vbox.add_child(img_label)
+
+	# Collection Cards
+	if not cards.is_empty():
+		var card_label = Label.new()
+		card_label.text = "🃏 Cards Unlocked: %d" % cards.size()
+		card_label.add_theme_font_size_override("font_size", 24)
+		card_label.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 1.0))
+		card_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(card_label)
+
+		# Show individual card names if not too many
+		if cards.size() <= 3:
+			for card in cards:
+				var card_name = card.get("card_name", card.get("card_id", "Unknown"))
+				var card_item_label = Label.new()
+				card_item_label.text = "  • %s" % card_name
+				card_item_label.add_theme_font_size_override("font_size", 18)
+				card_item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				vbox.add_child(card_item_label)
+
+	# Themes
+	if not themes.is_empty():
+		var theme_label = Label.new()
+		theme_label.text = "🎨 Themes Unlocked: %d" % themes.size()
+		theme_label.add_theme_font_size_override("font_size", 24)
+		theme_label.add_theme_color_override("font_color", Color(0.9, 0.4, 0.9, 1.0))
+		theme_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(theme_label)
+
+	# Videos
+	if not videos.is_empty():
+		var video_label = Label.new()
+		video_label.text = "📹 Videos Unlocked: %d" % videos.size()
+		video_label.add_theme_font_size_override("font_size", 24)
+		video_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5, 1.0))
+		video_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(video_label)
+
+	# Score
+	var score_label = Label.new()
+	score_label.text = "Score: %d" % score
+	score_label.add_theme_font_size_override("font_size", 22)
+	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(score_label)
+
+	# Stars
+	var stars_label = Label.new()
+	var stars_text = ""
+	for i in range(stars):
+		stars_text += "⭐"
+	stars_label.text = stars_text if stars > 0 else "☆☆☆"
+	stars_label.add_theme_font_size_override("font_size", 32)
+	stars_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(stars_label)
+
+	# Spacer
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 30)
+	vbox.add_child(spacer)
+
+	# Continue button
+	var continue_btn = Button.new()
+	continue_btn.text = "CONTINUE"
+	continue_btn.custom_minimum_size = Vector2(250, 70)
+	continue_btn.add_theme_font_size_override("font_size", 28)
+
+	# Style the button
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.2, 0.7, 0.3, 1.0)
+	btn_style.corner_radius_top_left = 8
+	btn_style.corner_radius_top_right = 8
+	btn_style.corner_radius_bottom_left = 8
+	btn_style.corner_radius_bottom_right = 8
+	continue_btn.add_theme_stylebox_override("normal", btn_style)
+
+	var btn_hover = StyleBoxFlat.new()
+	btn_hover.bg_color = Color(0.3, 0.8, 0.4, 1.0)
+	btn_hover.corner_radius_top_left = 8
+	btn_hover.corner_radius_top_right = 8
+	btn_hover.corner_radius_bottom_left = 8
+	btn_hover.corner_radius_bottom_right = 8
+	continue_btn.add_theme_stylebox_override("hover", btn_hover)
+
+	var hbox = HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_child(continue_btn)
+	vbox.add_child(hbox)
+
+	# Bottom spacer
+	var bottom_spacer = Control.new()
+	bottom_spacer.custom_minimum_size = Vector2(0, 20)
+	vbox.add_child(bottom_spacer)
+
+	# Connect button
+	continue_btn.pressed.connect(func():
+		print("[RewardTransitionController] Continue button pressed")
+		# Cleanup summary
+		if is_instance_valid(summary_overlay):
+			summary_overlay.queue_free()
+		# Advance to next stage
+		_on_ui_continue_pressed()
+	)
+
+	# Also make background clickable
+	bg.gui_input.connect(func(event):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			print("[RewardTransitionController] Background clicked, advancing")
+			if is_instance_valid(summary_overlay):
+				summary_overlay.queue_free()
+			_on_ui_continue_pressed()
+	)
+
+	print("[RewardTransitionController] Container summary displayed with Continue button")
+	print("[RewardTransitionController] Summary overlay z_index: %d, visible: %s" % [summary_overlay.z_index, summary_overlay.visible])
+
+
+func _on_container_complete():
+	"""Handle container completion"""
+	print("[RewardTransitionController] Container animation complete")
+	# For now, auto-advance (TODO: wait for Continue button)
+	await get_tree().create_timer(1.0).timeout
+	_on_stage_completed(Stage.SUMMARY)
 
 func _on_ui_continue_pressed():
 	"""Handle Continue button from SimpleRewardUI"""
@@ -352,6 +533,24 @@ func _get_stage_name(stage: Stage) -> String:
 			return "exit"
 	return "unknown"
 
+func _get_booster_icon(booster_type: String) -> String:
+	"""Get emoji icon for booster type"""
+	match booster_type:
+		"hammer":
+			return "🔨"
+		"swap":
+			return "🔄"
+		"shuffle":
+			return "🔀"
+		"bomb":
+			return "💣"
+		"rainbow":
+			return "🌈"
+		"lightning":
+			return "⚡"
+		_:
+			return "🎁"
+
 func _check_reduced_motion_setting() -> bool:
 	"""Check if reduced motion is enabled in settings"""
 	# TODO: Check actual setting from game settings
@@ -364,10 +563,9 @@ func _emit_analytics(event_name: String, data: Dictionary):
 
 func _cleanup():
 	"""Clean up resources"""
-	if container_instance and is_instance_valid(container_instance):
-		container_instance.queue_free()
-		container_instance = null
 
-	if simple_ui and is_instance_valid(simple_ui):
-		simple_ui.queue_free()
-		simple_ui = null
+	if reward_container and is_instance_valid(reward_container):
+		reward_container.cleanup()
+		reward_container.queue_free()
+		reward_container = null
+

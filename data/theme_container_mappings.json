@@ -1,0 +1,18 @@
+{
+	"modern": {
+		"reward_container": "fade_chest_example",
+		"description": "Modern/casual theme container"
+	},
+	"legacy": {
+		"reward_container": "simple_box",
+		"description": "Legacy theme container"
+	},
+	"biblical": {
+		"reward_container": "simple_box",
+		"description": "Biblical theme container"
+	},
+	"_default": {
+		"reward_container": "fade_chest_example",
+		"description": "Default container for unknown themes (DLC, custom themes, etc.)"
+	}
+}

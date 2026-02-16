@@ -1,0 +1,61 @@
+{
+	"description": "Data-driven rules for selecting reward containers based on level, performance, or rewards",
+
+	"rules": [
+		{
+			"id": "milestone_levels",
+			"description": "Every 10th level gets special container",
+			"enabled": false,
+			"condition": {
+				"type": "level_modulo",
+				"divisor": 10,
+				"remainder": 0
+			},
+			"container": "golden_chest"
+		},
+		{
+			"id": "perfect_completion",
+			"description": "3-star completions get special container",
+			"enabled": false,
+			"condition": {
+				"type": "stars_earned",
+				"min": 3
+			},
+			"container": "crystal_chest"
+		},
+		{
+			"id": "high_value_rewards",
+			"description": "High coin rewards get special container",
+			"enabled": false,
+			"condition": {
+				"type": "coins_earned",
+				"min": 1000
+			},
+			"container": "silver_chest"
+		},
+		{
+			"id": "boss_levels",
+			"description": "Boss levels (every 5th) get special container",
+			"enabled": false,
+			"condition": {
+				"type": "level_modulo",
+				"divisor": 5,
+				"remainder": 0
+			},
+			"container": "boss_chest"
+		},
+		{
+			"id": "chapter_milestones",
+			"description": "Chapter endings get special container",
+			"enabled": false,
+			"condition": {
+				"type": "level_in_list",
+				"levels": [10, 20, 30, 40, 50, 60]
+			},
+			"container": "chapter_chest"
+		}
+	],
+
+	"priority": "first_match",
+	"fallback": "use_theme_mapping"
+}
