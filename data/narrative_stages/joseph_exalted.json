@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Pharaoh made Joseph second-in-command\nover all of Egypt.\n\nFrom prisoner to prince in one day.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JOSEPH_EXALTED_MAIN"
     }
   ],
   "transitions": [

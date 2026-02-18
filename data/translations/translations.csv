@@ -1,0 +1,102 @@
+keys,en,es,pt,fr
+UI_BUTTON_START,Start Level,Iniciar Nivel,Iniciar Nível,Commencer Niveau
+UI_BUTTON_CONTINUE,Continue,Continuar,Continuar,Continuer
+UI_BUTTON_RETRY,Retry,Reintentar,Tentar Novamente,Réessayer
+UI_BUTTON_SETTINGS,Settings,Configuración,Configurações,Paramètres
+UI_BUTTON_ACHIEVEMENTS,Achievements,Logros,Conquistas,Succès
+UI_BUTTON_MAP,Map,Mapa,Mapa,Carte
+UI_BUTTON_SHOP,Shop,Tienda,Loja,Boutique
+UI_BUTTON_GALLERY,Gallery,Galería,Galeria,Galerie
+UI_BUTTON_EXCHANGE,Exchange Gems,Cambiar Gemas,Trocar Gemas,Échanger Gemmes
+UI_BUTTON_CLOSE,Close,Cerrar,Fechar,Fermer
+UI_BUTTON_BACK,Back,Atrás,Voltar,Retour
+UI_BUTTON_CLAIM,CLAIM,RECLAMAR,REIVINDICAR,RÉCLAMER
+UI_BUTTON_SKIP,Skip,Saltar,Pular,Passer
+UI_LABEL_SCORE,Score,Puntuación,Pontuação,Score
+UI_LABEL_MOVES,Moves,Movimientos,Movimentos,Mouvements
+UI_LABEL_GOAL,Goal,Objetivo,Objetivo,Objectif
+UI_LABEL_LEVEL,Level,Nivel,Nível,Niveau
+UI_LABEL_COINS,Coins,Monedas,Moedas,Pièces
+UI_LABEL_GEMS,Gems,Gemas,Gemas,Gemmes
+UI_LABEL_LIVES,Lives,Vidas,Vidas,Vies
+UI_LABEL_REWARDS,Rewards,Recompensas,Recompensas,Récompenses
+UI_LEVEL_COMPLETE,Level Complete!,¡Nivel Completado!,Nível Completo!,Niveau Terminé!
+UI_LEVEL_FAILED,Level Failed,Nivel Fallido,Nível Falhado,Niveau Échoué
+UI_GAME_OVER,Game Over,Fin del Juego,Fim de Jogo,Jeu Terminé
+UI_NEW_REWARD,+%d %s,+%d %s,+%d %s,+%d %s
+UI_AUDIO,Audio,Audio,Áudio,Audio
+UI_MUSIC,Music,Música,Música,Musique
+UI_SOUND_EFFECTS,Sound Effects,Efectos de Sonido,Efeitos Sonoros,Effets Sonores
+UI_VIBRATION,Vibration,Vibración,Vibração,Vibration
+UI_LANGUAGE,Language,Idioma,Idioma,Langue
+SETTING_MUSIC_VOLUME,Music Volume,Volumen de Música,Volume da Música,Volume Musique
+SETTING_SFX_VOLUME,Sound Volume,Volumen de Sonido,Volume do Som,Volume Son
+ACHIEVEMENT_UNLOCKED,Achievement Unlocked!,¡Logro Desbloqueado!,Conquista Desbloqueada!,Succès Débloqué!
+REWARD_LEVEL_COMPLETION,Level Completion Reward,Recompensa de Nivel,Recompensa de Nível,Récompense Niveau
+REWARD_DAILY_BONUS,Daily Bonus,Bonificación Diaria,Bônus Diário,Bonus Quotidien
+SHOP_TITLE,Shop,Tienda,Loja,Boutique
+SHOP_BOOSTERS,Boosters,Potenciadores,Impulsionadores,Boosters
+SHOP_CURRENCY,Currency,Moneda,Moeda,Monnaie
+SHOP_BUY,Buy,Comprar,Comprar,Acheter
+SHOP_PRICE,Price,Precio,Preço,Prix
+BOOSTER_HAMMER,Hammer,Martillo,Martelo,Marteau
+BOOSTER_SHUFFLE,Shuffle,Mezclar,Embaralhar,Mélanger
+BOOSTER_SWAP,Swap,Intercambiar,Trocar,Échanger
+BOOSTER_BOMB,Bomb,Bomba,Bomba,Bombe
+BOOSTER_CHAIN,Chain Reaction,Reacción en Cadena,Reação em Cadeia,Réaction en Chaîne
+BOOSTER_LINE_BLAST,Line Blast,Explosión de Línea,Explosão de Linha,Explosion Ligne
+BOOSTER_ROW_CLEAR,Row Clear,Limpiar Fila,Limpar Linha,Effacer Ligne
+BOOSTER_COLUMN_CLEAR,Column Clear,Limpiar Columna,Limpar Coluna,Effacer Colonne
+BOOSTER_TILE_SQUASHER,Tile Squasher,Aplastador,Esmagador,Écraseur
+ERROR_NO_MOVES,Out of moves!,¡Sin movimientos!,Sem movimentos!,Plus de mouvements!
+ERROR_LEVEL_NOT_FOUND,Level not found,Nivel no encontrado,Nível não encontrado,Niveau introuvable
+ERROR_SAVE_FAILED,Save failed,Error al guardar,Falha ao salvar,Échec de sauvegarde
+MSG_LOADING,Loading...,Cargando...,Carregando...,Chargement...
+MSG_AWESOME,Awesome!,¡Increíble!,Incrível!,Génial!
+MSG_GREAT,Great!,¡Genial!,Ótimo!,Super!
+MSG_NICE,Nice!,¡Bien!,Legal!,Bien!
+MSG_COMBO,Combo!,¡Combo!,Combo!,Combo!
+MSG_SUPER_COMBO,Super Combo!,¡Súper Combo!,Super Combo!,Super Combo!
+MSG_AMAZING_COMBO,Amazing Combo!,¡Combo Asombroso!,Combo Incrível!,Combo Incroyable!
+NARRATIVE_SKIP,Skip,Saltar,Pular,Passer
+WORLDMAP_TITLE,World Map,Mapa del Mundo,Mapa do Mundo,Carte du Monde
+WORLDMAP_SELECT_LEVEL,Select Level,Seleccionar Nivel,Selecionar Nível,Sélectionner Niveau
+GALLERY_TITLE,Gallery,Galería,Galeria,Galerie
+GALLERY_LOCKED,Locked,Bloqueado,Bloqueado,Verrouillé
+GALLERY_UNLOCKED,Unlocked,Desbloqueado,Desbloqueado,Débloqué
+GALLERY_PROGRESS,Progress: %d/%d,Progreso: %d/%d,Progresso: %d/%d,Progrès: %d/%d
+DAILY_REWARD_TITLE,Daily Reward,Recompensa Diaria,Recompensa Diária,Récompense Quotidienne
+DAILY_REWARD_DAY,Day %d,Día %d,Dia %d,Jour %d
+DAILY_REWARD_CLAIMED,Claimed!,¡Reclamado!,Reivindicado!,Réclamé!
+DAILY_REWARD_STREAK,Streak: %d days,Racha: %d días,Sequência: %d dias,Série: %d jours
+CHEST_COMMON,Common Chest,Cofre Común,Baú Comum,Coffre Commun
+CHEST_RARE,Rare Chest,Cofre Raro,Baú Raro,Coffre Rare
+CHEST_EPIC,Epic Chest,Cofre Épico,Baú Épico,Coffre Épique
+CHEST_LEGENDARY,Legendary Chest,Cofre Legendario,Baú Lendário,Coffre Légendaire
+CHEST_OPENING,Opening...,Abriendo...,Abrindo...,Ouverture...
+CHEST_UNLOCK_NOW,Unlock Now,Desbloquear Ahora,Desbloquear Agora,Débloquer Maintenant
+QUEST_DAILY,Daily Quest,Misión Diaria,Missão Diária,Quête Quotidienne
+QUEST_WEEKLY,Weekly Quest,Misión Semanal,Missão Semanal,Quête Hebdomadaire
+QUEST_COMPLETE_LEVELS,Complete %d levels,Completa %d niveles,Complete %d níveis,Terminer %d niveaux
+QUEST_COLLECT_COINS,Collect %d coins,Recolecta %d monedas,Colete %d moedas,Collecter %d pièces
+QUEST_USE_BOOSTERS,Use %d boosters,Usa %d potenciadores,Use %d impulsionadores,Utiliser %d boosters
+ENERGY_TITLE,Energy,Energía,Energia,Énergie
+ENERGY_FULL,Full Energy!,¡Energía Completa!,Energia Cheia!,Énergie Pleine!
+ENERGY_OUT,Out of Energy,Sin Energía,Sem Energia,Sans Énergie
+ENERGY_REFILL,Refill Energy,Recargar Energía,Recarregar Energia,Recharger Énergie
+ENERGY_NEXT_IN,Next heart in: %s,Próximo corazón en: %s,Próximo coração em: %s,Prochain cœur dans: %s
+STORYBOARD_TITLE,Story,Historia,História,Histoire
+STORYBOARD_CHAPTER,Chapter %d,Capítulo %d,Capítulo %d,Chapitre %d
+STORYBOARD_LOCKED,Unlock at level %d,Desbloquear en nivel %d,Desbloquear no nível %d,Débloquer au niveau %d
+COLLECTION_COMPLETE,Collection Complete!,¡Colección Completa!,Coleção Completa!,Collection Complète!
+COLLECTION_RARITY_COMMON,Common,Común,Comum,Commun
+COLLECTION_RARITY_RARE,Rare,Raro,Raro,Rare
+COLLECTION_RARITY_EPIC,Epic,Épico,Épico,Épique
+COLLECTION_RARITY_LEGENDARY,Legendary,Legendario,Lendário,Légendaire
+PROFILE_LEVEL,Player Level,Nivel de Jugador,Nível do Jogador,Niveau Joueur
+PROFILE_XP,Experience,Experiencia,Experiência,Expérience
+PROFILE_STATS,Statistics,Estadísticas,Estatísticas,Statistiques
+MILESTONE_REACHED,Milestone Reached!,¡Hito Alcanzado!,Marco Alcançado!,Jalon Atteint!
+BONUS_MOVE,Bonus Move!,¡Movimiento Bonus!,Movimento Bônus!,Mouvement Bonus!
+PERFECT_SCORE,Perfect Score!,¡Puntuación Perfecta!,Pontuação Perfeita!,Score Parfait!
+THREE_STARS,3 Stars!,¡3 Estrellas!,3 Estrelas!,3 Étoiles!

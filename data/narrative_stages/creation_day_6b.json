@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God created mankind in His own image,\nmale and female He created them.\n\nAnd it was very good.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_CREATION_DAY_6B_MAIN"
     }
   ],
   "transitions": [

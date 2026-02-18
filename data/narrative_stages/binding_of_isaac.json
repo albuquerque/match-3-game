@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God tested Abraham:\n'Take your son Isaac and offer him as a sacrifice.'\n\nAbraham obeyed, but God provided a ram instead.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_BINDING_OF_ISAAC_MAIN"
     }
   ],
   "transitions": [

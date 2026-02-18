@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Joseph lived to see his great-grandchildren.\n\nBefore dying, he made them promise:\n'Carry my bones from this place.'",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JOSEPH_FINAL_DAYS_MAIN"
     }
   ],
   "transitions": [

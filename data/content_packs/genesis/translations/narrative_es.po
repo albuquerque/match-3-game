@@ -1,0 +1,989 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Content-Pack: genesis\n"
+"X-Content-Version: 1.0\n"
+"X-Pack-Name: Genesis to Exodus\n"
+
+msgid ""
+msgstr "\"\n\"Language: es\n\"\n\"Content-Type: text/plain; charset=UTF-8\n\"\n\"Content-Transfer-Encoding: 8bit\n\"\n\"X-Content-Pack: genesis\n\"\n\"X-Content-Version: 1.0\n\"\n\"X-Pack-Name: Genesis to Exodus\n"
+
+msgid "ACHIEVEMENT_CREATION_MASTER_DESC"
+msgstr "Completa todas las fases de la Semana de la Creación con 3 estrellas"
+
+msgid "ACHIEVEMENT_CREATION_MASTER_TITLE"
+msgstr "Maestro de la Creación"
+
+msgid "ACHIEVEMENT_EXODUS_CHAMPION_DESC"
+msgstr "Alcanza el cruce del Mar Rojo"
+
+msgid "ACHIEVEMENT_EXODUS_CHAMPION_TITLE"
+msgstr "Campeón del Éxodo"
+
+msgid "ACHIEVEMENT_FAITHFUL_SERVANT_DESC"
+msgstr "Completa todos los niveles sin perder"
+
+msgid "ACHIEVEMENT_FAITHFUL_SERVANT_TITLE"
+msgstr "Siervo Fiel"
+
+msgid "ACH_GENESIS_COLLECTIBLE"
+msgstr ""
+
+msgid "ACH_GENESIS_COLLECTIBLE_DESC"
+msgstr ""
+
+msgid "ACH_GENESIS_COMPLETE"
+msgstr ""
+
+msgid "ACH_GENESIS_COMPLETE_DESC"
+msgstr ""
+
+msgid "ACH_GENESIS_SECRETS"
+msgstr ""
+
+msgid "ACH_GENESIS_SECRETS_DESC"
+msgstr ""
+
+msgid "CHAR_ABEL_NAME"
+msgstr "Abel"
+
+msgid "CHAR_ABRAHAM_NAME"
+msgstr "Abraham"
+
+msgid "CHAR_ADAM_NAME"
+msgstr "Adán"
+
+msgid "CHAR_CAIN_NAME"
+msgstr "Caín"
+
+msgid "CHAR_EVE_NAME"
+msgstr "Eva"
+
+msgid "CHAR_GOD_NAME"
+msgstr "Dios"
+
+msgid "CHAR_ISAAC_NAME"
+msgstr "Isaac"
+
+msgid "CHAR_JACOB_NAME"
+msgstr "Jacob"
+
+msgid "CHAR_JOSEPH_NAME"
+msgstr "José"
+
+msgid "CHAR_MOSES_NAME"
+msgstr "Moisés"
+
+msgid "CHAR_NOAH_NAME"
+msgstr "Noé"
+
+msgid "CHAR_PHARAOH_NAME"
+msgstr "Faraón"
+
+msgid "CHAR_RACHEL_NAME"
+msgstr "Raquel"
+
+msgid "CHAR_REBEKAH_NAME"
+msgstr "Rebeca"
+
+msgid "CHAR_SARAH_NAME"
+msgstr "Sara"
+
+msgid "CHAR_SERPENT_NAME"
+msgstr "La Serpiente"
+
+msgid "COLLECTION_CREATION_CARD_DAY1_DESC"
+msgstr "El primer acto de creación de Dios: traer luz a la oscuridad"
+
+msgid "COLLECTION_CREATION_CARD_DAY1_NAME"
+msgstr "Primera Luz"
+
+msgid "COLLECTION_CREATION_CARD_DAY2_DESC"
+msgstr "La separación de las aguas y la formación del cielo"
+
+msgid "COLLECTION_CREATION_CARD_DAY2_NAME"
+msgstr "El Firmamento"
+
+msgid "COLLECTION_CREATION_CARD_DAY3_DESC"
+msgstr "La reunión de las aguas y la aparición de la tierra"
+
+msgid "COLLECTION_CREATION_CARD_DAY3_NAME"
+msgstr "Tierra Seca"
+
+msgid "LEVEL_01_DESCRIPTION"
+msgstr "Combina fichas para llevar la luz a la oscuridad"
+
+msgid "LEVEL_01_NAME"
+msgstr "Sea la Luz"
+
+msgid "LEVEL_02_DESCRIPTION"
+msgstr "Separa las aguas para formar el cielo"
+
+msgid "LEVEL_02_NAME"
+msgstr "Aguas de Arriba y Abajo"
+
+msgid "LEVEL_03_DESCRIPTION"
+msgstr "Reúne las aguas y revela la tierra"
+
+msgid "LEVEL_03_NAME"
+msgstr "Aparece la Tierra Seca"
+
+msgid "LEVEL_04_DESCRIPTION"
+msgstr "Crea el sol, la luna y las estrellas"
+
+msgid "LEVEL_04_NAME"
+msgstr "Luminarias en el Cielo"
+
+msgid "LEVEL_05_DESCRIPTION"
+msgstr "Llena los mares con criaturas"
+
+msgid "LEVEL_05_NAME"
+msgstr "Vida en las Aguas"
+
+msgid "LEVEL_06_DESCRIPTION"
+msgstr "Trae animales y humanidad"
+
+msgid "LEVEL_06_NAME"
+msgstr "Criaturas de la Tierra"
+
+msgid "LEVEL_07_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_07_NAME"
+msgstr ""
+
+msgid "LEVEL_08_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_08_NAME"
+msgstr ""
+
+msgid "LEVEL_09_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_09_NAME"
+msgstr ""
+
+msgid "LEVEL_10_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_10_NAME"
+msgstr ""
+
+msgid "LEVEL_11_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_11_NAME"
+msgstr ""
+
+msgid "LEVEL_12_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_12_NAME"
+msgstr ""
+
+msgid "LEVEL_13_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_13_NAME"
+msgstr ""
+
+msgid "LEVEL_14_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_14_NAME"
+msgstr ""
+
+msgid "LEVEL_15_DESCRIPTION"
+msgstr ""
+
+msgid "LEVEL_15_NAME"
+msgstr ""
+
+msgid "LOC_BABEL_NAME"
+msgstr "Torre de Babel"
+
+msgid "LOC_CANAAN_NAME"
+msgstr "Tierra de Canaán"
+
+msgid "LOC_EGYPT_NAME"
+msgstr "Egipto"
+
+msgid "LOC_GARDEN_OF_EDEN_NAME"
+msgstr "Jardín del Edén"
+
+msgid "LOC_MOUNT_ARARAT_NAME"
+msgstr "Monte Ararat"
+
+msgid "LOC_MOUNT_SINAI_NAME"
+msgstr "Monte Sinaí"
+
+msgid "LOC_RED_SEA_NAME"
+msgstr "Mar Rojo"
+
+msgid "LOC_TREE_OF_KNOWLEDGE_NAME"
+msgstr "Árbol del Conocimiento del Bien y del Mal"
+
+msgid "LOC_TREE_OF_LIFE_NAME"
+msgstr "Árbol de la Vida"
+
+msgid "NARRATIVE_ABRAHAM_AND_SARAH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ABRAHAM_CALLED_TEXT"
+msgstr "God called Abram to leave his homeland:\n\n'Go to the land I will show you,\nand I will make you a great nation.'"
+
+msgid "NARRATIVE_ASCENSION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_BINDING_OF_ISAAC_DESC"
+msgstr "La prueba máxima de la fe de Abraham"
+
+msgid "NARRATIVE_BINDING_OF_ISAAC_MAIN"
+msgstr "Dios probó a Abraham:\n'Toma a tu hijo Isaac y ofrécelo en holocausto.'\n\nAbraham obedeció, pero Dios proveyó un carnero en su lugar."
+
+msgid "NARRATIVE_BINDING_OF_ISAAC_NAME"
+msgstr "El Sacrificio de Isaac"
+
+msgid "NARRATIVE_BIRTHRIGHT_SOLD_MAIN"
+msgstr "Esaú vendió su primogenitura a Jacob\npor un plato de guiso.\n\nUn momento de hambre le costó todo."
+
+msgid "NARRATIVE_BROTHERS_ARRIVE_EGYPT_DESC"
+msgstr "Reunión y reconciliación"
+
+msgid "NARRATIVE_BROTHERS_ARRIVE_EGYPT_MAIN"
+msgstr "La hambruna llevó a los hermanos de José a Egipto,\nbuscando alimento.\n\nNo reconocieron al hermano que vendieron."
+
+msgid "NARRATIVE_BROTHERS_ARRIVE_EGYPT_NAME"
+msgstr "Los Hermanos Llegan a Egipto"
+
+msgid "NARRATIVE_BURNING_BUSH_DESC"
+msgstr "Dios llama a Moisés"
+
+msgid "NARRATIVE_BURNING_BUSH_MAIN"
+msgstr "God spoke to Moses from a bush\nthat burned but was not consumed:\n\n'I will send you to Pharaoh.'"
+
+msgid "NARRATIVE_BURNING_BUSH_NAME"
+msgstr "La Zarza Ardiente"
+
+msgid "NARRATIVE_BURNING_BUSH_TEXT"
+msgstr "El ángel del SEÑOR se le apareció en una llama de fuego desde en medio de una zarza. Moisés vio que la zarza ardía, pero no se consumía."
+
+msgid "NARRATIVE_CAINS_DESCENDANTS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_CAIN_AND_ABEL_MAIN"
+msgstr "Abel's offering was accepted,\nbut Cain's was not.\n\nJealousy led to tragedy."
+
+msgid "NARRATIVE_CALL_OF_ABRAHAM_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_CALL_OF_THE_FIRST_DISCIPLES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_CREATION_DAY1_DESC"
+msgstr "Dios crea la luz"
+
+msgid "NARRATIVE_CREATION_DAY1_NAME"
+msgstr "El Primer Día"
+
+msgid "NARRATIVE_CREATION_DAY1_TEXT"
+msgstr "Al principio Dios creó los cielos y la tierra. La tierra estaba desordenada y vacía; las tinieblas cubrían la superficie del abismo, y el Espíritu de Dios se movía sobre las aguas. Y Dios dijo: 'Sea la luz', y hubo luz."
+
+msgid "NARRATIVE_CREATION_DAY2_DESC"
+msgstr "Dios separa las aguas"
+
+msgid "NARRATIVE_CREATION_DAY2_NAME"
+msgstr "El Segundo Día"
+
+msgid "NARRATIVE_CREATION_DAY2_TEXT"
+msgstr "Y Dios dijo: 'Haya un firmamento en medio de las aguas para separar las aguas de las aguas.'"
+
+msgid "NARRATIVE_CREATION_DAY3_DESC"
+msgstr "Dios crea la tierra y la vegetación"
+
+msgid "NARRATIVE_CREATION_DAY3_NAME"
+msgstr "El Tercer Día"
+
+msgid "NARRATIVE_CREATION_DAY3_TEXT"
+msgstr "Y Dios dijo: 'Júntense las aguas que están debajo del cielo en un lugar, y descúbrase lo seco.' Y así fue. Luego Dios dijo: 'Produzca la tierra hierba verde, hierba que dé semilla y árbol de fruto que dé fruto según su especie.'"
+
+msgid "NARRATIVE_CREATION_DAY4_DESC"
+msgstr "Dios crea el sol, la luna y las estrellas"
+
+msgid "NARRATIVE_CREATION_DAY4_NAME"
+msgstr "El Cuarto Día"
+
+msgid "NARRATIVE_CREATION_DAY4_TEXT"
+msgstr "Y Dios dijo: 'Haya lumbreras en el firmamento del cielo para separar el día de la noche, y sirvan de señales para las estaciones, los días y los años.'"
+
+msgid "NARRATIVE_CREATION_DAY5_DESC"
+msgstr "Dios crea criaturas marinas y aves"
+
+msgid "NARRATIVE_CREATION_DAY5_NAME"
+msgstr "El Quinto Día"
+
+msgid "NARRATIVE_CREATION_DAY5_TEXT"
+msgstr "Y Dios dijo: 'Produzca el agua seres vivientes, y aves que naden sobre la tierra, en la expansión de los cielos.'"
+
+msgid "NARRATIVE_CREATION_DAY6_DESC"
+msgstr "Dios crea animales y a la humanidad"
+
+msgid "NARRATIVE_CREATION_DAY6_NAME"
+msgstr "El Sexto Día"
+
+msgid "NARRATIVE_CREATION_DAY6_TEXT"
+msgstr "Entonces Dios dijo: 'Hagamos al hombre a nuestra imagen, conforme a nuestra semejanza.' Y creó Dios al hombre a su imagen; varón y hembra los creó."
+
+msgid "NARRATIVE_CREATION_DAY_1_DARKNESS"
+msgstr "La tierra estaba sin forma y vacía,\ny la oscuridad cubría las aguas profundas..."
+
+msgid "NARRATIVE_CREATION_DAY_1_LIGHT"
+msgstr "Y Dios dijo: 'Que haya luz',\n¡y hubo luz!"
+
+msgid "NARRATIVE_CREATION_DAY_2_INTRO"
+msgstr "Y Dios dijo: 'Que haya un firmamento entre las aguas para separar agua de agua.'"
+
+msgid "NARRATIVE_CREATION_DAY_3_MAIN"
+msgstr "God said, 'Let the waters be gathered together,\nand let dry land appear.'\n\nAnd God saw that it was good."
+
+msgid "NARRATIVE_CREATION_DAY_4_MAIN"
+msgstr "Dios creó dos grandes luminarias—\nla mayor para gobernar el día,\ny la menor para gobernar la noche."
+
+msgid "NARRATIVE_CREATION_DAY_5_MAIN"
+msgstr "Dios creó las grandes criaturas del mar\ny todo ser viviente que se mueve en las aguas,\ny toda ave alada."
+
+msgid "NARRATIVE_CREATION_DAY_6A_MAIN"
+msgstr "Dios hizo las bestias de la tierra,\nel ganado y todo lo que se arrastra sobre la tierra."
+
+msgid "NARRATIVE_CREATION_DAY_6B_MAIN"
+msgstr "God created mankind in His own image,\nmale and female He created them.\n\nAnd it was very good."
+
+msgid "NARRATIVE_CREATION_DAY_6_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_CREATION_DAY_7_MAIN"
+msgstr "On the seventh day God finished His work,\nand He rested.\n\nGod blessed the seventh day and made it holy."
+
+msgid "NARRATIVE_CREATION_INTRO_INTRO"
+msgstr "Al principio, Dios creó los cielos y la tierra..."
+
+msgid "NARRATIVE_CRUCIFIXION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_DAVID_AND_GOLIATH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_DAVID_ANNOUNCED_AS_KING_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_DAVID_BECOMES_KING_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_DEBORAH_AND_BARAK_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ELIJAH_AND_THE_PROPHETS_OF_BAAL_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ELISHA_HEALS_NAAMAN_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_EXODUS_BEGINS_MAIN"
+msgstr "Pharaoh finally let them go.\n\nIsrael left Egypt with great wealth,\na pillar of cloud leading them."
+
+msgid "NARRATIVE_EXODUS_FROM_EGYPT_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_EXODUS_PASSOVER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_EXODUS_REED_SEA_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_FLOOD_OLIVE_BRANCH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_FLOOD_RAIN_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_FLOOD_RAVEN_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_GARDEN_OF_EDEN_DESC"
+msgstr "Paraíso creado para la humanidad"
+
+msgid "NARRATIVE_GARDEN_OF_EDEN_MAIN"
+msgstr "The Lord God planted a garden in Eden,\nand there He placed the man He had formed.\n\nA place of perfect peace."
+
+msgid "NARRATIVE_GARDEN_OF_EDEN_NAME"
+msgstr "El Jardín del Edén"
+
+msgid "NARRATIVE_GARDEN_OF_EDEN_TEXT"
+msgstr "El SEÑOR Dios plantó un huerto en el Edén, al oriente; y puso allí al hombre que había formado. El SEÑOR Dios hizo brotar de la tierra todo árbol delicioso a la vista y bueno para comer."
+
+msgid "NARRATIVE_GARDEN_OF_GETHSEMANE_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_GIBEONITE_DECEPTION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_GIDEON_CALLED_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_GIDEON_DEFEATS_MIDIANITES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_GIDEON_TESTS_GOD_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_GODS_PROMISES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ISAAC_AND_REBEKAH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ISAAC_BORN_MAIN"
+msgstr "Sarah laughed when told she would have a son.\n\nBut God kept His promise,\nand Isaac was born."
+
+msgid "NARRATIVE_ISRAELITES_IN_EGYPT_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ISRAELITES_WILDERNESS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ISRAEL_ENTERS_CANAAN_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ISRAEL_ESCAPE_EGYPT_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_ISRAEL_MULTIPLIES_DESC"
+msgstr "Crece una nueva generación"
+
+msgid "NARRATIVE_ISRAEL_MULTIPLIES_MAIN"
+msgstr "The Israelites were fruitful\nand multiplied greatly.\n\nThe land of Egypt was filled with them."
+
+msgid "NARRATIVE_ISRAEL_MULTIPLIES_NAME"
+msgstr "Israel se Multiplica en Egipto"
+
+msgid "NARRATIVE_ISRAEL_TO_EGYPT_MAIN"
+msgstr "Jacob and his entire family\nmoved to Egypt.\n\nSeventy souls, who would become a great nation."
+
+msgid "NARRATIVE_ISRAEL_WILDERNESS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JACOBS_BLESSINGS_MAIN"
+msgstr "Before he died, Jacob blessed each of his sons,\nprophesying their futures.\n\nJudah would bring forth kings."
+
+msgid "NARRATIVE_JACOBS_LADDER_DESC"
+msgstr "Una visión de las puertas del cielo"
+
+msgid "NARRATIVE_JACOBS_LADDER_MAIN"
+msgstr "Jacob dreamed of a ladder reaching to heaven,\nwith angels ascending and descending.\n\nGod renewed His promise there."
+
+msgid "NARRATIVE_JACOBS_LADDER_NAME"
+msgstr "La Escalera de Jacob"
+
+msgid "NARRATIVE_JACOB_AND_ESAU_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JACOB_SEES_ANGELS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JACOB_WRESTLES_MAIN"
+msgstr "Jacob wrestled with a mysterious man all night.\n\nHe received a new name: Israel,\n'one who struggles with God.'"
+
+msgid "NARRATIVE_JESUS_AND_THE_SAMARITAN_WOMAN_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_APPEARS_TO_DISCIPLES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_ARREST_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_ASCENSION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_BAPTISM_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_BURIAL_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_CALMS_THE_STORM_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_CRUCIFIXION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_DEATH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_FEEDS_FIVE_THOUSAND_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_FEEDS_THE_5000_MAIN"
+msgstr "Con cinco panes y dos peces,\nJesús alimentó a cinco mil hombres,\nsin contar mujeres y niños."
+
+msgid "NARRATIVE_JESUS_FIRST_DISCIPLES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_GREAT_COMMISSION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_HEALS_THE_SICK_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_LAST_SUPPER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_LAZARUS_RAISING_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_PARABLE_OF_THE_SOWER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_RAISES_LAZARUS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_RESURRECTION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_SERMONT_ON_THE_MOUNT_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_TEMPLE_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_TEMPTATION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_TRIAL_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_WALKING_ON_WATER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JESUS_WALKS_ON_WATER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JONAH_AND_THE_BIG_FISH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JOSEPHS_BROTHERS_BOW_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JOSEPHS_DREAMS_MAIN"
+msgstr "Joseph dreamed that his brothers' sheaves\nbowed down to his.\n\nHis brothers hated him for it."
+
+msgid "NARRATIVE_JOSEPHS_RISE_DESC"
+msgstr ""
+
+msgid "NARRATIVE_JOSEPHS_RISE_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JOSEPHS_RISE_NAME"
+msgstr ""
+
+msgid "NARRATIVE_JOSEPH_EXALTED_MAIN"
+msgstr "Pharaoh made Joseph second-in-command\nover all of Egypt.\n\nFrom prisoner to prince in one day."
+
+msgid "NARRATIVE_JOSEPH_FINAL_DAYS_MAIN"
+msgstr "Joseph lived to see his great-grandchildren.\n\nBefore dying, he made them promise:\n'Carry my bones from this place.'"
+
+msgid "NARRATIVE_JOSEPH_IMPRISONED_MAIN"
+msgstr "Falsely accused, Joseph was thrown into prison.\n\nYet even there, the Lord was with him."
+
+msgid "NARRATIVE_JOSEPH_INTERPRETS_DREAMS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JOSEPH_INTERPRETS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JOSEPH_REVEALED_MAIN"
+msgstr "'I am Joseph, your brother,\nwhom you sold into Egypt.'\n\nTears and forgiveness followed."
+
+msgid "NARRATIVE_JOSEPH_RISES_TO_POWER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_JOSEPH_SOLD_DESC"
+msgstr "Traicionado por sus hermanos"
+
+msgid "NARRATIVE_JOSEPH_SOLD_MAIN"
+msgstr "Joseph's brothers sold him to traders\nand told their father he was dead.\n\nBetrayal by blood."
+
+msgid "NARRATIVE_JOSEPH_SOLD_NAME"
+msgstr "José vendido como esclavo"
+
+msgid "NARRATIVE_LAST_SUPPER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_LET_MY_PEOPLE_GO_MAIN"
+msgstr "Moses and Aaron stood before Pharaoh:\n\n'Thus says the Lord:\nLet My people go!'"
+
+msgid "NARRATIVE_LIFE_OF_JESUS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MANNA_QUAIL_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MERIBAH_WATER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MIDWIVES_COURAGE_MAIN"
+msgstr "Faraón ordenó matar a todos los varones hebreos,\npero las parteras temieron a Dios\ny dejaron vivir a los niños."
+
+msgid "NARRATIVE_MIRACLES_IN_EGYPT_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_ADOPTED_MAIN"
+msgstr "Pharaoh's daughter raised Moses\nas her own son.\n\nA Hebrew prince in Egypt's palace."
+
+msgid "NARRATIVE_MOSES_BIRTH_DESC"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_BIRTH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_BIRTH_NAME"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_BORN_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_CALLING_DESC"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_CALLING_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_CALLING_NAME"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_FLEES_DESC"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_FLEES_MAIN"
+msgstr "Moses killed an Egyptian taskmaster\nand fled to Midian.\n\nHe became a shepherd in the wilderness."
+
+msgid "NARRATIVE_MOSES_FLEES_NAME"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_FLEES_TO_MIDIAN_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MOSES_IN_BASKET_MAIN"
+msgstr "A mother placed her baby in a basket\nand set him in the Nile.\n\nPharaoh's daughter found him."
+
+msgid "NARRATIVE_MOSES_RETURNS_TO_EGYPT_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_MOUNT_SINAI_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_NEW_HEAVENS_NEW_EARTH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_NEW_PHARAOH_MAIN"
+msgstr "A new king arose over Egypt,\nwho did not know Joseph.\n\nHe feared the Israelites' numbers."
+
+msgid "NARRATIVE_NOAH_CALLED_MAIN"
+msgstr "God saw the wickedness of mankind\nand decided to flood the earth.\n\nBut Noah found favor in God's eyes."
+
+msgid "NARRATIVE_PARABLE_OF_THE_LOST_SHEEP_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PARABLE_OF_THE_SOWER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PARTING_OF_THE_RED_SEA_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PASSOVER_INSTITUTED_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PASSOVER_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PASSOVER_NIGHT_MAIN"
+msgstr "The final plague came at midnight.\n\nBut the angel passed over every house\nmarked with lamb's blood."
+
+msgid "NARRATIVE_PAULS_EPISTLES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PAULS_MISSIONARY_JOURNEYS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PAUL_CONVERSION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PENTECOST_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PETER_DENIES_JESUS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PHARAOHS_DREAMS_MAIN"
+msgstr "Pharaoh dreamed of seven fat cows\nand seven lean cows.\n\nJoseph alone could interpret it."
+
+msgid "NARRATIVE_PILLAR_OF_CLOUD_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PILLAR_OF_FIRE_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PLAGUES_CONTINUE_DESC"
+msgstr "El poder de Dios demostrado"
+
+msgid "NARRATIVE_PLAGUES_CONTINUE_MAIN"
+msgstr "Gnats, flies, and pestilence\nstruck the land of Egypt.\n\nYet Pharaoh would not relent."
+
+msgid "NARRATIVE_PLAGUES_CONTINUE_NAME"
+msgstr "Los Plagas Continúan"
+
+msgid "NARRATIVE_PLAGUES_DESC"
+msgstr ""
+
+msgid "NARRATIVE_PLAGUES_LIVESTOCK_BOILS_MAIN"
+msgstr "The livestock died,\nand painful boils broke out on all Egyptians.\n\nThe plagues grew worse."
+
+msgid "NARRATIVE_PLAGUES_NAME"
+msgstr ""
+
+msgid "NARRATIVE_PLAGUES_SUMMARY_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PLAGUE_BLOOD_MAIN"
+msgstr "Aaron struck the Nile with his staff,\nand all the water turned to blood.\n\nBut Pharaoh's heart was hardened."
+
+msgid "NARRATIVE_PLAGUE_DARKNESS_MAIN"
+msgstr "Darkness covered Egypt for three days,\nso thick it could be felt.\n\nBut Israel had light in their dwellings."
+
+msgid "NARRATIVE_PLAGUE_FIRSTBORN_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_PLAGUE_FROGS_DESC"
+msgstr "La segunda plaga"
+
+msgid "NARRATIVE_PLAGUE_FROGS_MAIN"
+msgstr "Frogs covered the land of Egypt,\nin houses, bedrooms, and ovens.\n\nStill Pharaoh refused."
+
+msgid "NARRATIVE_PLAGUE_FROGS_NAME"
+msgstr "Plaga de Ranas"
+
+msgid "NARRATIVE_PLAGUE_HAIL_DESC"
+msgstr "Destrucción desde el cielo"
+
+msgid "NARRATIVE_PLAGUE_HAIL_MAIN"
+msgstr "Hail and fire rained from the sky,\ndestroying crops and killing cattle.\n\nEgypt had never seen such devastation."
+
+msgid "NARRATIVE_PLAGUE_HAIL_NAME"
+msgstr "Plaga de Granizo"
+
+msgid "NARRATIVE_PLAGUE_LOCUSTS_DESC"
+msgstr "La bandada devastadora"
+
+msgid "NARRATIVE_PLAGUE_LOCUSTS_MAIN"
+msgstr "Locusts covered the ground\nuntil the land was black.\n\nThey devoured everything the hail had left."
+
+msgid "NARRATIVE_PLAGUE_LOCUSTS_NAME"
+msgstr "Plaga de Langostas"
+
+msgid "NARRATIVE_PRISON_DREAMS_DESC"
+msgstr "José interpreta sueños"
+
+msgid "NARRATIVE_PRISON_DREAMS_MAIN"
+msgstr "Joseph interpreted the dreams\nof Pharaoh's cupbearer and baker.\n\nEverything happened as he said."
+
+msgid "NARRATIVE_PRISON_DREAMS_NAME"
+msgstr "Sueños en la Prisión"
+
+msgid "NARRATIVE_QUEEN_OF_SHEBA_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_RACHEL_AT_WELL_DESC"
+msgstr "Jacob conoce a su amada"
+
+msgid "NARRATIVE_RACHEL_AT_WELL_MAIN"
+msgstr "Jacob met Rachel at a well\nand fell in love immediately.\n\nHe would work fourteen years to marry her."
+
+msgid "NARRATIVE_RACHEL_AT_WELL_NAME"
+msgstr "Raquel en el Pozo"
+
+msgid "NARRATIVE_RAINBOW_COVENANT_MAIN"
+msgstr "God placed a rainbow in the sky\nas a sign of His promise:\n\n'Never again will I flood the earth.'"
+
+msgid "NARRATIVE_REBEKAH_AT_WELL_DESC"
+msgstr "Una esposa para Isaac"
+
+msgid "NARRATIVE_REBEKAH_AT_WELL_MAIN"
+msgstr "Abraham's servant prayed for a sign,\nand Rebekah appeared at the well.\n\nShe would become Isaac's wife."
+
+msgid "NARRATIVE_REBEKAH_AT_WELL_NAME"
+msgstr "Rebeca en el Pozo"
+
+msgid "NARRATIVE_REBEKAH_JACOB_ISAAC_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_REDEMPTION_DESC"
+msgstr ""
+
+msgid "NARRATIVE_REDEMPTION_NAME"
+msgstr ""
+
+msgid "NARRATIVE_RED_SEA_CROSSING_MAIN"
+msgstr "God parted the Red Sea,\nand Israel walked through on dry ground.\n\nThe waters covered Pharaoh's army."
+
+msgid "NARRATIVE_REED_SEA_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_REVELATION_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_RUTHS_LOYALTY_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SACRIFICE_ABRAHAM_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SAMPLING_OF_GRAPES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SAMSONS_BIRTH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SAMSONS_DEFEAT_OF_THE_PHILISTINES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SAMSONS_VOW_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SAMUEL_ANOINTS_SAUL_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SAUL_DISOBEYS_GODS_COMMAND_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SERMON_ON_THE_MOUNT_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SILVER_CUP_MAIN"
+msgstr "Joseph tested his brothers\nby hiding his cup in Benjamin's sack.\n\nWould they abandon him as they did Joseph?"
+
+msgid "NARRATIVE_SINAI_COVENANT_DESC"
+msgstr ""
+
+msgid "NARRATIVE_SINAI_COVENANT_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SINAI_COVENANT_NAME"
+msgstr ""
+
+msgid "NARRATIVE_SLAVERY_BEGINS_MAIN"
+msgstr "The Egyptians made the Israelites slaves,\nforcing them to make bricks and build cities.\n\nTheir cry rose up to God."
+
+msgid "NARRATIVE_SODOM_AND_GOMORRAH_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SODOM_DESTROYED_MAIN"
+msgstr "The cities of Sodom and Gomorrah were wicked.\n\nFire and brimstone rained down,\nbut Lot and his daughters escaped."
+
+msgid "NARRATIVE_SOLOMONS_WISDOM_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_SPARROW_AND_LILIES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_STOLEN_BLESSING_MAIN"
+msgstr "Jacob disguised himself as Esau\nand stole his father's blessing.\n\nDeception brought blessing, but also exile."
+
+msgid "NARRATIVE_TABERNACLE_DESC"
+msgstr ""
+
+msgid "NARRATIVE_TABERNACLE_INSTRUCTIONS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_TABERNACLE_NAME"
+msgstr ""
+
+msgid "NARRATIVE_TEN_PLAGUES_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_THE_FALL_DESC"
+msgstr "La elección y la consecuencia de la humanidad"
+
+msgid "NARRATIVE_THE_FALL_MAIN"
+msgstr "The serpent deceived them, and they ate the forbidden fruit.\n\nSin entered the world,\nand they were cast from the garden."
+
+msgid "NARRATIVE_THE_FALL_NAME"
+msgstr "La Caída"
+
+msgid "NARRATIVE_THE_FALL_TEXT"
+msgstr "La serpiente dijo a la mujer: 'No moriréis ciertamente; porque Dios sabe que el día que comáis de él se os abrirán los ojos, y seréis como Dios, conocedores del bien y del mal.'"
+
+msgid "NARRATIVE_THE_FLOOD_DESC"
+msgstr "El juicio de Dios y la obediencia de Noé"
+
+msgid "NARRATIVE_THE_FLOOD_MAIN"
+msgstr "Rain fell for forty days and forty nights.\n\nThe waters covered the earth,\nbut the ark kept Noah and his family safe."
+
+msgid "NARRATIVE_THE_FLOOD_NAME"
+msgstr "El Gran Diluvio"
+
+msgid "NARRATIVE_THE_FLOOD_TEXT"
+msgstr "El SEÑOR dijo a Noé: 'Entra en el arca, tú y toda tu casa, porque a ti he visto justo en esta generación.'"
+
+msgid "NARRATIVE_THE_TOWER_OF_BABEL_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_THREE_VISITORS_MAIN"
+msgstr "Three mysterious visitors came to Abraham.\n\nThey promised that Sarah would bear a son,\ndespite her old age."
+
+msgid "NARRATIVE_TOWER_OF_BABEL_MAIN"
+msgstr "Mankind tried to build a tower to heaven.\n\nGod confused their language\nand scattered them across the earth."
+
+msgid "NARRATIVE_TWELVE_TRIBES_MAIN"
+msgstr "Jacob had twelve sons,\nwho would become the twelve tribes of Israel.\n\nGod's promise was multiplying."
+
+msgid "NARRATIVE_WATER_FROM_THE_ROCK_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_WILDERNESS_DESC"
+msgstr ""
+
+msgid "NARRATIVE_WILDERNESS_NAME"
+msgstr ""
+
+msgid "NARRATIVE_WILDERNESS_YEARS_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_WOMAN_AT_THE_WELL_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_YOUNG_ISAAC_DESC"
+msgstr ""
+
+msgid "NARRATIVE_YOUNG_ISAAC_NAME"
+msgstr ""
+
+msgid "NARRATIVE_YOUNG_JESUS_IN_TEMPLE_MAIN"
+msgstr ""
+
+msgid "NARRATIVE_YOUNG_JOSEPH_DESC"
+msgstr ""
+
+msgid "NARRATIVE_YOUNG_JOSEPH_NAME"
+msgstr "\"\n# Appending 30 missing keys to narrative_en.po\nmsgid \"ACH_GENESIS_COLLECTIBLE\"\nmsgstr \""
+
+msgid "NARRATIVE_YOUNG_MOSES_DESC"
+msgstr ""
+
+msgid "NARRATIVE_YOUNG_MOSES_NAME"
+msgstr ""
+
+msgid "NARRATIVE_ZIPORAH_MIDIANITE_MAIN"
+msgstr ""

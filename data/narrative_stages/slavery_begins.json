@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "The Egyptians made the Israelites slaves,\nforcing them to make bricks and build cities.\n\nTheir cry rose up to God.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_SLAVERY_BEGINS_MAIN"
     }
   ],
   "transitions": [

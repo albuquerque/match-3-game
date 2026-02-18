@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God made the beasts of the earth,\nthe livestock, and everything that creeps on the ground.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_CREATION_DAY_6A_MAIN"
     }
   ],
   "transitions": [

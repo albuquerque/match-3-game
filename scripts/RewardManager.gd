@@ -119,6 +119,9 @@ var audio_music_enabled: bool = true
 var audio_sfx_enabled: bool = true
 var audio_muted: bool = false
 
+# Language settings (persisted in player progress)
+var language: String = "en"  # Current language locale (en, es, pt, fr, etc.)
+
 func _ready():
 	print("[RewardManager] Initializing...")
 	load_progress()
@@ -467,7 +470,9 @@ func save_progress():
 			"music_enabled": audio_music_enabled,
 			"sfx_enabled": audio_sfx_enabled,
 			"muted": audio_muted
-		}
+		},
+		# Language preference
+		"language": language
 	}
 
 	var file = FileAccess.open(SAVE_FILE_PATH, FileAccess.WRITE)
@@ -553,6 +558,28 @@ func load_progress():
 			audio_music_enabled = audio_data.get("music_enabled", audio_music_enabled)
 			audio_sfx_enabled = audio_data.get("sfx_enabled", audio_sfx_enabled)
 			audio_muted = audio_data.get("muted", audio_muted)
+
+			# Load and apply language preference
+			var saved_language = data.get("language", "")
+			if saved_language != "":
+				language = saved_language
+				TranslationServer.set_locale(saved_language)
+				print("[RewardManager] Language set to: %s" % saved_language)
+			else:
+				# Auto-detect system language on first launch
+				var system_locale = OS.get_locale()
+				var lang_code = system_locale.substr(0, 2)  # Extract language code (e.g., "en" from "en_US")
+
+				# Check if we support this language
+				if lang_code in ["en", "es", "pt", "fr"]:
+					language = lang_code
+					TranslationServer.set_locale(lang_code)
+					print("[RewardManager] Auto-detected language: %s" % lang_code)
+				else:
+					# Default to English
+					language = "en"
+					TranslationServer.set_locale("en")
+					print("[RewardManager] Unsupported system language, defaulting to English")
 
 			# Load ExperienceState data if ExperienceDirector is available
 			var experience_director = get_node_or_null("/root/ExperienceDirector")

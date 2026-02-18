@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "'I am Joseph, your brother,\nwhom you sold into Egypt.'\n\nTears and forgiveness followed.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JOSEPH_REVEALED_MAIN"
     }
   ],
   "transitions": [

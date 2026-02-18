@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "The Israelites were fruitful\nand multiplied greatly.\n\nThe land of Egypt was filled with them.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_ISRAEL_MULTIPLIES_MAIN"
     }
   ],
   "transitions": [

@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Pharaoh dreamed of seven fat cows\nand seven lean cows.\n\nJoseph alone could interpret it.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PHARAOHS_DREAMS_MAIN"
     }
   ],
   "transitions": [

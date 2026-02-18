@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Jacob disguised himself as Esau\nand stole his father's blessing.\n\nDeception brought blessing, but also exile.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_STOLEN_BLESSING_MAIN"
     }
   ],
   "transitions": [

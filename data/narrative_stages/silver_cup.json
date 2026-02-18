@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Joseph tested his brothers\nby hiding his cup in Benjamin's sack.\n\nWould they abandon him as they did Joseph?",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_SILVER_CUP_MAIN"
     }
   ],
   "transitions": [

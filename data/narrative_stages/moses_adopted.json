@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Pharaoh's daughter raised Moses\nas her own son.\n\nA Hebrew prince in Egypt's palace.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_MOSES_ADOPTED_MAIN"
     }
   ],
   "transitions": [

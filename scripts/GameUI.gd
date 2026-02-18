@@ -198,6 +198,8 @@ func _ready():
 	RewardManager.connect("lives_changed", _on_lives_changed)
 	RewardManager.connect("booster_changed", _on_booster_changed)
 
+	# Listen for language changes to refresh HUD labels
+	EventBus.language_changed.connect(_on_language_changed)
 	# Connect to GameManager signals
 	GameManager.connect("score_changed", _on_score_changed)
 	GameManager.connect("level_changed", _on_level_changed)
@@ -214,13 +216,13 @@ func _ready():
 
 	# Connect floating menu buttons
 	if map_button:
-		map_button.connect("pressed", _on_map_button_pressed)
+		map_button.connect("pressed", Callable(self, "_on_map_button_pressed"))
 	if audio_button:
-		audio_button.connect("pressed", _on_audio_button_pressed)
+		audio_button.connect("pressed", Callable(self, "_on_audio_button_pressed"))
 	if shop_menu_button:
-		shop_menu_button.connect("pressed", _on_shop_menu_button_pressed)
+		shop_menu_button.connect("pressed", Callable(self, "_on_shop_menu_button_pressed"))
 	if gallery_button:
-		gallery_button.connect("pressed", _on_gallery_button_pressed)
+		gallery_button.connect("pressed", Callable(self, "_on_gallery_button_pressed"))
 
 	# Initialize expandable panel as hidden
 	if expandable_panel:
@@ -362,6 +364,9 @@ func _ready():
 		if start_page.has_signal("settings_pressed") and not start_page.is_connected("settings_pressed", Callable(self, "_on_startpage_settings_pressed")):
 			start_page.connect("settings_pressed", Callable(self, "_on_startpage_settings_pressed"))
 		# Connect achievements signal
+		if start_page.has_signal("achievements_pressed") and not start_page.is_connected("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed")):
+			start_page.connect("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed"))
+
 	# Create LevelTransition screen
 	level_transition = get_node_or_null("LevelTransition")
 	if not level_transition:
@@ -487,17 +492,17 @@ func update_display():
 		# Unmovable-based level
 		var progress = float(GameManager.unmovables_cleared) / float(GameManager.unmovable_target)
 		target_progress.value = min(progress * 100, 100)
-		target_label.text = "Obstacles: %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
+		target_label.text = tr("UI_OBSTACLES") + ": %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
 	elif GameManager.collectible_target > 0:
 		# Collectible-based level
 		var progress = float(GameManager.collectibles_collected) / float(GameManager.collectible_target)
 		target_progress.value = min(progress * 100, 100)
-		target_label.text = "Coins: %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
+		target_label.text = tr("UI_COINS") + ": %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
 	else:
 		# Score-based level
 		var progress = float(GameManager.score) / float(GameManager.target_score)
 		target_progress.value = min(progress * 100, 100)
-		target_label.text = "Goal: %d" % GameManager.target_score
+		target_label.text = tr("UI_GOAL_SCORE") + ": %d" % GameManager.target_score
 
 func hide_gameplay_ui():
 	"""Hide gameplay UI elements (HUD and booster panel) during level transitions
@@ -593,11 +598,11 @@ func _on_level_changed(new_level: int):
 
 	# Update target label based on level type
 	if GameManager.unmovable_target > 0:
-		target_label.text = "Obstacles: %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
+		target_label.text = tr("UI_OBSTACLES") + ": %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
 	elif GameManager.collectible_target > 0:
-		target_label.text = "Coins: %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
+		target_label.text = tr("UI_COINS") + ": %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
 	else:
-		target_label.text = "Goal: %d" % GameManager.target_score
+		target_label.text = tr("UI_GOAL_SCORE") + ": %d" % GameManager.target_score
 
 	target_progress.value = 0
 
@@ -607,7 +612,7 @@ func _on_level_changed(new_level: int):
 func _on_collectibles_changed(collected: int, target: int):
 	"""Update UI when collectibles are collected"""
 	if target > 0:
-		target_label.text = "Coins: %d/%d" % [collected, target]
+		target_label.text = tr("UI_COINS") + ": %d/%d" % [collected, target]
 		var progress = float(collected) / float(target)
 		target_progress.value = min(progress * 100, 100)
 
@@ -619,7 +624,7 @@ func _on_collectibles_changed(collected: int, target: int):
 func _on_unmovables_changed(cleared: int, target: int):
 	"""Update UI when unmovables are cleared"""
 	if target > 0:
-		target_label.text = "Obstacles: %d/%d" % [cleared, target]
+		target_label.text = tr("UI_OBSTACLES") + ": %d/%d" % [cleared, target]
 		var progress = float(cleared) / float(target)
 		target_progress.value = min(progress * 100, 100)
 
@@ -697,7 +702,7 @@ func _show_enhanced_game_over():
 	# Title
 	var title = Label.new()
 	title.name = "Title"
-	title.text = "Game Over"
+	title.text = tr("UI_GAME_OVER")
 	ThemeManager.apply_bangers_font(title, 48)
 	title.add_theme_color_override("font_color", Color(1,0.2,0.2))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -711,7 +716,7 @@ func _show_enhanced_game_over():
 	# Details
 	var details = Label.new()
 	details.name = "Details"
-	details.text = "You have no moves left. Final Score: %d\nTarget: %d" % [GameManager.score, GameManager.target_score]
+	details.text = tr("UI_NO_MOVES") + " " + tr("UI_FINAL_SCORE") + ": %d\n" + tr("UI_TARGET") + ": %d" % [GameManager.score, GameManager.target_score]
 	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	details.valign = VERTICAL_ALIGNMENT_CENTER
 	#	details.autowrap = true
@@ -736,7 +741,7 @@ func _show_enhanced_game_over():
 	# Retry button
 	var retry_btn = Button.new()
 	retry_btn.name = "RetryButton"
-	retry_btn.text = "Try Again"
+	retry_btn.text = tr("UI_TRY_AGAIN")
 	retry_btn.focus_mode = Control.FOCUS_NONE
 	retry_btn.connect("pressed", Callable(self, "_on_game_over_retry"))
 	# Godot 4: use size_flags to expand horizontally
@@ -746,7 +751,7 @@ func _show_enhanced_game_over():
 	# Quit button
 	var quit_btn = Button.new()
 	quit_btn.name = "QuitButton"
-	quit_btn.text = "Quit"
+	quit_btn.text = tr("UI_QUIT")
 	quit_btn.focus_mode = Control.FOCUS_NONE
 	quit_btn.connect("pressed", Callable(self, "_on_game_over_quit"))
 	# Godot 4: use size flags to expand horizontally
@@ -1298,8 +1303,6 @@ func _load_level_by_number(level_num: int):
 
 	print("[GameUI] Level loading completed")
 
-
-
 func _on_worldmap_back_to_menu():
 	"""Handle closing the WorldMap and returning to previous UI (StartPage)."""
 	print("[GameUI] WorldMap requested close/back to menu")
@@ -1585,9 +1588,9 @@ func _reorganize_hud():
 		top_panel.add_theme_constant_override("separation", 40)
 
 	# Add header labels above the values for clarity
-	_add_header_label_to_container(hud_container.get_node("HUDContent/MovesContainer"), "MOVES")
-	_add_header_label_to_container(hud_container.get_node("HUDContent/ScoreContainer"), "SCORE")
-	_add_header_label_to_container(hud_container.get_node("HUDContent/TargetContainer"), "GOAL")
+	_add_header_label_to_container(hud_container.get_node("HUDContent/MovesContainer"), "UI_MOVES")
+	_add_header_label_to_container(hud_container.get_node("HUDContent/ScoreContainer"), "UI_SCORE_LABEL")
+	_add_header_label_to_container(hud_container.get_node("HUDContent/TargetContainer"), "UI_GOAL")
 
 	# Create a cleaner layout - hide level label (redundant with start page)
 	if level_label and level_label.get_parent():
@@ -1625,11 +1628,14 @@ func _add_header_label_to_container(container: Node, header_text: String):
 
 	# Check if header already exists
 	if container.get_child_count() > 0 and container.get_child(0).name == "HeaderLabel":
+		# Update existing header with current translation
+		var existing_header = container.get_child(0)
+		existing_header.text = tr(header_text)
 		return
 
 	var header = Label.new()
 	header.name = "HeaderLabel"
-	header.text = header_text
+	header.text = tr(header_text)
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	header.add_theme_font_size_override("font_size", 14)
 	header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 0.8))
@@ -1664,6 +1670,30 @@ func _on_booster_changed(booster_type: String, new_amount: int):
 	"""Handle booster count changes"""
 	print("[GameUI] Booster changed: ", booster_type, " = ", new_amount)
 	update_booster_ui()
+
+func _on_language_changed(locale: String):
+	"""Refresh HUD labels when language changes"""
+	print("[GameUI] Refreshing HUD for language: %s" % locale)
+
+	# Refresh header labels
+	var top_panel = get_node_or_null("VBoxContainer/TopPanel")
+	if top_panel:
+		var hud_container = top_panel.get_node_or_null("HUD")
+		if hud_container:
+			var hud_content = hud_container.get_node_or_null("HUDContent")
+			if hud_content:
+				_add_header_label_to_container(hud_content.get_node_or_null("MovesContainer"), "UI_MOVES")
+				_add_header_label_to_container(hud_content.get_node_or_null("ScoreContainer"), "UI_SCORE_LABEL")
+				_add_header_label_to_container(hud_content.get_node_or_null("TargetContainer"), "UI_GOAL")
+
+	# Refresh target label
+	if target_label:
+		if GameManager.unmovable_target > 0:
+			target_label.text = tr("UI_OBSTACLES") + ": %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
+		elif GameManager.collectible_target > 0:
+			target_label.text = tr("UI_COINS") + ": %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
+		else:
+			target_label.text = tr("UI_GOAL_SCORE") + ": %d" % GameManager.target_score
 
 func animate_currency_change(control: Control):
 	"""Animate currency change - works with Label or HBoxContainer"""
@@ -2427,17 +2457,7 @@ func _show_settings_side():
 				inst = packed.instantiate()
 				inst.name = "SettingsDialog"
 				add_child(inst)
-				print("[GameUI] Instanced SettingsDialog (fullscreen)")
-				# connect its dialog_closed signal if present to our close handler
-				if inst.has_signal("dialog_closed"):
-					inst.connect("dialog_closed", Callable(self, "_on_settings_closed"))
-				# also try to hook a CloseButton if present
-				if inst.has_node("VBoxContainer/CloseButton"):
-					var cb = inst.get_node("VBoxContainer/CloseButton")
-					if cb and cb is Button:
-						cb.pressed.connect(Callable(self, "_on_settings_closed"))
-			else:
-				print("[GameUI] Failed to load SettingsDialog scene for fullscreen")
+				print("[GameUI] Created SettingsDialog")
 		else:
 			print("[GameUI] SettingsDialog scene not found: %s" % scene_path)
 
@@ -2488,19 +2508,7 @@ func _show_shop_side():
 				shop_ui = packed.instantiate()
 				shop_ui.name = "ShopUI"
 				add_child(shop_ui)
-				print("[GameUI] Instanced ShopUI (fullscreen)")
-				# connect shop signals to GameUI handlers
-				if shop_ui.has_signal("shop_closed"):
-					shop_ui.connect("shop_closed", Callable(self, "_on_shop_closed"))
-				if shop_ui.has_signal("item_purchased"):
-					shop_ui.connect("item_purchased", Callable(self, "_on_item_purchased"))
-				# hook CloseButton fallback
-				if shop_ui.has_node("Panel/VBoxContainer/TopBar/CloseButton"):
-					var scb = shop_ui.get_node("Panel/VBoxContainer/TopBar/CloseButton")
-					if scb and scb is Button:
-						scb.pressed.connect(Callable(self, "_on_shop_closed"))
-			else:
-				print("[GameUI] Failed to load ShopUI scene for fullscreen")
+				print("[GameUI] Created ShopUI")
 		else:
 			print("[GameUI] ShopUI scene not found: %s" % scene_path)
 
@@ -2508,7 +2516,7 @@ func _show_shop_side():
 		shop_ui.anchor_left = 0
 		shop_ui.anchor_top = 0
 		shop_ui.anchor_right = 1
-		shop_ui.anchor_bottom = 1		# start offscreen to right (GameUI will animate position)
+		shop_ui.anchor_bottom = 1
 		shop_ui.position = Vector2(vp.x, 0)
 		shop_ui.size = vp
 		shop_ui.visible = true
@@ -3063,6 +3071,113 @@ func _show_worldmap_fullscreen():
 
 	print("[GameUI] WorldMap shown")
 
+
+func _on_startpage_settings_pressed():
+	"""Called when StartPage requests to open Settings."""
+	print("[GameUI] Settings button pressed on StartPage")
+	AudioManager.play_sfx("ui_click")
+
+	# Create or get settings dialog
+	var settings = get_node_or_null("SettingsDialog")
+	if not settings or not is_instance_valid(settings):
+		var scene_path = "res://scenes/SettingsDialog.tscn"
+		if ResourceLoader.exists(scene_path):
+			var packed = load(scene_path)
+			if packed and packed is PackedScene:
+				settings = packed.instantiate()
+				settings.name = "SettingsDialog"
+				add_child(settings)
+				print("[GameUI] Instanced SettingsDialog from scene")
+		else:
+			print("[GameUI] ERROR: SettingsDialog scene not found")
+			return
+
+	if settings:
+		# Reset position and modulate in case it was animated off-screen
+		settings.position = Vector2.ZERO
+		settings.modulate = Color.WHITE
+		settings.visible = true
+		settings.z_index = 200  # Above everything
+		print("[GameUI] SettingsDialog shown (pos: %s, visible: %s, z: %d)" % [settings.position, settings.visible, settings.z_index])
+		# Connect close signal if not already connected
+		if settings.has_signal("close_requested") and not settings.is_connected("close_requested", Callable(self, "_on_settings_closed")):
+			settings.connect("close_requested", Callable(self, "_on_settings_closed"))
+
+
+func _on_startpage_achievements_pressed():
+	"""Called when StartPage requests to open Achievements."""
+	print("[GameUI] Achievements button pressed on StartPage")
+	AudioManager.play_sfx("ui_click")
+
+	# Create or get achievements page
+	var achievements = get_node_or_null("AchievementsPage")
+	if not achievements or not is_instance_valid(achievements):
+		var scene_path = "res://scenes/AchievementsPage.tscn"
+		if ResourceLoader.exists(scene_path):
+			var packed = load(scene_path)
+			if packed and packed is PackedScene:
+				achievements = packed.instantiate()
+				achievements.name = "AchievementsPage"
+				add_child(achievements)
+				print("[GameUI] Instanced AchievementsPage from scene")
+		else:
+			# Fallback to script
+			var script = load("res://scripts/AchievementsPage.gd")
+			if script:
+				achievements = script.new()
+				achievements.name = "AchievementsPage"
+				add_child(achievements)
+				print("[GameUI] Instanced AchievementsPage from script")
+
+	if achievements:
+		# Configure as fullscreen
+		achievements.anchor_left = 0
+		achievements.anchor_top = 0
+		achievements.anchor_right = 1
+		achievements.anchor_bottom = 1
+		achievements.visible = true
+		achievements.z_index = 150
+		achievements.mouse_filter = Control.MOUSE_FILTER_STOP
+
+		# Connect back signal if exists
+		if achievements.has_signal("back_pressed") and not achievements.is_connected("back_pressed", Callable(self, "_on_achievements_back_pressed")):
+			achievements.connect("back_pressed", Callable(self, "_on_achievements_back_pressed"))
+
+func _on_achievements_back_pressed():
+	"""Called when back button is pressed on achievements page."""
+	var achievements = get_node_or_null("AchievementsPage")
+	if achievements:
+		achievements.visible = false
+
+func _on_startpage_exchange_pressed():
+	"""Called when StartPage requests to exchange gems for coins."""
+	print("[GameUI] Exchange button pressed on StartPage")
+	AudioManager.play_sfx("ui_click")
+
+	# Open shop UI (where gem exchange happens)
+	var shop = get_node_or_null("ShopUI")
+	if not shop or not is_instance_valid(shop):
+		var shop_script = load("res://scripts/ShopUI.gd")
+		if shop_script:
+			shop = shop_script.new()
+			shop.name = "ShopUI"
+			add_child(shop)
+			print("[GameUI] Created ShopUI")
+
+	if shop:
+		# Configure as fullscreen
+		shop.anchor_left = 0
+		shop.anchor_top = 0
+		shop.anchor_right = 1
+		shop.anchor_bottom = 1
+		shop.visible = true
+		shop.z_index = 150
+		shop.mouse_filter = Control.MOUSE_FILTER_STOP
+
+		# Connect close signal if not already connected
+		if shop.has_signal("shop_closed") and not shop.is_connected("shop_closed", Callable(self, "_on_shop_closed")):
+			shop.connect("shop_closed", Callable(self, "_on_shop_closed"))
+
 func _show_gallery_page():
 	"""Show the gallery as a fullscreen UI"""
 	AudioManager.play_sfx("ui_click")
@@ -3235,7 +3350,6 @@ func _start_menu_glow_animations():
 	if menu_button and menu_button.has_node("Glow"):
 		var glow = menu_button.get_node("Glow")
 		_animate_glow_pulse(glow, Color(0.2, 0.6, 1, 0.3), Color(0.2, 0.6, 1, 0.6), 1.5, 0.0)
-
 	# Animate map button glow
 	if map_button and map_button.has_node("Glow"):
 		var glow = map_button.get_node("Glow")
@@ -3271,14 +3385,11 @@ func _animate_glow_pulse(glow_rect: ColorRect, color_from: Color, color_to: Colo
 	tween.tween_property(glow_rect, "color", color_from, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _find_node_recursive(node: Node, target_name: String) -> Node:
-	if not node:
-		return null
+	"""Recursively find a node by name in the tree"""
 	if node.name == target_name:
 		return node
 	for child in node.get_children():
-		if child is Node:
-			var found = _find_node_recursive(child, target_name)
-			if found:
-				return found
+		var found = _find_node_recursive(child, target_name)
+		if found:
+			return found
 	return null
-

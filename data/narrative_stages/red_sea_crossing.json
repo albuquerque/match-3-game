@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God parted the Red Sea,\nand Israel walked through on dry ground.\n\nThe waters covered Pharaoh's army.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_RED_SEA_CROSSING_MAIN"
     }
   ],
   "transitions": [

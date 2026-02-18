@@ -32,7 +32,7 @@ func _setup_ui():
 
 	# Title with warm biblical colors
 	var title = Label.new()
-	title.text = "Achievements"
+	title.text = tr("UI_ACHIEVEMENTS_TITLE")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(title, 40)
 	title.add_theme_color_override("font_color", Color(0.5, 0.3, 0.1))  # Deep warm brown
@@ -65,7 +65,7 @@ func _setup_ui():
 	streak_panel.add_child(streak_vbox)
 
 	var streak_title = Label.new()
-	streak_title.text = "🔥 Daily Login Streak"
+	streak_title.text = tr("UI_DAILY_STREAK_TITLE")
 	streak_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(streak_title, 28)
 	streak_title.add_theme_color_override("font_color", Color(1, 0.6, 0.2))
@@ -73,13 +73,13 @@ func _setup_ui():
 
 	streak_label = Label.new()
 	streak_label.name = "StreakLabel"
-	streak_label.text = "Current Streak: 0 days"
+	streak_label.text = tr("UI_CURRENT_STREAK") % 0
 	streak_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(streak_label, 24)
 	streak_vbox.add_child(streak_label)
 
 	var reward_info = Label.new()
-	reward_info.text = "Login daily to earn rewards!"
+	reward_info.text = tr("UI_LOGIN_REWARDS_INFO")
 	reward_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(reward_info, 16)
 	reward_info.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
@@ -88,7 +88,7 @@ func _setup_ui():
 	# Claim reward button
 	claim_reward_button = Button.new()
 	claim_reward_button.name = "ClaimRewardButton"
-	claim_reward_button.text = "Claim Daily Reward"
+	claim_reward_button.text = tr("UI_CLAIM_DAILY")
 	claim_reward_button.custom_minimum_size = Vector2(250, 50)
 	claim_reward_button.disabled = true
 	claim_reward_button.pressed.connect(_on_claim_reward_pressed)
@@ -101,7 +101,7 @@ func _setup_ui():
 
 	# Badges section
 	var badges_title = Label.new()
-	badges_title.text = "Milestone Badges"
+	badges_title.text = tr("UI_MILESTONE_BADGES")
 	badges_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(badges_title, 28)
 	badges_title.add_theme_color_override("font_color", Color(0.8, 0.8, 1.0))
@@ -118,7 +118,7 @@ func _setup_ui():
 
 	# Back button
 	back_button = Button.new()
-	back_button.text = "Back"
+	back_button.text = tr("UI_BACK")
 	back_button.custom_minimum_size = Vector2(150, 50)
 	back_button.pressed.connect(_on_back_pressed)
 	vbox.add_child(back_button)
@@ -131,7 +131,7 @@ func _update_display():
 	# Update streak display
 	var streak = rm.daily_streak
 	if streak_label:
-		streak_label.text = "Current Streak: %d days" % streak
+		streak_label.text = tr("UI_CURRENT_STREAK") % streak
 
 		# Add visual flair for milestones
 		if streak >= 7:
@@ -146,9 +146,9 @@ func _update_display():
 	if claim_reward_button:
 		claim_reward_button.disabled = not can_claim
 		if can_claim:
-			claim_reward_button.text = "🎁 Claim Daily Reward"
+			claim_reward_button.text = "🎁 " + tr("UI_CLAIM_DAILY")
 		else:
-			claim_reward_button.text = "✓ Reward Claimed Today"
+			claim_reward_button.text = "✓ " + tr("UI_CLAIMED")
 
 	# Update badges
 	_update_badges(streak)
@@ -266,7 +266,7 @@ func _update_badges(streak: int):
 	for category in achievement_categories:
 		# Category header with biblical theme colors
 		var category_header = Label.new()
-		category_header.text = category["title"]
+		category_header.text = tr(category["title"])
 		category_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		ThemeManager.apply_bangers_font(category_header, 24)
 		category_header.add_theme_color_override("font_color", Color(0.4, 0.2, 0.1))  # Rich brown
@@ -282,8 +282,8 @@ func _update_badges(streak: int):
 				var required_days = int(achievement_data["id"].split("_")[1])
 				achievement_panel = _create_achievement_panel(
 					achievement_data["id"],
-					achievement_data["title"],
-					achievement_data["desc"],
+					tr(achievement_data["title"]),
+					tr(achievement_data["desc"]),
 					streak,
 					required_days,
 					streak >= required_days
@@ -293,8 +293,8 @@ func _update_badges(streak: int):
 				var progress_data = rm.get_achievement_progress(achievement_data["id"])
 				achievement_panel = _create_achievement_panel(
 					achievement_data["id"],
-					achievement_data["title"],
-					achievement_data["desc"],
+					tr(achievement_data["title"]),
+					tr(achievement_data["desc"]),
 					progress_data["progress"],
 					progress_data["target"],
 					progress_data["progress"] >= progress_data["target"]
@@ -351,6 +351,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 	# Title with appropriate colors for light backgrounds
 	var title_label = Label.new()
 	title_label.text = title if unlocked else "🔒 " + title
+	# Consider wrapping title in tr() earlier if titles are fixed keys
 	ThemeManager.apply_bangers_font(title_label, 20)
 	if unlocked:
 		title_label.add_theme_color_override("font_color", Color(0.6, 0.4, 0.1))  # Warm brown for completed
@@ -380,6 +381,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 	progress_bar.value = current_progress
 	progress_container.add_child(progress_bar)
 
+	# Progress label
 	var progress_label = Label.new()
 	progress_label.text = "%d/%d" % [current_progress, target_progress]
 	progress_label.custom_minimum_size = Vector2(60, 0)  # Fixed width for consistent alignment
@@ -403,7 +405,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 		if not achievement_progress.get("claimed", false):
 			# Show claim button with biblical theme colors
 			var claim_button = Button.new()
-			claim_button.text = "🎁 CLAIM"
+			claim_button.text = tr("UI_CLAIM_BUTTON")
 			claim_button.custom_minimum_size = Vector2(100, 40)
 			ThemeManager.apply_bangers_font_to_button(claim_button, 16)
 			claim_button.add_theme_color_override("font_color", Color(0.8, 0.5, 0.1))  # Golden orange
@@ -421,7 +423,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 		else:
 			# Already claimed
 			var claimed_label = Label.new()
-			claimed_label.text = "✓ CLAIMED"
+			claimed_label.text = tr("UI_CLAIMED")
 			claimed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			ThemeManager.apply_bangers_font(claimed_label, 18)
 			claimed_label.add_theme_color_override("font_color", Color(0.6, 0.4, 0.1))  # Warm brown
@@ -430,10 +432,10 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 		# Locked or no reward manager
 		var status_label = Label.new()
 		if unlocked:
-			status_label.text = "✓ COMPLETE"
+			status_label.text = tr("UI_COMPLETE")
 			status_label.add_theme_color_override("font_color", Color(0.6, 0.4, 0.1))  # Warm brown
 		else:
-			status_label.text = "LOCKED"
+			status_label.text = tr("UI_LOCKED")
 			status_label.add_theme_color_override("font_color", Color(0.5, 0.6, 0.7))  # Soft blue-gray
 		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ThemeManager.apply_bangers_font(status_label, 18)
@@ -514,7 +516,7 @@ func _on_claim_achievement(achievement_id: String, button: Button):
 
 	var result = rm.claim_achievement_reward(achievement_id)
 	if result["success"]:
-		button.text = "✓ CLAIMED"
+		button.text = "✓ " + tr("UI_CLAIMED")
 		button.disabled = true
 		button.add_theme_color_override("font_color", Color(0.5, 1, 0.5))
 
@@ -644,7 +646,7 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 
 	# Title
 	var title = Label.new()
-	title.text = "🎁 Day %d Reward Claimed!" % streak
+	title.text = tr("UI_DAY_REWARD_CLAIMED") % streak
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(title, 32)
 	title.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
@@ -657,7 +659,7 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 
 	# Rewards list
 	var rewards_label = Label.new()
-	rewards_label.text = "You received:"
+	rewards_label.text = tr("UI_YOU_RECEIVED")
 	rewards_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(rewards_label, 20)
 	vbox.add_child(rewards_label)
@@ -717,7 +719,7 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 
 	# Close button
 	var close_btn = Button.new()
-	close_btn.text = "Awesome!"
+	close_btn.text = tr("UI_AWESOME")
 	close_btn.custom_minimum_size = Vector2(200, 50)
 	close_btn.pressed.connect(popup_overlay.queue_free)
 	vbox.add_child(close_btn)

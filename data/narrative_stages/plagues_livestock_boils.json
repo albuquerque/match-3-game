@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "The livestock died,\nand painful boils broke out on all Egyptians.\n\nThe plagues grew worse.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PLAGUES_LIVESTOCK_BOILS_MAIN"
     }
   ],
   "transitions": [

@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Moses killed an Egyptian taskmaster\nand fled to Midian.\n\nHe became a shepherd in the wilderness.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_MOSES_FLEES_MAIN"
     }
   ],
   "transitions": [

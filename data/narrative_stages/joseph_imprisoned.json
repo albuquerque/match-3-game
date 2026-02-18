@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Falsely accused, Joseph was thrown into prison.\n\nYet even there, the Lord was with him.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JOSEPH_IMPRISONED_MAIN"
     }
   ],
   "transitions": [

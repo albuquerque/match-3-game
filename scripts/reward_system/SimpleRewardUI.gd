@@ -68,7 +68,7 @@ func _create_ui():
 
 	# Title - larger and more prominent
 	title_label = Label.new()
-	title_label.text = "Level Complete!"
+	title_label.text = tr("UI_LEVEL_COMPLETE")
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 48)  # Bigger title
 	title_label.add_theme_color_override("font_color", title_color)  # Theme color
@@ -76,7 +76,7 @@ func _create_ui():
 
 	# Score - larger font
 	score_label = Label.new()
-	score_label.text = "Score: 0"
+	score_label.text = tr("UI_LABEL_SCORE") + ": 0"
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	score_label.add_theme_font_size_override("font_size", 32)  # Bigger score
 	score_label.add_theme_color_override("font_color", text_color)  # Theme color
@@ -96,7 +96,7 @@ func _create_ui():
 
 	# Rewards - larger font
 	rewards_label = Label.new()
-	rewards_label.text = "Rewards: 0 coins, 0 gems"
+	rewards_label.text = tr("UI_REWARDS_SUMMARY") % [0, 0]
 	rewards_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rewards_label.add_theme_font_size_override("font_size", 28)  # Bigger rewards text
 	rewards_label.add_theme_color_override("font_color", text_color)  # Theme color
@@ -109,7 +109,7 @@ func _create_ui():
 
 	# Continue button - larger and more prominent
 	continue_button = Button.new()
-	continue_button.text = "Continue"
+	continue_button.text = tr("UI_BUTTON_CONTINUE")
 	continue_button.custom_minimum_size = Vector2(300, 80)  # Much larger button
 	continue_button.add_theme_font_size_override("font_size", 32)  # Bigger button text
 	continue_button.pressed.connect(_on_continue_pressed)
@@ -138,11 +138,11 @@ func show_rewards(data: Dictionary):
 	print("[SimpleRewardUI] Showing rewards - Level: %d, Score: %d, Stars: %d, Coins: %d, Gems: %d" % [level_number, score, stars, coins, gems])
 
 	# Update static UI elements
-	title_label.text = "🎉 Level %d Complete! 🎉" % level_number
-	score_label.text = "Score: %d" % score
+	title_label.text = "🎉 " + tr("UI_LEVEL_COMPLETE") + " %d! 🎉" % level_number
+	score_label.text = tr("UI_LABEL_SCORE") + ": %d" % score
 
 	# Start with 0 rewards shown
-	rewards_label.text = "Rewards: 0 coins, 0 gems"
+	rewards_label.text = tr("UI_REWARDS_SUMMARY") % [0, 0]
 
 	# Dim all stars initially
 	for i in range(stars_container.get_child_count()):
@@ -203,11 +203,11 @@ func _animate_rewards(target_coins: int, target_gems: int):
 		var progress = float(i) / float(steps)
 		var current_coins = int(target_coins * progress)
 		var current_gems = int(target_gems * progress)
-		rewards_label.text = "Rewards: %d coins, %d gems" % [current_coins, current_gems]
+		rewards_label.text = tr("UI_REWARDS_SUMMARY") % [current_coins, current_gems]
 		await get_tree().create_timer(step_duration).timeout
 
 	# Ensure final values are exact
-	rewards_label.text = "Rewards: %d coins, %d gems" % [target_coins, target_gems]
+	rewards_label.text = tr("UI_REWARDS_SUMMARY") % [target_coins, target_gems]
 
 	# Play completion chime
 	if AudioManager:

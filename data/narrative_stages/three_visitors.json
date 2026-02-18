@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Three mysterious visitors came to Abraham.\n\nThey promised that Sarah would bear a son,\ndespite her old age.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_THREE_VISITORS_MAIN"
     }
   ],
   "transitions": [

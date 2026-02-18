@@ -9,8 +9,8 @@
     {
       "name": "intro",
       "asset": "res://data/images/narrative/creation_day_2.svg",
-      "text": "And God said, 'Let there be a vault between the waters to separate water from water.'",
-      "duration": 5.0
+      "duration": 5.0,
+      "text_key": "NARRATIVE_CREATION_DAY_2_INTRO"
     }
   ],
   "transitions": [

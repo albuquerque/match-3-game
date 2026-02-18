@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Frogs covered the land of Egypt,\nin houses, bedrooms, and ovens.\n\nStill Pharaoh refused.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PLAGUE_FROGS_MAIN"
     }
   ],
   "transitions": [

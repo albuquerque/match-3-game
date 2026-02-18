@@ -167,9 +167,9 @@ func _connect_dlc_signals():
 		return
 
 	print("[WorldMap] Connecting DLC signals...")
-	DLCManager.dlc_list_updated.connect(_on_dlc_list_updated)
-	DLCManager.download_complete.connect(_on_dlc_download_complete)
-	DLCManager.chapter_installed.connect(_on_dlc_chapter_installed)
+	DLCManager.dlc_list_updated.connect(Callable(self, "_on_dlc_list_updated"))
+	DLCManager.download_complete.connect(Callable(self, "_on_dlc_download_complete"))
+	DLCManager.chapter_installed.connect(Callable(self, "_on_dlc_chapter_installed"))
 	print("[WorldMap] ✓ All DLC signals connected")
 
 func _fetch_available_dlc():
@@ -234,7 +234,7 @@ func _setup_ui():
 	# Title
 	title_label = Label.new()
 	title_label.name = "Title"
-	title_label.text = world_map_data.world_map.title
+	title_label.text = tr("WORLDMAP_TITLE") if not world_map_data or not world_map_data.world_map.title else world_map_data.world_map.title
 	title_label.anchor_left = 0.5
 	title_label.anchor_right = 0.5
 	title_label.anchor_top = 0.2
@@ -280,7 +280,7 @@ func _setup_ui():
 	# Back Button
 	var back_button = Button.new()
 	back_button.name = "BackButton"
-	back_button.text = "← Back to Menu"
+	back_button.text = tr("UI_BACK_TO_MENU")
 	back_button.position = Vector2(20, 20)
 	back_button.custom_minimum_size = Vector2(180, 50)
 	ThemeManager.apply_bangers_font_to_button_styled(back_button, 16, Color.WHITE, Color(0,0,0), 2)
@@ -326,11 +326,24 @@ func _populate_chapters():
 			spacer.custom_minimum_size = Vector2(0, 50)
 			chapters_vbox.add_child(spacer)
 
+	# After adding all chapters, ensure level button states are updated
+	update_progress()
+
+	# Debug: count created level buttons
+	var total_levels = 0
+	for ch in current_chapter_containers:
+		var levels = ch.get_node_or_null("LevelsContainer")
+		if levels:
+			for n in levels.get_children():
+				if n.name.begins_with("LevelContainer"):
+					total_levels += 1
+	print("[WorldMap] Finished populating chapters - total level buttons: %d" % total_levels)
+
 func _create_chapter_container(chapter_data: Dictionary) -> Control:
 	"""Create a complete chapter container with background and levels"""
 	# Main chapter container - scale height based on screen
 	var chapter = Control.new()
-	chapter.name = "Chapter%d" % chapter_data.id
+	chapter.name = "Chapter%d" % int(chapter_data.get("id", 0))
 	var chapter_height = 900 * scale_factor.y  # Increased to accommodate y=810 button
 	chapter.custom_minimum_size = Vector2(0, chapter_height)
 
@@ -364,6 +377,7 @@ func _create_chapter_container(chapter_data: Dictionary) -> Control:
 
 	if bg_texture:
 		chapter_bg.texture = bg_texture
+		chapter_bg.z_index = 0
 	else:
 		# Fallback colored background
 		var color_rect = ColorRect.new()
@@ -371,158 +385,169 @@ func _create_chapter_container(chapter_data: Dictionary) -> Control:
 		color_rect.anchor_bottom = 1.0
 		color_rect.color = Color.from_string(chapter_data.theme_color, Color.BLUE)
 		color_rect.color.a = 0.7  # Semi-transparent
+		color_rect.z_index = 0
 		chapter.add_child(color_rect)
 
 	chapter.add_child(chapter_bg)
 
 	# Chapter Title
 	var chapter_title = _create_chapter_title(chapter_data)
+	chapter_title.z_index = 10
 	chapter.add_child(chapter_title)
 
 	# Levels Container (for custom positioning)
 	var levels_container = Control.new()
 	levels_container.name = "LevelsContainer"
+	# Ensure it fills the chapter area
+	levels_container.anchor_left = 0.0
+	levels_container.anchor_top = 0.0
 	levels_container.anchor_right = 1.0
 	levels_container.anchor_bottom = 1.0
+	levels_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	levels_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	levels_container.z_index = 5
 	chapter.add_child(levels_container)
 
 	# Create level buttons
-	for level_data in chapter_data.levels:
+	var initial_levels_count = 0
+	var levels_array = chapter_data.get("levels", [])
+	initial_levels_count = int(levels_array.size())
+	print("[WorldMap] Chapter %s initial levels: %d" % [str(chapter_data.get("id", "?")), initial_levels_count])
+
+	if levels_array.size() == 0:
+		# Fallback: generate synthetic levels using level_grid or default 2x5
+		var grid = chapter_data.get("level_grid", {})
+		var rows = int(grid.get("rows", 2))
+		var cols = int(grid.get("columns", 5))
+		var start_num = int((chapter_data.get("id", 1) - 1) * (rows * cols) + 1)
+		print("[WorldMap] No explicit levels found for chapter %s — generating %dx%d grid starting at %d" % [str(chapter_data.get("id", "?")), rows, cols, start_num])
+		var generated = []
+		for r in range(rows):
+			for c in range(cols):
+				var lvl = start_num + r * cols + c
+				# Position grid with spacing; base positions are chosen to fit typical chapter layout
+				var gx = 120 + c * 110
+				var gy = 160 + r * 120
+				generated.append({"level": lvl, "pos": [gx, gy], "unlocked": true, "name": "Level %d" % lvl})
+		chapter_data["levels"] = generated
+		levels_array = chapter_data.get("levels", [])
+		print("[WorldMap] Generated %d levels for chapter %s" % [levels_array.size(), str(chapter_data.get("id", "?"))])
+
+	var created_in_chapter = 0
+	for level_data in levels_array:
 		var level_button = _create_level_button(level_data)
 		levels_container.add_child(level_button)
+		created_in_chapter += 1
+
+	print("[WorldMap] Chapter %s created %d level buttons (had %d levels)" % [str(chapter_data.get("id", "?")), created_in_chapter, initial_levels_count])
 
 	# Next Chapter Button (if not last chapter)
 	if chapter_data.has("next_chapter_button_pos"):
-		var next_button = _create_next_chapter_button(chapter_data)
+		var next_button = Button.new()
+		var chapter_complete = chapter_data.get("complete", false)
+		next_button.text = tr("UI_NEXT_CHAPTER") if chapter_complete else tr("UI_COMPLETE_CHAPTER")
+		# ...existing code to position and style button ...
 		chapter.add_child(next_button)
 
 	return chapter
 
-func _create_chapter_title(chapter_data: Dictionary) -> Label:
-	"""Create chapter title label"""
+func _create_chapter_title(chapter_data: Dictionary) -> Control:
+	var container = HBoxContainer.new()
+	container.name = "ChapterTitle"
+	container.anchor_left = 0.5
+	container.anchor_right = 0.5
+	container.custom_minimum_size = Vector2(0, 40)
+	container.alignment = BoxContainer.ALIGNMENT_CENTER
+
 	var title = Label.new()
-	title.name = "ChapterTitle"
 	title.text = chapter_data.title
-	title.position = Vector2(0, 30 * scale_factor.y)
-	title.anchor_right = 1.0
-	title.custom_minimum_size = Vector2(0, 80 * scale_factor.y)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-	var title_font_size = int(28 * min(scale_factor.x, scale_factor.y))
-	ThemeManager.apply_bangers_font(title, title_font_size)
-	title.add_theme_color_override("font_color", Color.WHITE)
-	title.add_theme_color_override("font_outline_color", Color.BLACK)
-	title.add_theme_constant_override("outline_size", 3)
-
-	return title
+	ThemeManager.apply_bangers_font(title, 20)
+	container.add_child(title)
+	return container
 
 func _create_level_button(level_data: Dictionary) -> Control:
-	"""Create a level button with stars and name"""
-	var rm = RewardManager
-	var level_num = level_data.level
-	var level_unlocked = level_num <= rm.levels_completed + 1
-	var level_completed = level_num <= rm.levels_completed
-	var stars_earned = _get_level_stars(level_num)
+	"""Create a positioned level button inside a LevelsContainer.
+	Returns a Control named 'LevelContainer{N}' with a child Button 'LevelButton{N}'.
+	This handles positioning (using pos or grid), locked state, and stars display.
+	"""
+	# Defensive: ensure level_data is a dictionary
+	if not level_data or typeof(level_data) != TYPE_DICTIONARY:
+		var empty_container = Control.new()
+		empty_container.name = "LevelContainer_invalid"
+		return empty_container
 
-	# Container for the entire level display - use scaled position
-	var scaled_pos = _scale_position(level_data.pos)
-	var button_size = 130 * min(scale_factor.x, scale_factor.y)  # Scale uniformly
+	var level_num = int(level_data.get("level", 0))
+	var level_name = str(level_data.get("name", ""))
+	var pos_arr = level_data.get("pos", null)
 
-	var level_container = Control.new()
-	level_container.name = "LevelContainer%d" % level_num
-	level_container.position = Vector2(scaled_pos.x - button_size/2, scaled_pos.y - button_size/2)
-	level_container.custom_minimum_size = Vector2(button_size, button_size)
+	# Container to allow positioned children without being affected by VBox layout
+	var container = Control.new()
+	container.name = "LevelContainer%d" % level_num
+	container.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Main level button - scale size
-	var button_actual_size = 60 * min(scale_factor.x, scale_factor.y)
-	var level_button = Button.new()
-	level_button.name = "LevelButton%d" % level_num
-	level_button.position = Vector2((button_size - button_actual_size) / 2, (button_size - button_actual_size) / 2 - 10)
-	level_button.size = Vector2(button_actual_size, button_actual_size)
-	level_button.text = str(level_num)
-	var font_size = int(18 * min(scale_factor.x, scale_factor.y))
-	ThemeManager.apply_bangers_font_to_button(level_button, font_size)
-
-	# Style based on status
-	if level_unlocked:
-		if level_completed:
-			level_button.modulate = Color.GREEN
-		else:
-			level_button.modulate = Color.WHITE
-		level_button.disabled = false
-		level_button.pressed.connect(_on_level_selected.bind(level_num))
+	# Determine position (scale JSON pos to screen)
+	var position = Vector2.ZERO
+	if pos_arr and typeof(pos_arr) == TYPE_ARRAY and pos_arr.size() >= 2:
+		# Coerce to floats safely
+		var x = float(pos_arr[0])
+		var y = float(pos_arr[1])
+		position = _scale_position([x, y])
 	else:
-		level_button.modulate = Color.GRAY
-		level_button.disabled = true
+		# Fallback grid layout: staggered positions based on level number
+		position = Vector2(100 + ((level_num-1) % 5) * 110, 100 + int((level_num-1) / 5) * 120) * scale_factor
 
-	level_container.add_child(level_button)
+	# We'll treat 'position' as the desired center for the button; compute container top-left
+	# Determine expected button size (use fixed fallback)
+	var expected_btn_size = Vector2(72, 72)
 
-	# Stars display - scale positioning and size
-	if level_completed and stars_earned > 0:
-		var stars_container = HBoxContainer.new()
-		stars_container.position = Vector2(button_size * 0.15, 5)
-		stars_container.custom_minimum_size = Vector2(button_size * 0.7, 20 * scale_factor.y)
-		stars_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	# Position container so that the button inside (anchored at 0,0) is centered at `position`
+	container.position = position - expected_btn_size / 2.0
+	container.custom_minimum_size = Vector2(96, 96)
+	container.z_index = 6
 
-		for i in range(stars_earned):
-			# Use TextureRect with the provided gold star SVG so mobile renders consistently
-			var star_tex = TextureRect.new()
-			star_tex.texture = gold_star_texture
-			star_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-			star_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			# size scaled according to UI scale factor
-			star_tex.custom_minimum_size = Vector2(18 * scale_factor.x, 18 * scale_factor.y)
-			stars_container.add_child(star_tex)
-
-		level_container.add_child(stars_container)
-
-	# Level name - scale positioning and font
-	var name_label = Label.new()
-	name_label.text = level_data.name
-	name_label.position = Vector2(0, button_size * 0.7)
-	name_label.size = Vector2(button_size, 30 * scale_factor.y)
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var name_font_size = int(12 * min(scale_factor.x, scale_factor.y))
-	# Styled name label for consistency
-	ThemeManager.apply_bangers_font_styled(name_label, name_font_size, Color.WHITE, Color(0,0,0), 2)
-	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-
-	level_container.add_child(name_label)
-
-	return level_container
-
-func _create_next_chapter_button(chapter_data: Dictionary) -> Button:
-	"""Create next chapter button"""
-	var rm = RewardManager
-	var chapter_levels = chapter_data.levels
-	var min_level = chapter_levels[0].level if chapter_levels.size() > 0 else 1
-	var max_level = chapter_levels[-1].level if chapter_levels.size() > 0 else 10
-	var chapter_complete = rm.levels_completed >= max_level
-
-	var next_button = Button.new()
-	next_button.name = "NextChapterButton"
-	next_button.text = "Next Chapter →" if chapter_complete else "Complete Chapter to Continue"
-
-	# Scale position and size
-	var scaled_pos = _scale_position(chapter_data.next_chapter_button_pos)
-	var button_width = 200 * scale_factor.x
-	var button_height = 50 * scale_factor.y
-	next_button.position = Vector2(scaled_pos.x - button_width/2, scaled_pos.y)
-	next_button.custom_minimum_size = Vector2(button_width, button_height)
-	var button_font_size = int(16 * min(scale_factor.x, scale_factor.y))
-	ThemeManager.apply_bangers_font_to_button(next_button, button_font_size)
-
-	if chapter_complete:
-		next_button.modulate = Color.WHITE
-		next_button.disabled = false
-		next_button.pressed.connect(_scroll_to_next_chapter.bind(chapter_data.id))
+	# Create the visible button
+	var btn = Button.new()
+	btn.name = "LevelButton%d" % level_num
+	# Prefer level name if provided, else numeric label
+	if level_name.strip_edges() != "":
+		btn.text = level_name
 	else:
-		next_button.modulate = Color.GRAY
-		next_button.disabled = true
+		btn.text = str(level_num)
 
-	return next_button
+	# Styling: apply themed font if ThemeManager exists, else keep default
+	if typeof(ThemeManager) != TYPE_NIL and ThemeManager and ThemeManager.has_method("apply_bangers_font_to_button_styled"):
+		ThemeManager.apply_bangers_font_to_button_styled(btn, 18, Color.WHITE, Color(0,0,0), 2)
+
+	# Size and anchors: keep absolute positioning inside LevelsContainer
+	btn.anchor_left = 0
+	btn.anchor_top = 0
+	btn.anchor_right = 0
+	btn.anchor_bottom = 0
+	btn.position = Vector2(0,0)
+	btn.custom_minimum_size = Vector2(72, 72)
+	btn.z_index = 7
+
+	# Connect press to selection
+	btn.pressed.connect(func() -> void:
+		_on_level_selected(level_num)
+	)
+
+	container.add_child(btn)
+
+	# Visual indicator for locked/completed state will be updated later in _update_level_button_state
+	btn.disabled = true
+
+	# Optional star container (will be populated in update)
+	var stars_container = Control.new()
+	stars_container.name = "StarsContainer"
+	stars_container.custom_minimum_size = Vector2(90, 20)
+	# Keep placeholder just below the button; real positioning computed in update
+	stars_container.position = Vector2(0, 72)
+	stars_container.z_index = 8
+	container.add_child(stars_container)
+
+	print("[WorldMap] Created level button: %d at %s" % [level_num, str(position)])
+	return container
 
 func _scroll_to_next_chapter(current_chapter_id: int):
 	"""Scroll to the next chapter"""
@@ -549,10 +574,27 @@ func _update_progress_display():
 			progress_label.text = "%d Stars Collected | 📖 %d Levels Completed" % [total_stars, levels_completed]
 
 func _get_level_stars(level_num: int) -> int:
-	"""Get star count for a specific level"""
-	var rm = RewardManager
-	var level_key = "level_%d" % level_num
-	return rm.level_stars.get(level_key, 0)
+	"""Return number of stars earned for given level.
+	First check RewardManager.level_stars (the persisted save), then fall back to StarRatingManager.
+	Logs the resolved value for diagnostics.
+	"""
+	var key = "level_%d" % level_num
+	var stars = 0
+	if typeof(RewardManager) != TYPE_NIL and RewardManager and RewardManager.level_stars.has(key):
+		stars = int(RewardManager.level_stars[key])
+		print("[WorldMap][DIAG] _get_level_stars -> RewardManager key %s = %d" % [key, stars])
+		return stars
+
+	if typeof(StarRatingManager) != TYPE_NIL and StarRatingManager and StarRatingManager.has_method("get_level_stars"):
+		var v = StarRatingManager.get_level_stars(level_num)
+		stars = int(v) if v != null else 0
+		print("[WorldMap][DIAG] _get_level_stars -> StarRatingManager returned %d for level %d" % [stars, level_num])
+		return stars
+
+	# Fallback: no star info available
+	print("[WorldMap][DIAG] _get_level_stars -> no data for level %d" % level_num)
+	return 0
+
 
 func _on_level_selected(level_num: int):
 	"""Handle level selection"""
@@ -571,11 +613,52 @@ func update_progress():
 	print("[WorldMap] Updating progress display")
 	_update_progress_display()
 
-	# Update level button states
+	# Defer heavy layout-dependent updates to the next idle so Controls have correct rect_size
+	call_deferred("_deferred_update_level_buttons")
+
+
+func _deferred_update_level_buttons(retries := 5):
+	# If RewardManager hasn't loaded save data yet, retry a few times
+	if typeof(RewardManager) != TYPE_NIL:
+		var ls_count = RewardManager.level_stars.keys().size()
+		if ls_count == 0 and RewardManager.levels_completed == 0 and retries > 0:
+			print("[WorldMap][DIAG] RewardManager not ready (level_stars=0). Retrying in 0.05s (retries=%d)" % retries)
+			await get_tree().create_timer(0.05).timeout
+			# Defer to avoid blocking layout
+			call_deferred("_deferred_update_level_buttons", retries - 1)
+			return
+
+	# Run a layout-sensitive update after the current frame so rect_size/anchors settle
+	# Diagnostic: print RewardManager star state for debugging missing stars
+	if typeof(RewardManager) != TYPE_NIL:
+		print("[WorldMap][DIAG] RewardManager.total_stars=%d levels_completed=%d level_stars_count=%d" % [RewardManager.total_stars, RewardManager.levels_completed, RewardManager.level_stars.keys().size()])
+		# Build a safe sample of keys without using Python-style slicing
+		var rm_keys = RewardManager.level_stars.keys()
+		if rm_keys.size() > 0:
+			# Print only the first sample key/value to keep diagnostics simple and parser-friendly
+			var sample_key = rm_keys[0]
+			print("[WorldMap][DIAG] level_stars sample: %s = %s" % [str(sample_key), str(RewardManager.level_stars.get(sample_key, "<nil>"))])
+	# If StarRatingManager is available, print its total as well
+	if typeof(StarRatingManager) != TYPE_NIL:
+		print("[WorldMap][DIAG] StarRatingManager available. get_total_stars(): %d" % StarRatingManager.get_total_stars())
+
 	for container in current_chapter_containers:
-		var levels_container = container.get_node("LevelsContainer")
+		var levels_container = container.get_node_or_null("LevelsContainer")
+		if not levels_container:
+			continue
 		for level_container in levels_container.get_children():
 			if level_container.name.begins_with("LevelContainer"):
+				var level_num_str = level_container.name.replace("LevelContainer", "")
+				var level_num = int(level_num_str)
+				# Diagnostic: fetch stars
+				var stars = 0
+				if typeof(StarRatingManager) != TYPE_NIL and StarRatingManager and StarRatingManager.has_method("get_level_stars"):
+					stars = StarRatingManager.get_level_stars(level_num)
+				else:
+					var key = "level_%d" % level_num
+					if RewardManager.level_stars.has(key):
+						stars = int(RewardManager.level_stars[key])
+				print("[WorldMap][DIAG] Level %d -> stars=%d" % [level_num, stars])
 				_update_level_button_state(level_container)
 
 func _update_level_button_state(level_container: Control):
@@ -606,23 +689,59 @@ func _update_level_button_state(level_container: Control):
 		if existing_stars:
 			existing_stars.queue_free()
 
-		if level_completed and stars_earned > 0:
-			var stars_container = HBoxContainer.new()
-			stars_container.name = "StarsContainer"
-			stars_container.position = Vector2(20, 5)
-			stars_container.custom_minimum_size = Vector2(90, 20)
-			stars_container.alignment = BoxContainer.ALIGNMENT_CENTER
+		# Always show a 3-star row under the button to make progress visible
+		var max_stars_display = 3
+		var stars_container = Control.new()
+		stars_container.name = "StarsContainer"
+		# Create centered placement beneath the level button
+		var star_size = 16
+		var spacing = 4
+		var total_width = max_stars_display * star_size + max(0, max_stars_display - 1) * spacing
 
-			for i in range(stars_earned):
-				# Create TextureRect star instead of emoji label for reliable mobile rendering
-				var star_tex = TextureRect.new()
-				star_tex.texture = gold_star_texture
-				star_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-				star_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				star_tex.custom_minimum_size = Vector2(16, 16)
-				stars_container.add_child(star_tex)
+		# Determine button width/height using custom_minimum_size first (avoid rect_size access which can fail in some contexts)
+		var btn_width = 72
+		var btn_height = 72
+		if level_button and level_button is Control:
+			# Prefer explicit custom_minimum_size if available
+			if level_button.custom_minimum_size.x > 0:
+				btn_width = int(level_button.custom_minimum_size.x)
+			elif level_button.custom_minimum_size.x == 0 and level_button.get_child_count() > 0:
+				# fallback: attempt to infer size from child textures or default
+				btn_width = int(max(72, level_button.custom_minimum_size.x))
+			if level_button.custom_minimum_size.y > 0:
+				btn_height = int(level_button.custom_minimum_size.y)
+			elif level_button.custom_minimum_size.y == 0:
+				btn_height = int(max(72, level_button.custom_minimum_size.y))
 
-			level_container.add_child(stars_container)
+		var x = int(max((btn_width - total_width) / 2, 0))
+		var y = int(btn_height + 6)
+
+		stars_container.position = Vector2(x, y)
+		stars_container.custom_minimum_size = Vector2(total_width, star_size)
+		stars_container.z_index = 8
+
+		for i in range(max_stars_display):
+			var star_tex = TextureRect.new()
+			star_tex.texture = gold_star_texture
+			if star_tex.texture == null:
+				print("[WorldMap][DIAG] star_tex.texture is null for level %d index %d" % [level_num, i])
+			star_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			star_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			star_tex.custom_minimum_size = Vector2(star_size, star_size)
+			star_tex.position = Vector2(i * (star_size + spacing), 0)
+			star_tex.z_index = 9
+			# Color: gold for earned, grey for unearned
+			if typeof(StarRatingManager) != TYPE_NIL and StarRatingManager and StarRatingManager.has_method("get_star_color"):
+				star_tex.modulate = StarRatingManager.get_star_color(i + 1, stars_earned)
+			else:
+				if i < stars_earned:
+					star_tex.modulate = Color(1.0, 0.9, 0.2)
+				else:
+					star_tex.modulate = Color(0.4, 0.4, 0.4, 0.6)
+			stars_container.add_child(star_tex)
+
+		level_container.add_child(stars_container)
+		print("[WorldMap] Level %d stars displayed (earned=%d) at %s total_width=%d (btn_w=%d)" % [level_num, stars_earned, str(stars_container.position), total_width, btn_width])
 
 # DLC Chapter Management
 
@@ -697,58 +816,39 @@ func _display_dlc_download_options():
 		chapters_vbox.add_child(download_card)
 
 func _create_dlc_download_card(dlc_info: Dictionary) -> Control:
-	"""Create a download card for DLC chapter"""
-	var card = PanelContainer.new()
-	card.name = "DLCCard_" + dlc_info.get("chapter_id", "unknown")
-	card.custom_minimum_size = Vector2(0, 200 * scale_factor.y)
+	"""Create a small card control with DLC title/desc and a Download button."""
+	var card = HBoxContainer.new()
+	card.name = "DLCCard_%s" % str(dlc_info.get("chapter_id", "unknown"))
+	card.custom_minimum_size = Vector2(0, 80)
+	card.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 10)
-	card.add_child(vbox)
+	vbox.name = "DLCCardVBox"
 
-	# Chapter name
 	var title = Label.new()
+	title.name = "DLCTitle"
 	title.text = dlc_info.get("name", "New Chapter")
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font_styled(title, 24, Color.WHITE, Color.BLACK, 2)
+	ThemeManager.apply_bangers_font(title, 16)
 	vbox.add_child(title)
 
-	# Description
 	var desc = Label.new()
+	desc.name = "DLCDesc"
 	desc.text = dlc_info.get("description", "")
-	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	ThemeManager.apply_bangers_font(desc, 14)
 	vbox.add_child(desc)
 
-	# Level count
-	var level_info = Label.new()
-	level_info.text = "📖 %s | %d Levels" % [dlc_info.get("levels", ""), dlc_info.get("level_count", 0)]
-	level_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(level_info, 16)
-	vbox.add_child(level_info)
+	card.add_child(vbox)
 
-	# Download button
-	var download_btn = Button.new()
-	var is_free = dlc_info.get("is_free", true)
-	if is_free:
-		download_btn.text = "📥 Download Free"
-	else:
-		var price = dlc_info.get("price_usd", 0.0)
-		download_btn.text = "📥 Download ($%.2f)" % price
-
-	download_btn.custom_minimum_size = Vector2(200 * scale_factor.x, 50 * scale_factor.y)
-	ThemeManager.apply_bangers_font_to_button_styled(download_btn, 18, Color.WHITE, Color.BLACK, 2)
-	download_btn.pressed.connect(_on_download_dlc_pressed.bind(dlc_info))
-	vbox.add_child(download_btn)
-
-	# Center the button
-	var center_container = CenterContainer.new()
-	vbox.remove_child(download_btn)
-	center_container.add_child(download_btn)
-	vbox.add_child(center_container)
+	var btn = Button.new()
+	btn.name = "DLCDownloadButton"
+	btn.text = tr("UI_DOWNLOAD")
+	btn.focus_mode = Control.FOCUS_NONE
+	# Connect to an inline callable that captures dlc_info safely
+	btn.pressed.connect(func(): _on_download_dlc_pressed(dlc_info))
+	card.add_child(btn)
 
 	return card
+
 
 func _on_download_dlc_pressed(dlc_info: Dictionary):
 	"""Handle DLC download button press"""
@@ -774,31 +874,46 @@ func _start_dlc_download(chapter_id: String):
 	_show_download_progress(chapter_id)
 
 func _show_download_progress(chapter_id: String):
-	"""Show download progress indicator"""
-	# Close any existing progress dialog
-	if progress_dialog:
-		progress_dialog.queue_free()
-
-	# Create a simple progress dialog
-	progress_dialog = AcceptDialog.new()
-	progress_dialog.title = "Downloading..."
-	progress_dialog.dialog_text = "Downloading new chapter. Please wait..."
-	progress_dialog.ok_button_text = "Background"
-	progress_dialog.dialog_close_on_escape = false
-	add_child(progress_dialog)
-
-	# Allow dismissing without canceling download
-	progress_dialog.confirmed.connect(_close_progress_dialog)
-
-	progress_dialog.popup_centered()
-
-	# TODO: Connect to download_progress signal and update progress bar
-
-func _close_progress_dialog():
-	"""Close the progress dialog"""
+	"""Show a progress dialog while a DLC chapter is downloading.
+	This connects to DLCManager.download_progress to update the UI and disconnects on completion.
+	"""
+	# Ensure any existing dialog is cleared
 	if progress_dialog:
 		progress_dialog.queue_free()
 		progress_dialog = null
+
+	# Create a dialog with a progress bar
+	progress_dialog = AcceptDialog.new()
+	progress_dialog.title = tr("UI_DOWNLOADING")
+	# Add a VBox to hold a label and a ProgressBar
+	var v = VBoxContainer.new()
+	v.name = "DLProgressVBox"
+	var label = Label.new()
+	label.name = "DLProgressLabel"
+	label.text = tr("UI_DOWNLOADING_CHAPTER") + ": %s" % chapter_id
+	v.add_child(label)
+
+	var pb = ProgressBar.new()
+	pb.name = "DLProgressBar"
+	pb.min_value = 0
+	pb.max_value = 100
+	pb.value = 0
+	pb.custom_minimum_size = Vector2(300, 24)
+	v.add_child(pb)
+
+	progress_dialog.add_child(v)
+	progress_dialog.dialog_close_on_escape = false
+	progress_dialog.ok_button_text = tr("UI_BACKGROUND")
+	add_child(progress_dialog)
+	progress_dialog.popup_centered()
+
+	# Connect to DLCManager signals if available
+	if DLCManager and DLCManager.has_signal("download_progress"):
+		# Connect using a callable to avoid analyzer complaints
+		DLCManager.download_progress.connect(Callable(self, "_on_dlc_download_progress"))
+	# Also listen for completion (existing handler will close dialog)
+	if DLCManager and DLCManager.has_signal("download_complete"):
+		DLCManager.download_complete.connect(Callable(self, "_on_dlc_download_complete"))
 
 func _show_purchase_dialog(dlc_info: Dictionary):
 	"""Show purchase confirmation dialog"""
@@ -836,3 +951,36 @@ func _show_download_success(chapter_id: String):
 	dialog.dialog_text = "Chapter downloaded successfully! You can now play the new levels."
 	add_child(dialog)
 	dialog.popup_centered()
+
+
+func _on_dlc_download_progress(chapter_id: String, bytes_downloaded: int, total_bytes: int):
+	"""Update progress dialog when DLCManager emits download_progress."""
+	if not progress_dialog:
+		return
+	# Resolve progress bar
+	var pb = progress_dialog.get_node_or_null("DLProgressVBox/DLProgressBar")
+	if not pb:
+		# Try to find directly under dialog
+		pb = progress_dialog.get_node_or_null("DLProgressBar")
+	if not pb:
+		return
+
+	if total_bytes and total_bytes > 0:
+		var pct = int(float(bytes_downloaded) / float(total_bytes) * 100.0)
+		pb.value = clamp(pct, 0, 100)
+	else:
+		# Unknown size - use indeterminate animation by pulsing value
+		pb.value = (pb.value + 5) % 100
+
+	# Auto close when complete
+	if total_bytes and total_bytes > 0 and bytes_downloaded >= total_bytes:
+		# Give a short delay then close
+		await get_tree().create_timer(0.15).timeout
+		if progress_dialog:
+			progress_dialog.queue_free()
+			progress_dialog = null
+		# Disconnect signals to avoid dangling references
+		if DLCManager and DLCManager.has_signal("download_progress") and DLCManager.is_connected("download_progress", Callable(self, "_on_dlc_download_progress")):
+			DLCManager.disconnect("download_progress", Callable(self, "_on_dlc_download_progress"))
+		if DLCManager and DLCManager.has_signal("download_complete") and DLCManager.is_connected("download_complete", Callable(self, "_on_dlc_download_complete")):
+			DLCManager.disconnect("download_complete", Callable(self, "_on_dlc_download_complete"))

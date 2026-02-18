@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Abel's offering was accepted,\nbut Cain's was not.\n\nJealousy led to tragedy.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_CAIN_AND_ABEL_MAIN"
     }
   ],
   "transitions": [

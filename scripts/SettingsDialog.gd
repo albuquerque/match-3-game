@@ -1,15 +1,21 @@
 extends Panel
 
+@onready var title_label = $VBoxContainer/Title
 @onready var close_button = $VBoxContainer/CloseButton
+@onready var music_label = $VBoxContainer/MusicHBox/MusicLabel
 @onready var music_slider = $VBoxContainer/MusicHBox/MusicSlider
 @onready var music_toggle = $VBoxContainer/MusicHBox/MusicToggle
 @onready var music_volume_label = $VBoxContainer/MusicHBox/VolumeLabel
+@onready var sfx_label = $VBoxContainer/SfxHBox/SfxLabel
 @onready var sfx_slider = $VBoxContainer/SfxHBox/SfxSlider
 @onready var sfx_toggle = $VBoxContainer/SfxHBox/SfxToggle
 @onready var sfx_volume_label = $VBoxContainer/SfxHBox/VolumeLabel
 
 # Vibration toggle (created dynamically)
 var vibration_toggle: CheckButton = null
+
+# Language selector (created dynamically)
+var language_dropdown: OptionButton = null
 
 const MUSIC_SETTING = "match3/audio/music_volume"
 const SFX_SETTING = "match3/audio/sfx_volume"
@@ -19,8 +25,14 @@ const SFX_ENABLED_SETTING = "match3/audio/sfx_enabled"
 func _ready():
 	visible = false
 
+	# Set translated labels
+	_initialize_ui_labels()
+
 	# Create vibration toggle if on mobile or for testing
 	_create_vibration_toggle()
+
+	# Create language selector
+	_create_language_selector()
 
 	# Connect close
 	close_button.pressed.connect(_on_close_pressed)
@@ -77,6 +89,17 @@ func _ready():
 	# Do NOT call _apply_audio_settings() here to avoid muting the game on open
 	# Controls now reflect the current runtime state; changes will be applied by handlers
 
+func _initialize_ui_labels():
+	"""Set UI labels with translated text"""
+	if title_label:
+		title_label.text = tr("UI_SETTINGS")
+	if music_label:
+		music_label.text = tr("UI_MUSIC")
+	if sfx_label:
+		sfx_label.text = tr("UI_SFX")
+	if close_button:
+		close_button.text = tr("UI_CLOSE")
+
 func _create_vibration_toggle():
 	"""Create vibration toggle UI dynamically"""
 	var vbox = get_node_or_null("VBoxContainer")
@@ -90,7 +113,7 @@ func _create_vibration_toggle():
 
 	# Add label
 	var label = Label.new()
-	label.text = "📳 Vibration:"
+	label.text = "📳 " + tr("UI_VIBRATION") + ":"
 	label.custom_minimum_size = Vector2(150, 0)
 	ThemeManager.apply_bangers_font(label, 18)
 	vibration_hbox.add_child(label)
@@ -104,7 +127,7 @@ func _create_vibration_toggle():
 	# Create toggle button
 	vibration_toggle = CheckButton.new()
 	vibration_toggle.name = "VibrationToggle"
-	vibration_toggle.text = "On" if VibrationManager.is_vibration_enabled() else "Off"
+	vibration_toggle.text = tr("UI_ON") if VibrationManager.is_vibration_enabled() else tr("UI_OFF")
 	vibration_toggle.button_pressed = VibrationManager.is_vibration_enabled()
 	ThemeManager.apply_bangers_font_to_button(vibration_toggle, 16)
 	vibration_toggle.toggled.connect(_on_vibration_toggled)
@@ -115,6 +138,67 @@ func _create_vibration_toggle():
 	vbox.move_child(vibration_hbox, vbox.get_child_count() - 2)  # Before close button
 
 	print("[SettingsDialog] Vibration toggle created")
+
+func _create_language_selector():
+	"""Create language selector UI dynamically"""
+	var vbox = get_node_or_null("VBoxContainer")
+	if not vbox:
+		print("[SettingsDialog] WARNING: VBoxContainer not found, can't add language selector")
+		return
+
+	# Create HBoxContainer for language setting
+	var language_hbox = HBoxContainer.new()
+	language_hbox.name = "LanguageHBox"
+
+	# Add label
+	var label = Label.new()
+	label.text = tr("UI_LANGUAGE") + ":"
+	label.custom_minimum_size = Vector2(150, 0)
+	ThemeManager.apply_bangers_font(label, 18)
+	language_hbox.add_child(label)
+
+	# Add spacer
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(20, 0)
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	language_hbox.add_child(spacer)
+
+	# Create dropdown
+	language_dropdown = OptionButton.new()
+	language_dropdown.name = "LanguageDropdown"
+	language_dropdown.custom_minimum_size = Vector2(150, 0)
+	ThemeManager.apply_bangers_font_to_button(language_dropdown, 16)
+
+	# Add language options
+	var languages = {
+		"en": "English",
+		"es": "Español",
+		"pt": "Português",
+		"fr": "Français"
+	}
+
+	var current_locale = TranslationServer.get_locale()
+	var selected_index = 0
+	var index = 0
+
+	for lang_code in languages.keys():
+		language_dropdown.add_item(languages[lang_code])
+		language_dropdown.set_item_metadata(index, lang_code)
+
+		if lang_code == current_locale:
+			selected_index = index
+
+		index += 1
+
+	language_dropdown.selected = selected_index
+	language_dropdown.item_selected.connect(_on_language_changed)
+	language_hbox.add_child(language_dropdown)
+
+	# Add to VBox (before close button)
+	vbox.add_child(language_hbox)
+	vbox.move_child(language_hbox, vbox.get_child_count() - 2)
+
+	print("[SettingsDialog] Language selector created - current locale: %s" % current_locale)
 
 func show_dialog():
 	visible = true
@@ -193,11 +277,75 @@ func _on_vibration_toggled(pressed: bool):
 	"""Handle vibration toggle"""
 	if VibrationManager:
 		VibrationManager.set_vibration_enabled(pressed)
-		vibration_toggle.text = "On" if pressed else "Off"
+		vibration_toggle.text = tr("UI_ON") if pressed else tr("UI_OFF")
 		# Give haptic feedback when toggling on
 		if pressed:
 			VibrationManager.vibrate_button_press()
 		print("[SettingsDialog] Vibration %s" % ("enabled" if pressed else "disabled"))
+
+func _on_language_changed(index: int):
+	"""Handle language selection change"""
+	if not language_dropdown:
+		return
+
+	var lang_code = language_dropdown.get_item_metadata(index)
+	print("[SettingsDialog] Language changed to: %s" % lang_code)
+
+	# Change the active language
+	TranslationServer.set_locale(lang_code)
+
+	# Save language preference
+	var rm = get_node_or_null('/root/RewardManager')
+	if rm:
+		# Set language property
+		rm.language = lang_code
+		rm.save_progress()
+		print("[SettingsDialog] Saved language preference: %s" % lang_code)
+
+	# Play feedback sound
+	AudioManager.play_sfx("ui_click")
+
+	# Broadcast language change to all listeners
+	EventBus.emit_language_changed(lang_code)
+
+	# Update UI text immediately by recreating labels
+	_update_ui_after_language_change()
+
+func _update_ui_after_language_change():
+	"""Update UI labels after language change"""
+	# Update main labels
+	if title_label:
+		title_label.text = tr("UI_SETTINGS")
+	if music_label:
+		music_label.text = tr("UI_MUSIC")
+	if sfx_label:
+		sfx_label.text = tr("UI_SFX")
+	if close_button:
+		close_button.text = tr("UI_CLOSE")
+
+	var vbox = get_node_or_null("VBoxContainer")
+	if not vbox:
+		return
+
+	# Update language label
+	var language_hbox = vbox.get_node_or_null("LanguageHBox")
+	if language_hbox:
+		var label = language_hbox.get_child(0)  # First child is the label
+		if label and label is Label:
+			label.text = tr("UI_LANGUAGE") + ":"
+
+	# Update vibration label
+	var vibration_hbox = vbox.get_node_or_null("VibrationHBox")
+	if vibration_hbox:
+		var label = vibration_hbox.get_child(0)  # First child is the label
+		if label and label is Label:
+			label.text = "📳 " + tr("UI_VIBRATION") + ":"
+
+	# Update vibration toggle text
+	if vibration_toggle:
+		vibration_toggle.text = tr("UI_ON") if vibration_toggle.button_pressed else tr("UI_OFF")
+
+	print("[SettingsDialog] UI updated for new language")
 
 func get_volume() -> float:
 	return music_slider.value

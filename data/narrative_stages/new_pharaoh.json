@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "A new king arose over Egypt,\nwho did not know Joseph.\n\nHe feared the Israelites' numbers.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_NEW_PHARAOH_MAIN"
     }
   ],
   "transitions": [

@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Joseph interpreted the dreams\nof Pharaoh's cupbearer and baker.\n\nEverything happened as he said.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PRISON_DREAMS_MAIN"
     }
   ],
   "transitions": [

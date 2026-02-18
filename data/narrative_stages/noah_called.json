@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God saw the wickedness of mankind\nand decided to flood the earth.\n\nBut Noah found favor in God's eyes.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_NOAH_CALLED_MAIN"
     }
   ],
   "transitions": [

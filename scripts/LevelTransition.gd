@@ -153,7 +153,7 @@ func _ready():
 	# Title label with theme color
 	title_label = Label.new()
 	title_label.name = "TitleLabel"
-	title_label.text = "🎉 Level Complete! 🎉"
+	title_label.text = "🎉 " + tr("UI_LEVEL_COMPLETE") + " 🎉"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	# Apply Bangers font for impactful display
@@ -172,7 +172,7 @@ func _ready():
 	# Score label with theme color
 	score_label = Label.new()
 	score_label.name = "ScoreLabel"
-	score_label.text = "Score: 0"
+	score_label.text = tr("UI_LABEL_SCORE") + ": 0"
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(score_label, 32)
 	score_label.add_theme_color_override("font_color", colors["score"])
@@ -185,7 +185,7 @@ func _ready():
 	content_container.add_child(rewards_container)
 
 	var rewards_title = Label.new()
-	rewards_title.text = "Rewards Earned:"
+	rewards_title.text = tr("UI_REWARDS_EARNED")
 	rewards_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(rewards_title, 28)
 	rewards_title.add_theme_color_override("font_color", colors["rewards_title"])
@@ -209,7 +209,7 @@ func _ready():
 	# Replay button with theme color
 	var replay_button = Button.new()
 	replay_button.name = "ReplayButton"
-	replay_button.text = "🔄 REPLAY"
+	replay_button.text = "🔄 " + tr("UI_REPLAY")
 	ThemeManager.apply_bangers_font_to_button(replay_button, 22)
 	replay_button.custom_minimum_size = Vector2(200, 80)
 	replay_button.add_theme_color_override("font_color", colors["replay_button"])
@@ -219,7 +219,7 @@ func _ready():
 	# Continue button with theme color
 	continue_button = Button.new()
 	continue_button.name = "ContinueButton"
-	continue_button.text = "▶ NEXT LEVEL"
+	continue_button.text = "▶ " + tr("UI_NEXT_LEVEL")
 	ThemeManager.apply_bangers_font_to_button(continue_button, 22)
 	continue_button.custom_minimum_size = Vector2(200, 80)
 	continue_button.add_theme_color_override("font_color", colors["continue_button"])
@@ -266,7 +266,7 @@ func _create_multiplier_ui():
 
 	# Title for multiplier game
 	var multiplier_title = Label.new()
-	multiplier_title.text = "🎯 Multiplier Challenge!"
+	multiplier_title.text = "🎯 " + tr("UI_MULTIPLIER_CHALLENGE")
 	multiplier_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(multiplier_title, 24)
 	multiplier_title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
@@ -275,7 +275,7 @@ func _create_multiplier_ui():
 	# Ad trigger button
 	ad_trigger_button = Button.new()
 	ad_trigger_button.name = "AdTriggerButton"
-	ad_trigger_button.text = "🎯 Start Multiplier Challenge!"
+	ad_trigger_button.text = "🎯 " + tr("UI_START_MULTIPLIER")
 	ad_trigger_button.custom_minimum_size = Vector2(300, 60)
 	ThemeManager.apply_bangers_font_to_button(ad_trigger_button, 20)
 	ad_trigger_button.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0, 1.0))
@@ -342,7 +342,7 @@ func _create_multiplier_ui():
 	# Tap instruction button (replaces label)
 	tap_instruction_button = Button.new()
 	tap_instruction_button.name = "TapInstructionButton"
-	tap_instruction_button.text = "🎯 TAP HERE TO STOP!"
+	tap_instruction_button.text = "🎯 " + tr("UI_TAP_TO_STOP")
 	tap_instruction_button.custom_minimum_size = Vector2(300, 60)
 	ThemeManager.apply_bangers_font_to_button(tap_instruction_button, 20)
 	tap_instruction_button.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))  # Red
@@ -540,7 +540,7 @@ func show_transition(data):
 	_reward_multiplied = false
 
 	# Update title with animation
-	title_label.text = "🎉 Level %d Complete! 🎉" % completed_level
+	title_label.text = "🎉 " + tr("UI_LEVEL_COMPLETE") + " %d! 🎉" % completed_level
 
 	# Add subtle pulsing animation to title
 	var title_tween = create_tween()
@@ -552,7 +552,7 @@ func show_transition(data):
 	_update_star_display(stars)
 
 	# Update score
-	score_label.text = "Final Score: %d" % final_score
+	score_label.text = tr("UI_FINAL_SCORE") + ": %d" % final_score
 
 	# Update rewards display
 	_update_rewards_display(coins_earned, gems_earned)
@@ -562,9 +562,9 @@ func show_transition(data):
 
 	# Update button text based on whether there's a next level
 	if has_next_level:
-		continue_button.text = "Continue to Next Level"
+		continue_button.text = tr("UI_CONTINUE_NEXT_LEVEL")
 	else:
-		continue_button.text = "Back to Menu"
+		continue_button.text = tr("UI_BACK_TO_MENU")
 
 	# Reset multiplier UI
 	_reset_multiplier_ui()
@@ -656,13 +656,13 @@ func _update_rewards_display(coins: int, gems: int):
 				ThemeManager.apply_bangers_font(performance_label, 20)
 
 				if efficiency >= 50:
-					performance_label.text = "⚡ Efficient! Used %d/%d moves (%d%% saved)" % [moves_used, total_moves, efficiency]
+					performance_label.text = "⚡ " + tr("UI_EFFICIENT_MOVES") % [moves_used, total_moves, efficiency]
 					performance_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))  # Green
 				elif efficiency >= 25:
-					performance_label.text = "✓ Good! Used %d/%d moves (%d%% saved)" % [moves_used, total_moves, efficiency]
+					performance_label.text = "✓ " + tr("UI_GOOD_MOVES") % [moves_used, total_moves, efficiency]
 					performance_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))  # Yellow
 				else:
-					performance_label.text = "Used %d/%d moves" % [moves_used, total_moves]
+					performance_label.text = tr("UI_USED_MOVES") % [moves_used, total_moves]
 					performance_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))  # Grey
 
 				rewards_container.add_child(performance_label)
@@ -680,7 +680,7 @@ func _update_rewards_display(coins: int, gems: int):
 
 		# Add "Coins: +" prefix
 		var prefix_label = Label.new()
-		prefix_label.text = "Coins: +"
+		prefix_label.text = tr("UI_COINS_PREFIX") + " +"
 		ThemeManager.apply_bangers_font(prefix_label, 24)
 		prefix_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0, 1.0))
 		coins_display.add_child(prefix_label)
@@ -695,7 +695,7 @@ func _update_rewards_display(coins: int, gems: int):
 
 		# Add "Gems: +" prefix
 		var prefix_label = Label.new()
-		prefix_label.text = "Gems: +"
+		prefix_label.text = tr("UI_GEMS_PREFIX") + " +"
 		ThemeManager.apply_bangers_font(prefix_label, 24)
 		prefix_label.add_theme_color_override("font_color", Color(0.3, 0.7, 1.0, 1.0))
 		gems_display.add_child(prefix_label)
@@ -714,7 +714,7 @@ func _update_rewards_display(coins: int, gems: int):
 
 			# Add "Bonus Rewards!" header
 			var bonus_header = Label.new()
-			bonus_header.text = "🎁 BONUS REWARDS! 🎁"
+			bonus_header.text = "🎁 " + tr("UI_BONUS_REWARDS") + " 🎁"
 			bonus_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			ThemeManager.apply_bangers_font(bonus_header, 26)
 			bonus_header.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0, 1.0))  # Gold
@@ -766,7 +766,7 @@ func _update_rewards_display(coins: int, gems: int):
 						var booster_type = bonus.get("booster_type", "")
 						var booster_name = booster_type.capitalize().replace("_", " ")
 						var bonus_label = Label.new()
-						bonus_label.text = "🚀 +%d %s Booster" % [bonus_amount, booster_name]
+						bonus_label.text = "🚀 " + tr("UI_BOOSTER_REWARD") % [bonus_amount, booster_name]
 						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 						ThemeManager.apply_bangers_font(bonus_label, 26)
 						bonus_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.2, 1.0))
@@ -775,7 +775,7 @@ func _update_rewards_display(coins: int, gems: int):
 					"gallery_image":
 						var image_name = bonus.get("image_name", "Mystery Image")
 						var bonus_label = Label.new()
-						bonus_label.text = "🖼️ Gallery Unlocked: %s" % image_name
+						bonus_label.text = "🖼️ " + tr("UI_GALLERY_UNLOCKED") + " %s" % image_name
 						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 						ThemeManager.apply_bangers_font(bonus_label, 26)
 						bonus_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.9, 1.0))
@@ -784,7 +784,7 @@ func _update_rewards_display(coins: int, gems: int):
 					"video":
 						var video_name = bonus.get("video_name", "Special Video")
 						var bonus_label = Label.new()
-						bonus_label.text = "🎬 Video Unlocked: %s" % video_name
+						bonus_label.text = "🎬 " + tr("UI_VIDEO_UNLOCKED") + " %s" % video_name
 						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 						ThemeManager.apply_bangers_font(bonus_label, 26)
 						bonus_label.add_theme_color_override("font_color", Color(0.9, 0.3, 0.9, 1.0))
@@ -793,7 +793,7 @@ func _update_rewards_display(coins: int, gems: int):
 					"card":
 						var card_name = bonus.get("card_name", "Special Card")
 						var bonus_label = Label.new()
-						bonus_label.text = "🃏 Card Unlocked: %s" % card_name
+						bonus_label.text = "🃏 " + tr("UI_CARD_UNLOCKED") + " %s" % card_name
 						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 						ThemeManager.apply_bangers_font(bonus_label, 26)
 						bonus_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.3, 1.0))
@@ -802,7 +802,7 @@ func _update_rewards_display(coins: int, gems: int):
 					"theme":
 						var theme_name = bonus.get("theme_name", "New Theme")
 						var bonus_label = Label.new()
-						bonus_label.text = "🎨 Theme Unlocked: %s" % theme_name
+						bonus_label.text = "🎨 " + tr("UI_THEME_UNLOCKED") + " %s" % theme_name
 						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 						ThemeManager.apply_bangers_font(bonus_label, 26)
 						bonus_label.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5, 1.0))
@@ -811,7 +811,7 @@ func _update_rewards_display(coins: int, gems: int):
 					_:
 						# Generic reward display for unknown types
 						var bonus_label = Label.new()
-						bonus_label.text = "🎁 %s Unlocked!" % bonus_type.capitalize()
+						bonus_label.text = "🎁 " + tr("UI_UNLOCKED") % bonus_type.capitalize()
 						bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 						ThemeManager.apply_bangers_font(bonus_label, 26)
 						bonus_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
@@ -837,7 +837,7 @@ func _check_and_show_gallery_unlock(level: int):
 			gallery_unlock.alignment = BoxContainer.ALIGNMENT_CENTER
 
 			var unlock_label = Label.new()
-			unlock_label.text = "🖼️ Gallery Unlocked: " + image_name
+			unlock_label.text = "🖼️ " + tr("UI_GALLERY_UNLOCKED") + " " + image_name
 			ThemeManager.apply_bangers_font(unlock_label, 22)
 			unlock_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.2, 1.0))
 			gallery_unlock.add_child(unlock_label)
@@ -953,7 +953,7 @@ func _on_multiplier_tapped():
 	# Show "Watch ad to claim" message
 	var watch_ad_label = Label.new()
 	watch_ad_label.name = "WatchAdLabel"
-	watch_ad_label.text = "📺 Watch ad to claim %.1fx multiplier!" % _selected_multiplier
+	watch_ad_label.text = "📺 " + tr("UI_WATCH_AD_MULTIPLIER") % _selected_multiplier
 	watch_ad_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(watch_ad_label, 20)
 	watch_ad_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
@@ -1017,7 +1017,7 @@ func _apply_multiplier():
 	# Show brief result message that will auto-fade
 	var result_label = Label.new()
 	result_label.name = "ResultLabel"
-	result_label.text = "🎉 %.1fx Multiplier Applied! 🎉" % _selected_multiplier
+	result_label.text = "🎉 " + tr("UI_MULTIPLIER_APPLIED") % _selected_multiplier + " 🎉"
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ThemeManager.apply_bangers_font(result_label, 28)
 	if _selected_multiplier >= 3.0:

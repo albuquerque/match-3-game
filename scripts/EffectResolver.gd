@@ -243,6 +243,44 @@ func cleanup_visual_overlays():
 
 	print("[EffectResolver] ✓ Visual overlays cleaned up")
 
+# Ensure we free allocated executors and clear references at exit
+func _exit_tree():
+	print("[EffectResolver] _exit_tree called - cleaning up executors and timers")
+
+	# Clear active effects data
+	active_effects.clear()
+	current_chapter.clear()
+
+	# Free and clear executor instances
+	for key in executors.keys():
+		var inst = executors.get(key)
+		if inst:
+			# If executor is a Node, queue_free; if it has a free() method, call it
+			if inst is Node:
+				if inst.has_method("queue_free"):
+					inst.queue_free()
+			elif inst.has_method("free"):
+				inst.free()
+	executors.clear()
+
+	# Clear preloaded script references (dereference to allow GC)
+	executor_scripts.clear()
+
+	# Clean overlays
+	cleanup_visual_overlays()
+
+	# Attempt to free known overlay nodes under MainGame if still present
+	if cached_viewport and cached_viewport.has_node("MainGame"):
+		var mg = cached_viewport.get_node("MainGame")
+		# try to free known overlay nodes if still present
+		var names = ["BackgroundDimOverlay","ForegroundDimOverlay","ScreenFlash","VignetteOverlay"]
+		for n in names:
+			var node = mg.get_node_or_null(n)
+			if node and is_instance_valid(node):
+				node.queue_free()
+
+	print("[EffectResolver] Cleanup complete")
+
 ## Generic event handler (level events)
 func _on_event(level_id: String, context: Dictionary, event_name: String):
 	print("[EffectResolver] _on_event called: event=%s, level_id=%s" % [event_name, level_id])

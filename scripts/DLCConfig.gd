@@ -5,7 +5,7 @@ extends Node
 const USE_LOCAL_SERVER: bool = true
 
 # Local server (for testing)
-const LOCAL_SERVER_IP: String = "192.168.0.110"
+const LOCAL_SERVER_IP: String = "192.168.0.76"
 const LOCAL_SERVER_PORT: int = 8000
 
 # Production server

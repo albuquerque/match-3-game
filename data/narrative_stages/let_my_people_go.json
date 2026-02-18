@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Moses and Aaron stood before Pharaoh:\n\n'Thus says the Lord:\nLet My people go!'",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_LET_MY_PEOPLE_GO_MAIN"
     }
   ],
   "transitions": [

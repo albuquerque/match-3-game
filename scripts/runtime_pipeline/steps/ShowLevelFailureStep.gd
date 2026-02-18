@@ -106,7 +106,7 @@ func _create_failure_screen(context: PipelineContext):
 
 	# Title
 	var title = Label.new()
-	title.text = "Level Failed"
+	title.text = tr("UI_LEVEL_FAILED")
 	title.add_theme_font_size_override("font_size", 40)
 	title.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -114,14 +114,14 @@ func _create_failure_screen(context: PipelineContext):
 
 	# Stats
 	var stats = Label.new()
-	stats.text = "Score: %d / %d\nMoves Used: %d" % [score, target, moves_used]
+	stats.text = tr("UI_SCORE_STATS") % [score, target, moves_used]
 	stats.add_theme_font_size_override("font_size", 22)
 	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(stats)
 
 	# Retry button
 	var retry_btn = Button.new()
-	retry_btn.text = "RETRY LEVEL"
+	retry_btn.text = tr("UI_RETRY_LEVEL")
 	retry_btn.custom_minimum_size = Vector2(250, 60)
 	retry_btn.add_theme_font_size_override("font_size", 24)
 	retry_btn.pressed.connect(_on_retry_pressed)
@@ -133,7 +133,7 @@ func _create_failure_screen(context: PipelineContext):
 
 	# Exit button
 	var quit_btn = Button.new()
-	quit_btn.text = "EXIT TO MAP"
+	quit_btn.text = tr("UI_EXIT_TO_MAP")
 	quit_btn.custom_minimum_size = Vector2(250, 50)
 	quit_btn.add_theme_font_size_override("font_size", 20)
 	quit_btn.pressed.connect(_on_quit_pressed)

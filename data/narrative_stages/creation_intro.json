@@ -9,8 +9,8 @@
     {
       "name": "intro",
       "asset": "res://data/images/narrative/creation_intro.svg",
-      "text": "In the beginning, God created the heavens and the earth...",
-      "duration": 5.0
+      "duration": 5.0,
+      "text_key": "NARRATIVE_CREATION_INTRO_INTRO"
     }
   ],
   "transitions": [

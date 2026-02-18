@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God created two great lights—\nthe greater light to rule the day,\nand the lesser light to rule the night.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_CREATION_DAY_4_MAIN"
     }
   ],
   "transitions": [

@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Pharaoh finally let them go.\n\nIsrael left Egypt with great wealth,\na pillar of cloud leading them.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_EXODUS_BEGINS_MAIN"
     }
   ],
   "transitions": [

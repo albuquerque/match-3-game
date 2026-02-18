@@ -39,7 +39,7 @@ func _process(_delta):
 		var time_remaining = RewardManager.get_time_until_next_life()
 		var minutes = int(time_remaining / 60)
 		var seconds = int(time_remaining) % 60
-		timer_label.text = "Next life in: %02d:%02d" % [minutes, seconds]
+		timer_label.text = tr("UI_NEXT_LIFE_IN") % [minutes, seconds]
 
 		# If a life regenerated, close dialog
 		if RewardManager.get_lives() > 0:
@@ -64,17 +64,17 @@ func _update_button_states():
 
 	if gem_refill_button:
 		gem_refill_button.disabled = (gems < GEM_REFILL_COST)
-		gem_refill_button.text = "Refill (%d 💎)" % GEM_REFILL_COST
+		gem_refill_button.text = tr("UI_REFILL_GEMS") % GEM_REFILL_COST
 
 	# Update watch ad button based on ad availability
 	if watch_ad_button:
 		var ad_manager = get_node_or_null("/root/AdMobManager")
 		if ad_manager and ad_manager.is_rewarded_ad_ready():
 			watch_ad_button.disabled = false
-			watch_ad_button.text = "Watch Ad (+1 ❤️)"
+			watch_ad_button.text = tr("UI_WATCH_AD_LIFE")
 		else:
 			watch_ad_button.disabled = true
-			watch_ad_button.text = "Loading Ad..."
+			watch_ad_button.text = tr("UI_LOADING_AD")
 
 func _on_gem_refill_pressed():
 	"""Player chose to spend gems to refill lives"""
@@ -99,7 +99,7 @@ func _on_watch_ad_pressed():
 	# Disable button while ad is loading/showing
 	if watch_ad_button:
 		watch_ad_button.disabled = true
-		watch_ad_button.text = "Loading..."
+		watch_ad_button.text = tr("UI_LOADING")
 
 	# Show rewarded ad - Don't await here, let the signal handle it
 	ad_manager.show_rewarded_ad()

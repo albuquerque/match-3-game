@@ -45,21 +45,21 @@ func _display_reward(reward_data: Dictionary):
 	# Set reward text and icon based on type
 	match reward_data.type:
 		"coins":
-			reward_label.text = "+%d Coins" % reward_data.amount
+			reward_label.text = "+%d " % reward_data.amount + tr("UI_COINS")
 		"gems":
-			reward_label.text = "+%d Gems" % reward_data.amount
+			reward_label.text = "+%d " % reward_data.amount + tr("UI_GEMS")
 		"lives":
 			# Keep emoji for lives as we don't have an SVG
-			reward_label.text = "❤️ +%d Lives" % reward_data.amount
+			reward_label.text = tr("UI_REWARDS_LIVES") % reward_data.amount
 		"booster":
 			# Keep emoji for booster as we don't have a generic SVG
-			reward_label.text = "🚀 Booster Unlocked!"
+			reward_label.text = tr("UI_REWARDS_BOOSTER_UNLOCKED")
 		"stars":
 			# Use gold star SVG texture for star rewards
-			reward_label.text = "%d Stars!" % reward_data.amount
+			reward_label.text = tr("UI_REWARDS_STARS") % reward_data.amount
 		_:
 			# Keep emoji for generic rewards
-			reward_label.text = "🎁 Reward!"
+			reward_label.text = tr("UI_REWARDS_GENERIC")
 
 	# Update description
 	if reward_data.description != "":

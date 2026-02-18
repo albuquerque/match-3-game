@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Gnats, flies, and pestilence\nstruck the land of Egypt.\n\nYet Pharaoh would not relent.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PLAGUES_CONTINUE_MAIN"
     }
   ],
   "transitions": [

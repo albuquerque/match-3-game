@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Abraham's servant prayed for a sign,\nand Rebekah appeared at the well.\n\nShe would become Isaac's wife.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_REBEKAH_AT_WELL_MAIN"
     }
   ],
   "transitions": [

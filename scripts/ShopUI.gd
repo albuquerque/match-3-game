@@ -63,19 +63,19 @@ func _setup_shop_items():
 	var buy_button_width = int(clamp(panel_width * 0.28, 80, 180))
 
 	# Add lives refill option
-	_add_shop_item("Lives Refill", "❤️", "Refill all 5 lives", LIVES_REFILL_GEM_COST, "gems", "lives_refill", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_LIVES_REFILL"), "❤️", tr("UI_REFILL_ALL_LIVES"), LIVES_REFILL_GEM_COST, "gems", "lives_refill", icon_font, name_font, desc_font, buy_button_width)
 
 	# Add booster items
-	_add_shop_item("Hammer", "🔨", "Destroy any tile", BOOSTER_PRICES["hammer"], "coins", "hammer", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("Shuffle", "🔀", "Reorganize board", BOOSTER_PRICES["shuffle"], "coins", "shuffle", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("Swap Tiles", "🔄", "Swap any 2 tiles", BOOSTER_PRICES["swap"], "coins", "swap", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("Chain Reaction", "⚡", "Spreading explosion", BOOSTER_PRICES["chain_reaction"], "coins", "chain_reaction", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("3x3 Bomb", "💣", "Destroy 3x3 area", BOOSTER_PRICES["bomb_3x3"], "coins", "bomb_3x3", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("Line Blast", "📏", "Clear 3 rows or columns", BOOSTER_PRICES["line_blast"], "coins", "line_blast", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("Row Clear", "↔️", "Clear entire row", BOOSTER_PRICES["row_clear"], "coins", "row_clear", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("Column Clear", "↕️", "Clear entire column", BOOSTER_PRICES["column_clear"], "coins", "column_clear", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("Extra Moves", "➕", "Add 10 moves instantly", BOOSTER_PRICES["extra_moves"], "coins", "extra_moves", icon_font, name_font, desc_font, buy_button_width)
-	_add_shop_item("Tile Squasher", "💥", "Remove all tiles of same type", BOOSTER_PRICES["tile_squasher"], "coins", "tile_squasher", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_HAMMER"), "🔨", tr("UI_HAMMER_DESC"), BOOSTER_PRICES["hammer"], "coins", "hammer", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_SHUFFLE"), "🔀", tr("UI_SHUFFLE_DESC"), BOOSTER_PRICES["shuffle"], "coins", "shuffle", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_SWAP_TILES"), "🔄", tr("UI_SWAP_TILES_DESC"), BOOSTER_PRICES["swap"], "coins", "swap", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_CHAIN_REACTION"), "⚡", tr("UI_CHAIN_REACTION_DESC"), BOOSTER_PRICES["chain_reaction"], "coins", "chain_reaction", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_3X3_BOMB"), "💣", tr("UI_3X3_BOMB_DESC"), BOOSTER_PRICES["bomb_3x3"], "coins", "bomb_3x3", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_LINE_BLAST"), "📏", tr("UI_LINE_BLAST_DESC"), BOOSTER_PRICES["line_blast"], "coins", "line_blast", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_ROW_CLEAR"), "↔️", tr("UI_ROW_CLEAR_DESC"), BOOSTER_PRICES["row_clear"], "coins", "row_clear", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_COLUMN_CLEAR"), "↕️", tr("UI_COLUMN_CLEAR_DESC"), BOOSTER_PRICES["column_clear"], "coins", "column_clear", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_EXTRA_MOVES"), "➕", tr("UI_EXTRA_MOVES_DESC"), BOOSTER_PRICES["extra_moves"], "coins", "extra_moves", icon_font, name_font, desc_font, buy_button_width)
+	_add_shop_item(tr("UI_TILE_SQUASHER"), "💥", tr("UI_TILE_SQUASHER_DESC"), BOOSTER_PRICES["tile_squasher"], "coins", "tile_squasher", icon_font, name_font, desc_font, buy_button_width)
 
 func _add_shop_item(item_name: String, icon: String, description: String, cost: int, cost_type: String, item_id: String, icon_font: int=48, name_font: int=20, desc_font: int=14, buy_width: int=100):
 	"""Add a shop item to the container"""
@@ -117,14 +117,14 @@ func _add_shop_item(item_name: String, icon: String, description: String, cost: 
 		var owned = RewardManager.get_booster_count(item_id)
 		if owned > 0:
 			var owned_label = Label.new()
-			owned_label.text = "Owned: %d" % owned
+			owned_label.text = tr("UI_OWNED_PREFIX") % owned
 			ThemeManager.apply_bangers_font(owned_label, int(max(10, name_font * 0.6)))
 			owned_label.modulate = Color(0.5, 1.0, 0.5)
 			info_vbox.add_child(owned_label)
 
 	# Buy button - create with icon
 	var buy_button = Button.new()
-	buy_button.text = "Buy\n%d" % cost
+	buy_button.text = tr("UI_BUY") + "\n%d" % cost
 	buy_button.custom_minimum_size = Vector2(buy_width, 60)
 
 	# Add icon to button (will be positioned by button's internal layout)

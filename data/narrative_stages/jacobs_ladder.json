@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Jacob dreamed of a ladder reaching to heaven,\nwith angels ascending and descending.\n\nGod renewed His promise there.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JACOBS_LADDER_MAIN"
     }
   ],
   "transitions": [

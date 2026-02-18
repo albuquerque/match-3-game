@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Jacob and his entire family\nmoved to Egypt.\n\nSeventy souls, who would become a great nation.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_ISRAEL_TO_EGYPT_MAIN"
     }
   ],
   "transitions": [

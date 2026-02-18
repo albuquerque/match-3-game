@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Joseph dreamed that his brothers' sheaves\nbowed down to his.\n\nHis brothers hated him for it.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JOSEPHS_DREAMS_MAIN"
     }
   ],
   "transitions": [
