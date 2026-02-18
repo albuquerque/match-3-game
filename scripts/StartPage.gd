@@ -52,7 +52,7 @@ func _ready():
 
 	var start_btn = Button.new()
 	start_btn.name = "StartButton"
-	start_btn.text = "Start Level"
+	start_btn.text = tr("UI_BUTTON_START")
 	start_btn.custom_minimum_size = Vector2(200, 64)
 	ThemeManager.apply_bangers_font_to_button(start_btn, 24)
 	start_btn.pressed.connect(Callable(self, "_on_start_pressed"))
@@ -60,7 +60,7 @@ func _ready():
 
 	var exchange_btn = Button.new()
 	exchange_btn.name = "ExchangeButton"
-	exchange_btn.text = "Exchange Gems"
+	exchange_btn.text = tr("UI_BUTTON_EXCHANGE")
 	exchange_btn.custom_minimum_size = Vector2(200, 64)
 	ThemeManager.apply_bangers_font_to_button(exchange_btn, 20)
 	exchange_btn.pressed.connect(Callable(self, "_on_exchange_pressed"))
@@ -75,7 +75,7 @@ func _ready():
 
 	var settings_btn = Button.new()
 	settings_btn.name = "SettingsButton"
-	settings_btn.text = "⚙️ Settings"
+	settings_btn.text = "⚙️ " + tr("UI_BUTTON_SETTINGS")
 	settings_btn.custom_minimum_size = Vector2(150, 48)
 	ThemeManager.apply_bangers_font_to_button(settings_btn, 16)
 	settings_btn.pressed.connect(Callable(self, "_on_settings_pressed"))
@@ -83,7 +83,7 @@ func _ready():
 
 	var map_btn = Button.new()
 	map_btn.name = "MapButton"
-	map_btn.text = "🗺️ Map"
+	map_btn.text = "🗺️ " + tr("UI_BUTTON_MAP")
 	map_btn.custom_minimum_size = Vector2(150, 48)
 	ThemeManager.apply_bangers_font_to_button(map_btn, 16)
 	map_btn.pressed.connect(Callable(self, "_on_map_pressed"))
@@ -91,7 +91,7 @@ func _ready():
 
 	var achievements_btn = Button.new()
 	achievements_btn.name = "AchievementsButton"
-	achievements_btn.text = "🏆 Achievements"
+	achievements_btn.text = "🏆 " + tr("UI_BUTTON_ACHIEVEMENTS")
 	achievements_btn.custom_minimum_size = Vector2(150, 48)
 	ThemeManager.apply_bangers_font_to_button(achievements_btn, 16)
 	achievements_btn.pressed.connect(Callable(self, "_on_achievements_pressed"))
@@ -103,10 +103,13 @@ func _ready():
 	visible = false
 	modulate = Color(1,1,1,0)
 
+	# Listen for language changes
+	EventBus.language_changed.connect(_on_language_changed)
+
 func set_level_info(level_number: int, description: String):
 	var btn = get_node_or_null("VBox/LevelButton")
 	if btn and btn is Button:
-		btn.text = "Level %d" % level_number
+		btn.text = tr("UI_LABEL_LEVEL") + " %d" % level_number
 	var dl = get_node_or_null("VBox/LevelDescription")
 	if dl and dl is Label:
 		dl.text = description
@@ -132,3 +135,39 @@ func _on_map_pressed():
 
 func _on_achievements_pressed():
 	emit_signal("achievements_pressed")
+
+func _on_language_changed(locale: String):
+	"""Refresh UI text when language changes"""
+	print("[StartPage] Refreshing UI for language: %s" % locale)
+
+	# Update all buttons with translated text
+	var start_btn = get_node_or_null("VBox/ActionsH/StartButton")
+	if start_btn and start_btn is Button:
+		start_btn.text = tr("UI_BUTTON_START")
+
+	var exchange_btn = get_node_or_null("VBox/ActionsH/ExchangeButton")
+	if exchange_btn and exchange_btn is Button:
+		exchange_btn.text = tr("UI_BUTTON_EXCHANGE")
+
+	var settings_btn = get_node_or_null("VBox/SettingsH/SettingsButton")
+	if settings_btn and settings_btn is Button:
+		settings_btn.text = "⚙️ " + tr("UI_BUTTON_SETTINGS")
+
+	var map_btn = get_node_or_null("VBox/SettingsH/MapButton")
+	if map_btn and map_btn is Button:
+		map_btn.text = "🗺️ " + tr("UI_BUTTON_MAP")
+
+	var achievements_btn = get_node_or_null("VBox/SettingsH/AchievementsButton")
+	if achievements_btn and achievements_btn is Button:
+		achievements_btn.text = "🏆 " + tr("UI_BUTTON_ACHIEVEMENTS")
+
+	# Refresh level info if it was set
+	var level_btn = get_node_or_null("VBox/LevelButton")
+	if level_btn and level_btn is Button:
+		# Extract level number from current text if possible
+		var current_text = level_btn.text
+		var number_match = current_text.split(" ")
+		if number_match.size() > 1:
+			var level_num = number_match[-1]
+			level_btn.text = tr("UI_LABEL_LEVEL") + " " + level_num
+

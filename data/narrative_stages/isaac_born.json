@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Sarah laughed when told she would have a son.\n\nBut God kept His promise,\nand Isaac was born.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_ISAAC_BORN_MAIN"
     }
   ],
   "transitions": [

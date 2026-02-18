@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Before he died, Jacob blessed each of his sons,\nprophesying their futures.\n\nJudah would bring forth kings.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JACOBS_BLESSINGS_MAIN"
     }
   ],
   "transitions": [

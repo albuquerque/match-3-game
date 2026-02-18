@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Joseph's brothers sold him to traders\nand told their father he was dead.\n\nBetrayal by blood.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JOSEPH_SOLD_MAIN"
     }
   ],
   "transitions": [

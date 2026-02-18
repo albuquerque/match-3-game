@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Jacob met Rachel at a well\nand fell in love immediately.\n\nHe would work fourteen years to marry her.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_RACHEL_AT_WELL_MAIN"
     }
   ],
   "transitions": [

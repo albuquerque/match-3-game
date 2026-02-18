@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Esau sold his birthright to Jacob\nfor a bowl of stew.\n\nA moment's hunger cost him everything.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_BIRTHRIGHT_SOLD_MAIN"
     }
   ],
   "transitions": [

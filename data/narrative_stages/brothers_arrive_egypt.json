@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Famine drove Joseph's brothers to Egypt,\nseeking food.\n\nThey didn't recognize the brother they sold.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_BROTHERS_ARRIVE_EGYPT_MAIN"
     }
   ],
   "transitions": [

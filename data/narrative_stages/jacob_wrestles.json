@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Jacob wrestled with a mysterious man all night.\n\nHe received a new name: Israel,\n'one who struggles with God.'",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_JACOB_WRESTLES_MAIN"
     }
   ],
   "transitions": [

@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "A mother placed her baby in a basket\nand set him in the Nile.\n\nPharaoh's daughter found him.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_MOSES_IN_BASKET_MAIN"
     }
   ],
   "transitions": [

@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Hail and fire rained from the sky,\ndestroying crops and killing cattle.\n\nEgypt had never seen such devastation.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PLAGUE_HAIL_MAIN"
     }
   ],
   "transitions": [

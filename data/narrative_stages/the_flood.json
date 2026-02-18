@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Rain fell for forty days and forty nights.\n\nThe waters covered the earth,\nbut the ark kept Noah and his family safe.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_THE_FLOOD_MAIN"
     }
   ],
   "transitions": [

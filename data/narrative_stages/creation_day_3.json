@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God said, 'Let the waters be gathered together,\nand let dry land appear.'\n\nAnd God saw that it was good.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_CREATION_DAY_3_MAIN"
     }
   ],
   "transitions": [

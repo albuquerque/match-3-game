@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God created the great sea creatures\nand every living thing that moves in the waters,\nand every winged bird.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_CREATION_DAY_5_MAIN"
     }
   ],
   "transitions": [

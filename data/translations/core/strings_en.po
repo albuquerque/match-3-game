@@ -1,0 +1,874 @@
+# Translation file for Match-3 Game
+# Language: English (en)
+# 
+msgid ""
+msgstr ""
+"Language: en\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "UI_BUTTON_START"
+msgstr "Start Level"
+
+msgid "UI_BUTTON_CONTINUE"
+msgstr "Continue"
+
+msgid "UI_BUTTON_RETRY"
+msgstr "Retry"
+
+msgid "UI_BUTTON_SETTINGS"
+msgstr "Settings"
+
+msgid "UI_BUTTON_ACHIEVEMENTS"
+msgstr "Achievements"
+
+msgid "UI_BUTTON_MAP"
+msgstr "Map"
+
+msgid "UI_BUTTON_SHOP"
+msgstr "Shop"
+
+msgid "UI_BUTTON_GALLERY"
+msgstr "Gallery"
+
+msgid "UI_BUTTON_EXCHANGE"
+msgstr "Exchange Gems"
+
+msgid "UI_BUTTON_CLOSE"
+msgstr "Close"
+
+msgid "UI_BUTTON_BACK"
+msgstr "Back"
+
+msgid "UI_BUTTON_CLAIM"
+msgstr "CLAIM"
+
+msgid "UI_BUTTON_SKIP"
+msgstr "Skip"
+
+msgid "UI_LABEL_SCORE"
+msgstr "Score"
+
+msgid "UI_LABEL_MOVES"
+msgstr "Moves"
+
+msgid "UI_LABEL_GOAL"
+msgstr "Goal"
+
+msgid "UI_LABEL_LEVEL"
+msgstr "Level"
+
+msgid "UI_LABEL_COINS"
+msgstr "Coins"
+
+msgid "UI_LABEL_GEMS"
+msgstr "Gems"
+
+msgid "UI_LABEL_LIVES"
+msgstr "Lives"
+
+msgid "UI_LABEL_REWARDS"
+msgstr "Rewards"
+
+msgid "UI_LEVEL_COMPLETE"
+msgstr "Level Complete!"
+
+msgid "UI_LEVEL_FAILED"
+msgstr "Level Failed"
+
+msgid "UI_GAME_OVER"
+msgstr "Game Over"
+
+msgid "UI_NEW_REWARD"
+msgstr "+%d %s"
+
+msgid "UI_AUDIO"
+msgstr "Audio"
+
+msgid "UI_SETTINGS"
+msgstr "Settings"
+
+msgid "UI_MUSIC"
+msgstr "Music"
+
+msgid "UI_SFX"
+msgstr "SFX"
+
+msgid "UI_SOUND_EFFECTS"
+msgstr "Sound Effects"
+
+msgid "UI_CLOSE"
+msgstr "Close"
+
+msgid "UI_MOVES"
+msgstr "MOVES"
+
+msgid "UI_SCORE_LABEL"
+msgstr "SCORE"
+
+msgid "UI_GOAL"
+msgstr "GOAL"
+
+msgid "UI_OBSTACLES"
+msgstr "Obstacles"
+
+msgid "UI_COINS"
+msgstr "Coins"
+
+msgid "UI_GOAL_SCORE"
+msgstr "Goal"
+
+msgid "UI_FINAL_SCORE"
+msgstr "Final Score"
+
+msgid "UI_TARGET"
+msgstr "Target"
+
+msgid "UI_NO_MOVES"
+msgstr "You have no moves left."
+
+msgid "UI_VIBRATION"
+msgstr "Vibration"
+
+msgid "UI_ON"
+msgstr "On"
+
+msgid "UI_OFF"
+msgstr "Off"
+
+msgid "UI_LANGUAGE"
+msgstr "Language"
+
+msgid "UI_LEVEL_COMPLETE"
+msgstr "Level Complete!"
+
+msgid "UI_LEVEL_FAILED"
+msgstr "Level Failed"
+
+msgid "UI_GAME_OVER"
+msgstr "Game Over"
+
+msgid "UI_REPLAY"
+msgstr "REPLAY"
+
+msgid "UI_NEXT_LEVEL"
+msgstr "NEXT LEVEL"
+
+msgid "UI_CONTINUE_NEXT_LEVEL"
+msgstr "Continue to Next Level"
+
+msgid "UI_BACK_TO_MENU"
+msgstr "Back to Menu"
+
+msgid "UI_TRY_AGAIN"
+msgstr "Try Again"
+
+msgid "UI_QUIT"
+msgstr "Quit"
+
+msgid "UI_REWARDS_EARNED"
+msgstr "Rewards Earned:"
+
+msgid "UI_EFFICIENT_MOVES"
+msgstr "Efficient! Used %d/%d moves (%d%% saved)"
+
+msgid "UI_GOOD_MOVES"
+msgstr "Good! Used %d/%d moves (%d%% saved)"
+
+msgid "UI_USED_MOVES"
+msgstr "Used %d/%d moves"
+
+msgid "UI_COINS_PREFIX"
+msgstr "Coins:"
+
+msgid "UI_GEMS_PREFIX"
+msgstr "Gems:"
+
+msgid "UI_BONUS_REWARDS"
+msgstr "BONUS REWARDS!"
+
+msgid "UI_BOOSTER_REWARD"
+msgstr "+%d %s Booster"
+
+msgid "UI_GALLERY_UNLOCKED"
+msgstr "Gallery Unlocked:"
+
+msgid "UI_VIDEO_UNLOCKED"
+msgstr "Video Unlocked:"
+
+msgid "UI_CARD_UNLOCKED"
+msgstr "Card Unlocked:"
+
+msgid "UI_THEME_UNLOCKED"
+msgstr "Theme Unlocked:"
+
+msgid "UI_UNLOCKED"
+msgstr "%s Unlocked!"
+
+msgid "UI_MULTIPLIER_CHALLENGE"
+msgstr "Multiplier Challenge!"
+
+msgid "UI_START_MULTIPLIER"
+msgstr "Start Multiplier Challenge!"
+
+msgid "UI_TAP_TO_STOP"
+msgstr "TAP HERE TO STOP!"
+
+msgid "UI_WATCH_AD_MULTIPLIER"
+msgstr "Watch ad to claim %.1fx multiplier!"
+
+msgid "UI_MULTIPLIER_APPLIED"
+msgstr "%.1fx Multiplier Applied!"
+
+msgid "UI_OUT_OF_LIVES"
+msgstr "Out of Lives!"
+
+msgid "UI_WAIT_FOR_LIVES"
+msgstr "Wait for lives to refill or get more now"
+
+msgid "UI_GET_LIVES"
+msgstr "Get Lives"
+
+msgid "UI_WATCH_AD"
+msgstr "Watch Ad"
+
+msgid "UI_NEXT_LIFE_IN"
+msgstr "Next life in: %02d:%02d"
+
+msgid "UI_REFILL_GEMS"
+msgstr "Refill (%d 💎)"
+
+msgid "UI_WATCH_AD_LIFE"
+msgstr "Watch Ad (+1 ❤️)"
+
+msgid "UI_LOADING_AD"
+msgstr "Loading Ad..."
+
+msgid "UI_LOADING"
+msgstr "Loading..."
+
+msgid "UI_SCORE_STATS"
+msgstr "Score: %d / %d\nMoves Used: %d"
+
+msgid "UI_RETRY_LEVEL"
+msgstr "RETRY LEVEL"
+
+msgid "UI_EXIT_TO_MAP"
+msgstr "EXIT TO MAP"
+
+msgid "UI_REWARDS_COINS"
+msgstr "💰 Coins: +%d"
+
+msgid "UI_REWARDS_GEMS"
+msgstr "💎 Gems: +%d"
+
+msgid "UI_REWARDS_LIVES"
+msgstr "❤️ +%d Lives"
+
+msgid "UI_REWARDS_BOOSTER_UNLOCKED"
+msgstr "🚀 Booster Unlocked!"
+
+msgid "UI_REWARDS_STARS"
+msgstr "%d Stars!"
+
+msgid "UI_REWARDS_GENERIC"
+msgstr "🎁 Reward!"
+
+msgid "UI_GALLERY_IMAGES_UNLOCKED"
+msgstr "🖼️ Gallery Images Unlocked: %d"
+
+msgid "UI_CARDS_UNLOCKED"
+msgstr "🃏 Cards Unlocked: %d"
+
+msgid "UI_THEMES_UNLOCKED"
+msgstr "🎨 Themes Unlocked: %d"
+
+msgid "UI_VIDEOS_UNLOCKED"
+msgstr "📹 Videos Unlocked: %d"
+
+msgid "UI_REWARDS_SUMMARY"
+msgstr "Rewards: %d coins, %d gems"
+
+msgid "UI_BOOSTER_PREFIX"
+msgstr "%s %s: +%d"
+
+msgid "UI_CONTINUE"
+msgstr "CONTINUE"
+
+msgid "SETTING_MUSIC_VOLUME"
+msgstr "Music Volume"
+
+msgid "SETTING_SFX_VOLUME"
+msgstr "Sound Volume"
+
+msgid "ACHIEVEMENT_UNLOCKED"
+msgstr "Achievement Unlocked!"
+
+msgid "REWARD_LEVEL_COMPLETION"
+msgstr "Level Completion Reward"
+
+msgid "REWARD_DAILY_BONUS"
+msgstr "Daily Bonus"
+
+msgid "SHOP_TITLE"
+msgstr "Shop"
+
+msgid "SHOP_BOOSTERS"
+msgstr "Boosters"
+
+msgid "SHOP_CURRENCY"
+msgstr "Currency"
+
+msgid "SHOP_BUY"
+msgstr "Buy"
+
+msgid "SHOP_PRICE"
+msgstr "Price"
+
+msgid "BOOSTER_HAMMER"
+msgstr "Hammer"
+
+msgid "BOOSTER_SHUFFLE"
+msgstr "Shuffle"
+
+msgid "BOOSTER_SWAP"
+msgstr "Swap"
+
+msgid "BOOSTER_BOMB"
+msgstr "Bomb"
+
+msgid "BOOSTER_CHAIN"
+msgstr "Chain Reaction"
+
+msgid "BOOSTER_LINE_BLAST"
+msgstr "Line Blast"
+
+msgid "BOOSTER_ROW_CLEAR"
+msgstr "Row Clear"
+
+msgid "BOOSTER_COLUMN_CLEAR"
+msgstr "Column Clear"
+
+msgid "BOOSTER_TILE_SQUASHER"
+msgstr "Tile Squasher"
+
+msgid "ERROR_NO_MOVES"
+msgstr "Out of moves!"
+
+msgid "ERROR_LEVEL_NOT_FOUND"
+msgstr "Level not found"
+
+msgid "ERROR_SAVE_FAILED"
+msgstr "Save failed"
+
+msgid "MSG_LOADING"
+msgstr "Loading..."
+
+msgid "MSG_AWESOME"
+msgstr "Awesome!"
+
+msgid "MSG_GREAT"
+msgstr "Great!"
+
+msgid "MSG_NICE"
+msgstr "Nice!"
+
+msgid "MSG_COMBO"
+msgstr "Combo!"
+
+msgid "MSG_SUPER_COMBO"
+msgstr "Super Combo!"
+
+msgid "MSG_AMAZING_COMBO"
+msgstr "Amazing Combo!"
+
+msgid "NARRATIVE_SKIP"
+msgstr "Skip"
+
+msgid "WORLDMAP_TITLE"
+msgstr "World Map"
+
+msgid "WORLDMAP_SELECT_LEVEL"
+msgstr "Select Level"
+
+msgid "GALLERY_TITLE"
+msgstr "Gallery"
+
+msgid "GALLERY_LOCKED"
+msgstr "Locked"
+
+msgid "GALLERY_UNLOCKED"
+msgstr "Unlocked"
+
+msgid "GALLERY_PROGRESS"
+msgstr "Progress: %d/%d"
+
+msgid "DAILY_REWARD_TITLE"
+msgstr "Daily Reward"
+
+msgid "DAILY_REWARD_DAY"
+msgstr "Day %d"
+
+msgid "DAILY_REWARD_CLAIMED"
+msgstr "Claimed!"
+
+msgid "DAILY_REWARD_STREAK"
+msgstr "Streak: %d days"
+
+msgid "CHEST_COMMON"
+msgstr "Common Chest"
+
+msgid "CHEST_RARE"
+msgstr "Rare Chest"
+
+msgid "CHEST_EPIC"
+msgstr "Epic Chest"
+
+msgid "CHEST_LEGENDARY"
+msgstr "Legendary Chest"
+
+msgid "CHEST_OPENING"
+msgstr "Opening..."
+
+msgid "CHEST_UNLOCK_NOW"
+msgstr "Unlock Now"
+
+msgid "QUEST_DAILY"
+msgstr "Daily Quest"
+
+msgid "QUEST_WEEKLY"
+msgstr "Weekly Quest"
+
+msgid "QUEST_COMPLETE_LEVELS"
+msgstr "Complete %d levels"
+
+msgid "QUEST_COLLECT_COINS"
+msgstr "Collect %d coins"
+
+msgid "QUEST_USE_BOOSTERS"
+msgstr "Use %d boosters"
+
+msgid "ENERGY_TITLE"
+msgstr "Energy"
+
+msgid "ENERGY_FULL"
+msgstr "Full Energy!"
+
+msgid "ENERGY_OUT"
+msgstr "Out of Energy"
+
+msgid "ENERGY_REFILL"
+msgstr "Refill Energy"
+
+msgid "ENERGY_NEXT_IN"
+msgstr "Next heart in: %s"
+
+msgid "STORYBOARD_TITLE"
+msgstr "Story"
+
+msgid "STORYBOARD_CHAPTER"
+msgstr "Chapter %d"
+
+msgid "STORYBOARD_LOCKED"
+msgstr "Unlock at level %d"
+
+msgid "COLLECTION_COMPLETE"
+msgstr "Collection Complete!"
+
+msgid "COLLECTION_RARITY_COMMON"
+msgstr "Common"
+
+msgid "COLLECTION_RARITY_RARE"
+msgstr "Rare"
+
+msgid "COLLECTION_RARITY_EPIC"
+msgstr "Epic"
+
+msgid "COLLECTION_RARITY_LEGENDARY"
+msgstr "Legendary"
+
+msgid "PROFILE_LEVEL"
+msgstr "Player Level"
+
+msgid "PROFILE_XP"
+msgstr "Experience"
+
+msgid "PROFILE_STATS"
+msgstr "Statistics"
+
+msgid "MILESTONE_REACHED"
+msgstr "Milestone Reached!"
+
+msgid "BONUS_MOVE"
+msgstr "Bonus Move!"
+
+msgid "PERFECT_SCORE"
+msgstr "Perfect Score!"
+
+msgid "THREE_STARS"
+msgstr "3 Stars!"
+
+msgid "UI_ACHIEVEMENTS_TITLE"
+msgstr "Achievements"
+
+msgid "UI_DAILY_STREAK_TITLE"
+msgstr "🔥 Daily Login Streak"
+
+msgid "UI_CURRENT_STREAK"
+msgstr "Current Streak: %d days"
+
+msgid "UI_LOGIN_REWARDS_INFO"
+msgstr "Login daily to earn rewards!"
+
+msgid "UI_CLAIM_DAILY"
+msgstr "Claim Daily Reward"
+
+msgid "UI_MILESTONE_BADGES"
+msgstr "Milestone Badges"
+
+msgid "UI_BACK"
+msgstr "Back"
+
+msgid "UI_CLAIM_BUTTON"
+msgstr "🎁 CLAIM"
+
+msgid "UI_CLAIMED"
+msgstr "✓ CLAIMED"
+
+msgid "UI_COMPLETE"
+msgstr "✓ COMPLETE"
+
+msgid "UI_LOCKED"
+msgstr "LOCKED"
+
+msgid "UI_DAY_REWARD_CLAIMED"
+msgstr "🎁 Day %d Reward Claimed!"
+
+msgid "UI_YOU_RECEIVED"
+msgstr "You received:"
+
+msgid "UI_AWESOME"
+msgstr "Awesome!"
+
+msgid "UI_OWNED_PREFIX"
+msgstr "Owned: %d"
+
+# Shop item names and descriptions
+msgid "UI_LIVES_REFILL"
+msgstr "Lives Refill"
+
+msgid "UI_REFILL_ALL_LIVES"
+msgstr "Refill all 5 lives"
+
+msgid "UI_HAMMER"
+msgstr "Hammer"
+msgid "UI_HAMMER_DESC"
+msgstr "Destroy any tile"
+
+msgid "UI_SHUFFLE"
+msgstr "Shuffle"
+msgid "UI_SHUFFLE_DESC"
+msgstr "Reorganize board"
+
+msgid "UI_SWAP_TILES"
+msgstr "Swap Tiles"
+msgid "UI_SWAP_TILES_DESC"
+msgstr "Swap any 2 tiles"
+
+msgid "UI_CHAIN_REACTION"
+msgstr "Chain Reaction"
+msgid "UI_CHAIN_REACTION_DESC"
+msgstr "Spreading explosion"
+
+msgid "UI_3X3_BOMB"
+msgstr "3x3 Bomb"
+msgid "UI_3X3_BOMB_DESC"
+msgstr "Destroy 3x3 area"
+
+msgid "UI_LINE_BLAST"
+msgstr "Line Blast"
+msgid "UI_LINE_BLAST_DESC"
+msgstr "Clear 3 rows or columns"
+
+msgid "UI_ROW_CLEAR"
+msgstr "Row Clear"
+msgid "UI_ROW_CLEAR_DESC"
+msgstr "Clear entire row"
+
+msgid "UI_COLUMN_CLEAR"
+msgstr "Column Clear"
+msgid "UI_COLUMN_CLEAR_DESC"
+msgstr "Clear entire column"
+
+msgid "UI_EXTRA_MOVES"
+msgstr "Extra Moves"
+msgid "UI_EXTRA_MOVES_DESC"
+msgstr "Add 10 moves instantly"
+
+msgid "UI_TILE_SQUASHER"
+msgstr "Tile Squasher"
+msgid "UI_TILE_SQUASHER_DESC"
+msgstr "Remove all tiles of same type"
+
+msgid "UI_BUY"
+msgstr "Buy"
+
+# WorldMap keys
+msgid "UI_NEXT_CHAPTER"
+msgstr "Next Chapter →"
+
+msgid "UI_COMPLETE_CHAPTER"
+msgstr "Complete Chapter to Continue"
+
+msgid "UI_PROGRESS_STATS"
+msgstr "%d Stars Collected  📖 %d Levels Completed"
+
+msgid "UI_DOWNLOAD_FREE"
+msgstr "📥 Download Free"
+
+msgid "UI_DOWNLOAD_PRICE"
+msgstr "📥 Download ($%.2f)"
+
+# Achievement category titles
+msgid "📈 Match Master"
+msgstr "📈 Match Master"
+
+msgid "🏆 Level Progress"
+msgstr "🏆 Level Progress"
+
+msgid "Star Collector"
+msgstr "Star Collector"
+
+msgid "🔥 Daily Streak"
+msgstr "🔥 Daily Streak"
+
+msgid "🎯 Special Challenges"
+msgstr "🎯 Special Challenges"
+
+msgid "📅 Weekly Challenges"
+msgstr "📅 Weekly Challenges"
+
+msgid "🌟 Monthly Milestones"
+msgstr "🌟 Monthly Milestones"
+
+msgid "🎄 Seasonal Events"
+msgstr "🎄 Seasonal Events"
+
+# Match achievements
+msgid "First Century"
+msgstr "First Century"
+msgid "Make 100 matches"
+msgstr "Make 100 matches"
+
+msgid "Match Veteran"
+msgstr "Match Veteran"
+msgid "Make 500 matches"
+msgstr "Make 500 matches"
+
+msgid "Match Legend"
+msgstr "Match Legend"
+msgid "Make 1000 matches"
+msgstr "Make 1000 matches"
+
+msgid "Match Hero"
+msgstr "Match Hero"
+msgid "Make 2500 matches"
+msgstr "Make 2500 matches"
+
+msgid "Match Master"
+msgstr "Match Master"
+msgid "Make 5000 matches"
+msgstr "Make 5000 matches"
+
+msgid "Match God"
+msgstr "Match God"
+msgid "Make 10,000 matches"
+msgstr "Make 10,000 matches"
+
+# Level progress achievements
+msgid "Explorer"
+msgstr "Explorer"
+msgid "Complete 10 levels"
+msgstr "Complete 10 levels"
+
+msgid "Adventurer"
+msgstr "Adventurer"
+msgid "Complete 25 levels"
+msgstr "Complete 25 levels"
+
+msgid "Champion"
+msgstr "Champion"
+msgid "Complete 50 levels"
+msgstr "Complete 50 levels"
+
+msgid "Conqueror"
+msgstr "Conqueror"
+msgid "Complete 100 levels"
+msgstr "Complete 100 levels"
+
+msgid "Crusader"
+msgstr "Crusader"
+msgid "Complete 250 levels"
+msgstr "Complete 250 levels"
+
+msgid "Legendary"
+msgstr "Legendary"
+msgid "Complete 500 levels"
+msgstr "Complete 500 levels"
+
+# Star collector achievements
+msgid "Rising Star"
+msgstr "Rising Star"
+msgid "Earn 10 stars"
+msgstr "Earn 10 stars"
+
+msgid "Star Seeker"
+msgstr "Star Seeker"
+msgid "Earn 25 stars"
+msgstr "Earn 25 stars"
+
+msgid "Star Master"
+msgstr "Star Master"
+msgid "Earn 50 stars"
+msgstr "Earn 50 stars"
+
+msgid "Star Lord"
+msgstr "Star Lord"
+msgid "Earn 100 stars"
+msgstr "Earn 100 stars"
+
+msgid "Star Emperor"
+msgstr "Star Emperor"
+msgid "Earn 250 stars"
+msgstr "Earn 250 stars"
+
+msgid "Celestial Being"
+msgstr "Celestial Being"
+msgid "Earn 500 stars"
+msgstr "Earn 500 stars"
+
+# Daily streak achievements
+msgid "Consistent Player"
+msgstr "Consistent Player"
+msgid "Login 3 days in a row"
+msgstr "Login 3 days in a row"
+
+msgid "Week Warrior"
+msgstr "Week Warrior"
+msgid "Login 7 days in a row"
+msgstr "Login 7 days in a row"
+
+msgid "Dedicated"
+msgstr "Dedicated"
+msgid "Login 14 days in a row"
+msgstr "Login 14 days in a row"
+
+msgid "Legend"
+msgstr "Legend"
+msgid "Login 30 days in a row"
+msgstr "Login 30 days in a row"
+
+msgid "Devoted"
+msgstr "Devoted"
+msgid "Login 60 days in a row"
+msgstr "Login 60 days in a row"
+
+msgid "Saint"
+msgstr "Saint"
+msgid "Login 100 days in a row"
+msgstr "Login 100 days in a row"
+
+# Special challenges
+msgid "Tool Master"
+msgstr "Tool Master"
+msgid "Use 5 different booster types"
+msgstr "Use 5 different booster types"
+
+msgid "Combo King"
+msgstr "Combo King"
+msgid "Reach a 10+ combo"
+msgstr "Reach a 10+ combo"
+
+msgid "Perfectionist"
+msgstr "Perfectionist"
+msgid "Get 3 levels with 3 stars"
+msgstr "Get 3 levels with 3 stars"
+
+msgid "Score Hunter"
+msgstr "Score Hunter"
+msgid "Earn 100,000 total points"
+msgstr "Earn 100,000 total points"
+
+msgid "Score Legend"
+msgstr "Score Legend"
+msgid "Earn 1,000,000 total points"
+msgstr "Earn 1,000,000 total points"
+
+msgid "Combo God"
+msgstr "Combo God"
+msgid "Reach a 20+ combo"
+msgstr "Reach a 20+ combo"
+
+msgid "Perfect Master"
+msgstr "Perfect Master"
+msgid "Get 10 levels with 3 stars"
+msgstr "Get 10 levels with 3 stars"
+
+msgid "Booster Addict"
+msgstr "Booster Addict"
+msgid "Use 100 boosters total"
+msgstr "Use 100 boosters total"
+
+# Weekly challenges
+msgid "Weekly Matcher"
+msgstr "Weekly Matcher"
+msgid "Make 100 matches this week"
+msgstr "Make 100 matches this week"
+
+msgid "Weekly Explorer"
+msgstr "Weekly Explorer"
+msgid "Complete 10 levels this week"
+msgstr "Complete 10 levels this week"
+
+msgid "Weekly Perfectionist"
+msgstr "Weekly Perfectionist"
+msgid "Get 5 perfect levels this week"
+msgstr "Get 5 perfect levels this week"
+
+msgid "Weekly Warrior"
+msgstr "Weekly Warrior"
+msgid "Play 7 days this week"
+msgstr "Play 7 days this week"
+
+# Monthly milestones
+msgid "Monthly Devotee"
+msgstr "Monthly Devotee"
+msgid "Play 20 days this month"
+msgstr "Play 20 days this month"
+
+msgid "Monthly Champion"
+msgstr "Monthly Champion"
+msgid "Earn 50,000 points this month"
+msgstr "Earn 50,000 points this month"
+
+msgid "Monthly Star Hunter"
+msgstr "Monthly Star Hunter"
+msgid "Earn 25 stars this month"
+msgstr "Earn 25 stars this month"
+
+# Seasonal events
+msgid "Christmas Spirit"
+msgstr "Christmas Spirit"
+msgid "Play during Christmas season"
+msgstr "Play during Christmas season"
+
+msgid "Easter Joy"
+msgstr "Easter Joy"
+msgid "Complete 20 levels during Easter"
+msgstr "Complete 20 levels during Easter"
+
+msgid "Harvest Blessing"
+msgstr "Harvest Blessing"
+msgid "Collect 1000 coins in autumn"
+msgstr "Collect 1000 coins in autumn"
+

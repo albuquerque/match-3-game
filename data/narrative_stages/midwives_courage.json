@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Pharaoh ordered all Hebrew boys killed,\nbut the midwives feared God\nand let them live.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_MIDWIVES_COURAGE_MAIN"
     }
   ],
   "transitions": [

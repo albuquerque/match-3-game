@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Mankind tried to build a tower to heaven.\n\nGod confused their language\nand scattered them across the earth.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_TOWER_OF_BABEL_MAIN"
     }
   ],
   "transitions": [

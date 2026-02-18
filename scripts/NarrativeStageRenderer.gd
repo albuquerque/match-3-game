@@ -7,6 +7,7 @@ class_name NarrativeStageRenderer
 
 var current_visual: Node = null
 var current_text_label: Label = null  # Text overlay for narratives
+var current_text_key: String = ""  # Track the translation key for the current text
 var anchor_name: String = "top_banner"
 var asset_cache: Dictionary = {}
 
@@ -40,13 +41,31 @@ func _ready():
 	print("[NarrativeStageRenderer] ✓ Configured as fullscreen (anchors set to 0,0,1,1)")
 	print("[NarrativeStageRenderer] === RENDERER READY COMPLETE ===")
 
+	# Connect to language change events so we can re-translate visible text
+	var eb = get_node_or_null('/root/EventBus')
+	if eb and eb.has_signal('language_changed'):
+		if not eb.language_changed.is_connected(Callable(self, '_on_language_changed')):
+			eb.language_changed.connect(Callable(self, '_on_language_changed'))
+			print('[NarrativeStageRenderer] Connected to EventBus.language_changed')
+
 func render_state(state_data: Dictionary):
 	"""Render a narrative stage state"""
 	print("[NarrativeStageRenderer] Rendering state: ", state_data.get("name", "unknown"))
 
 	# Get asset path
 	var asset_path = state_data.get("asset", "")
-	var text_content = state_data.get("text", "")
+
+	# Get text content - support both direct text and translation keys
+	var text_content = ""
+	current_text_key = ""
+	if state_data.has("text_key"):
+		# Use translation key
+		current_text_key = state_data.get("text_key", "")
+		text_content = tr(current_text_key)
+	elif state_data.has("text"):
+		# Fallback to direct text (legacy support)
+		current_text_key = ""
+		text_content = state_data.get("text", "")
 
 	# If there's no asset but there is text/content, render a text-only state
 	if asset_path == "" and text_content != "":
@@ -264,7 +283,11 @@ func _add_text_overlay(text_content: String, position_mode: String, parent_node:
 	# Create text label
 	var label = Label.new()
 	label.name = "NarrativeText"
-	label.text = text_content
+	# If we have a tracked key, use tr(key) to set text so later re-translation is accurate
+	if current_text_key != "":
+		label.text = tr(current_text_key)
+	else:
+		label.text = text_content
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -350,6 +373,13 @@ func _add_text_overlay(text_content: String, position_mode: String, parent_node:
 	label.modulate.a = 0.0
 	var tween = create_tween()
 	tween.tween_property(label, "modulate:a", 1.0, fade_in_duration)
+
+func _on_language_changed(locale: String) -> void:
+	"""Update visible narrative text when the language changes."""
+	print("[NarrativeStageRenderer] Language changed: ", locale)
+	if current_text_label and is_instance_valid(current_text_label) and current_text_key != "":
+		current_text_label.text = tr(current_text_key)
+		print("[NarrativeStageRenderer] Updated narrative label to locale: ", locale)
 
 func _load_asset(asset_path: String) -> Texture2D:
 	"""Load texture from bundled or DLC source (cache-aware wrapper)."""
@@ -511,7 +541,14 @@ func _display_texture(texture: Texture2D, state_data: Dictionary):
 	print("[NarrativeStageRenderer] ✓ TextureRect z_index: ", tex_rect.z_index)
 
 	# Add text overlay if text is provided
-	var text_content = state_data.get("text", "")
+	var text_content = ""
+	if state_data.has("text_key"):
+		# Use translation key
+		text_content = tr(state_data.get("text_key", ""))
+	elif state_data.has("text"):
+		# Fallback to direct text (legacy support)
+		text_content = state_data.get("text", "")
+
 	if text_content != "":
 		_add_text_overlay(text_content, position_mode, anchor_node)
 

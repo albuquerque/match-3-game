@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Aaron struck the Nile with his staff,\nand all the water turned to blood.\n\nBut Pharaoh's heart was hardened.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PLAGUE_BLOOD_MAIN"
     }
   ],
   "transitions": [

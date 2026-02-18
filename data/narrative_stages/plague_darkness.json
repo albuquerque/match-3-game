@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Darkness covered Egypt for three days,\nso thick it could be felt.\n\nBut Israel had light in their dwellings.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PLAGUE_DARKNESS_MAIN"
     }
   ],
   "transitions": [

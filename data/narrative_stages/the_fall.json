@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "The serpent deceived them, and they ate the forbidden fruit.\n\nSin entered the world,\nand they were cast from the garden.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_THE_FALL_MAIN"
     }
   ],
   "transitions": [

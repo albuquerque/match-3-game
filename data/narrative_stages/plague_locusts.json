@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "Locusts covered the ground\nuntil the land was black.\n\nThey devoured everything the hail had left.",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_PLAGUE_LOCUSTS_MAIN"
     }
   ],
   "transitions": [

@@ -246,7 +246,7 @@ func _show_container_summary():
 
 	# Title
 	var title = Label.new()
-	title.text = "Level Complete!"
+	title.text = tr("UI_LEVEL_COMPLETE")
 	title.add_theme_font_size_override("font_size", 36)
 	title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -254,7 +254,7 @@ func _show_container_summary():
 
 	# Rewards section
 	var rewards_title = Label.new()
-	rewards_title.text = "Rewards Earned"
+	rewards_title.text = tr("UI_REWARDS_EARNED")
 	rewards_title.add_theme_font_size_override("font_size", 24)
 	rewards_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(rewards_title)
@@ -271,7 +271,7 @@ func _show_container_summary():
 	# Coins
 	if coins > 0:
 		var coins_label = Label.new()
-		coins_label.text = "💰 Coins: +%d" % coins
+		coins_label.text = tr("UI_REWARDS_COINS") % coins
 		coins_label.add_theme_font_size_override("font_size", 28)
 		coins_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0, 1.0))
 		coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -280,7 +280,7 @@ func _show_container_summary():
 	# Gems
 	if gems > 0:
 		var gems_label = Label.new()
-		gems_label.text = "💎 Gems: +%d" % gems
+		gems_label.text = tr("UI_REWARDS_GEMS") % gems
 		gems_label.add_theme_font_size_override("font_size", 28)
 		gems_label.add_theme_color_override("font_color", Color(0.3, 0.7, 1.0, 1.0))
 		gems_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -293,7 +293,7 @@ func _show_container_summary():
 			if booster_count > 0:
 				var booster_label = Label.new()
 				var booster_icon = _get_booster_icon(booster_type)
-				booster_label.text = "%s %s: +%d" % [booster_icon, booster_type.capitalize(), booster_count]
+				booster_label.text = tr("UI_BOOSTER_PREFIX") % [booster_icon, booster_type.capitalize(), booster_count]
 				booster_label.add_theme_font_size_override("font_size", 24)
 				booster_label.add_theme_color_override("font_color", Color(0.9, 0.5, 1.0, 1.0))
 				booster_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -302,7 +302,7 @@ func _show_container_summary():
 	# Gallery Images
 	if not gallery_images.is_empty():
 		var gallery_label = Label.new()
-		gallery_label.text = "🖼️ Gallery Images Unlocked: %d" % gallery_images.size()
+		gallery_label.text = tr("UI_GALLERY_IMAGES_UNLOCKED") % gallery_images.size()
 		gallery_label.add_theme_font_size_override("font_size", 24)
 		gallery_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.4, 1.0))
 		gallery_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -320,7 +320,7 @@ func _show_container_summary():
 	# Collection Cards
 	if not cards.is_empty():
 		var card_label = Label.new()
-		card_label.text = "🃏 Cards Unlocked: %d" % cards.size()
+		card_label.text = tr("UI_CARDS_UNLOCKED") % cards.size()
 		card_label.add_theme_font_size_override("font_size", 24)
 		card_label.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 1.0))
 		card_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -339,7 +339,7 @@ func _show_container_summary():
 	# Themes
 	if not themes.is_empty():
 		var theme_label = Label.new()
-		theme_label.text = "🎨 Themes Unlocked: %d" % themes.size()
+		theme_label.text = tr("UI_THEMES_UNLOCKED") % themes.size()
 		theme_label.add_theme_font_size_override("font_size", 24)
 		theme_label.add_theme_color_override("font_color", Color(0.9, 0.4, 0.9, 1.0))
 		theme_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -348,7 +348,7 @@ func _show_container_summary():
 	# Videos
 	if not videos.is_empty():
 		var video_label = Label.new()
-		video_label.text = "📹 Videos Unlocked: %d" % videos.size()
+		video_label.text = tr("UI_VIDEOS_UNLOCKED") % videos.size()
 		video_label.add_theme_font_size_override("font_size", 24)
 		video_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5, 1.0))
 		video_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -356,7 +356,7 @@ func _show_container_summary():
 
 	# Score
 	var score_label = Label.new()
-	score_label.text = "Score: %d" % score
+	score_label.text = tr("UI_LABEL_SCORE") + ": %d" % score
 	score_label.add_theme_font_size_override("font_size", 22)
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(score_label)
@@ -378,7 +378,7 @@ func _show_container_summary():
 
 	# Continue button
 	var continue_btn = Button.new()
-	continue_btn.text = "CONTINUE"
+	continue_btn.text = tr("UI_CONTINUE")
 	continue_btn.custom_minimum_size = Vector2(250, 70)
 	continue_btn.add_theme_font_size_override("font_size", 28)
 

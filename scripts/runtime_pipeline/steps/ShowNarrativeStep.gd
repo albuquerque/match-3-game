@@ -174,8 +174,9 @@ func execute(context: PipelineContext) -> bool:
 	if skippable:
 		print("[ShowNarrativeStep] Creating skip button...")
 		var skip_btn = Button.new()
-		skip_btn.text = "Skip"
+		skip_btn.text = tr("NARRATIVE_SKIP")
 		skip_btn.name = "SkipButton"
+		print("[ShowNarrativeStep] Skip button text set to: ", skip_btn.text)
 		# Position in top-right corner using anchors only
 		skip_btn.anchor_left = 1.0
 		skip_btn.anchor_top = 0.0
@@ -204,12 +205,12 @@ func execute(context: PipelineContext) -> bool:
 		skip_btn.add_theme_stylebox_override("normal", style_normal)
 
 		var style_hover = StyleBoxFlat.new()
-		style_hover.bg_color = Color(0.3, 0.3, 0.3, 0.9)  # Brighter on hover
+		style_hover.bg_color = Color(0.3, 0.3, 0.9)  # Brighter on hover
 		style_hover.border_width_left = 2
 		style_hover.border_width_right = 2
 		style_hover.border_width_top = 2
 		style_hover.border_width_bottom = 2
-		style_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)  # White border on hover
+		style_hover.border_color = Color(1.0, 1.0, 1.0)  # White border on hover
 		style_hover.corner_radius_top_left = 5
 		style_hover.corner_radius_top_right = 5
 		style_hover.corner_radius_bottom_left = 5
@@ -217,7 +218,7 @@ func execute(context: PipelineContext) -> bool:
 		skip_btn.add_theme_stylebox_override("hover", style_hover)
 
 		var style_pressed = StyleBoxFlat.new()
-		style_pressed.bg_color = Color(0.1, 0.1, 0.1, 0.9)  # Darker when pressed
+		style_pressed.bg_color = Color(0.1, 0.1, 0.9)  # Darker when pressed
 		style_pressed.border_width_left = 2
 		style_pressed.border_width_right = 2
 		style_pressed.border_width_top = 2

@@ -18,6 +18,9 @@ signal spreader_destroyed(entity_id: String, context: Dictionary)
 # Narrative system signals
 signal narrative_stage_complete(stage_id: String)
 
+# Language/localization signals
+signal language_changed(locale: String)
+
 # Generic event emission for extensibility
 signal custom_event(event_name: String, entity_id: String, context: Dictionary)
 
@@ -83,3 +86,9 @@ func emit_spreader_destroyed(entity_id: String = "", context: Dictionary = {}):
 func emit_custom(event_name: String, entity_id: String = "", context: Dictionary = {}):
 	print("[EventBus] custom_event: ", event_name, " entity: ", entity_id)
 	custom_event.emit(event_name, entity_id, context)
+
+## Emit language_changed event
+func emit_language_changed(locale: String):
+	print("[EventBus] language_changed: ", locale)
+	language_changed.emit(locale)
+

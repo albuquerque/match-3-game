@@ -8,8 +8,8 @@
   "states": [
     {
       "name": "main",
-      "text": "God placed a rainbow in the sky\nas a sign of His promise:\n\n'Never again will I flood the earth.'",
-      "duration": 3.0
+      "duration": 3.0,
+      "text_key": "NARRATIVE_RAINBOW_COVENANT_MAIN"
     }
   ],
   "transitions": [
