@@ -193,15 +193,17 @@ func populate_gallery():
 	sorted_levels.sort()
 
 	print("[GalleryUI] Total gallery images configured: ", sorted_levels.size())
-	print("[GalleryUI] Unlocked images: ", RewardManager.get_unlocked_gallery_images())
+	var rm_g = NodeResolvers._get_rm()
+	print("[GalleryUI] Unlocked images: ", rm_g.get_unlocked_gallery_images() if rm_g and rm_g.has_method("get_unlocked_gallery_images") else [])
 
 	for level in sorted_levels:
 		var image_data = GALLERY_IMAGES[level]
 		var image_id = image_data["id"]
 		var image_name = image_data["name"]
-		var is_unlocked = RewardManager.is_gallery_image_unlocked(image_id)
+		var rm_check = NodeResolvers._get_rm()
+		var is_unlocked = rm_check.is_gallery_image_unlocked(image_id) if rm_check and rm_check.has_method("is_gallery_image_unlocked") else false
 
-		print("[GalleryUI] Level ", level, " - ", image_name, " (", image_id, "): ", "UNLOCKED" if is_unlocked else "LOCKED")
+		print("[GalleryUI] Level ", level, " - ", image_name, " (", image_id, "):", "UNLOCKED" if is_unlocked else "LOCKED")
 
 		# Create thumbnail button
 		var thumb_button = create_thumbnail(image_id, image_name, level, is_unlocked)

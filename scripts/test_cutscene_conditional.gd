@@ -1,9 +1,20 @@
 extends Node
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+    if NodeResolvers == null:
+        var s = load("res://scripts/helpers/node_resolvers_api.gd")
+        if s != null and typeof(s) != TYPE_NIL:
+            NodeResolvers = s
+        else:
+            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
 ## Test script for cutscene and conditional branching
 ## Run this from the console or attach to a test scene
 
 func _ready():
+    _ensure_resolvers()
 	print("\n" + "=".repeat(80))
 	print("CUTSCENE & CONDITIONAL BRANCHING TEST")
 	print("=".repeat(80))
@@ -12,31 +23,38 @@ func _ready():
 	await get_tree().process_frame
 
 	print("\n[TEST] Step 1: Loading test_flow_simple...")
-	var success = ExperienceDirector.load_flow("test_flow_simple")
+	var xd = NodeResolvers._get_xd()
+	var success = xd.load_flow("test_flow_simple") if xd and xd.has_method("load_flow") else false
 	if not success:
 		print("[TEST] ❌ FAILED to load test flow!")
 		return
 
 	print("[TEST] ✅ Flow loaded successfully")
-	print("[TEST] Flow has %d nodes" % ExperienceDirector.parser.get_flow_length(ExperienceDirector.current_flow))
+	if xd and xd.parser:
+		print("[TEST] Flow has %d nodes" % xd.parser.get_flow_length(xd.current_flow))
+	else:
+		print("[TEST] Flow parser unavailable")
 
 	print("\n[TEST] Step 2: Starting flow...")
 	print("[TEST] This should process level_01 node")
-	ExperienceDirector.start_flow()
+	if xd and xd.has_method("start_flow"):
+		xd.start_flow()
 
 	print("\n[TEST] Step 3: Simulating level completion...")
 	await get_tree().create_timer(1.0).timeout
 
 	# Simulate level complete event
 	print("[TEST] Emitting level_complete for level_01")
-	if EventBus:
-		EventBus.level_complete.emit("level_01", {"score": 1000, "stars": 3})
+	var eb = NodeResolvers._get_evbus()
+	if eb and eb.has_method("level_complete"):
+		eb.level_complete.emit("level_01", {"score": 1000, "stars": 3})
 
 	print("\n[TEST] Step 4: Waiting for flow to process...")
 	await get_tree().create_timer(1.0).timeout
 
 	print("\n[TEST] Step 5: Checking current state...")
-	ExperienceDirector.debug_info()
+	if xd and xd.has_method("debug_info"):
+		xd.debug_info()
 
 	print("\n[TEST] What should have happened:")
 	print("[TEST]   1. Level_01 node processed")

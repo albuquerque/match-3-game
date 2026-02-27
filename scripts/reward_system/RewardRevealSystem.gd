@@ -12,6 +12,17 @@ signal waiting_for_claim  # New signal for interactive mode
 var coin_texture: Texture2D = null
 var gem_texture: Texture2D = null
 
+
+# Cached AudioManager for this node
+var _cached_am: Node = null
+
+func _am():
+	if is_instance_valid(_cached_am):
+		return _cached_am
+	# AudioManager is a global autoload
+	_cached_am = AudioManager if AudioManager else get_node_or_null("/root/AudioManager")
+	return _cached_am
+
 # HUD target positions (set from outside)
 var coin_target_position: Vector2 = Vector2.ZERO
 var gem_target_position: Vector2 = Vector2.ZERO
@@ -32,7 +43,9 @@ func _load_reward_textures():
 	"""Load or create reward icon textures"""
 	# Get current theme
 	var theme_name = "modern"  # Default theme
-	if ThemeManager:
+	if ThemeManager and ThemeManager.has_method("get_theme_name"):
+		theme_name = ThemeManager.get_theme_name()
+	elif ThemeManager and "current_theme" in ThemeManager:
 		theme_name = ThemeManager.current_theme
 
 	# Try to load coin icon from theme folder
@@ -295,8 +308,9 @@ func _reveal_single_reward_interactive(reward: Dictionary, spawn_pos: Vector2):
 	collect_tween.parallel().tween_property(icon, "modulate:a", 0.0, 0.6)
 
 	# Play claim sound
-	if AudioManager:
-		AudioManager.play_sfx("combo")
+	var _am_local = _am()
+	if _am_local and _am_local.has_method("play_sfx"):
+		_am_local.play_sfx("combo")
 
 	await collect_tween.finished
 
@@ -607,8 +621,9 @@ func _create_reward_icon(reward_type: String, amount: int, pos: Vector2) -> Node
 	tween.tween_property(sprite, "scale", Vector2(0.1, 0.1), 0.3)  # Pop to 0.1, not 1.0!
 
 	# Play sound
-	if AudioManager:
-		AudioManager.play_sfx("match")
+	var _am2_local = _am()
+	if _am2_local and _am2_local.has_method("play_sfx"):
+		_am2_local.play_sfx("match")
 
 	return icon_container
 
@@ -729,3 +744,4 @@ func cleanup():
 	active_icons.clear()
 
 	_remove_claim_button()
+

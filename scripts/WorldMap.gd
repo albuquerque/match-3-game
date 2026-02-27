@@ -31,9 +31,48 @@ var progress_dialog: AcceptDialog = null
 # Preload gold star texture for consistent cross-platform rendering
 var gold_star_texture = load("res://textures/gold_star.svg") as Texture2D
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+    if NodeResolvers == null:
+        var s = load("res://scripts/helpers/node_resolvers_api.gd")
+        if s != null and typeof(s) != TYPE_NIL:
+            NodeResolvers = s
+        else:
+            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
+# Cached autoload resolvers
+var _cached_ar: Node = null
+var _cached_dlc: Node = null
+var _cached_am: Node = null
+var _cached_rm: Node = null
+
+func _ar():
+	if is_instance_valid(_cached_ar):
+		return _cached_ar
+	var a = NodeResolvers._get_ar() if typeof(NodeResolvers) != TYPE_NIL else null
+	if a == null and has_method("get_tree"):
+		var _root = get_tree().root
+		if _root:
+			a = _root.get_node_or_null("AssetRegistry")
+	_cached_ar = a
+	return a
+
+func _get_dlc():
+    if is_instance_valid(_cached_dlc):
+        return _cached_dlc
+    var d = NodeResolvers._get_dlc() if typeof(NodeResolvers) != TYPE_NIL else null
+    if d == null and has_method("get_tree"):
+        var _root = get_tree().root
+        if _root:
+            d = _root.get_node_or_null("DLCManager")
+    _cached_dlc = d
+    return d
+
 func _ready():
 	"""Initialize the world map"""
 	screen_size = get_viewport_rect().size
+	_ensure_resolvers()
 	# Base design was for 720x1280, calculate scale factors
 	scale_factor = Vector2(screen_size.x / 720.0, screen_size.y / 1280.0)
 	_load_world_map_data()
@@ -118,12 +157,16 @@ func _load_dlc_chapters():
 		print("[WorldMap] AssetRegistry not available")
 		return
 
-	var installed = AssetRegistry.get_installed_chapters()
+	var ar = _ar()
+	if ar == null:
+		print("[WorldMap] AssetRegistry resolver returned null")
+		return
+	var installed = ar.get_installed_chapters()
 	print("[WorldMap] Found %d installed DLC chapters" % installed.size())
 
 	for chapter_id in installed:
 		print("[WorldMap] Processing chapter_id: %s" % chapter_id)
-		var manifest = AssetRegistry.get_chapter_info(chapter_id)
+		var manifest = ar.get_chapter_info(chapter_id)
 		print("[WorldMap] Manifest keys: %s" % str(manifest.keys()))
 
 		var world_map_entry = manifest.get("world_map_entry", {})
@@ -162,22 +205,25 @@ func _load_dlc_chapters():
 
 func _connect_dlc_signals():
 	"""Connect to DLC manager signals"""
-	if not DLCManager:
+	# DLC manager resolved earlier via _dlc()
+	var dlc = _get_dlc()
+	if dlc == null:
 		print("[WorldMap] DLCManager not available")
 		return
 
 	print("[WorldMap] Connecting DLC signals...")
-	DLCManager.dlc_list_updated.connect(Callable(self, "_on_dlc_list_updated"))
-	DLCManager.download_complete.connect(Callable(self, "_on_dlc_download_complete"))
-	DLCManager.chapter_installed.connect(Callable(self, "_on_dlc_chapter_installed"))
+	dlc.connect("dlc_list_updated", self, "_on_dlc_list_updated")
+	dlc.connect("download_complete", self, "_on_dlc_download_complete")
+	dlc.connect("chapter_installed", self, "_on_dlc_chapter_installed")
 	print("[WorldMap] ✓ All DLC signals connected")
 
 func _fetch_available_dlc():
 	"""Fetch available DLC chapters from server"""
-	if not DLCManager:
+	var dlc2 = _get_dlc()
+	if dlc2 == null:
 		return
 
-	DLCManager.fetch_available_chapters()
+	dlc2.fetch_available_chapters()
 
 func _get_dlc_asset_path(chapter_id: String, relative_path: String) -> String:
 	"""Convert DLC relative path to full path"""
@@ -560,9 +606,12 @@ func _scroll_to_next_chapter(current_chapter_id: int):
 
 func _update_progress_display():
 	"""Update the progress display at the top"""
-	var rm = RewardManager
-	var total_stars = rm.total_stars
-	var levels_completed = rm.levels_completed
+	var rm = _rm()
+	var total_stars = 0
+	var levels_completed = 0
+	if rm:
+		total_stars = rm.total_stars
+		levels_completed = rm.levels_completed
 
 	# Update the combined progress text (star icon is a texture in the container)
 	var progress_text = get_node_or_null("TopUI/ProgressContainer/ProgressText")
@@ -580,8 +629,9 @@ func _get_level_stars(level_num: int) -> int:
 	"""
 	var key = "level_%d" % level_num
 	var stars = 0
-	if typeof(RewardManager) != TYPE_NIL and RewardManager and RewardManager.level_stars.has(key):
-		stars = int(RewardManager.level_stars[key])
+	var rm_local = _rm()
+	if rm_local and rm_local.level_stars.has(key):
+		stars = int(rm_local.level_stars[key])
 		print("[WorldMap][DIAG] _get_level_stars -> RewardManager key %s = %d" % [key, stars])
 		return stars
 
@@ -599,13 +649,17 @@ func _get_level_stars(level_num: int) -> int:
 func _on_level_selected(level_num: int):
 	"""Handle level selection"""
 	print("[WorldMap] Level %d selected" % level_num)
-	AudioManager.play_sfx("ui_click")
+	var _am_local = _am()
+	if _am_local and _am_local.has_method("play_sfx"):
+		_am_local.play_sfx("ui_click")
 	level_selected.emit(level_num)
 
 func _on_back_pressed():
 	"""Handle back button"""
 	print("[WorldMap] Back to menu")
-	AudioManager.play_sfx("ui_click")
+	var _am_local2 = _am()
+	if _am_local2 and _am_local2.has_method("play_sfx"):
+		_am_local2.play_sfx("ui_click")
 	back_to_menu.emit()
 
 func update_progress():
@@ -619,9 +673,10 @@ func update_progress():
 
 func _deferred_update_level_buttons(retries := 5):
 	# If RewardManager hasn't loaded save data yet, retry a few times
-	if typeof(RewardManager) != TYPE_NIL:
-		var ls_count = RewardManager.level_stars.keys().size()
-		if ls_count == 0 and RewardManager.levels_completed == 0 and retries > 0:
+	var rm_check = _rm()
+	if rm_check:
+		var ls_count = rm_check.level_stars.keys().size()
+		if ls_count == 0 and rm_check.levels_completed == 0 and retries > 0:
 			print("[WorldMap][DIAG] RewardManager not ready (level_stars=0). Retrying in 0.05s (retries=%d)" % retries)
 			await get_tree().create_timer(0.05).timeout
 			# Defer to avoid blocking layout
@@ -630,14 +685,15 @@ func _deferred_update_level_buttons(retries := 5):
 
 	# Run a layout-sensitive update after the current frame so rect_size/anchors settle
 	# Diagnostic: print RewardManager star state for debugging missing stars
-	if typeof(RewardManager) != TYPE_NIL:
-		print("[WorldMap][DIAG] RewardManager.total_stars=%d levels_completed=%d level_stars_count=%d" % [RewardManager.total_stars, RewardManager.levels_completed, RewardManager.level_stars.keys().size()])
+	var rm_diag = _rm()
+	if rm_diag:
+		print("[WorldMap][DIAG] RewardManager.total_stars=%d levels_completed=%d level_stars_count=%d" % [rm_diag.total_stars, rm_diag.levels_completed, rm_diag.level_stars.keys().size()])
 		# Build a safe sample of keys without using Python-style slicing
-		var rm_keys = RewardManager.level_stars.keys()
+		var rm_keys = rm_diag.level_stars.keys()
 		if rm_keys.size() > 0:
 			# Print only the first sample key/value to keep diagnostics simple and parser-friendly
 			var sample_key = rm_keys[0]
-			print("[WorldMap][DIAG] level_stars sample: %s = %s" % [str(sample_key), str(RewardManager.level_stars.get(sample_key, "<nil>"))])
+			print("[WorldMap][DIAG] level_stars sample: %s = %s" % [str(sample_key), str(rm_diag.level_stars.get(sample_key, "<nil>"))])
 	# If StarRatingManager is available, print its total as well
 	if typeof(StarRatingManager) != TYPE_NIL:
 		print("[WorldMap][DIAG] StarRatingManager available. get_total_stars(): %d" % StarRatingManager.get_total_stars())
@@ -656,8 +712,9 @@ func _deferred_update_level_buttons(retries := 5):
 					stars = StarRatingManager.get_level_stars(level_num)
 				else:
 					var key = "level_%d" % level_num
-					if RewardManager.level_stars.has(key):
-						stars = int(RewardManager.level_stars[key])
+					var rm_local2 = _rm()
+					if rm_local2 and rm_local2.level_stars.has(key):
+						stars = int(rm_local2.level_stars[key])
 				print("[WorldMap][DIAG] Level %d -> stars=%d" % [level_num, stars])
 				_update_level_button_state(level_container)
 
@@ -666,9 +723,13 @@ func _update_level_button_state(level_container: Control):
 	var level_num_str = level_container.name.replace("LevelContainer", "")
 	var level_num = int(level_num_str)
 
-	var rm = RewardManager
-	var level_unlocked = level_num <= rm.levels_completed + 1
-	var level_completed = level_num <= rm.levels_completed
+	var rm = _rm()
+	var level_unlocked = false
+	var level_completed = false
+	if rm:
+		level_unlocked = level_num <= rm.levels_completed + 1
+		level_completed = level_num <= rm.levels_completed
+
 	var stars_earned = _get_level_stars(level_num)
 
 	var level_button = level_container.get_node_or_null("LevelButton%d" % level_num)
@@ -808,7 +869,8 @@ func _display_dlc_download_options():
 		var chapter_id = dlc_info.get("chapter_id", "")
 
 		# Skip if already installed
-		if AssetRegistry.is_chapter_installed(chapter_id):
+		var ar2 = _ar()
+		if ar2 and ar2.is_chapter_installed(chapter_id):
 			continue
 
 		# Create download card
@@ -865,12 +927,14 @@ func _on_download_dlc_pressed(dlc_info: Dictionary):
 
 func _start_dlc_download(chapter_id: String):
 	"""Start downloading a DLC chapter"""
-	if not DLCManager:
+	var dlc3 = _get_dlc()
+	if dlc3 == null:
 		print("[WorldMap] DLCManager not available")
 		return
 
 	print("[WorldMap] Starting download: %s" % chapter_id)
-	DLCManager.download_chapter(chapter_id)
+	dlc3.download_chapter(chapter_id)
+
 	_show_download_progress(chapter_id)
 
 func _show_download_progress(chapter_id: String):
@@ -908,12 +972,12 @@ func _show_download_progress(chapter_id: String):
 	progress_dialog.popup_centered()
 
 	# Connect to DLCManager signals if available
-	if DLCManager and DLCManager.has_signal("download_progress"):
-		# Connect using a callable to avoid analyzer complaints
-		DLCManager.download_progress.connect(Callable(self, "_on_dlc_download_progress"))
+	var dlc4 = _get_dlc()
+	if dlc4 and dlc4.has_signal("download_progress"):
+		dlc4.connect("download_progress", self, "_on_dlc_download_progress")
 	# Also listen for completion (existing handler will close dialog)
-	if DLCManager and DLCManager.has_signal("download_complete"):
-		DLCManager.download_complete.connect(Callable(self, "_on_dlc_download_complete"))
+	if dlc4 and dlc4.has_signal("download_complete"):
+		dlc4.connect("download_complete", self, "_on_dlc_download_complete")
 
 func _show_purchase_dialog(dlc_info: Dictionary):
 	"""Show purchase confirmation dialog"""
@@ -980,7 +1044,8 @@ func _on_dlc_download_progress(chapter_id: String, bytes_downloaded: int, total_
 			progress_dialog.queue_free()
 			progress_dialog = null
 		# Disconnect signals to avoid dangling references
-		if DLCManager and DLCManager.has_signal("download_progress") and DLCManager.is_connected("download_progress", Callable(self, "_on_dlc_download_progress")):
-			DLCManager.disconnect("download_progress", Callable(self, "_on_dlc_download_progress"))
-		if DLCManager and DLCManager.has_signal("download_complete") and DLCManager.is_connected("download_complete", Callable(self, "_on_dlc_download_complete")):
-			DLCManager.disconnect("download_complete", Callable(self, "_on_dlc_download_complete"))
+		var dlc5 = _get_dlc()
+		if dlc5 and dlc5.has_signal("download_progress") and dlc5.is_connected("download_progress", self, "_on_dlc_download_progress"):
+			dlc5.disconnect("download_progress", self, "_on_dlc_download_progress")
+		if dlc5 and dlc5.has_signal("download_complete") and dlc5.is_connected("download_complete", self, "_on_dlc_download_complete"):
+			dlc5.disconnect("download_complete", self, "_on_dlc_download_complete")

@@ -41,6 +41,7 @@ var container_override: String = ""  # Optional: Override which container config
 
 # Parent UI reference
 var ui_parent: Control = null
+var last_summary_overlay: Control = null
 
 func _init():
 	name = "RewardTransitionController"
@@ -109,6 +110,7 @@ func _run_current_stage():
 		Stage.EXIT:
 			_run_exit_stage()
 
+# NodeResolvers is a global autoload — no local declaration needed.
 
 func _run_summary_stage():
 	"""Show final summary with total rewards"""
@@ -134,7 +136,11 @@ func _run_summary_stage():
 			container_config = ContainerConfigLoader.load_container(rule_container)
 		else:
 			# Priority 3: Theme-based selection (fallback)
-			var theme_name = ThemeManager.get_theme_name() if ThemeManager else "modern"
+			var theme_name = "modern"
+			if ThemeManager and ThemeManager.has_method("get_theme_name"):
+				theme_name = ThemeManager.get_theme_name()
+			elif ThemeManager and "current_theme" in ThemeManager:
+				theme_name = ThemeManager.current_theme
 			print("[RewardTransitionController] No rules matched, using theme container for: %s" % theme_name)
 			container_config = ContainerConfigLoader.load_for_theme(theme_name)
 
@@ -187,248 +193,75 @@ func _show_with_container(config: Dictionary):
 	_show_container_summary()
 
 func _show_container_summary():
-	"""Show reward amounts and Continue button after container animation"""
-	# Create summary overlay with high z-index to ensure visibility
+	"""Minimal, parser-safe summary overlay with a Continue button.
+	This keeps the UX while avoiding complex inline code that triggered parser errors.
+	"""
+	# Create overlay
 	var summary_overlay = Control.new()
 	summary_overlay.name = "ContainerSummaryOverlay"
 	summary_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	summary_overlay.z_index = 1000  # Very high to be on top
-	summary_overlay.mouse_filter = Control.MOUSE_FILTER_STOP  # Block input to elements below
-	ui_parent.add_child(summary_overlay)
+	summary_overlay.z_index = 1000
+	summary_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	if ui_parent:
+		ui_parent.add_child(summary_overlay)
+	else:
+		add_child(summary_overlay)
 
-	# Create semi-transparent background
+	last_summary_overlay = summary_overlay
+
+	# Simple semi-transparent background
 	var bg = ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.5)  # Darker so it's visible
+	bg.color = Color(0, 0, 0, 0.5)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	summary_overlay.add_child(bg)
 
-	# Create summary panel (centered)
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(500, 400)
-	panel.z_index = 1001
-	# Center it properly
-	panel.anchor_left = 0.5
-	panel.anchor_top = 0.5
-	panel.anchor_right = 0.5
-	panel.anchor_bottom = 0.5
-	panel.offset_left = -250  # Half of width
-	panel.offset_top = -200   # Half of height
-	panel.offset_right = 250
-	panel.offset_bottom = 200
-	summary_overlay.add_child(panel)
-
-	# Add a visible background to the panel
-	var panel_bg = panel.get_theme_stylebox("panel", "PanelContainer")
-	if not panel_bg:
-		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.2, 0.2, 0.3, 0.95)
-		style.border_width_left = 3
-		style.border_width_right = 3
-		style.border_width_top = 3
-		style.border_width_bottom = 3
-		style.border_color = Color(0.8, 0.7, 0.3, 1.0)
-		style.corner_radius_top_left = 10
-		style.corner_radius_top_right = 10
-		style.corner_radius_bottom_left = 10
-		style.corner_radius_bottom_right = 10
-		panel.add_theme_stylebox_override("panel", style)
-
-	# Add content
+	# Centered simple VBox
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 15)
-	panel.add_child(vbox)
-
-	# Add some padding
-	var top_spacer = Control.new()
-	top_spacer.custom_minimum_size = Vector2(0, 20)
-	vbox.add_child(top_spacer)
+	vbox.anchor_left = 0.5
+	vbox.anchor_top = 0.5
+	vbox.anchor_right = 0.5
+	vbox.anchor_bottom = 0.5
+	vbox.offset_left = -150
+	vbox.offset_top = -80
+	vbox.offset_right = 150
+	vbox.offset_bottom = 80
+	summary_overlay.add_child(vbox)
 
 	# Title
 	var title = Label.new()
 	title.text = tr("UI_LEVEL_COMPLETE")
-	title.add_theme_font_size_override("font_size", 36)
-	title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
+	title.add_theme_font_size_override("font_size", 28)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
-	# Rewards section
-	var rewards_title = Label.new()
-	rewards_title.text = tr("UI_REWARDS_EARNED")
-	rewards_title.add_theme_font_size_override("font_size", 24)
-	rewards_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(rewards_title)
-
-	# Rewards list - show all reward types
+	# Rewards summary (simple lines)
 	var coins = rewards_data.get("coins", 0)
 	var gems = rewards_data.get("gems", 0)
-	var boosters = rewards_data.get("boosters", {})
-	var gallery_images = rewards_data.get("gallery_images", [])
-	var cards = rewards_data.get("cards", [])
-	var themes = rewards_data.get("themes", [])
-	var videos = rewards_data.get("videos", [])
-
-	# Coins
+	var rewards_text = ""
 	if coins > 0:
-		var coins_label = Label.new()
-		coins_label.text = tr("UI_REWARDS_COINS") % coins
-		coins_label.add_theme_font_size_override("font_size", 28)
-		coins_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0, 1.0))
-		coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(coins_label)
-
-	# Gems
+		rewards_text += tr("UI_REWARDS_COINS") % coins + "\n"
 	if gems > 0:
-		var gems_label = Label.new()
-		gems_label.text = tr("UI_REWARDS_GEMS") % gems
-		gems_label.add_theme_font_size_override("font_size", 28)
-		gems_label.add_theme_color_override("font_color", Color(0.3, 0.7, 1.0, 1.0))
-		gems_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(gems_label)
+		rewards_text += tr("UI_REWARDS_GEMS") % gems + "\n"
+	if rewards_text == "":
+		rewards_text = tr("UI_REWARDS_NONE")
 
-	# Boosters
-	if not boosters.is_empty():
-		for booster_type in boosters.keys():
-			var booster_count = boosters[booster_type]
-			if booster_count > 0:
-				var booster_label = Label.new()
-				var booster_icon = _get_booster_icon(booster_type)
-				booster_label.text = tr("UI_BOOSTER_PREFIX") % [booster_icon, booster_type.capitalize(), booster_count]
-				booster_label.add_theme_font_size_override("font_size", 24)
-				booster_label.add_theme_color_override("font_color", Color(0.9, 0.5, 1.0, 1.0))
-				booster_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				vbox.add_child(booster_label)
-
-	# Gallery Images
-	if not gallery_images.is_empty():
-		var gallery_label = Label.new()
-		gallery_label.text = tr("UI_GALLERY_IMAGES_UNLOCKED") % gallery_images.size()
-		gallery_label.add_theme_font_size_override("font_size", 24)
-		gallery_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.4, 1.0))
-		gallery_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(gallery_label)
-
-		# Show individual image names if not too many
-		if gallery_images.size() <= 3:
-			for image_name in gallery_images:
-				var img_label = Label.new()
-				img_label.text = "  • %s" % image_name
-				img_label.add_theme_font_size_override("font_size", 18)
-				img_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				vbox.add_child(img_label)
-
-	# Collection Cards
-	if not cards.is_empty():
-		var card_label = Label.new()
-		card_label.text = tr("UI_CARDS_UNLOCKED") % cards.size()
-		card_label.add_theme_font_size_override("font_size", 24)
-		card_label.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 1.0))
-		card_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(card_label)
-
-		# Show individual card names if not too many
-		if cards.size() <= 3:
-			for card in cards:
-				var card_name = card.get("card_name", card.get("card_id", "Unknown"))
-				var card_item_label = Label.new()
-				card_item_label.text = "  • %s" % card_name
-				card_item_label.add_theme_font_size_override("font_size", 18)
-				card_item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				vbox.add_child(card_item_label)
-
-	# Themes
-	if not themes.is_empty():
-		var theme_label = Label.new()
-		theme_label.text = tr("UI_THEMES_UNLOCKED") % themes.size()
-		theme_label.add_theme_font_size_override("font_size", 24)
-		theme_label.add_theme_color_override("font_color", Color(0.9, 0.4, 0.9, 1.0))
-		theme_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(theme_label)
-
-	# Videos
-	if not videos.is_empty():
-		var video_label = Label.new()
-		video_label.text = tr("UI_VIDEOS_UNLOCKED") % videos.size()
-		video_label.add_theme_font_size_override("font_size", 24)
-		video_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5, 1.0))
-		video_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(video_label)
-
-	# Score
-	var score_label = Label.new()
-	score_label.text = tr("UI_LABEL_SCORE") + ": %d" % score
-	score_label.add_theme_font_size_override("font_size", 22)
-	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(score_label)
-
-	# Stars
-	var stars_label = Label.new()
-	var stars_text = ""
-	for i in range(stars):
-		stars_text += "⭐"
-	stars_label.text = stars_text if stars > 0 else "☆☆☆"
-	stars_label.add_theme_font_size_override("font_size", 32)
-	stars_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(stars_label)
-
-	# Spacer
-	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(0, 30)
-	vbox.add_child(spacer)
+	var rewards_label = Label.new()
+	rewards_label.text = rewards_text
+	rewards_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(rewards_label)
 
 	# Continue button
 	var continue_btn = Button.new()
 	continue_btn.text = tr("UI_CONTINUE")
-	continue_btn.custom_minimum_size = Vector2(250, 70)
-	continue_btn.add_theme_font_size_override("font_size", 28)
+	continue_btn.custom_minimum_size = Vector2(200, 56)
+	vbox.add_child(continue_btn)
 
-	# Style the button
-	var btn_style = StyleBoxFlat.new()
-	btn_style.bg_color = Color(0.2, 0.7, 0.3, 1.0)
-	btn_style.corner_radius_top_left = 8
-	btn_style.corner_radius_top_right = 8
-	btn_style.corner_radius_bottom_left = 8
-	btn_style.corner_radius_bottom_right = 8
-	continue_btn.add_theme_stylebox_override("normal", btn_style)
+	# Connect via Callable to avoid anonymous func parsing issues
+	continue_btn.pressed.connect(Callable(self, "_on_ui_continue_pressed"))
+	bg.gui_input.connect(Callable(self, "_on_summary_bg_gui_input"))
 
-	var btn_hover = StyleBoxFlat.new()
-	btn_hover.bg_color = Color(0.3, 0.8, 0.4, 1.0)
-	btn_hover.corner_radius_top_left = 8
-	btn_hover.corner_radius_top_right = 8
-	btn_hover.corner_radius_bottom_left = 8
-	btn_hover.corner_radius_bottom_right = 8
-	continue_btn.add_theme_stylebox_override("hover", btn_hover)
-
-	var hbox = HBoxContainer.new()
-	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	hbox.add_child(continue_btn)
-	vbox.add_child(hbox)
-
-	# Bottom spacer
-	var bottom_spacer = Control.new()
-	bottom_spacer.custom_minimum_size = Vector2(0, 20)
-	vbox.add_child(bottom_spacer)
-
-	# Connect button
-	continue_btn.pressed.connect(func():
-		print("[RewardTransitionController] Continue button pressed")
-		# Cleanup summary
-		if is_instance_valid(summary_overlay):
-			summary_overlay.queue_free()
-		# Advance to next stage
-		_on_ui_continue_pressed()
-	)
-
-	# Also make background clickable
-	bg.gui_input.connect(func(event):
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			print("[RewardTransitionController] Background clicked, advancing")
-			if is_instance_valid(summary_overlay):
-				summary_overlay.queue_free()
-			_on_ui_continue_pressed()
-	)
-
-	print("[RewardTransitionController] Container summary displayed with Continue button")
+	print("[RewardTransitionController] Minimal container summary displayed")
 	print("[RewardTransitionController] Summary overlay z_index: %d, visible: %s" % [summary_overlay.z_index, summary_overlay.visible])
 
 
@@ -440,9 +273,21 @@ func _on_container_complete():
 	_on_stage_completed(Stage.SUMMARY)
 
 func _on_ui_continue_pressed():
-	"""Handle Continue button from SimpleRewardUI"""
+	"""Handle Continue button from SimpleRewardUI and summary overlay"""
 	print("[RewardTransitionController] User clicked Continue")
+	if last_summary_overlay and is_instance_valid(last_summary_overlay):
+		last_summary_overlay.queue_free()
+		last_summary_overlay = null
 	_on_stage_completed(Stage.SUMMARY)
+
+func _on_summary_bg_gui_input(event):
+	# Called when the semi-transparent background is clicked; advance as if Continue
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		print("[RewardTransitionController] Background clicked, advancing")
+		if last_summary_overlay and is_instance_valid(last_summary_overlay):
+			last_summary_overlay.queue_free()
+			last_summary_overlay = null
+		_on_stage_completed(Stage.SUMMARY)
 
 func _run_exit_stage():
 	"""Clean up and signal completion"""

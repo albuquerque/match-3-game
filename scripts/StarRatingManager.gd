@@ -8,6 +8,15 @@ extends Node
 ## 2 Stars: Score >= target * 1.5 (50% above target)
 ## 3 Stars: Score >= target * 2.0 (100% above target) OR use <= 50% of moves
 
+var NodeResolvers = null
+
+func _init_resolvers():
+	if NodeResolvers == null:
+		NodeResolvers = load("res://scripts/helpers/node_resolvers_api.gd")
+
+func _ready():
+	_init_resolvers()
+
 ## Calculate star rating based on performance
 func calculate_stars(score: int, target_score: int, moves_used: int, total_moves: int) -> int:
 	if score < target_score:
@@ -30,8 +39,9 @@ func calculate_stars(score: int, target_score: int, moves_used: int, total_moves
 ## Get star rating for a specific level from save data
 func get_level_stars(level_number: int) -> int:
 	var level_key = "level_%d" % level_number
-	if RewardManager.level_stars.has(level_key):
-		return RewardManager.level_stars[level_key]
+	var rm = NodeResolvers._get_rm()
+	if rm and rm.level_stars.has(level_key):
+		return rm.level_stars[level_key]
 	return 0
 
 ## Save star rating for a level (only if better than previous)
@@ -41,19 +51,23 @@ func save_level_stars(level_number: int, stars: int) -> void:
 
 	# Only save if new rating is better
 	if stars > current_stars:
-		RewardManager.level_stars[level_key] = stars
-		RewardManager.save_progress()
-		print("[StarRating] Level %d: New best rating %d stars (was %d)" % [level_number, stars, current_stars])
-		# Debug: dump current level_stars dict for diagnosis
-		print("[StarRating] level_stars now:", RewardManager.level_stars)
+		var rm2 = NodeResolvers._get_rm()
+		if rm2:
+			rm2.level_stars[level_key] = stars
+			rm2.save_progress()
+			print("[StarRating] Level %d: New best rating %d stars (was %d)" % [level_number, stars, current_stars])
+			# Debug: dump current level_stars dict for diagnosis
+			print("[StarRating] level_stars now:", rm2.level_stars)
 	else:
 		print("[StarRating] Level %d: Rating %d stars (keeping best: %d)" % [level_number, stars, current_stars])
 
 ## Get total stars collected across all levels
 func get_total_stars() -> int:
 	var total = 0
-	for level_key in RewardManager.level_stars.keys():
-		total += RewardManager.level_stars[level_key]
+	var rm3 = NodeResolvers._get_rm()
+	if rm3:
+		for level_key in rm3.level_stars.keys():
+			total += rm3.level_stars[level_key]
 	return total
 
 ## Get stars for a specific chapter (levels in a range)

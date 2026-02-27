@@ -1,6 +1,16 @@
 extends Node
 class_name EffectExecutorCameraImpulse
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+	if NodeResolvers == null:
+		var s = load("res://scripts/helpers/node_resolvers_api.gd")
+		if s != null and typeof(s) != TYPE_NIL and s.has_method("_get_vm"):
+			NodeResolvers = s
+		else:
+			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
 # Safe recursive search for a descendant node by name
 func _find_descendant_by_name(root: Node, target_name: String) -> Node:
 	if root == null:
@@ -20,6 +30,7 @@ func _find_descendant_by_name(root: Node, target_name: String) -> Node:
 	return null
 
 func execute(context: Dictionary) -> void:
+	_ensure_resolvers()
 	var params = context.get("params", {})
 	var viewport = context.get("viewport", null)
 	var board_node = context.get("board", null)
@@ -29,8 +40,9 @@ func execute(context: Dictionary) -> void:
 	print("[CameraImpulseExecutor] Applying screen shake: strength=%s, duration=%s" % [strength, duration])
 
 	# Trigger haptic vibration on mobile devices
-	if VibrationManager:
-		VibrationManager.vibrate_screenshake()
+	var vm = NodeResolvers._get_vm()
+	if vm and vm.has_method("vibrate_screenshake"):
+		vm.vibrate_screenshake()
 
 	if not viewport:
 		print("[CameraImpulseExecutor] No viewport - skipping shake")

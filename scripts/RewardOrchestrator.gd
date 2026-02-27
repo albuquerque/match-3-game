@@ -9,10 +9,24 @@ signal all_rewards_granted
 
 # Queue for batching rewards
 var reward_queue: Array = []
-var is_processing: bool = false
+var _is_processing: bool = false
 
 # Reference to RewardNotification (will be set by GameUI or created)
 var reward_notification: Node = null
+
+# Preload NodeResolvers for use in this script
+var NodeResolvers = null
+
+func _ensure_resolvers():
+    if NodeResolvers == null:
+        var s = load("res://scripts/helpers/node_resolvers_api.gd")
+        if s != null and typeof(s) != TYPE_NIL:
+            NodeResolvers = s
+        else:
+            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
+# Cached RewardManager resolver for this instance
+var _cached_rm: Node = null
 
 func _ready():
 	print("============================================================")
@@ -33,7 +47,7 @@ func queue_reward(reward_data: Dictionary):
 	print("[RewardOrchestrator] Queue size: ", reward_queue.size())
 
 	# Auto-process if not already processing
-	if not is_processing:
+	if not _is_processing:
 		print("[RewardOrchestrator] Starting automatic processing...")
 		process_reward_queue()
 	else:
@@ -47,11 +61,11 @@ func process_reward_queue():
 		print("[RewardOrchestrator] No rewards to process")
 		return
 
-	if is_processing:
+	if _is_processing:
 		print("[RewardOrchestrator] Already processing rewards")
 		return
 
-	is_processing = true
+	_is_processing = true
 	print("[RewardOrchestrator] Processing %d reward(s)" % reward_queue.size())
 
 	# Process each reward
@@ -60,7 +74,7 @@ func process_reward_queue():
 
 	# Clear queue
 	reward_queue.clear()
-	is_processing = false
+	_is_processing = false
 
 	emit_signal("all_rewards_granted")
 	print("[RewardOrchestrator] All rewards processed")
@@ -106,6 +120,24 @@ func _grant_reward(reward: Dictionary):
 		_:
 			print("[RewardOrchestrator] Unknown reward type: ", reward_type)
 
+# Use centralized NodeResolvers helpers
+func _get_rm():
+	if is_instance_valid(_cached_rm):
+		return _cached_rm
+	var r = NodeResolvers._fallback_autoload("RewardManager")
+	if r == null and has_method("get_tree"):
+		var _root = get_tree().root
+		if _root:
+			r = _root.get_node_or_null("RewardManager")
+	_cached_rm = r
+	return r
+
+func _get_xd():
+	_ensure_resolvers()
+	if typeof(NodeResolvers) != TYPE_NIL:
+		return NodeResolvers._get_xd()
+	return null
+
 ## Grant coins reward
 func _grant_coins(reward: Dictionary):
 	"""Grant coins and show notification"""
@@ -117,8 +149,9 @@ func _grant_coins(reward: Dictionary):
 		return
 
 	# Grant via RewardManager
-	if RewardManager:
-		RewardManager.add_coins(amount)
+	var rm = _get_rm()
+	if rm:
+		rm.add_coins(amount)
 		print("[RewardOrchestrator] Granted %d coins" % amount)
 
 	# Show notification with correct parameters
@@ -135,8 +168,9 @@ func _grant_gems(reward: Dictionary):
 		return
 
 	# Grant via RewardManager
-	if RewardManager:
-		RewardManager.add_gems(amount)
+	var rm = _get_rm()
+	if rm:
+		rm.add_gems(amount)
 		print("[RewardOrchestrator] Granted %d gems" % amount)
 
 	# Show notification with correct parameters
@@ -154,8 +188,9 @@ func _grant_booster(reward: Dictionary):
 		return
 
 	# Grant via RewardManager
-	if RewardManager:
-		RewardManager.add_booster(booster_type, amount)
+	var rm = _get_rm()
+	if rm:
+		rm.add_booster(booster_type, amount)
 		print("[RewardOrchestrator] Granted %d x %s booster" % [amount, booster_type])
 
 	# Format booster name nicely
@@ -191,8 +226,9 @@ func _grant_theme(reward: Dictionary):
 		return
 
 	# Grant via RewardManager
-	if RewardManager:
-		RewardManager.unlock_theme(theme_id)
+	var rm = _get_rm()
+	if rm:
+		rm.unlock_theme(theme_id)
 		print("[RewardOrchestrator] Granted theme: ", theme_id)
 
 	# Show notification via fallback (RewardNotification doesn't have 'theme' type)
@@ -209,10 +245,11 @@ func _grant_gallery_image(reward: Dictionary):
 		return
 
 	# Grant via RewardManager
-	if RewardManager:
-		if not image_id in RewardManager.unlocked_gallery_images:
-			RewardManager.unlocked_gallery_images.append(image_id)
-			RewardManager.save_progress()
+	var rm = _get_rm()
+	if rm:
+		if not image_id in rm.unlocked_gallery_images:
+			rm.unlocked_gallery_images.append(image_id)
+			rm.save_progress()
 			print("[RewardOrchestrator] Granted gallery image: ", image_id)
 		else:
 			print("[RewardOrchestrator] Gallery image already unlocked: ", image_id)
@@ -254,10 +291,21 @@ func _show_notification_fallback(title: String, message: String, duration: float
 func _find_reward_notification() -> Node:
 	"""Find the RewardNotification node in the scene tree"""
 
-	# Try common locations
+	# Try resolver-based lookups first
+	# 1) Common autoload-provided GameUI
+	var ui = NodeResolvers._fallback_autoload("GameUI")
+	if ui and ui.has_node("RewardNotification"):
+		return ui.get_node("RewardNotification")
+
+	# 2) Try RewardManager/VisualAnchor/Common parents
+	var rm = NodeResolvers._get_rm()
+	if rm and rm.has_node("RewardNotification"):
+		return rm.get_node("RewardNotification")
+
+	# Try common absolute locations (legacy) - reduced to non-root variants
 	var locations = [
-		"/root/MainGame/GameUI/RewardNotification",
-		"/root/GameUI/RewardNotification",
+		"MainGame/GameUI/RewardNotification",
+		"GameUI/RewardNotification",
 		"../GameUI/RewardNotification",
 		"../../RewardNotification"
 	]
@@ -314,7 +362,7 @@ func _format_booster_name(booster_type: String) -> String:
 func clear_queue():
 	"""Clear all pending rewards"""
 	reward_queue.clear()
-	is_processing = false
+	_is_processing = false
 	print("[RewardOrchestrator] Queue cleared")
 
 ## Check if a specific reward has been granted (to prevent duplicates)
@@ -322,7 +370,8 @@ func is_reward_granted(reward_id: String) -> bool:
 	"""Check if a reward has already been granted"""
 
 	# Check with ExperienceDirector state
-	if ExperienceDirector and ExperienceDirector.state:
-		return ExperienceDirector.state.is_reward_unlocked(reward_id)
+	var xd = _get_xd()
+	if xd and xd.state:
+		return xd.state.is_reward_unlocked(reward_id)
 
 	return false

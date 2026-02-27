@@ -3,28 +3,26 @@
   "version": "1.0.0",
   "requires_engine_version": "1.0.0",
   "name": "Level 6 Demo Effects",
-  "description": "Demo effects for level 6: timeline sequence and state swap",
+  "description": "Demo effects for level 6: screen flash and background tint",
 
   "effects": [
     {
       "on": "level_loaded",
-      "effect": "timeline_sequence",
-      "params": {
-        "sequence": [
-          { "delay": 0.2, "binding": { "effect": "screen_flash", "params": { "color": "#00FF00", "intensity": 0.6, "duration": 0.3 } } },
-          { "delay": 0.6, "binding": { "effect": "background_tint", "params": { "color": "#FFD700", "intensity": 0.5, "duration": 0.6 } } }
-        ]
-      }
+      "effect": "screen_flash",
+      "params": { "color": "#00FF00", "intensity": 0.4, "duration": 0.4 },
+      "condition": { "level": 6 }
     },
     {
       "on": "level_loaded",
-      "effect": "state_swap",
-      "params": { "anchor_a": "board", "anchor_b": "hud", "mode": "visibility" }
+      "effect": "background_tint",
+      "params": { "color": "#FFD700", "intensity": 0.3, "duration": 1.0 },
+      "condition": { "level": 6 }
     },
     {
       "on": "level_complete",
-      "effect": "state_swap",
-      "params": { "anchor_a": "board", "anchor_b": "hud", "mode": "visibility" }
+      "effect": "screen_flash",
+      "params": { "color": "#FFD700", "intensity": 0.8, "duration": 0.6 },
+      "condition": { "level": 6 }
     }
   ]
 }

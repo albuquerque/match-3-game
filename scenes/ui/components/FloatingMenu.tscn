@@ -1,0 +1,236 @@
+[gd_scene load_steps=7 format=3 uid="UID_FLOATINGMENU"]
+
+[ext_resource type="Script" uid="uid://FloatingMenuComponent" path="res://scripts/ui/components/FloatingMenuComponent.gd" id="1_fm"]
+[ext_resource type="Texture2D" path="res://textures/menu_hamburger.svg" id="2_menu"]
+[ext_resource type="Texture2D" path="res://textures/map.png" id="3_map"]
+[ext_resource type="Texture2D" path="res://textures/shop.png" id="5_shop"]
+[ext_resource type="Texture2D" path="res://textures/gallery.png" id="6_gallery"]
+[ext_resource type="Texture2D" path="res://textures/audio_settings.png" id="7_settings"]
+
+[node name="FloatingMenu" type="Control"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -85.0
+offset_top = 80.0
+offset_right = -10.0
+offset_bottom = 380.0
+grow_horizontal = 0
+script = ExtResource("1_fm")
+
+[node name="MenuButton" type="TextureButton" parent="."]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -70.0
+offset_right = 0.0
+offset_bottom = 70.0
+grow_horizontal = 0
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="MenuButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.2, 0.6, 1, 0.3)
+
+[node name="Icon" type="TextureRect" parent="MenuButton"]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_menu")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ExpandablePanel" type="VBoxContainer" parent="."]
+modulate = Color(1, 1, 1, 0)
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -70.0
+offset_top = 80.0
+offset_right = 0.0
+offset_bottom = 320.0
+grow_horizontal = 0
+theme_override_constants/separation = 10
+
+[node name="MapButton" type="TextureButton" parent="ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="ExpandablePanel/MapButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.3, 0.8, 0.3, 0.3)
+
+[node name="Icon" type="TextureRect" parent="ExpandablePanel/MapButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_map")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ShopButton" type="TextureButton" parent="ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="ExpandablePanel/ShopButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.8, 0.3, 0.8, 0.3)
+
+[node name="Icon" type="TextureRect" parent="ExpandablePanel/ShopButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("5_shop")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="GalleryButton" type="TextureButton" parent="ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="ExpandablePanel/GalleryButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.3, 0.3, 0.8, 0.3)
+
+[node name="Icon" type="TextureRect" parent="ExpandablePanel/GalleryButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("6_gallery")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SettingsButton" type="TextureButton" parent="ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="ExpandablePanel/SettingsButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.3, 0.8, 0.5, 0.3)
+
+[node name="Icon" type="TextureRect" parent="ExpandablePanel/SettingsButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("7_settings")
+expand_mode = 1
+stretch_mode = 5
+

@@ -274,6 +274,9 @@ msgstr "%d Étoiles!"
 msgid "UI_REWARDS_GENERIC"
 msgstr "🎁 Récompense!"
 
+msgid "UI_REWARDS_NONE"
+msgstr "Complété!"
+
 msgid "UI_GALLERY_IMAGES_UNLOCKED"
 msgstr "🖼️ Images de Galerie Débloquées: %d"
 

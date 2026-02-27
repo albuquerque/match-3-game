@@ -9,8 +9,8 @@ var renderer: Node = null
 var active_stage_id: String = ""
 
 # Preloaded scenes
-var controller_scene: Script = null
-var renderer_scene: Script = null
+var controller_scene = null
+var renderer_scene = null
 
 var _locked: bool = false
 var _watchdog_timer: SceneTreeTimer = null
@@ -18,6 +18,8 @@ var _watchdog_duration: float = 15.0
 
 signal stage_shown(stage_id: String, fullscreen: bool)
 signal stage_cleared()
+
+var NodeResolvers = null
 
 func _ready():
 	print("[NarrativeStageManager] Ready")
@@ -213,8 +215,17 @@ func is_stage_active() -> bool:
 func _try_load_dlc_stage(level_num: int) -> bool:
 	"""Try to load narrative stage from DLC for this level"""
 	# Get current chapter for this level
-	var level_manager = get_node_or_null("/root/LevelManager")
+	var level_manager = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		level_manager = NodeResolvers._get_lm()
+	# Fallback to root child lookup if resolver didn't find it
+	if level_manager == null:
+		var root = get_tree().root if has_method("get_tree") else null
+		if root:
+			level_manager = root.get_node_or_null("LevelManager")
+
 	if not level_manager:
+		print("[NarrativeStageManager] WARNING: LevelManager not found via NodeResolvers")
 		return false
 
 	# Check if level is in a DLC chapter
@@ -251,3 +262,11 @@ func trigger_event(event_name: String, context: Dictionary = {}):
 		return true
 	print("[NarrativeStageManager] Cannot trigger event; controller missing or method not available: ", event_name)
 	return false
+
+func _ensure_resolvers():
+	if NodeResolvers == null:
+		var s = load("res://scripts/helpers/node_resolvers_api.gd")
+		if s != null and typeof(s) != TYPE_NIL:
+			NodeResolvers = s
+		else:
+			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")

@@ -1,3395 +1,446 @@
 extends Control
 class_name GameUI
 
-# Currency UI
-@onready var coins_label = $VBoxContainer/CurrencyPanel/HBoxContainer/CoinsLabel
-@onready var gems_label = $VBoxContainer/CurrencyPanel/HBoxContainer/GemsLabel
-@onready var lives_label = $VBoxContainer/CurrencyPanel/HBoxContainer/LivesLabel
+var NodeResolverAPI = null
 
-# Game UI
-@onready var score_label = $VBoxContainer/TopPanel/ScoreContainer/ScoreLabel
-@onready var level_label = $VBoxContainer/TopPanel/LevelContainer/LevelLabel
-@onready var moves_label = $VBoxContainer/TopPanel/MovesContainer/MovesLabel
-@onready var target_progress = $VBoxContainer/TopPanel/TargetContainer/TargetProgress
-@onready var target_label = $VBoxContainer/TopPanel/TargetContainer/TargetLabel
+func _init_resolvers():
+	if NodeResolverAPI == null:
+		var s = load("res://scripts/helpers/node_resolvers_api.gd")
+		if s != null and typeof(s) != TYPE_NIL and s.has_method("_get_gm"):
+			NodeResolverAPI = s
+		else:
+			NodeResolverAPI = load("res://scripts/helpers/node_resolvers_shim.gd")
 
-# Booster UI (optional - will be null if not added to scene yet)
-@onready var booster_panel = get_node_or_null("BoosterPanel")
-@onready var hammer_button = get_node_or_null("BoosterPanel/HBoxContainer/HammerButton")
-@onready var shuffle_button = get_node_or_null("BoosterPanel/HBoxContainer/ShuffleButton")
-@onready var swap_button = get_node_or_null("BoosterPanel/HBoxContainer/SwapButton")
-@onready var chain_reaction_button = get_node_or_null("BoosterPanel/HBoxContainer/ChainReactionButton")
-@onready var bomb_3x3_button = get_node_or_null("BoosterPanel/HBoxContainer/Bomb3x3Button")
-@onready var line_blast_button = get_node_or_null("BoosterPanel/HBoxContainer/LineBlastButton")
-@onready var tile_squasher_button = get_node_or_null("BoosterPanel/HBoxContainer/TileSquasherButton")
-@onready var row_clear_button = get_node_or_null("BoosterPanel/HBoxContainer/RowClearButton")
-@onready var column_clear_button = get_node_or_null("BoosterPanel/HBoxContainer/ColumnClearButton")
+# ── Component references ──────────────────────────────────────────────────────
+@onready var hud                = get_node_or_null("HUDComponent")
+@onready var booster_bar        = get_node_or_null("BoosterPanel")
+@onready var floating_menu_comp = get_node_or_null("FloatingMenu")
 
-# Booster button icons (TextureRect children)
-@onready var hammer_icon = get_node_or_null("BoosterPanel/HBoxContainer/HammerButton/Icon")
-@onready var shuffle_icon = get_node_or_null("BoosterPanel/HBoxContainer/ShuffleButton/Icon")
-@onready var swap_icon = get_node_or_null("BoosterPanel/HBoxContainer/SwapButton/Icon")
-@onready var chain_reaction_icon = get_node_or_null("BoosterPanel/HBoxContainer/ChainReactionButton/Icon")
-@onready var bomb_3x3_icon = get_node_or_null("BoosterPanel/HBoxContainer/Bomb3x3Button/Icon")
-@onready var line_blast_icon = get_node_or_null("BoosterPanel/HBoxContainer/LineBlastButton/Icon")
-@onready var tile_squasher_icon = get_node_or_null("BoosterPanel/HBoxContainer/TileSquasherButton/Icon")
-@onready var row_clear_icon = get_node_or_null("BoosterPanel/HBoxContainer/RowClearButton/Icon")
-@onready var column_clear_icon = get_node_or_null("BoosterPanel/HBoxContainer/ColumnClearButton/Icon")
+var floating_menu = null
+var reward_notification = null
+var level_transition = null
 
-# Booster count labels
-@onready var hammer_count_label = get_node_or_null("BoosterPanel/HBoxContainer/HammerButton/CountLabel")
-@onready var shuffle_count_label = get_node_or_null("BoosterPanel/HBoxContainer/ShuffleButton/CountLabel")
-@onready var swap_count_label = get_node_or_null("BoosterPanel/HBoxContainer/SwapButton/CountLabel")
-@onready var chain_reaction_count_label = get_node_or_null("BoosterPanel/HBoxContainer/ChainReactionButton/CountLabel")
-@onready var bomb_3x3_count_label = get_node_or_null("BoosterPanel/HBoxContainer/Bomb3x3Button/CountLabel")
-@onready var line_blast_count_label = get_node_or_null("BoosterPanel/HBoxContainer/LineBlastButton/CountLabel")
-@onready var tile_squasher_count_label = get_node_or_null("BoosterPanel/HBoxContainer/TileSquasherButton/CountLabel")
-@onready var row_clear_count_label = get_node_or_null("BoosterPanel/HBoxContainer/RowClearButton/CountLabel")
-@onready var column_clear_count_label = get_node_or_null("BoosterPanel/HBoxContainer/ColumnClearButton/CountLabel")
-
-# Old game over panel removed - using dynamic EnhancedGameOver screen now
-# @onready var game_over_panel = $GameOverPanel  # REMOVED FROM SCENE
-@onready var level_complete_panel = $LevelCompletePanel
-# @onready var restart_button = $GameOverPanel/VBoxContainer/RestartButton  # REMOVED FROM SCENE
-@onready var continue_button = $LevelCompletePanel/VBoxContainer/ContinueButton
-# @onready var final_score_label = $GameOverPanel/VBoxContainer/FinalScoreLabel  # REMOVED FROM SCENE
-@onready var level_complete_score = $LevelCompletePanel/VBoxContainer/LevelScoreLabel
-
-# Update menu & popup references
-@onready var floating_menu = $FloatingMenu
-@onready var menu_button = $FloatingMenu/MenuButton
-@onready var expandable_panel = $FloatingMenu/ExpandablePanel
-@onready var map_button = $FloatingMenu/ExpandablePanel/MapButton
-@onready var audio_button = $FloatingMenu/ExpandablePanel/AudioButton
-@onready var shop_menu_button = $FloatingMenu/ExpandablePanel/ShopButton
-@onready var gallery_button = $FloatingMenu/ExpandablePanel/GalleryButton
-@onready var main_menu_popup = $MainMenuPopup
-
-# Phase 2: Shop and Dialogs
-@onready var shop_button = get_node_or_null("VBoxContainer/BottomPanel/ShopButton")
-@onready var shop_ui = get_node_or_null("ShopUI")
-@onready var out_of_lives_dialog = $OutOfLivesDialog
-@onready var reward_notification = get_node_or_null("RewardNotification")  # Removed from scene, kept for compatibility
-
-# Dialog references
-@onready var settings_dialog = get_node_or_null("SettingsDialog")
-@onready var about_dialog = get_node_or_null("AboutDialog")
-
-# Gallery reference
-var gallery_ui = null  # Will be created when needed
-
-# Start page reference
-var start_page = null  # Will be set in _ready()
-
-# Level transition screen
-var level_transition = null  # Will be created in _ready()
-
-# Reintroduce game over panel reference (was removed earlier)
-var game_over_panel: Panel = null
-
-# Narrative fullscreen active flag
+var booster_mode_active: bool = false
+var active_booster_type: String = ""
+var swap_first_tile = null
+var line_blast_direction: String = ""
 var _narrative_fullscreen_active: bool = false
 
-var is_paused = false
-var booster_mode_active = false
-var active_booster_type = ""
-var swap_first_tile = null  # For swap booster - remember first selected tile
-var line_blast_direction = ""  # For line blast - "horizontal" or "vertical"
-var _panel_to_hide = null
-var _active_booster_button: Button = null  # Currently selected booster button
-var _booster_animation_tween: Tween = null  # Animation tween for highlighting
+# ── Component accessors ───────────────────────────────────────────────────────
+func _hud():
+	return hud if (hud and hud.has_method("set_score")) else null
 
-# New variables for side panel behavior
-var board_original_position = Vector2.ZERO
-var side_panel_open = false
-const SIDE_PANEL_MAX_WIDTH = 480
-const SIDE_PANEL_WIDTH_PERCENT = 0.40
-var _shop_original_parent = null
-var _shop_original_index = -1
-var _side_position = "right"  # current side where the panel will open from: "left" or "right"
+func _bbar():
+	return booster_bar if (booster_bar and booster_bar.has_method("refresh_counts")) else null
 
-# Helper flag used when awaiting level_loaded signal
-var _level_loaded_flag: bool = false
+func _fmc():
+	return floating_menu_comp if (floating_menu_comp and floating_menu_comp.has_method("collapse")) else null
 
-# Floating menu state
-var menu_expanded = false
+# ── Resolver helpers ──────────────────────────────────────────────────────────
+func _get_gm():
+	return NodeResolverAPI._get_gm()
 
-# Helper function to determine if a level is a DLC level
-func is_dlc_level(level_num: int) -> bool:
-	"""Check if a level number is a DLC level (beyond built-in levels)"""
-	var lm = get_node_or_null('/root/LevelManager')
-	if lm and lm.levels.size() > 0:
-		# DLC levels are those with level numbers greater than the number of built-in levels
-		return level_num > lm.levels.size()
-	# If LevelManager not available or no levels loaded, assume DLC if > 60 as fallback
-	return level_num > 60
+func _get_rm():
+	return NodeResolverAPI._get_rm()
 
-var _level_loaded_awaited = false
+func _get_tm():
+	return NodeResolverAPI._get_tm()
 
-func _level_loaded_signal():
-	_level_loaded_flag = true
+func _get_pm():
+	return NodeResolverAPI._get_pm()
 
-func _input(event):
-	"""Debug: Check if any input is reaching GameUI"""
-	if event is InputEventMouseButton and event.pressed:
-		print("[GameUI] ===== MOUSE CLICK DETECTED =====")
-		print("[GameUI] Position: %s" % str(event.position))
-		print("[GameUI] BoosterPanel visible: %s" % str(booster_panel.visible if booster_panel else "null"))
-		if booster_panel and booster_panel.visible:
-			var rect = booster_panel.get_global_rect()
-			print("[GameUI] BoosterPanel rect: %s" % str(rect))
-			var in_bounds = rect.has_point(event.position)
-			print("[GameUI] Click in BoosterPanel bounds: %s" % str(in_bounds))
+func _get_am():
+	return NodeResolverAPI._get_am()
 
-			# Check each button
-			var hbox = booster_panel.get_node_or_null("HBoxContainer")
-			if hbox:
-				print("[GameUI] Checking %d buttons:" % hbox.get_child_count())
-				for child in hbox.get_children():
-					if child is Button:
-						var btn_rect = child.get_global_rect()
-						var btn_hit = btn_rect.has_point(event.position)
-						print("[GameUI]   - %s: rect=%s, hit=%s, disabled=%s" % [child.name, str(btn_rect), str(btn_hit), str(child.disabled)])
-
-						# WORKAROUND: Manually trigger handler since Button.pressed signal won't fire!
-						if btn_hit and not child.disabled:
-							print("[GameUI] !!! MANUAL CLICK HANDLER TRIGGERED for %s !!!" % child.name)
-							# Extract booster_id from button name
-							var booster_id = child.name.replace("Button", "").replace(" ", "_").to_lower()
-							# Convert from display name to internal name
-							if booster_id == "row_clear":
-								booster_id = "row_clear"
-							elif booster_id == "column_clear":
-								booster_id = "column_clear"
-							elif booster_id == "chain_reaction":
-								booster_id = "chain_reaction"
-							elif booster_id == "bomb_3x_3":
-								booster_id = "bomb_3x3"
-							elif booster_id == "extra_moves":
-								booster_id = "extra_moves"
-							elif booster_id == "tile_squasher":
-								booster_id = "tile_squasher"
-							elif booster_id == "line_blast":
-								booster_id = "line_blast"
-							else:
-								# For simple names like shuffle, hammer, swap
-								booster_id = booster_id.replace("_", "")
-
-							print("[GameUI] Calling _on_booster_button_pressed with: %s" % booster_id)
-							_on_booster_button_pressed(booster_id)
-							get_viewport().set_input_as_handled()
-							break
-		print("[GameUI] ================================")
+func _get_ed():
+	var rt = get_tree().root if has_node("/root") else null
+	if rt:
+		var ed = rt.get_node_or_null("ExperienceDirector")
+		if ed:
+			return ed
+	return null
 
 func _ready():
-	# Debug: print initial global state to help diagnose inadvertent Game Over
-	print("[GameUI] _ready() — initial states: GameManager.score=", GameManager.score, ", moves_left=", GameManager.moves_left, ", target=", GameManager.target_score)
+	_init_resolvers()
+	self.z_index = 200
 
-	# Reorganize HUD for better gameplay layout
-	_reorganize_hud()
+	floating_menu       = get_node_or_null("FloatingMenu")
+	reward_notification = get_node_or_null("RewardNotification")
+	level_transition    = get_node_or_null("LevelTransition")
 
-	# Phase 12.3: Migrate existing save to ExperienceState if needed
-	if ExperienceDirector and ExperienceDirector.has_method("migrate_existing_save_to_experience_state"):
-		ExperienceDirector.migrate_existing_save_to_experience_state()
+	# Wire HUD signals (HUDComponent.tscn not instanced — wire directly to scene labels)
+	call_deferred("_connect_hud_signals")
 
-	# Connect to RewardManager signals
-	RewardManager.connect("coins_changed", _on_coins_changed)
-	RewardManager.connect("gems_changed", _on_gems_changed)
-	RewardManager.connect("lives_changed", _on_lives_changed)
-	RewardManager.connect("booster_changed", _on_booster_changed)
+	# Wire FloatingMenuComponent signals
+	if _fmc():
+		_fmc().connect("map_pressed",      func(): _on_floating_map_pressed())
+		_fmc().connect("shop_pressed",     func(): _on_floating_shop_pressed())
+		_fmc().connect("gallery_pressed",  func(): _on_floating_gallery_pressed())
+		_fmc().connect("settings_pressed", func(): _on_floating_settings_pressed())
 
-	# Listen for language changes to refresh HUD labels
-	EventBus.language_changed.connect(_on_language_changed)
-	# Connect to GameManager signals
-	GameManager.connect("score_changed", _on_score_changed)
-	GameManager.connect("level_changed", _on_level_changed)
-	GameManager.connect("moves_changed", _on_moves_changed)
-	GameManager.connect("game_over", _on_game_over)
-	GameManager.connect("level_complete", _on_level_complete)
-	GameManager.connect("collectibles_changed", _on_collectibles_changed)
-	GameManager.connect("unmovables_changed", _on_unmovables_changed)
+	# Wire BoosterPanelComponent booster_pressed → GameUI (GameUI still handles activation)
+	if _bbar():
+		booster_bar.connect("booster_pressed", Callable(self, "_on_booster_button_pressed"))
 
-	# Connect UI buttons
-	# restart_button removed - enhanced game over screen uses its own buttons
-	continue_button.connect("pressed", _on_continue_pressed)
-	menu_button.connect("pressed", _on_menu_pressed)
+	# Register with VisualAnchorManager
+	var vam = NodeResolverAPI._get_vam() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	if vam and vam.has_method("register_anchor"):
+		vam.register_anchor("ui", self)
 
-	# Connect floating menu buttons
-	if map_button:
-		map_button.connect("pressed", Callable(self, "_on_map_button_pressed"))
-	if audio_button:
-		audio_button.connect("pressed", Callable(self, "_on_audio_button_pressed"))
-	if shop_menu_button:
-		shop_menu_button.connect("pressed", Callable(self, "_on_shop_menu_button_pressed"))
-	if gallery_button:
-		gallery_button.connect("pressed", Callable(self, "_on_gallery_button_pressed"))
+	# Connect PageManager
+	var pm = NodeResolverAPI._get_pm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	if pm == null:
+		pm = get_tree().root.get_node_or_null("PageManager")
+	if pm and pm.has_signal("page_opened"):
+		if not pm.is_connected("page_opened", Callable(self, "_on_page_opened")):
+			pm.connect("page_opened", Callable(self, "_on_page_opened"))
+	if pm:
+		pm.call_deferred("open", "StartPage", {})
+	else:
+		print("[GameUI] WARNING: PageManager not available; StartPage will not be opened automatically")
 
-	# Initialize expandable panel as hidden
-	if expandable_panel:
-		expandable_panel.modulate = Color(1, 1, 1, 0)
-		expandable_panel.visible = false
+	call_deferred("hide_gameplay_ui")
 
-	# Start glow animations for menu buttons
-	_start_menu_glow_animations()
-
-	# Set up Main Menu popup (kept for backward compatibility but not used in floating menu)
-	if main_menu_popup:
-		main_menu_popup.add_item("Settings", 0)
-		main_menu_popup.add_item("Shop", 1)
-		main_menu_popup.add_item("Gallery", 2)
-		main_menu_popup.add_item("About", 3)
-		main_menu_popup.add_item("Share", 4)
-		main_menu_popup.id_pressed.connect(_on_main_menu_item_selected)
-
-	# Connect booster buttons
-	if hammer_button:
-		hammer_button.connect("pressed", _on_hammer_pressed)
-	if shuffle_button:
-		shuffle_button.connect("pressed", _on_shuffle_pressed)
-	if swap_button:
-		swap_button.connect("pressed", _on_swap_pressed)
-	if chain_reaction_button:
-		chain_reaction_button.connect("pressed", _on_chain_reaction_pressed)
-	if bomb_3x3_button:
-		bomb_3x3_button.connect("pressed", _on_bomb_3x3_pressed)
-	if line_blast_button:
-		line_blast_button.connect("pressed", _on_line_blast_pressed)
-	if tile_squasher_button:
-		tile_squasher_button.connect("pressed", _on_tile_squasher_pressed)
-	if row_clear_button:
-		row_clear_button.connect("pressed", _on_row_clear_pressed)
-	if column_clear_button:
-		column_clear_button.connect("pressed", _on_column_clear_pressed)
-
-	# Phase 2: Shop button
-	if shop_button:
-		shop_button.connect("pressed", _on_shop_pressed)
-
-	# Connect shop and dialog signals
-	if shop_ui:
-		shop_ui.connect("shop_closed", _on_shop_closed)
-		shop_ui.connect("item_purchased", _on_item_purchased)
-
-	if out_of_lives_dialog:
-		out_of_lives_dialog.connect("refill_requested", _on_refill_requested)
-		out_of_lives_dialog.connect("dialog_closed", _on_out_of_lives_closed)
-
-	# Connect AboutDialog closed signal if present
-	var adlg_node = get_node_or_null("AboutDialog")
-	if adlg_node and adlg_node.has_signal("dialog_closed"):
-		adlg_node.connect("dialog_closed", Callable(self, "_on_about_dialog_closed"))
-
-	# Initialize UI
-	# game_over_panel removed - using dynamic EnhancedGameOver screen
-	level_complete_panel.visible = false
-	update_display()
-	update_currency_display()
-	load_booster_icons()
-	update_booster_ui()
-
-	# Set LevelManager's current_level_index based on saved progress BEFORE showing start page
-	# This ensures the start page shows the correct level number
-	var level_manager = get_node_or_null("/root/LevelManager")
-	if level_manager:
-		# levels_completed tracks highest level finished
-		# Next level to play is at index levels_completed
-		# Example: levels_completed=0 → play index 0 (Level 1)
-		# Example: levels_completed=3 → play index 3 (Level 4)
-		var next_level_index = RewardManager.levels_completed
-		level_manager.current_level_index = next_level_index
-		print("[GameUI] _ready: Set level to index ", next_level_index, " (Level ", next_level_index + 1, ") based on levels_completed=", RewardManager.levels_completed)
-
-	# Show StartPage instead of immediately starting the level
-	start_page = get_node_or_null("StartPage")
-	if not start_page:
-		# Try to instance the StartPage script as a Control
-		var sp = load("res://scripts/StartPage.gd")
-		if sp:
-			start_page = sp.new()
-			start_page.name = "StartPage"
-			add_child(start_page)
-			print("[GameUI] Instanced StartPage")
-
-	if start_page and start_page is Control:
-		# Configure fullscreen
-		start_page.anchor_left = 0
-		start_page.anchor_top = 0
-		start_page.anchor_right = 1
-		start_page.anchor_bottom = 1
-		start_page.position = Vector2(0,0)
-		start_page.size = get_viewport().get_visible_rect().size
-		start_page.visible = true
-		# Ensure StartPage actually becomes opaque (ScreenBase defaults to transparent)
-		if start_page.has_method("show_screen"):
-			start_page.show_screen()
-		# Hide gameplay UI while StartPage is shown
-		hide_gameplay_ui()
-
-		# Populate level info - check if it's a DLC level first
-		if GameManager and is_dlc_level(GameManager.level):
-			# DLC level - get info from DLC manifest
-			var level_num = GameManager.level
-			var level_desc = "DLC Level"
-
-			# Try to find level description in DLC manifest
-			var installed_chapters = AssetRegistry.get_installed_chapters()
-			for chapter_id in installed_chapters:
-				var manifest = AssetRegistry.get_chapter_info(chapter_id)
-				var levels_array = manifest.get("levels", [])
-				for level_info in levels_array:
-					if level_info.get("number") == level_num:
-						level_desc = level_info.get("name", "DLC Level %d" % level_num)
-						break
-				if level_desc != "DLC Level":
-					break
-
-			if start_page.has_method('set_level_info'):
-				start_page.set_level_info(level_num, level_desc)
-		else:
-			# Built-in level - use LevelManager
-			var lm = get_node_or_null('/root/LevelManager')
-			if lm:
-				var lvl = lm.get_current_level()
-				if lvl and start_page.has_method('set_level_info'):
-					start_page.set_level_info(lvl.level_number, lvl.description)
-
-		# Connect signals
-		if not start_page.is_connected("start_pressed", Callable(self, "_on_startpage_start_pressed")):
-			start_page.connect("start_pressed", Callable(self, "_on_startpage_start_pressed"))
-		if not start_page.is_connected("booster_selected", Callable(self, "_on_startpage_booster_selected")):
-			start_page.connect("booster_selected", Callable(self, "_on_startpage_booster_selected"))
-		if not start_page.is_connected("exchange_pressed", Callable(self, "_on_startpage_exchange_pressed")):
-			start_page.connect("exchange_pressed", Callable(self, "_on_startpage_exchange_pressed"))
-		# Connect new settings signal so StartPage can open settings
-		if start_page.has_signal("settings_pressed") and not start_page.is_connected("settings_pressed", Callable(self, "_on_startpage_settings_pressed")):
-			start_page.connect("settings_pressed", Callable(self, "_on_startpage_settings_pressed"))
-		# Connect achievements signal
-		if start_page.has_signal("achievements_pressed") and not start_page.is_connected("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed")):
-			start_page.connect("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed"))
-
-	# Create LevelTransition screen
-	level_transition = get_node_or_null("LevelTransition")
-	if not level_transition:
-		var lt_script = load("res://scripts/LevelTransition.gd")
-		if lt_script:
-			level_transition = lt_script.new()
-			level_transition.name = "LevelTransition"
-			add_child(level_transition)
-			level_transition.visible = false
-			level_transition.z_index = 100  # On top of everything
-			print("[GameUI] Created LevelTransition screen")
-
-	if level_transition:
-		# Connect signals
-		if not level_transition.is_connected("continue_pressed", Callable(self, "_on_transition_continue")):
-			level_transition.connect("continue_pressed", Callable(self, "_on_transition_continue"))
-		if not level_transition.is_connected("rewards_claimed", Callable(self, "_on_transition_rewards_claimed")):
-			level_transition.connect("rewards_claimed", Callable(self, "_on_transition_rewards_claimed"))
-
-		if start_page.has_signal("achievements_pressed") and not start_page.is_connected("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed")):
-			start_page.connect("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed"))
-		# Connect map signal
-		if start_page.has_signal("map_pressed") and not start_page.is_connected("map_pressed", Callable(self, "_on_startpage_map_pressed")):
-			start_page.connect("map_pressed", Callable(self, "_on_startpage_map_pressed"))
-
-	# Play menu music (will be switched to game music when level starts)
-	AudioManager.play_music("menu", 1.0)
-
-	# Connect to NarrativeStageManager signals so we can hide/show UI during narratives
-	var nsm = get_node_or_null('/root/NarrativeStageManager')
-	if nsm:
-		if nsm.has_signal('stage_shown') and not nsm.is_connected('stage_shown', Callable(self, '_on_narrative_stage_shown')):
-			nsm.connect('stage_shown', Callable(self, '_on_narrative_stage_shown'))
-		if nsm.has_signal('stage_cleared') and not nsm.is_connected('stage_cleared', Callable(self, '_on_narrative_stage_cleared')):
-			nsm.connect('stage_cleared', Callable(self, '_on_narrative_stage_cleared'))
-
-func _force_hide_global_ui():
-	"""Force-hide known gameplay UI elements across the scene tree.
-	This handles cases where HUD/Booster/FloatingMenu got instanced outside of GameUI.
-	"""
-	var names = ["BoosterPanel", "TopPanel", "FloatingMenu", "RewardNotification", "LevelTransition"]
-	var rt = get_tree()
-	if not rt:
+# ── HUD wiring — connects GameManager signals to the labels already in the scene ──
+func _connect_hud_signals() -> void:
+	# If a HUDComponent node exists (future), let it handle its own wiring.
+	if hud != null:
 		return
-	var root = rt.root
-	for n in names:
-		# Use our recursive finder to locate nodes by name
-		var found = _find_node_recursive(root, n)
-		if found and found is Control:
-			found.visible = false
-			# also hide children and stop input
-			found.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			for c in found.get_children():
-				if c is Control:
-					c.visible = false
-		print("[GameUI] _force_hide_global_ui: hid ", n)
+	var gm = _get_gm()
+	if gm == null:
+		push_warning("[GameUI] _connect_hud_signals: GameManager not found")
+		return
+	if not gm.is_connected("score_changed", _on_score_changed):
+		gm.connect("score_changed", _on_score_changed)
+	if not gm.is_connected("moves_changed", _on_moves_changed):
+		gm.connect("moves_changed", _on_moves_changed)
+	if not gm.is_connected("level_changed", _on_level_changed):
+		gm.connect("level_changed", _on_level_changed)
+	if not gm.is_connected("level_loaded", _on_hud_level_loaded):
+		gm.connect("level_loaded", _on_hud_level_loaded)
+	if gm.has_signal("collectibles_changed") and not gm.is_connected("collectibles_changed", _on_collectibles_changed):
+		gm.connect("collectibles_changed", _on_collectibles_changed)
+	if gm.has_signal("unmovables_changed") and not gm.is_connected("unmovables_changed", _on_unmovables_changed):
+		gm.connect("unmovables_changed", _on_unmovables_changed)
+	var rm = _get_rm()
+	if rm and rm.has_signal("coins_changed") and not rm.is_connected("coins_changed", _on_currency_changed):
+		rm.connect("coins_changed", _on_currency_changed)
+	print("[GameUI] HUD signals wired directly to scene labels")
 
-# call force hide when narrative shown or startpage shown
-func _on_narrative_stage_shown(stage_id: String, fullscreen: bool):
-	print("[GameUI] Narrative stage shown: ", stage_id, " fullscreen=", fullscreen)
-	_narrative_fullscreen_active = fullscreen
-	# Always hide gameplay UI when any narrative stage is shown — prevents HUD/boosters showing under narrative
-	hide_gameplay_ui()
-	_force_hide_global_ui()
-	# Ensure narrative renderer sits above everything by raising this UI's z-index if needed
-	var renderer = get_node_or_null('/root/NarrativeStageManager')
-	if renderer and renderer.has_method('get_parent'):
-		# no-op; we rely on NarrativeStageRenderer to place visuals; just ensure GameUI doesn't overlay
-		pass
+# ── HUD label helpers ─────────────────────────────────────────────────────────
+func _score_label() -> Label:
+	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/ScoreContainer/ScoreLabel")
 
-func load_booster_icons():
-	"""Load booster icons based on current theme"""
-	var theme = ThemeManager.get_theme_name()
-	var base_path = "res://textures/%s/" % theme
+func _moves_label() -> Label:
+	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/MovesContainer/MovesLabel")
 
-	# Icon size configuration (256x256 images scaled down to 48x48 to fit in 70x70 buttons)
-	var icon_size = Vector2(48, 48)
+func _level_label() -> Label:
+	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/LevelContainer/LevelLabel")
 
-	print("[GameUI] Loading booster icons for theme: ", theme)
-	print("[GameUI] Base path: ", base_path)
+func _target_label() -> Label:
+	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/TargetContainer/TargetLabel")
 
-	# Load each booster icon with scaling
-	_load_and_scale_icon(hammer_icon, base_path + "booster_hammer.png", icon_size)
-	_load_and_scale_icon(shuffle_icon, base_path + "booster_shuffle.png", icon_size)
-	_load_and_scale_icon(swap_icon, base_path + "booster_swap.png", icon_size)
-	_load_and_scale_icon(chain_reaction_icon, base_path + "booster_chain_reaction.png", icon_size)
-	_load_and_scale_icon(bomb_3x3_icon, base_path + "booster_bomb_3x3.png", icon_size)
-	_load_and_scale_icon(line_blast_icon, base_path + "booster_line_blast.png", icon_size)
-	_load_and_scale_icon(tile_squasher_icon, base_path + "booster_tile_squasher.png", icon_size)
-	_load_and_scale_icon(row_clear_icon, base_path + "booster_row_clear.png", icon_size)
-	_load_and_scale_icon(column_clear_icon, base_path + "booster_column_clear.png", icon_size)
+func _target_progress() -> ProgressBar:
+	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/TargetContainer/TargetProgress")
 
-	print("[GameUI] Finished loading booster icons")
+func _coins_label() -> Label:
+	return get_node_or_null("VBoxContainer/CurrencyPanel/HBoxContainer/CoinsLabel")
 
-func _load_and_scale_icon(icon_node: TextureRect, path: String, size: Vector2):
-	"""Helper function to load and scale a single icon"""
-	if icon_node:
-		if ResourceLoader.exists(path):
-			icon_node.texture = load(path)
-			icon_node.custom_minimum_size = size
-			icon_node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			print("[GameUI] Loaded and scaled: ", path)
-		else:
-			print("[GameUI] ERROR: Icon not found at: ", path)
+func _gems_label() -> Label:
+	return get_node_or_null("VBoxContainer/CurrencyPanel/HBoxContainer/GemsLabel")
+
+func _lives_label() -> Label:
+	return get_node_or_null("VBoxContainer/CurrencyPanel/HBoxContainer/LivesLabel")
+
+# ── HUD signal handlers ───────────────────────────────────────────────────────
+func _on_hud_level_loaded() -> void:
+	var gm = _get_gm()
+	if not gm:
+		return
+	var sl = _score_label()
+	if sl: sl.text = "%d" % gm.score
+	var ll = _level_label()
+	if ll: ll.text = "Lv %d" % gm.level
+	var ml = _moves_label()
+	if ml: ml.text = "%d" % gm.moves_left
+	_refresh_target_display(gm)
+	_refresh_currency_display()
+
+func _on_score_changed(new_score: int) -> void:
+	var sl = _score_label()
+	if sl: sl.text = "%d" % new_score
+	var gm = _get_gm()
+	if gm and gm.unmovable_target == 0 and gm.collectible_target == 0:
+		_refresh_target_display(gm)
+
+func _on_moves_changed(moves: int) -> void:
+	var ml = _moves_label()
+	if ml:
+		ml.text = "%d" % moves
+		ml.modulate = Color.RED if moves <= 5 else Color.WHITE
+
+func _on_level_changed(new_level: int) -> void:
+	var ll = _level_label()
+	if ll: ll.text = "Lv %d" % new_level
+
+func _on_collectibles_changed(collected: int, target: int) -> void:
+	var tl = _target_label()
+	if tl: tl.text = "%d / %d" % [collected, target]
+	var tp = _target_progress()
+	if tp:
+		tp.max_value = target
+		tp.value = collected
+
+func _on_unmovables_changed(cleared: int, target: int) -> void:
+	var tl = _target_label()
+	if tl: tl.text = "%d / %d" % [cleared, target]
+	var tp = _target_progress()
+	if tp:
+		tp.max_value = target
+		tp.value = cleared
+
+func _on_currency_changed(_amount: int) -> void:
+	_refresh_currency_display()
+
+func _refresh_target_display(gm: Node) -> void:
+	var tl = _target_label()
+	var tp = _target_progress()
+	if gm.unmovable_target > 0:
+		if tl: tl.text = "%d / %d" % [gm.unmovables_cleared, gm.unmovable_target]
+		if tp: tp.max_value = gm.unmovable_target; tp.value = gm.unmovables_cleared
+	elif gm.collectible_target > 0:
+		if tl: tl.text = "%d / %d" % [gm.collectibles_collected, gm.collectible_target]
+		if tp: tp.max_value = gm.collectible_target; tp.value = gm.collectibles_collected
 	else:
-		print("[GameUI] ERROR: Icon node is null for: ", path)
+		if tl: tl.text = "%d / %d" % [gm.score, gm.target_score]
+		if tp:
+			tp.max_value = gm.target_score
+			tp.value = gm.score
 
-func update_display():
-	# Clean display without redundant prefixes
-	score_label.text = "%d" % GameManager.score
-	level_label.text = "Lv %d" % GameManager.level
-	moves_label.text = "%d" % GameManager.moves_left
+func _refresh_currency_display() -> void:
+	var rm = _get_rm()
+	if not rm:
+		return
+	var cl = _coins_label()
+	if cl: cl.text = "💰 %d" % (rm.get_coins() if rm.has_method("get_coins") else 0)
+	var gl = _gems_label()
+	if gl: gl.text = "💎 %d" % (rm.get_gems() if rm.has_method("get_gems") else 0)
+	var ll = _lives_label()
+	if ll: ll.text = "❤️ %d/5" % (rm.get_lives() if rm.has_method("get_lives") else 5)
 
-	# Set correct color for moves (don't leave it red from previous level)
-	if GameManager.moves_left <= 5:
-		moves_label.modulate = Color.RED
-	else:
-		moves_label.modulate = Color.WHITE
+# ── Level loading (called by ExperiencePipeline) ──────────────────────────────
+func _load_level_by_number(level_num: int) -> void:
+	print("[GameUI] _load_level_by_number(%d) called by pipeline" % level_num)
+	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	if lm == null:
+		lm = get_tree().root.get_node_or_null("LevelManager")
+	if lm and lm.has_method("get_level_index"):
+		var idx = lm.get_level_index(level_num)
+		if idx >= 0:
+			lm.set_current_level(idx)
+			print("[GameUI] LevelManager set to index %d (level %d)" % [idx, level_num])
+	var gm = _get_gm()
+	if gm and gm.has_method("initialize_game"):
+		print("[GameUI] Calling GameManager.initialize_game() for level %d" % level_num)
+		gm.initialize_game()
 
-	# Update progress bar and target label based on level type
-	if GameManager.unmovable_target > 0:
-		# Unmovable-based level
-		var progress = float(GameManager.unmovables_cleared) / float(GameManager.unmovable_target)
-		target_progress.value = min(progress * 100, 100)
-		target_label.text = tr("UI_OBSTACLES") + ": %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
-	elif GameManager.collectible_target > 0:
-		# Collectible-based level
-		var progress = float(GameManager.collectibles_collected) / float(GameManager.collectible_target)
-		target_progress.value = min(progress * 100, 100)
-		target_label.text = tr("UI_COINS") + ": %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
-	else:
-		# Score-based level
-		var progress = float(GameManager.score) / float(GameManager.target_score)
-		target_progress.value = min(progress * 100, 100)
-		target_label.text = tr("UI_GOAL_SCORE") + ": %d" % GameManager.target_score
-
-func hide_gameplay_ui():
-	"""Hide gameplay UI elements (HUD and booster panel) during level transitions
-	This prevents showing old level state while loading next level"""
-	print("[GameUI] Hiding gameplay UI elements")
-
-	# Hide HUD elements (top panel with score, moves, target)
-	if get_node_or_null("VBoxContainer/TopPanel"):
-		get_node("VBoxContainer/TopPanel").visible = false
-		print("[GameUI]   - TopPanel hidden")
-
-	# Hide booster panel
-	if booster_panel:
-		booster_panel.visible = false
-		print("[GameUI]   - BoosterPanel hidden")
-
-	# Hide currency panel
-	if get_node_or_null("VBoxContainer/CurrencyPanel"):
-		get_node("VBoxContainer/CurrencyPanel").visible = false
-		print("[GameUI]   - CurrencyPanel hidden")
-
-	# Hide floating menu and menu button so player can't open gameplay screens
-	if floating_menu:
-		floating_menu.visible = false
-		print("[GameUI]   - FloatingMenu hidden")
-	if menu_button:
-		menu_button.visible = false
-		print("[GameUI]   - MenuButton hidden")
-
-	# Hide reward notification and any transition screens
-	if reward_notification:
-		reward_notification.visible = false
-		print("[GameUI]   - RewardNotification hidden")
-	if level_transition:
-		level_transition.visible = false
-		print("[GameUI]   - LevelTransition hidden")
-
-	print("[GameUI] ✓ All gameplay UI elements hidden")
-
-func show_gameplay_ui():
-	"""Show gameplay UI elements when level is ready
-	This ensures UI appears cleanly with new level state"""
+# ── Gameplay UI visibility ────────────────────────────────────────────────────
+func show_gameplay_ui() -> void:
 	print("[GameUI] Showing gameplay UI elements")
-
-	# If a fullscreen narrative is active, don't restore gameplay UI
 	if _narrative_fullscreen_active:
-		print("[GameUI] Narrative fullscreen active - skipping show_gameplay_ui")
 		return
-
-	# Show HUD elements
-	if get_node_or_null("VBoxContainer/TopPanel"):
-		get_node("VBoxContainer/TopPanel").visible = true
-		print("[GameUI]   - TopPanel shown")
-
-	# Show booster panel
-	if booster_panel:
-		booster_panel.visible = true
-		print("[GameUI]   - BoosterPanel shown")
-
-	# Show currency panel
-	if get_node_or_null("VBoxContainer/CurrencyPanel"):
-		get_node("VBoxContainer/CurrencyPanel").visible = true
-		print("[GameUI]   - CurrencyPanel shown")
-
-	# Show floating menu and menu button
-	if floating_menu:
-		floating_menu.visible = true
-		print("[GameUI]   - FloatingMenu shown")
-	if menu_button:
-		menu_button.visible = true
-		print("[GameUI]   - MenuButton shown")
-
-	# Show reward notification (it will manage its own visibility)
-	if reward_notification:
-		reward_notification.visible = true
-		print("[GameUI]   - RewardNotification shown")
-
+	var top_panel = get_node_or_null("VBoxContainer/TopPanel")
+	if top_panel: top_panel.visible = true
+	if booster_bar: booster_bar.visible = true
+	var currency_panel = get_node_or_null("VBoxContainer/CurrencyPanel")
+	if currency_panel: currency_panel.visible = true
+	if floating_menu: floating_menu.visible = true
+	if reward_notification: reward_notification.visible = true
 	print("[GameUI] ✓ All gameplay UI elements shown")
 
-func _on_score_changed(new_score: int):
-	score_label.text = "%d" % new_score
-
-	# Update progress only if score-based level (not collectible or unmovable)
-	if GameManager.collectible_target == 0 and GameManager.unmovable_target == 0:
-		var progress = float(new_score) / float(GameManager.target_score)
-		target_progress.value = min(progress * 100, 100)
-
-	# Animate score increase
-	animate_score_change()
-
-func _on_level_changed(new_level: int):
-	level_label.text = "Lv %d" % new_level
-
-	# Update target label based on level type
-	if GameManager.unmovable_target > 0:
-		target_label.text = tr("UI_OBSTACLES") + ": %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
-	elif GameManager.collectible_target > 0:
-		target_label.text = tr("UI_COINS") + ": %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
-	else:
-		target_label.text = tr("UI_GOAL_SCORE") + ": %d" % GameManager.target_score
-
-	target_progress.value = 0
-
-	# Animate level change
-	animate_level_change()
-
-func _on_collectibles_changed(collected: int, target: int):
-	"""Update UI when collectibles are collected"""
-	if target > 0:
-		target_label.text = tr("UI_COINS") + ": %d/%d" % [collected, target]
-		var progress = float(collected) / float(target)
-		target_progress.value = min(progress * 100, 100)
-
-		# Animate collectible collection
-		var tween = create_tween()
-		tween.tween_property(target_label, "modulate", Color(1.0, 0.9, 0.2), 0.1)  # Gold flash
-		tween.tween_property(target_label, "modulate", Color.WHITE, 0.1)
-
-func _on_unmovables_changed(cleared: int, target: int):
-	"""Update UI when unmovables are cleared"""
-	if target > 0:
-		target_label.text = tr("UI_OBSTACLES") + ": %d/%d" % [cleared, target]
-		var progress = float(cleared) / float(target)
-		target_progress.value = min(progress * 100, 100)
-
-		# Animate unmovable clearing
-		var tween = create_tween()
-		tween.tween_property(target_label, "modulate", Color(1.0, 0.5, 0.3), 0.1)  # Orange flash
-		tween.tween_property(target_label, "modulate", Color.WHITE, 0.1)
-
-func _on_moves_changed(moves_left: int):
-	moves_label.text = "%d" % moves_left
-
-	# Warning color when low on moves
-	if moves_left <= 5:
-		moves_label.modulate = Color.RED
-		animate_low_moves_warning()
-	else:
-		moves_label.modulate = Color.WHITE
-
-func _on_game_over():
-	# OLD GAME OVER HANDLING - Check if experience flow should handle this
-	print("=".repeat(60))
-	print("[GameUI] 💔 _on_game_over() CALLED 💔")
-	print("=".repeat(60))
-
-	# Check if experience flow is active - it handles failure now via ShowLevelFailureStep
-	if ExperienceDirector and ExperienceDirector.is_flow_active():
-		print("[GameUI] ✅ Experience flow active - skipping old game over screen")
-		print("[GameUI] ShowLevelFailureStep will handle failure UI")
-		return
-
-	# Fallback: Only show old screen if experience flow is NOT active
-	print("[GameUI] Game over - verifying state: moves_left=", GameManager.moves_left, ", score=", GameManager.score, ", target=", GameManager.target_score)
-
-	# Consider it a valid game over if no moves left and score < target
-	if GameManager.moves_left > 0 and GameManager.score < GameManager.target_score:
-		print("[GameUI] INVALID GAME OVER (still has moves). Ignoring.")
-		return
-
-	# Show enhanced game over screen
-	_show_enhanced_game_over()
-
-# Create or show the enhanced Game Over panel (modal)
-func _show_enhanced_game_over():
-	# If already created, just show and return
-	if game_over_panel and is_instance_valid(game_over_panel):
-		show_panel(game_over_panel)
-		return
-
-	# Create a centered panel
-	var screen_size = get_viewport().get_visible_rect().size
-	var panel_size = Vector2(min(720, screen_size.x * 0.9), min(480, screen_size.y * 0.6))
-	game_over_panel = Panel.new()
-	game_over_panel.name = "EnhancedGameOverPanel"
-	game_over_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	# Use Godot 4 Control API: custom_minimum_size instead of rect_min_size
-	game_over_panel.custom_minimum_size = panel_size
-	# Position the panel centrally
-	game_over_panel.position = (screen_size - panel_size) / 2
-	game_over_panel.z_index = 2000
-
-	# Style container
-	var vb = VBoxContainer.new()
-	vb.name = "GameOverVBox"
-	vb.anchor_left = 0
-	vb.anchor_top = 0
-	vb.anchor_right = 1
-	vb.anchor_bottom = 1
-	# Use offset_* (Control API) instead of margin_* on Container-derived controls
-	vb.offset_left = 20
-	vb.offset_top = 20
-	vb.offset_right = -20
-	vb.offset_bottom = -20
-	game_over_panel.add_child(vb)
-
-	# Title
-	var title = Label.new()
-	title.name = "Title"
-	title.text = tr("UI_GAME_OVER")
-	ThemeManager.apply_bangers_font(title, 48)
-	title.add_theme_color_override("font_color", Color(1,0.2,0.2))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(title)
-
-	# Spacer
-	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(0, 12)
-	vb.add_child(spacer)
-
-	# Details
-	var details = Label.new()
-	details.name = "Details"
-	details.text = tr("UI_NO_MOVES") + " " + tr("UI_FINAL_SCORE") + ": %d\n" + tr("UI_TARGET") + ": %d" % [GameManager.score, GameManager.target_score]
-	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	details.valign = VERTICAL_ALIGNMENT_CENTER
-	#	details.autowrap = true
-	# Godot 4 uses autowrap_mode on Label via TextServer constants
-	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	details.add_theme_font_size_override("font_size", 20)
-	vb.add_child(details)
-
-	# Buttons row
-	var hb = HBoxContainer.new()
-	hb.name = "ButtonsRow"
-	hb.custom_minimum_size = Vector2(0, 16)
-	hb.anchor_left = 0
-	hb.anchor_right = 1
-	# Use offset_* instead of margin_* for Control positioning
-	hb.offset_left = 30
-	hb.offset_top = 0
-	hb.offset_right = -30
-	hb.offset_bottom = 0
-	vb.add_child(hb)
-
-	# Retry button
-	var retry_btn = Button.new()
-	retry_btn.name = "RetryButton"
-	retry_btn.text = tr("UI_TRY_AGAIN")
-	retry_btn.focus_mode = Control.FOCUS_NONE
-	retry_btn.connect("pressed", Callable(self, "_on_game_over_retry"))
-	# Godot 4: use size_flags to expand horizontally
-	retry_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.add_child(retry_btn)
-
-	# Quit button
-	var quit_btn = Button.new()
-	quit_btn.name = "QuitButton"
-	quit_btn.text = tr("UI_QUIT")
-	quit_btn.focus_mode = Control.FOCUS_NONE
-	quit_btn.connect("pressed", Callable(self, "_on_game_over_quit"))
-	# Godot 4: use size flags to expand horizontally
-	quit_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.add_child(quit_btn)
-
-	# Add the panel to this UI and make modal
-	add_child(game_over_panel)
-	show_panel(game_over_panel)
-	print("[GameUI] Enhanced Game Over panel created and shown")
-
-# Handler for retry pressed on enhanced game over
-func _on_game_over_retry():
-	AudioManager.play_sfx("ui_click")
-	if game_over_panel:
-		hide_panel(game_over_panel)
-		# Small delay to allow fade-out
-		await get_tree().create_timer(0.25).timeout
-		# Restart the current level / game
-		await restart_game()
-
-# Handler for quit pressed on enhanced game over
-func _on_game_over_quit():
-	AudioManager.play_sfx("ui_click")
-	# Gracefully quit the application (or go back to start page)
-	# If running in editor, just show start page
-	if Engine.is_editor_hint():
-		show_start_page()
-		return
-	get_tree().quit()
-
-func _on_level_complete():
-	print("=".repeat(60))
-	print("[GameUI] _on_level_complete() CALLED")
-	print("=".repeat(60))
-	print("[GameUI] Level complete! Score: %d, Target: %d" % [GameManager.score, GameManager.target_score])
-	print("[GameUI] GameManager.level = ", GameManager.level)
-	print("[GameUI] GameManager.level_transitioning = ", GameManager.level_transitioning)
-	print("[GameUI] GameManager.processing_moves = ", GameManager.processing_moves)
-	print("[GameUI] GameManager.moves_left = ", GameManager.moves_left)
-	print("[GameUI] LevelManager.current_level_index = ", get_node_or_null("/root/LevelManager").current_level_index if get_node_or_null("/root/LevelManager") else "N/A")
-	print("[GameUI] RewardManager.levels_completed = ", RewardManager.levels_completed)
-
-	# Calculate rewards based on score
-	var base_coins = _calculate_level_coins()
-	var base_gems = _calculate_level_gems()
-
-	# Store rewards for potential multiplication
-	_pending_reward_coins = base_coins
-	_pending_reward_gems = base_gems
-	_reward_multiplied = false
-
-	# DON'T hide the game board - leave it visible in the background
-	# The transition screen will overlay on top with the finished board visible
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		print("[GameUI] Keeping game board visible in background for transition screen")
-		# Board stays visible but is in a "finished" state (processing_moves is false)
-
-	# Check if there's a next level
-	var level_manager = get_node_or_null("/root/LevelManager")
-	var has_next_level = false
-
-	if level_manager:
-		var completed_level_num = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
-		print("[GameUI] Checking for next level after completing level %d" % completed_level_num)
-
-		# Check if this is a DLC level
-		if is_dlc_level(completed_level_num):
-			# DLC level - check DLC manifest for next level
-			print("[GameUI] DLC level detected, checking DLC chapters...")
-
-			# Find which DLC chapter this level belongs to
-			var installed_chapters = AssetRegistry.get_installed_chapters()
-			print("[GameUI] Found %d installed DLC chapters" % installed_chapters.size())
-
-			for chapter_id in installed_chapters:
-				var manifest = AssetRegistry.get_chapter_info(chapter_id)
-				var levels_array = manifest.get("levels", [])
-
-				print("[GameUI] Checking chapter '%s' with %d levels" % [chapter_id, levels_array.size()])
-
-				# Check if our completed level is in this chapter
-				for i in range(levels_array.size()):
-					var level_info = levels_array[i]
-					if level_info.get("number") == completed_level_num:
-						# Found our level - check if there's a next one
-						has_next_level = (i + 1) < levels_array.size()
-						print("[GameUI] Found level %d at index %d, has_next: %s" % [completed_level_num, i, has_next_level])
-						break
-
-				if has_next_level or is_dlc_level(completed_level_num):  # If we found the chapter, stop searching
-					break
-		else:
-			# Built-in level - use existing logic
-			var current_idx = level_manager.current_level_index
-			has_next_level = (current_idx + 1) < level_manager.levels.size()
-			print("[GameUI] Built-in level, index %d, has_next: %s" % [current_idx, has_next_level])
-
-	# IMPORTANT: Use the level number that was just completed, not the current GameManager.level
-	# which might have been updated already
-	var completed_level_number = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
-
-	# Get star rating for the completed level
-	var stars = StarRatingManager.get_level_stars(completed_level_number)
-	print("[GameUI] get_level_stars returned:", stars, "for level", completed_level_number)
-	if stars == 0:
-		# If no stars saved yet, calculate based on current score
-		var lvl_mgr = get_node_or_null("/root/LevelManager")
-		if lvl_mgr:
-			var level_data = lvl_mgr.get_level(lvl_mgr.current_level_index)
-			var total_moves = level_data.moves if level_data else 20
-			var moves_used = total_moves - GameManager.last_level_moves_left
-			stars = StarRatingManager.calculate_stars(
-				GameManager.last_level_score,
-				GameManager.last_level_target,
-				moves_used,
-				total_moves
-			)
-			print("[GameUI] Calculated stars (fallback):", stars)
-
-	print("[GameUI] Level %d completed with %d stars" % [completed_level_number, stars])
-
-	# ALWAYS hide the old level complete panel (and ensure it STAYS hidden)
-	if level_complete_panel:
-		level_complete_panel.visible = false
-		level_complete_panel.hide()
-		level_complete_panel.z_index = -1000
-		print("[GameUI] 🚫 Hidden old level_complete_panel")
-
-	# Check if there are bonus rewards from flow (reward nodes)
-	var bonus_rewards = {}
-	if ExperienceDirector and ExperienceDirector.has_method("get_next_node_rewards"):
-		bonus_rewards = ExperienceDirector.get_next_node_rewards()
-		if bonus_rewards.get("has_rewards", false):
-			print("[GameUI] 🎁 Found bonus rewards from flow: ", bonus_rewards.get("reward_id"))
-
-	# Check if experience flow is active and handling rewards
-	var flow_handling_rewards = false
-	if ExperienceDirector and ExperienceDirector.has_method("is_flow_active"):
-		flow_handling_rewards = ExperienceDirector.is_flow_active()
-		print("[GameUI] Experience flow active: %s" % flow_handling_rewards)
-
-	if flow_handling_rewards:
-		print("[GameUI] ✅ Experience flow will handle reward screen via ShowRewardsStep - skipping old transition screen")
-		# The experience flow pipeline will call ShowRewardsStep which will display rewards
-		# ShowRewardsStep will use old transition screen until Phase 2 UI is implemented
-		return
-
-	# Show the transition screen with both level rewards AND bonus flow rewards (manual mode only)
-	if level_transition:
-		print("[GameUI] 🎯 Showing transition screen with rewards (manual mode - no flow)")
-		print("[GameUI]    Level: %d, Score: %d, Coins: %d, Gems: %d, Stars: %d" % [completed_level_number, GameManager.score, base_coins, base_gems, stars])
-
-		# Pass bonus rewards to transition screen
-		if level_transition.has_method("show_transition_with_bonus"):
-			level_transition.show_transition_with_bonus(
-				completed_level_number,
-				GameManager.score,
-				base_coins,
-				base_gems,
-				has_next_level,
-				stars,
-				bonus_rewards
-			)
-		else:
-			# Use dictionary format
-			var transition_data = {
-				"level_number": completed_level_number,
-				"score": GameManager.score,
-				"coins": base_coins,
-				"gems": base_gems,
-				"stars": stars,
-				"has_next_level": has_next_level
-			}
-			level_transition.show_transition(transition_data)
-		print("[GameUI] ✅ Transition screen shown")
-	else:
-		print("[GameUI] ❌ ERROR: LevelTransition is null!")
-
-func _calculate_level_coins() -> int:
-	# Base coins from score (1 coin per 100 points)
-	var score_coins = GameManager.score / 100
-	# Bonus for moves remaining (10 coins per move)
-	var moves_bonus = GameManager.moves_left * 10
-	return score_coins + moves_bonus
-
-func _calculate_level_gems() -> int:
-	# Gems are rarer - 1 gem per 500 points
-	var score_gems = GameManager.score / 500
-	# Bonus gem for completing with >50% moves remaining
-	var total_moves = 30  # Could get this from level data
-	if GameManager.moves_left > total_moves / 2:
-		score_gems += 1
-	return max(score_gems, 1)  # At least 1 gem per level
-
-# DEPRECATED FUNCTIONS REMOVED
-# _show_level_complete_with_ad_option() - Replaced by LevelTransition screen
-# _on_ad_multiplier_pressed() - Replaced by LevelTransition multiplier system
-# _on_reward_ad_completed() - Replaced by LevelTransition ad handling
-
-	# Play reward sound
-	AudioManager.play_sfx("reward_earned")
-
-# Tracking variables for reward multiplication
-var _pending_reward_coins: int = 0
-var _pending_reward_gems: int = 0
-var _reward_multiplied: bool = false
-
-func show_panel(panel: Control):
-	# Make panel visible and modal (capture input) so underlying game board doesn't receive clicks
-	panel.visible = true
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	# Ensure the panel can receive focus so button presses work reliably
-	if panel.has_method("grab_focus"):
-		panel.grab_focus()
-	panel.modulate = Color.TRANSPARENT
-
-	var tween = create_tween()
-	tween.tween_property(panel, "modulate", Color.WHITE, 0.3)
-
-func hide_panel(panel: Control):
-	# Fade out then hide and release input capture
-	_panel_to_hide = panel
-	var tween = create_tween()
-	tween.tween_property(panel, "modulate", Color.TRANSPARENT, 0.3)
-	# When tween finishes, call the finish handler (no extra args allowed by tween_callback)
-	tween.tween_callback(Callable(self, "_finish_hide_panel"))
-
-func _finish_hide_panel():
-	if _panel_to_hide and _panel_to_hide is Control:
-		_panel_to_hide.visible = false
-		_panel_to_hide.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# release focus if held
-		if _panel_to_hide.has_method("release_focus"):
-			_panel_to_hide.release_focus()
-		print("[GameUI] Panel hidden: %s" % _panel_to_hide.name)
-		_panel_to_hide = null
-
-# Old restart function removed - enhanced game over screen uses _on_game_over_retry() instead
-#func _on_restart_pressed():
-#	AudioManager.play_sfx("ui_click")
-#	hide_panel(game_over_panel)
-#	await get_tree().create_timer(0.3).timeout
-#	restart_game()
-
-func _on_continue_pressed():
-	AudioManager.play_sfx("ui_click")
-
-	# Grant the pending rewards
-	if _pending_reward_coins > 0 or _pending_reward_gems > 0:
-		RewardManager.add_coins(_pending_reward_coins)
-		RewardManager.add_gems(_pending_reward_gems)
-		print("[GameUI] Granted rewards: %d coins, %d gems" % [_pending_reward_coins, _pending_reward_gems])
-
-		# Show reward notification
-		if reward_notification and reward_notification.has_method("show_reward"):
-			reward_notification.call("show_reward", "level_complete", _pending_reward_coins, "Level Complete!")
-
-		# Reset pending rewards
-		_pending_reward_coins = 0
-		_pending_reward_gems = 0
-		_reward_multiplied = false
-
-	hide_panel(level_complete_panel)
-
-	# Phase 12.1: Route through ExperienceDirector when available
-	if ExperienceDirector:
-		if not ExperienceDirector.current_flow.is_empty():
-			print("[GameUI] Advancing through ExperienceDirector flow")
-			ExperienceDirector.advance_to_next_node()
-			return
-		elif ExperienceDirector.load_flow("main_story"):
-			print("[GameUI] Loaded main_story flow, starting from next level")
-			var current_level_num = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
-			var next_level_num = current_level_num + 1
-			ExperienceDirector.start_flow_at_level(next_level_num)
-			return
-
-	# Fallback to manual progression
-	_advance_to_next_level()
-
-func _on_transition_rewards_claimed():
-	"""Called when rewards are claimed from the transition screen"""
-	print("[GameUI] Transition rewards claimed")
-	# Rewards are already granted in LevelTransition.gd
-	# Just log this for tracking
-
-func _on_transition_continue():
-	"""Called when player presses continue on the transition screen"""
-	print("[GameUI] Transition continue pressed")
-
-	# Phase 12.1: Primary path is always through ExperienceDirector
-	if ExperienceDirector:
-		# Check if a flow is active
-		if not ExperienceDirector.current_flow.is_empty():
-			print("[GameUI] ExperienceDirector active - advancing to next node in flow")
-			ExperienceDirector.advance_to_next_node()
-			# ExperienceDirector will handle everything (rewards, narratives, levels)
-			return
-		else:
-			# No flow active - try to load and start main story flow
-			print("[GameUI] No active flow - attempting to load main_story flow")
-			if ExperienceDirector.load_flow("main_story"):
-				print("[GameUI] main_story flow loaded - starting from current level")
-				# Start from the next level after the one just completed
-				var current_level_num = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
-				var next_level_num = current_level_num + 1
-				ExperienceDirector.start_flow_at_level(next_level_num)
-				return
-			else:
-				print("[GameUI] ⚠️ Failed to load main_story flow - falling back to manual progression")
-
-	# Fallback: If ExperienceDirector unavailable or flow fails, manually advance to next level
-	print("[GameUI] Using fallback manual level progression")
-	_advance_to_next_level()
-
-func _advance_to_next_level():
-	"""
-	Phase 12.1: Legacy fallback for manual level progression.
-	This function is now used only when ExperienceDirector is unavailable or fails.
-	Primary progression path should be through ExperienceDirector.
-	"""
-	print("[GameUI] [FALLBACK] Advancing to next level manually")
-
-	var current_level_num = GameManager.last_level_number if GameManager.last_level_number > 0 else GameManager.level
-	var next_level_num = current_level_num + 1
-
-	print("[GameUI] Current level: %d, Next level: %d" % [current_level_num, next_level_num])
-
-	# Centralized loader handles DLC vs built-in levels
-	await _load_level_by_number(next_level_num)
-	return
-
-func _load_level_by_number(level_num: int):
-	"""
-	Phase 12.1: Core level loading function.
-	Called by:
-	  - ExperienceDirector._process_level_node() (primary path)
-	  - _advance_to_next_level() (fallback only)
-	  - _on_worldmap_level_selected() (fallback only)
-	"""
-	print("[GameUI] Loading level by number: %d" % level_num)
-
-	# Hide the transition screen if it's still visible
-	# (It stays visible during reward processing, but should be hidden when actually loading next level)
-	if level_transition and level_transition.visible:
-		level_transition.visible = false
-		print("[GameUI] Hidden transition screen before loading level %d" % level_num)
-
-	# Ensure HUD is visible (in case previous level's effects hid it)
-	var hud_container = $VBoxContainer/TopPanel/HUD
-	if hud_container:
-		hud_container.visible = true
-		print("[GameUI] Restored HUD visibility for level %d" % level_num)
-
-	# Reset GameBoard position (in case previous level's effects moved it)
-	var board = get_node_or_null("../GameBoard")
-	if board and board is Node2D:
-		board.position = Vector2.ZERO
-		print("[GameUI] Reset GameBoard position for level %d" % level_num)
-
-	# For DLC levels, handle narrative effects and chapter loading
-	if is_dlc_level(level_num):
-		print("[GameUI] DLC level detected, preparing to load")
-
-		# Find the DLC level file and load chapter effects
-		var installed_chapters = AssetRegistry.get_installed_chapters()
-		var level_file_path: String = ""
-		var chapter_manifest: Dictionary = {}
-
-		for chapter_id in installed_chapters:
-			var manifest = AssetRegistry.get_chapter_info(chapter_id)
-			var levels_array = manifest.get("levels", [])
-
-			for level_info in levels_array:
-				if level_info.get("number") == level_num:
-					var chapter_path = "user://dlc/chapters/" + chapter_id + "/"
-					level_file_path = chapter_path + level_info.get("file", "")
-					chapter_manifest = manifest  # Store for effect loading
-					print("[GameUI] Found DLC level %d at: %s" % [level_num, level_file_path])
-					break
-
-			if level_file_path != "":
-				break
-
-		if level_file_path == "":
-			print("[GameUI] ERROR: Could not find DLC level %d" % level_num)
-			return
-
-		# Load narrative effects for this chapter
-		if chapter_manifest and EffectResolver:
-			print("[GameUI] Loading narrative effects for chapter: %s" % chapter_manifest.get("chapter_id", "unknown"))
-			# Clean up any previous level's visual overlays first
-			EffectResolver.cleanup_visual_overlays()
-			EffectResolver.load_effects(chapter_manifest)
-
-		# Load the DLC level directly into GameManager
-		if GameManager:
-			var absolute_path = ProjectSettings.globalize_path(level_file_path)
-			if FileAccess.file_exists(absolute_path):
-				var file = FileAccess.open(absolute_path, FileAccess.READ)
-				if file:
-					var json_text = file.get_as_text()
-					file.close()
-
-					var json = JSON.new()
-					if json.parse(json_text) == OK:
-						var level_data = json.data
-
-						# Apply level data to GameManager
-						GameManager.level = level_num
-						GameManager.GRID_WIDTH = level_data.get("grid_width", level_data.get("width", 8))
-						GameManager.GRID_HEIGHT = level_data.get("grid_height", level_data.get("height", 8))
-						GameManager.target_score = level_data.get("target_score", level_data.get("target", 1000))
-						GameManager.moves_left = level_data.get("max_moves", level_data.get("moves", 20))
-						GameManager.collectible_target = level_data.get("collectible_target", 0)
-						GameManager.collectible_type = level_data.get("collectible_type", "coin")
-						GameManager.unmovable_type = level_data.get("unmovable_type", "snow")
-						GameManager.unmovable_target = level_data.get("unmovable_target", 0)
-
-						# Parse layout and initialize grid properly
-						var layout_str = level_data.get("layout", "")
-						GameManager.create_empty_grid()
-						var parsed_layout = GameManager.parse_layout_string(layout_str, GameManager.GRID_WIDTH, GameManager.GRID_HEIGHT)
-						GameManager.fill_grid_from_layout(parsed_layout)
-
-						# Reset state
-						GameManager.score = 0
-						GameManager.combo_count = 0
-						GameManager.collectibles_collected = 0
-						GameManager.unmovables_cleared = 0
-						GameManager.initialized = true
-						GameManager.level_transitioning = false
-
-					print("[GameUI] DLC level %d loaded successfully" % level_num)
-					GameManager.emit_signal("level_loaded")
-
-					# Emit EventBus event for narrative system (DLC levels)
-					if EventBus:
-						EventBus.emit_level_loaded("level_%d" % level_num, {"level": level_num, "target": GameManager.target_score})
-						print("[GameUI] Emitted EventBus.level_loaded for level %d" % level_num)
-					else:
-						print("[GameUI] ERROR: Failed to parse DLC level JSON")
-				else:
-					print("[GameUI] ERROR: Failed to open DLC level file")
-			else:
-				print("[GameUI] ERROR: DLC level file does not exist: %s" % absolute_path)
-	else:
-		# Built-in level - use LevelManager
-		var lm = get_node_or_null('/root/LevelManager')
-		if lm:
-			# Robust resolution: search levels array for exact match of level_number
-			var found_idx = -1
-			for i in range(lm.levels.size()):
-				var lv = lm.get_level(i)
-				if lv:
-					var lv_num = 0
-					if typeof(lv) == TYPE_OBJECT and lv.level_number:
-						lv_num = int(lv.level_number)
-					elif typeof(lv) == TYPE_DICTIONARY and lv.has("level"):
-						lv_num = int(lv.level)
-					if lv_num == int(level_num):
-						found_idx = i
-						break
-			# If exact match not found, fall back to naive mapping and warn
-			if found_idx == -1:
-				found_idx = max(0, int(level_num) - 1)
-				print("[GameUI] WARNING: Exact match for level %d not found; falling back to index %d" % [level_num, found_idx])
-			# Set the index on the LevelManager
-			if lm.has_method("set_current_level"):
-				lm.set_current_level(found_idx)
-			else:
-				lm.current_level_index = found_idx
-			print("[GameUI] LevelManager.current_level_index set to %d" % (lm.current_level_index if lm.has_method("get_current_level") else found_idx))
-
-			# Load narrative effects for built-in level BEFORE loading level
-			# This ensures effects are active when level_loaded event fires
-			print("[GameUI] DEBUG: Checking EffectResolver - exists: %s" % (EffectResolver != null))
-			if EffectResolver:
-				print("[GameUI] DEBUG: EffectResolver is available, proceeding with effect loading")
-				EffectResolver.cleanup_visual_overlays()
-
-				# Try to load level-specific chapter file first
-				var level_chapter_path = "res://data/chapters/chapter_level_%d.json" % level_num
-				var global_chapter_path = "res://data/chapters/chapter_builtin.json"
-
-				print("[GameUI] DEBUG: Checking for level chapter at: %s" % level_chapter_path)
-				var level_file_exists = FileAccess.file_exists(level_chapter_path)
-				print("[GameUI] DEBUG: Level chapter exists: %s" % level_file_exists)
-
-				if level_file_exists:
-					print("[GameUI] Loading narrative effects for built-in level %d from: %s" % [level_num, level_chapter_path])
-					if EffectResolver.load_effects_from_file(level_chapter_path):
-						print("[GameUI] Successfully loaded level-specific narrative effects")
-					else:
-						print("[GameUI] Failed to load level-specific narrative effects")
-				elif FileAccess.file_exists(global_chapter_path):
-					print("[GameUI] Loading global narrative effects for built-in levels from: %s" % global_chapter_path)
-					if EffectResolver.load_effects_from_file(global_chapter_path):
-						print("[GameUI] Successfully loaded global narrative effects")
-					else:
-						print("[GameUI] Failed to load global narrative effects")
-				else:
-					print("[GameUI] No narrative effects defined for built-in level %d" % level_num)
-			else:
-				print("[GameUI] ERROR: EffectResolver is null - narrative effects cannot be loaded!")
-
-			# Now load the level into GameManager (will emit level_loaded event)
-			var gm = get_node_or_null('/root/GameManager')
-			if gm:
-				gm.initialized = false
-				if gm.has_method("load_current_level"):
-					print("[GameUI] Requesting GameManager to load new level %d" % level_num)
-					await gm.load_current_level()
-				else:
-					print("[GameUI] WARNING: GameManager does not expose load_current_level()")
-			else:
-				print("[GameUI] ERROR: LevelManager not found when selecting built-in level %d" % level_num)
-
-	# Close the WorldMap UI
-	var wm = get_node_or_null("WorldMap")
-	if wm:
-		wm.visible = false
-		wm.queue_free()
-
-	# Show the game board directly (level and effects already loaded above)
-	print("[GameUI] Level selected from WorldMap - showing game board directly")
-
-	# Hide start page if visible
-	if start_page:
-		start_page.visible = false
-
-	# Show game board (reusing board variable from earlier in function)
-	if not board:
-		board = get_node_or_null("../GameBoard")
-	if board:
-		board.visible = true
-		# NOTE: _on_level_loaded() is automatically called via signal connection
-		# when GameManager emits level_loaded - no need to call it manually here!
-		if board.has_method("draw_board_borders"):
-			board.draw_board_borders()
-		if board.has_method("show_tile_overlay"):
-			board.show_tile_overlay()
-
-		# CRITICAL: Update booster UI immediately while we know we're in valid context
-		update_display()
-		update_booster_ui()
-
-	print("[GameUI] Level loading completed")
-
-func _on_worldmap_back_to_menu():
-	"""Handle closing the WorldMap and returning to previous UI (StartPage)."""
-	print("[GameUI] WorldMap requested close/back to menu")
-	AudioManager.play_sfx("ui_click")
-	var wm = get_node_or_null("WorldMap")
-	if wm:
-		wm.visible = false
-		wm.queue_free()
-
-	# Show start page again
-	if start_page:
-		start_page.visible = true
-
-	# Restore board if needed
-	var board = get_node_or_null("../GameBoard")
-	if board and board.has_method("show_tile_overlay"):
-		board.show_tile_overlay()
-
-	print("[GameUI] WorldMap closed and StartPage restored")
-
-func show_start_page():
-	"""Show the start page for the current level"""
-	print("[GameUI] Showing start page for level ", GameManager.level)
-
-	# Hide game board
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		board.visible = false
-
-		# Also clear any drawn borders so StartPage doesn't show a board-shaped border
-		if board.has_method("_clear_board_borders"):
-			board._clear_board_borders()
-		# Hide tile overlay if present
-		if board.has_method("hide_tile_overlay"):
-			board.hide_tile_overlay()
-
-	# Hide transition screen if visible
-	if level_transition:
-		level_transition.visible = false
-
-	# Show start page
-	if start_page:
-		start_page.visible = true
-		# ensure StartPage captures input and sits on top
-		start_page.mouse_filter = Control.MOUSE_FILTER_STOP
-		start_page.z_index = 10000
-		# Hide gameplay UI while StartPage is shown
-		hide_gameplay_ui()
-		_force_hide_global_ui()
-
-		# Update level info - check if it's a DLC level first
-		if GameManager and is_dlc_level(GameManager.level):
-			# DLC level - get info from DLC manifest
-			var level_num = GameManager.level
-			var level_desc = "DLC Level"
-
-			# Try to find level description in DLC manifest
-			var installed_chapters = AssetRegistry.get_installed_chapters()
-			for chapter_id in installed_chapters:
-				var manifest = AssetRegistry.get_chapter_info(chapter_id)
-				var levels_array = manifest.get("levels", [])
-				for level_info in levels_array:
-					if level_info.get("number") == level_num:
-						level_desc = level_info.get("name", "DLC Level %d" % level_num)
-						break
-				if level_desc != "DLC Level":
-					break
-
-			if start_page.has_method('set_level_info'):
-				start_page.set_level_info(level_num, level_desc)
-		else:
-			# Built-in level - use LevelManager
-			var lm = get_node_or_null('/root/LevelManager')
-			if lm:
-				var lvl = lm.get_current_level()
-				if lvl and start_page.has_method('set_level_info'):
-					start_page.set_level_info(lvl.level_number, lvl.description)
-
-func _on_menu_pressed():
-	# Play UI click sound
-	AudioManager.play_sfx("ui_click")
-
-	# Toggle the expandable panel
-	menu_expanded = !menu_expanded
-	_animate_menu_toggle()
-
-func _animate_menu_toggle():
-	"""Animate the expandable panel opening or closing"""
-	if not expandable_panel:
-		return
-
-	if menu_expanded:
-		# Show and fade in the panel
-		expandable_panel.visible = true
-		var tween = create_tween()
-		tween.set_parallel(true)
-		tween.tween_property(expandable_panel, "modulate", Color(1, 1, 1, 1), 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		# Start position is 54 (below the 44px MenuButton), animate to 54 (same position)
-		# The panel position is relative to FloatingMenu parent
-	else:
-		# Fade out and hide the panel
-		var tween = create_tween()
-		tween.set_parallel(true)
-		tween.tween_property(expandable_panel, "modulate", Color(1, 1, 1, 0), 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-		tween.finished.connect(func(): expandable_panel.visible = false)
-
-func restart_game():
-	# Reset GameManager completely (just like starting fresh)
-	GameManager.level_transitioning = false
-	GameManager.initialized = false
-
-	# Show the board so it can receive signals
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		board.visible = true
-
-	# Reinitialize the game exactly like we do when starting from StartPage
-	await GameManager.initialize_game()
-
-	# Update UI
-	update_display()
-	update_booster_ui()
-
-
-func animate_score_change():
-	var tween = create_tween()
-	tween.tween_property(score_label, "modulate", Color.YELLOW, 0.1)
-	tween.tween_property(score_label, "modulate", Color.WHITE, 0.1)
-
-func animate_level_change():
-	var tween = create_tween()
-	tween.tween_property(level_label, "scale", Vector2(1.3, 1.3), 0.2)
-	tween.tween_property(level_label, "scale", Vector2.ONE, 0.2)
-
-func animate_low_moves_warning():
-	var tween = create_tween()
-	tween.set_loops(3)
-	tween.tween_property(moves_label, "scale", Vector2(1.2, 1.2), 0.2)
-	tween.tween_property(moves_label, "scale", Vector2.ONE, 0.2)
-
-# ============================================
-# Currency Display Functions
-# ============================================
-
-func update_currency_display():
-	# Instead of using emojis, we'll update the labels to show icon+text
-	# Note: For now keeping simple text, but could enhance with TextureRect icons
-	_update_coins_display(RewardManager.get_coins())
-	_update_gems_display(RewardManager.get_gems())
-
-	# Hide lives display - no longer using lives system
-	if lives_label:
-		lives_label.visible = false
-
-func _update_coins_display(amount: int):
-	"""Update coins label - replace with icon in parent container"""
-	if not coins_label:
-		return
-
-	# Get parent container
-	var parent = coins_label.get_parent()
-	if not parent:
-		coins_label.text = "%d" % amount
-		return
-
-	# Check if we already created icon display
-	var icon_display = parent.get_node_or_null("CoinsIconDisplay")
-	if not icon_display:
-		# Hide old label
-		coins_label.visible = false
-
-		# Create new display with icon (increased size for better visibility)
-		icon_display = ThemeManager.create_currency_display("coins", amount, 32, 28, Color.WHITE)
-		icon_display.name = "CoinsIconDisplay"
-		parent.add_child(icon_display)
-	else:
-		# Update existing display
-		var label = icon_display.get_child(1) as Label  # Icon is child 0, label is child 1
-		if label:
-			label.text = str(amount)
-
-func _update_gems_display(amount: int):
-	"""Update gems label - replace with icon in parent container"""
-	if not gems_label:
-		return
-
-	# Get parent container
-	var parent = gems_label.get_parent()
-	if not parent:
-		gems_label.text = "%d" % amount
-		return
-
-	# Check if we already created icon display
-	var icon_display = parent.get_node_or_null("GemsIconDisplay")
-	if not icon_display:
-		# Hide old label
-		gems_label.visible = false
-
-		# Create new display with icon (increased size for better visibility)
-		icon_display = ThemeManager.create_currency_display("gems", amount, 32, 28, Color.WHITE)
-		icon_display.name = "GemsIconDisplay"
-		parent.add_child(icon_display)
-	else:
-		# Update existing display
-		var label = icon_display.get_child(1) as Label  # Icon is child 0, label is child 1
-		if label:
-			label.text = str(amount)
-
-func _reorganize_hud():
-	"""Reorganize HUD for better gameplay layout based on design spec:
-	- Top bar: Moves | Score | Goal (centered, clean)
-	- Currency moved to top right corner
-	- Boosters on left/right edges
-	- Combo text displays briefly then fades
-	"""
-	print("[GameUI] Reorganizing HUD for better gameplay layout")
-
-	# Get the top panel
-	var top_panel = $VBoxContainer/TopPanel
-	if not top_panel:
-		print("[GameUI] TopPanel not found, skipping reorganization")
-		return
-
-	# Create HUD container with rounded translucent background
-	var hud_container = top_panel.get_node_or_null("HUD")
-	if not hud_container:
-		hud_container = PanelContainer.new()
-		hud_container.name = "HUD"
-
-		# Create StyleBox for rounded translucent background
-		var style_box = StyleBoxFlat.new()
-		style_box.bg_color = Color(0.1, 0.1, 0.15, 0.7)  # Dark translucent
-		style_box.corner_radius_top_left = 12
-		style_box.corner_radius_top_right = 12
-		style_box.corner_radius_bottom_left = 12
-		style_box.corner_radius_bottom_right = 12
-		style_box.border_width_left = 2
-		style_box.border_width_right = 2
-		style_box.border_width_top = 2
-		style_box.border_width_bottom = 2
-		style_box.border_color = Color(0.4, 0.4, 0.5, 0.8)  # Subtle border
-		style_box.content_margin_left = 20
-		style_box.content_margin_right = 20
-		style_box.content_margin_top = 15
-		style_box.content_margin_bottom = 15
-
-		hud_container.add_theme_stylebox_override("panel", style_box)
-
-		# Create inner HBox for the actual HUD elements
-		var inner_hbox = HBoxContainer.new()
-		inner_hbox.name = "HUDContent"
-		inner_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		inner_hbox.add_theme_constant_override("separation", 40)
-		hud_container.add_child(inner_hbox)
-
-		# Reparent existing containers to the new HUD
-		var moves_container = top_panel.get_node_or_null("MovesContainer")
-		var score_container = top_panel.get_node_or_null("ScoreContainer")
-		var target_container = top_panel.get_node_or_null("TargetContainer")
-
-		if moves_container:
-			moves_container.reparent(inner_hbox)
-		if score_container:
-			score_container.reparent(inner_hbox)
-		if target_container:
-			target_container.reparent(inner_hbox)
-
-		# Add HUD container to top panel
-		top_panel.add_child(hud_container)
-
-		# Register with VisualAnchorManager
-		var vam = get_node_or_null("/root/VisualAnchorManager")
-		if vam and vam.has_method("register_anchor"):
-			vam.register_anchor("hud", hud_container)
-			print("[GameUI] Registered HUD container with VisualAnchorManager")
-
-		print("[GameUI] Created HUD container with rounded translucent background")
-
-	# Make top panel a clean HBoxContainer for horizontal layout
-	if top_panel is HBoxContainer:
-		# Clear default alignment and spacing
-		top_panel.alignment = BoxContainer.ALIGNMENT_CENTER
-		top_panel.add_theme_constant_override("separation", 40)
-
-	# Add header labels above the values for clarity
-	_add_header_label_to_container(hud_container.get_node("HUDContent/MovesContainer"), "UI_MOVES")
-	_add_header_label_to_container(hud_container.get_node("HUDContent/ScoreContainer"), "UI_SCORE_LABEL")
-	_add_header_label_to_container(hud_container.get_node("HUDContent/TargetContainer"), "UI_GOAL")
-
-	# Create a cleaner layout - hide level label (redundant with start page)
-	if level_label and level_label.get_parent():
-		var level_container = level_label.get_parent()
-		if level_container:
-			level_container.visible = false
-
-	# Simplify labels - remove "Score:", "Moves:" prefixes for cleaner look
-	if score_label:
-		score_label.add_theme_font_size_override("font_size", 32)
-		score_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))  # Gold color
-	if moves_label:
-		moves_label.add_theme_font_size_override("font_size", 32)
-		moves_label.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))  # Cyan color
-	if target_label:
-		target_label.add_theme_font_size_override("font_size", 20)
-
-	# Move currency to top right corner (compact display)
-	var currency_panel = $VBoxContainer/CurrencyPanel
-	if currency_panel:
-		# Keep it compact and in the corner
-		currency_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
-
-	# Move booster panel to side (we'll position it on edges in update_booster_ui)
-	if booster_panel:
-		booster_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-		booster_panel.add_theme_constant_override("separation", 10)
-
-	print("[GameUI] HUD reorganization complete")
-
-func _add_header_label_to_container(container: Node, header_text: String):
-	"""Add a small header label above a value in a container"""
-	if not container or not container is VBoxContainer:
-		return
-
-	# Check if header already exists
-	if container.get_child_count() > 0 and container.get_child(0).name == "HeaderLabel":
-		# Update existing header with current translation
-		var existing_header = container.get_child(0)
-		existing_header.text = tr(header_text)
-		return
-
-	var header = Label.new()
-	header.name = "HeaderLabel"
-	header.text = tr(header_text)
-	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	header.add_theme_font_size_override("font_size", 14)
-	header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 0.8))
-
-	# Move to front
-	container.add_child(header)
-	container.move_child(header, 0)
-
-func _on_coins_changed(new_amount: int):
-	_update_coins_display(new_amount)
-	# Animate the icon display if it exists
-	var parent = coins_label.get_parent() if coins_label else null
-	if parent:
-		var icon_display = parent.get_node_or_null("CoinsIconDisplay")
-		if icon_display:
-			animate_currency_change(icon_display)
-
-func _on_gems_changed(new_amount: int):
-	_update_gems_display(new_amount)
-	# Animate the icon display if it exists
-	var parent = gems_label.get_parent() if gems_label else null
-	if parent:
-		var icon_display = parent.get_node_or_null("GemsIconDisplay")
-		if icon_display:
-			animate_currency_change(icon_display)
-
-func _on_lives_changed(new_amount: int):
-	# Lives system removed - keeping function for compatibility
-	pass
-
-func _on_booster_changed(booster_type: String, new_amount: int):
-	"""Handle booster count changes"""
-	print("[GameUI] Booster changed: ", booster_type, " = ", new_amount)
-	update_booster_ui()
-
-func _on_language_changed(locale: String):
-	"""Refresh HUD labels when language changes"""
-	print("[GameUI] Refreshing HUD for language: %s" % locale)
-
-	# Refresh header labels
+func hide_gameplay_ui() -> void:
+	print("[GameUI] Hiding gameplay UI elements")
 	var top_panel = get_node_or_null("VBoxContainer/TopPanel")
-	if top_panel:
-		var hud_container = top_panel.get_node_or_null("HUD")
-		if hud_container:
-			var hud_content = hud_container.get_node_or_null("HUDContent")
-			if hud_content:
-				_add_header_label_to_container(hud_content.get_node_or_null("MovesContainer"), "UI_MOVES")
-				_add_header_label_to_container(hud_content.get_node_or_null("ScoreContainer"), "UI_SCORE_LABEL")
-				_add_header_label_to_container(hud_content.get_node_or_null("TargetContainer"), "UI_GOAL")
+	if top_panel: top_panel.visible = false; print("[GameUI]   - TopPanel hidden")
+	if booster_bar: booster_bar.visible = false; print("[GameUI]   - BoosterPanel hidden")
+	var currency_panel = get_node_or_null("VBoxContainer/CurrencyPanel")
+	if currency_panel: currency_panel.visible = false
+	if floating_menu: floating_menu.visible = false
+	if reward_notification: reward_notification.visible = false
+	if level_transition: level_transition.visible = false
+	print("[GameUI] ✓ All gameplay UI elements hidden")
 
-	# Refresh target label
-	if target_label:
-		if GameManager.unmovable_target > 0:
-			target_label.text = tr("UI_OBSTACLES") + ": %d/%d" % [GameManager.unmovables_cleared, GameManager.unmovable_target]
-		elif GameManager.collectible_target > 0:
-			target_label.text = tr("UI_COINS") + ": %d/%d" % [GameManager.collectibles_collected, GameManager.collectible_target]
-		else:
-			target_label.text = tr("UI_GOAL_SCORE") + ": %d" % GameManager.target_score
-
-func animate_currency_change(control: Control):
-	"""Animate currency change - works with Label or HBoxContainer"""
-	if not control:
-		return
-
-	var tween = create_tween()
-	tween.tween_property(control, "scale", Vector2(1.3, 1.3), 0.15)
-	tween.tween_property(control, "scale", Vector2.ONE, 0.15)
-	tween.tween_property(control, "modulate", Color.YELLOW, 0.1)
-	tween.tween_property(control, "modulate", Color.WHITE, 0.2)
-
-# ============================================
-# Phase 2: Shop and Dialog Functions
-# ============================================
-
-func _on_shop_pressed():
-	"""Open the shop"""
-	# Use the side-panel slide-in behaviour instead of the old modal shop
-	_show_shop_side()
-	print("[GameUI] Shop opened (side panel)")
-
-func _on_shop_closed():
-	"""Handle shop close"""
-	print("[GameUI] Shop closed signal received")
-	_close_fullscreen_panel(shop_ui)
-
-func _on_settings_closed():
-	print("[GameUI] Settings closed signal received")
-	var inst = get_node_or_null("SettingsDialog")
-	if inst:
-		_close_fullscreen_panel(inst)
-
-func _on_item_purchased(item_type: String, cost_type: String, cost_amount: int):
-	"""Handle item purchase from shop"""
-	print("[GameUI] Purchased: %s for %d %s" % [item_type, cost_amount, cost_type])
-
-	# Show reward notification
-	if reward_notification and reward_notification.has_method("show_reward"):
-		if item_type == "lives_refill":
-			reward_notification.call("show_reward", "lives", 5, "Lives refilled!")
-		else:
-			reward_notification.call("show_reward", "booster", 1, "%s booster added!" % item_type.capitalize())
-	else:
-		print("[GameUI] reward_notification missing show_reward method")
-
-func _show_out_of_lives_dialog():
-	"""Show the out of lives dialog"""
-	print("[GameUI] _show_out_of_lives_dialog called")
-	if out_of_lives_dialog:
-		print("[GameUI] OutOfLivesDialog node exists")
-		# Bring dialog to front
-		if out_of_lives_dialog.get_parent():
-			out_of_lives_dialog.get_parent().move_child(out_of_lives_dialog, -1)
-
-		if out_of_lives_dialog.has_method("show_dialog"):
-			print("[GameUI] Calling show_dialog() method")
-			out_of_lives_dialog.call("show_dialog")
-		elif out_of_lives_dialog is Control:
-			print("[GameUI] Manually setting visible = true")
-			out_of_lives_dialog.visible = true
-		else:
-			print("[GameUI] OutOfLivesDialog exists but has no show_dialog")
-		print("[GameUI] Dialog visible state: ", out_of_lives_dialog.visible)
-	else:
-		print("[GameUI] ERROR: out_of_lives_dialog is null!")
-
-func _on_refill_requested(method: String):
-	"""Handle life refill from dialog"""
-	print("[GameUI] Lives refilled via: %s" % method)
-
-	# Don't show notification - it's annoying
-	# if reward_notification:
-	# 	if reward_notification.has_method("show_reward"):
-	# 		reward_notification.show_reward("lives", RewardManager.get_lives(), "Lives restored!")
-	# 	else:
-	# 		print("[GameUI] reward_notification missing show_reward method")
-
-	# If the game wasn't initialized because player had no lives when app launched,
-	# initialize/load the level now so the board appears immediately.
-	if RewardManager.get_lives() > 0:
-		# GameManager is an autoload singleton; check whether its grid is empty
-		if Engine.has_singleton("GameManager") or true:
-			# Use the global GameManager object (autoload)
-			var gm = GameManager
-			if gm and (not gm.grid or gm.grid.size() == 0):
-				print("[GameUI] Detected uninitialized board after refill - initializing game now")
-				# Re-initialize game which will consume a life and load the level
-				if gm.has_method("initialize_game"):
-					gm.initialize_game()
-				else:
-					# Fallback: try loading current level
-					if gm.has_method("load_current_level"):
-						gm.load_current_level()
-						print("[GameUI] Called load_current_level() as fallback")
-					else:
-						print("[GameUI] ERROR: GameManager has no initialize/load method")
-			else:
-				print("[GameUI] GameManager already initialized - no action needed")
-
-	# DON'T automatically start game - let the dialog close naturally (legacy comment preserved)
-	# The player can see their lives increased and manually start when ready
-	print("[GameUI] Life granted. Player now has %d lives" % RewardManager.get_lives())
-
-func _on_out_of_lives_closed():
-	"""Handle out of lives dialog close"""
-	print("[GameUI] Out of lives dialog closed")
-
-	# If still no lives, go back to menu
-	if RewardManager.get_lives() <= 0:
-		print("[GameUI] Still no lives, returning to menu")
-		await get_tree().create_timer(0.5).timeout
-		_on_menu_pressed()
-
-func _on_hammer_pressed():
-	"""Handle hammer button press"""
-	print("[GameUI] _on_hammer_pressed CALLED")
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("hammer") > 0:
-		activate_booster("hammer")
-		print("[GameUI] Hammer activated")
-	else:
-		print("[GameUI] WARNING: Hammer count is 0, cannot activate")
-
-func _on_shuffle_pressed():
-	"""Handle shuffle button press - immediately shuffles board"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("shuffle") > 0:
-		print("[GameUI] Shuffle activated")
-		var board = get_node("../GameBoard")
-		if board:
-			await board.activate_shuffle_booster()
-			update_booster_ui()
-
-func _on_swap_pressed():
-	"""Handle swap button press"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("swap") > 0:
-		activate_booster("swap")
-		swap_first_tile = null  # Reset swap state
-		print("[GameUI] Swap activated - select first tile")
-
-func _on_chain_reaction_pressed():
-	"""Handle chain reaction button press"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("chain_reaction") > 0:
-		activate_booster("chain_reaction")
-		print("[GameUI] Chain Reaction activated")
-
-func _on_bomb_3x3_pressed():
-	"""Handle 3x3 bomb button press"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("bomb_3x3") > 0:
-		activate_booster("bomb_3x3")
-		print("[GameUI] 3x3 Bomb activated")
-
-func _on_line_blast_pressed():
-	"""Handle line blast button press - need to choose direction first"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("line_blast") > 0:
-		# Show direction selector or default to horizontal for now
-		# For simplicity, we'll prompt in console and default to horizontal
-		activate_booster("line_blast")
-		line_blast_direction = "horizontal"  # Can be changed to show UI selector
-		print("[GameUI] Line Blast activated - tap tile for center (horizontal mode)")
-
-func _on_tile_squasher_pressed():
-	"""Handle tile squasher button press"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("tile_squasher") > 0:
-		activate_booster("tile_squasher")
-		print("[GameUI] Tile Squasher activated")
-
-func _on_row_clear_pressed():
-	"""Handle row clear button press"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("row_clear") > 0:
-		activate_booster("row_clear")
-		print("[GameUI] Row clear activated")
-
-func _on_column_clear_pressed():
-	"""Handle column clear button press"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.get_booster_count("column_clear") > 0:
-		activate_booster("column_clear")
-		print("[GameUI] Column clear activated")
-
-func _on_extra_moves_pressed():
-	"""Handle extra moves button press - instant use, no targeting needed"""
-	AudioManager.play_sfx("ui_click")
-	if RewardManager.use_booster("extra_moves"):
-		# Add 5 extra moves to the game
-		GameManager.moves_left += 5
-		GameManager.emit_signal("moves_changed", GameManager.moves_left)
-		print("[GameUI] Extra moves activated - added 5 moves")
-
-		# Show feedback to player
-		if reward_notification and reward_notification.has_method("show_reward"):
-			reward_notification.call("show_reward", "extra_moves", 5, "+5 Moves!")
-
-		# Update booster UI
-		update_booster_ui()
-	else:
-		print("[GameUI] No extra moves available!")
-
-func activate_booster(booster_type: String):
-	"""Activate the selected booster - wait for user to select row/column/tile"""
+# ── Booster activation (GameUI still owns the activation state) ───────────────
+func activate_booster(booster_type: String) -> void:
 	booster_mode_active = true
 	active_booster_type = booster_type
+	if _bbar():
+		_bbar().highlight_active(booster_type)
+	print("[GameUI] Booster activated: %s" % booster_type)
 
-	# Find the active button in the dynamic booster panel
-	var active_button: Button = null
-	if booster_panel:
-		var hbox = booster_panel.get_node_or_null("HBoxContainer")
-		if hbox:
-			for child in hbox.get_children():
-				if child is Button:
-					# Check button name to match booster type
-					# Button name format: "{BoosterIdCapitalized}Button" (e.g., "Bomb 3x 3Button", "HammerButton")
-					# Normalize both strings by removing spaces, underscores, and "button" suffix for comparison
-					var button_name_normalized = child.name.to_lower().replace(" ", "").replace("_", "").replace("button", "")
-					var booster_type_normalized = booster_type.to_lower().replace(" ", "").replace("_", "")
-					# Check if normalized names match
-					if button_name_normalized == booster_type_normalized:
-						active_button = child
-						print("[GameUI] Found active button: %s for booster: %s" % [child.name, booster_type])
-						break
-
-	# If found, animate it; otherwise fall back to legacy highlighting
-	if active_button:
-		_animate_selected_booster(active_button)
-	else:
-		# Legacy: Update button states for static buttons
-		var all_buttons = [hammer_button, shuffle_button, swap_button, chain_reaction_button,
-						   bomb_3x3_button, line_blast_button, tile_squasher_button,
-						   row_clear_button, column_clear_button]
-
-		for btn in all_buttons:
-			if btn:
-				btn.modulate = Color.WHITE
-
-		# Highlight active button
-		match booster_type:
-			"hammer":
-				if hammer_button:
-					hammer_button.modulate = Color.YELLOW
-					_animate_selected_booster(hammer_button)
-			"swap":
-				if swap_button:
-					swap_button.modulate = Color.YELLOW
-					_animate_selected_booster(swap_button)
-			"chain_reaction":
-				if chain_reaction_button:
-					chain_reaction_button.modulate = Color.YELLOW
-					_animate_selected_booster(chain_reaction_button)
-			"bomb_3x3":
-				if bomb_3x3_button:
-					bomb_3x3_button.modulate = Color.YELLOW
-					_animate_selected_booster(bomb_3x3_button)
-			"line_blast":
-				if line_blast_button:
-					line_blast_button.modulate = Color.YELLOW
-					_animate_selected_booster(line_blast_button)
-			"tile_squasher":
-				if tile_squasher_button:
-					tile_squasher_button.modulate = Color.YELLOW
-					_animate_selected_booster(tile_squasher_button)
-			"row_clear":
-				if row_clear_button:
-					row_clear_button.modulate = Color.YELLOW
-					_animate_selected_booster(row_clear_button)
-			"column_clear":
-				if column_clear_button:
-					column_clear_button.modulate = Color.YELLOW
-					_animate_selected_booster(column_clear_button)
-
-	var message = ""
-	match booster_type:
-		"hammer":
-			message = "Hammer active. Tap a tile to destroy it."
-		"swap":
-			message = "Swap active. Tap first tile, then second tile to swap them."
-		"chain_reaction":
-			message = "Chain Reaction active. Tap a tile to start spreading explosion."
-		"bomb_3x3":
-			message = "3x3 Bomb active. Tap a tile to destroy 3x3 area around it."
-		"line_blast":
-			message = "Line Blast active (horizontal). Tap a tile for center of 3 rows."
-		"tile_squasher":
-			message = "Tile Squasher active. Tap a tile to destroy all tiles of that type."
-		"row_clear":
-			message = "Row Clear active. Tap a tile to clear its row."
-		"column_clear":
-			message = "Column Clear active. Tap a tile to clear its column."
-
-	print("[GameUI] ", message)
-
-func _stop_booster_animation():
-	"""Stop the booster button animation and reset to normal state"""
-	if _booster_animation_tween and is_instance_valid(_booster_animation_tween):
-		_booster_animation_tween.kill()
-		_booster_animation_tween = null
-
-	if _active_booster_button and is_instance_valid(_active_booster_button):
-		# Reset button to normal state
-		_active_booster_button.modulate = Color.WHITE
-		_active_booster_button.scale = Vector2(1.0, 1.0)
-		print("[GameUI] Stopped animation and reset booster button: %s" % _active_booster_button.name)
-		_active_booster_button = null
-
-func _animate_selected_booster(button: Button):
-	"""Animate the selected booster button with a pulsing glow effect"""
-	if not button or not is_instance_valid(button):
-		return
-
-	# Stop any existing animation
-	_stop_booster_animation()
-
-	# Store the active button
-	_active_booster_button = button
-
-	# Create pulsing glow animation
-	_booster_animation_tween = create_tween()
-	_booster_animation_tween.set_loops(-1)  # Loop infinitely
-	_booster_animation_tween.set_trans(Tween.TRANS_SINE)
-	_booster_animation_tween.set_ease(Tween.EASE_IN_OUT)
-
-	# Pulse between bright yellow and white with scale
-	_booster_animation_tween.tween_property(button, "modulate", Color(1.5, 1.5, 0.5, 1.0), 0.5)
-	_booster_animation_tween.parallel().tween_property(button, "scale", Vector2(1.15, 1.15), 0.5)
-	_booster_animation_tween.tween_property(button, "modulate", Color.WHITE, 0.5)
-	_booster_animation_tween.parallel().tween_property(button, "scale", Vector2(1.0, 1.0), 0.5)
-
-	print("[GameUI] Started pulsing animation for booster button: %s" % button.name)
-
-
-
-func update_booster_ui():
-	"""Update the booster panel UI to show only available boosters for this level"""
-	print("[GameUI] update_booster_ui called")
-	print("[GameUI] GameManager.available_boosters size: ", GameManager.available_boosters.size())
-	print("[GameUI] Available boosters: ", GameManager.available_boosters)
-
-	# Ensure booster panel exists
-	if not booster_panel:
-		print("[GameUI] WARNING: booster_panel not found in scene!")
-		return
-
-	# Check if we should rebuild the booster panel (on level load)
-	if GameManager.available_boosters.size() > 0:
-		print("[GameUI] Rebuilding dynamic booster panel with selected boosters")
-		_rebuild_dynamic_booster_panel()
-	else:
-		print("[GameUI] No boosters selected, using legacy display")
-		# Fallback: show all boosters (for compatibility)
-		_update_all_boosters_legacy()
-
-	# Always show the booster panel
-	if booster_panel:
-		booster_panel.visible = true
-		print("[GameUI] Booster panel visible")
-
-func _rebuild_dynamic_booster_panel():
-	"""Rebuild the booster panel with only the selected boosters for this level"""
-	if not booster_panel:
-		print("[GameUI] ERROR: booster_panel not found, cannot rebuild")
-		return
-
-	print("[GameUI] Rebuilding booster panel with: ", GameManager.available_boosters)
-
-	# Clear existing booster buttons
-	var hbox = booster_panel.get_node_or_null("HBoxContainer")
-	if not hbox:
-		print("[GameUI] Creating new HBoxContainer for boosters")
-		hbox = HBoxContainer.new()
-		hbox.name = "HBoxContainer"
-		hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		# Ensure HBoxContainer fills the parent panel
-		hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-		hbox.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		hbox.grow_vertical = Control.GROW_DIRECTION_BOTH
-		booster_panel.add_child(hbox)
-	else:
-		print("[GameUI] Found existing HBoxContainer, clearing %d children" % hbox.get_child_count())
-		# Ensure existing HBox has proper anchors
-		hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	# CRITICAL: Immediately remove and hide old children to prevent ghost clicks
-	for child in hbox.get_children():
-		hbox.remove_child(child)  # Remove from parent immediately
-		child.visible = false  # Hide it
-		child.queue_free()  # Mark for deletion
-
-	print("[GameUI] Old buttons removed and hidden")
-
-	# Style the booster panel
-	_style_booster_panel()
-
-	# Add spacing between buttons
-	hbox.add_theme_constant_override("separation", 16)
-
-	# Create buttons for selected boosters
-	var button_count = 0
-	for booster_id in GameManager.available_boosters:
-		var button = _create_booster_button(booster_id)
-		if button:
-			hbox.add_child(button)
-			button_count += 1
-		else:
-			print("[GameUI]   WARNING: Failed to create button for booster: %s" % booster_id)
-
-	print("[GameUI] Booster panel rebuilt with %d boosters" % button_count)
-
-	# CRITICAL: Make HBoxContainer visible and ensure it fills the panel
-	hbox.visible = true
-	hbox.custom_minimum_size = Vector2(700, 100)  # Match booster panel size
-
-
-func _style_booster_panel():
-	"""Apply visual styling to the booster panel"""
-	if not booster_panel:
-		return
-
-	# Add rounded background with gradient
-	var style_box = StyleBoxFlat.new()
-	style_box.bg_color = Color(0.15, 0.15, 0.2, 0.85)  # Semi-transparent dark background
-	style_box.corner_radius_top_left = 12
-	style_box.corner_radius_top_right = 12
-	style_box.corner_radius_bottom_left = 12
-	style_box.corner_radius_bottom_right = 12
-	style_box.border_width_left = 2
-	style_box.border_width_right = 2
-	style_box.border_width_top = 2
-	style_box.border_width_bottom = 2
-	style_box.border_color = Color(0.4, 0.4, 0.5, 0.6)
-	style_box.content_margin_left = 12
-	style_box.content_margin_right = 12
-	style_box.content_margin_top = 8
-	style_box.content_margin_bottom = 8
-
-	booster_panel.add_theme_stylebox_override("panel", style_box)
-
-func _create_booster_button(booster_id: String) -> Button:
-	"""Create a styled booster button with icon and count"""
-	var button = Button.new()
-	button.name = "%sButton" % booster_id.capitalize()
-	button.custom_minimum_size = Vector2(80, 80)
-	button.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	# Load icon
-	var theme = ThemeManager.get_theme_name()
-	var icon_path = "res://textures/%s/booster_%s.png" % [theme, booster_id]
-
-	var icon = TextureRect.new()
-	icon.name = "Icon"
-	icon.custom_minimum_size = Vector2(64, 64)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	if ResourceLoader.exists(icon_path):
-		icon.texture = load(icon_path)
-	else:
-		print("[GameUI] WARNING: Icon not found: %s" % icon_path)
-
-	# Center icon in button
-	icon.anchor_left = 0.5
-	icon.anchor_top = 0.5
-	icon.anchor_right = 0.5
-	icon.anchor_bottom = 0.5
-	icon.offset_left = -32
-	icon.offset_top = -32
-	icon.offset_right = 32
-	icon.offset_bottom = 32
-
-	button.add_child(icon)
-
-	# Add count label (top-right corner)
-	var count_label = Label.new()
-	count_label.name = "CountLabel"
-	var count = RewardManager.get_booster_count(booster_id)
-	count_label.text = "%d" % count
-	ThemeManager.apply_bangers_font(count_label, 18)
-	count_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
-	count_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))
-	count_label.add_theme_constant_override("outline_size", 2)
-	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	# Position in top-right corner
-	count_label.anchor_left = 1.0
-	count_label.anchor_top = 0.0
-	count_label.anchor_right = 1.0
-	count_label.anchor_bottom = 0.0
-	count_label.offset_left = -28
-	count_label.offset_top = 4
-	count_label.offset_right = -4
-	count_label.offset_bottom = 24
-	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-
-	button.add_child(count_label)
-
-	# Apply styling based on count
-	button.disabled = (count <= 0)
-	if count > 0:
-		icon.modulate = Color.WHITE
-		button.modulate = Color.WHITE
-	else:
-		icon.modulate = Color(0.5, 0.5, 0.5, 0.5)
-		button.modulate = Color(0.7, 0.7, 0.7, 0.8)
-
-	# Connect button press to booster handler
-	button.pressed.connect(Callable(self, "_on_booster_button_pressed").bind(booster_id))
-
-	return button
-
-func _on_booster_button_pressed(booster_id: String):
-	"""Handle dynamic booster button press"""
-	print("============================================================")
-	print("[GameUI] ✓ BOOSTER BUTTON PRESSED: %s" % booster_id)
-	print("[GameUI] booster_mode_active: %s" % booster_mode_active)
-	print("[GameUI] active_booster_type: %s" % active_booster_type)
-	print("[GameUI] GameManager.processing_moves: %s" % GameManager.processing_moves)
-	print("[GameUI] Booster count: %d" % RewardManager.get_booster_count(booster_id))
-	print("============================================================")
-
-	# Check if tapping the same booster that's already active - deactivate it
-	if booster_mode_active and active_booster_type == booster_id:
-		print("[GameUI] Deactivating booster: %s" % booster_id)
-		booster_mode_active = false
-		active_booster_type = ""
-		_stop_booster_animation()
-		AudioManager.play_sfx("ui_click")  # Play deactivation sound
-		return
-
-	# Call appropriate handler based on booster type
-	match booster_id:
-		"hammer":
-			_on_hammer_pressed()
-		"shuffle":
-			_on_shuffle_pressed()
-		"swap":
-			_on_swap_pressed()
-		"chain_reaction":
-			_on_chain_reaction_pressed()
-		"bomb_3x3":
-			_on_bomb_3x3_pressed()
-		"line_blast":
-			_on_line_blast_pressed()
-		"row_clear":
-			_on_row_clear_pressed()
-		"column_clear":
-			_on_column_clear_pressed()
-		"tile_squasher":
-			_on_tile_squasher_pressed()
-		"extra_moves":
-			_on_extra_moves_pressed()
-
-func _update_all_boosters_legacy():
-	"""Legacy function: Update all boosters (fallback when no selection is made)"""
-	print("[GameUI] Using legacy booster update (all boosters)")
-
-	# Update all boosters
-	_update_single_booster(hammer_button, hammer_icon, hammer_count_label, "hammer")
-	_update_single_booster(shuffle_button, shuffle_icon, shuffle_count_label, "shuffle")
-	_update_single_booster(swap_button, swap_icon, swap_count_label, "swap")
-	_update_single_booster(chain_reaction_button, chain_reaction_icon, chain_reaction_count_label, "chain_reaction")
-	_update_single_booster(bomb_3x3_button, bomb_3x3_icon, bomb_3x3_count_label, "bomb_3x3")
-	_update_single_booster(line_blast_button, line_blast_icon, line_blast_count_label, "line_blast")
-	_update_single_booster(tile_squasher_button, tile_squasher_icon, tile_squasher_count_label, "tile_squasher")
-	_update_single_booster(row_clear_button, row_clear_icon, row_clear_count_label, "row_clear")
-	_update_single_booster(column_clear_button, column_clear_icon, column_clear_count_label, "column_clear")
-
-
-func _update_single_booster(button, icon, count_label, booster_type: String):
-	"""Helper function to update a single booster button"""
-	var count = RewardManager.get_booster_count(booster_type)
-
-	print("[GameUI] _update_single_booster: %s, count=%d, button=%s, icon=%s, label=%s" % [booster_type, count, str(button != null), str(icon != null), str(count_label != null)])
-
-	if count_label:
-		count_label.text = "%d" % count
-
-	if button:
-		button.disabled = (count <= 0)
-		print("[GameUI]   Button disabled: %s" % str(button.disabled))
-		# Grey out when unavailable (0 count)
-		if icon:
-			if count > 0:
-				icon.modulate = Color.WHITE
-			else:
-				icon.modulate = Color(0.5, 0.5, 0.5, 0.5)
-		if count > 0:
-			button.modulate = Color.WHITE
-		else:
-			button.modulate = Color(0.7, 0.7, 0.7, 0.8)
-
-func _on_booster_used(booster_type: String):
-	"""Handle the event when a booster is used"""
-	print("[GameUI] Booster used: %s" % booster_type)
-
-	# Play booster animation or sound
-	var animation_player = $AnimationPlayer
-	animation_player.play("booster_used")
-
-	# Reset booster mode and stop animation
+func deactivate_booster() -> void:
 	booster_mode_active = false
 	active_booster_type = ""
-	_stop_booster_animation()
-
-	# Update UI
-	update_booster_ui()
-
-func _on_main_menu_item_selected(id: int):
-	"""Handle main menu popup item selection (robust implementation).
-	This avoids match/else parsing issues and ensures we only set `visible` on Controls.
-	"""
-	print("[GameUI] Main menu item selected: ", id)
-
-	# Play UI click sound
-	AudioManager.play_sfx("ui_click")
-
-	if id == 0:
-		# Settings - slide-in side panel
-		print("[GameUI] Open settings (side panel)")
-		_show_settings_side()
-	elif id == 1:
-		# Shop - slide-in side panel
-		print("[GameUI] Open shop (side panel)")
-		_show_shop_side()
-	elif id == 2:
-		# Gallery - fullscreen
-		print("[GameUI] Open gallery")
-		_show_gallery_fullscreen()
-	elif id == 3:
-		# About
-		print("[GameUI] Show about dialog")
-		var adlg = _find_or_instance_dialog("AboutDialog", "res://scenes/AboutDialog.tscn")
-		if adlg:
-			if adlg.has_method("show_dialog"):
-				adlg.show_dialog()
-			elif adlg is Control:
-				adlg.visible = true
-				adlg.raise()
-			else:
-				print("[GameUI] AboutDialog exists but is not a Control")
-			# Ensure we are connected to its dialog_closed signal so we know when it closes
-			if adlg.has_signal("dialog_closed"):
-				var cb = Callable(self, "_on_about_dialog_closed")
-				if not adlg.is_connected("dialog_closed", cb):
-					adlg.connect("dialog_closed", cb)
-		else:
-			print("[GameUI] Unable to open AboutDialog")
-	elif id == 4:
-		# Share
-		print("[GameUI] Share the game")
-		# TODO: Implement share functionality
-
-func _on_menu_icon_input(event):
-	"""Handle input on the runtime menu icon"""
-	if event is InputEventScreenTouch and event.pressed:
-		# Simulate a menu button press
-		menu_button.emit_signal("pressed")
-		print("[GameUI] Menu icon runtime pressed")
-
-# New helper moved to top-level to avoid nested function lambda issue
-func _find_or_instance_dialog(name: String, scene_path: String):
-	var node = get_node_or_null(name)
-	if node and not (node is Control):
-		# Replace placeholder node (non-Control) with a real instance
-		print("[GameUI] Replacing placeholder for %s" % name)
-		var parent = node.get_parent()
-		node.queue_free()
-		node = null
-	if not node:
-		if ResourceLoader.exists(scene_path):
-			var packed = load(scene_path)
-			if packed and packed is PackedScene:
-				node = packed.instantiate()
-				node.name = name
-				# attach to this UI node so dialog sits in correct tree
-				add_child(node)
-				print("[GameUI] Instanced %s from %s" % [name, scene_path])
-				# If the dialog defines a `dialog_closed` signal, connect it to a handler
-				if node.has_signal("dialog_closed"):
-					node.connect("dialog_closed", Callable(self, "_on_about_dialog_closed"))
-				# Also connect the dialog's CloseButton directly to a UI handler to ensure it closes
-				if node.has_node("VBoxContainer/CloseButton"):
-					var cb = node.get_node("VBoxContainer/CloseButton")
-					if cb and cb is Button:
-						# Connect using a small inline function that captures the dialog node to avoid overload ambiguity
-						cb.pressed.connect(Callable(self, "_on_dialog_close_pressed"))
-			else:
-				print("[GameUI] Failed to load packed scene: %s" % scene_path)
-		else:
-			print("[GameUI] Scene not found: %s" % scene_path)
-	return node
-
-func _on_about_dialog_closed(dialog_node):
-	print("[GameUI] About dialog closed: ", dialog_node)
-	# If dialog was instanced dynamically, free it
-	if dialog_node and dialog_node.get_parent() == self:
-		dialog_node.queue_free()
-		print("[GameUI] Freed runtime-instanced AboutDialog")
-
-func _on_dialog_close_pressed(dialog_node):
-	if dialog_node and dialog_node is Control:
-		var t = create_tween()
-		t.tween_property(dialog_node, "modulate", Color.TRANSPARENT, 0.15)
-		# Wait for the tween to finish, then call the finish handler with the dialog node
-		await t.finished
-		_finish_hide_dialog(dialog_node)
-
-func _finish_hide_dialog(dialog_node):
-	if dialog_node and dialog_node is Control:
-		dialog_node.visible = false
-		print("[GameUI] Dialog closed via GameUI handler: %s" % dialog_node.name)
-
-func _ensure_side_panel(side_pos: String = "right"):
-	var side = get_node_or_null("SidePanel")
-	var vp = get_viewport().get_visible_rect().size
-	_side_position = side_pos
-	# Compute responsive panel width (max cap)
-	var panel_width = int(min(SIDE_PANEL_MAX_WIDTH, vp.x * SIDE_PANEL_WIDTH_PERCENT))
-	if not side:
-		side = Panel.new()
-		side.name = "SidePanel"
-		# Use absolute positioning: anchor to top-left and control rect_position/rect_size
-		side.anchor_left = 0
-		side.anchor_top = 0
-		side.anchor_right = 0
-		side.anchor_bottom = 0
-		side.mouse_filter = Control.MOUSE_FILTER_STOP
-		add_child(side)
-	# Size and offscreen position (to the right or left)
-	# side.rect_size = Vector2(panel_width, vp.y)
-	side.custom_minimum_size = Vector2(panel_width, vp.y)
-	if side_pos == "right":
-		side.position = Vector2(vp.x, 0)
-		# start invisible
-		side.modulate = Color(1,1,1,0)
-	else:
-		side.position = Vector2(-panel_width, 0)
-		side.modulate = Color(1,1,1,0)
-	side.visible = true
-	# store last panel width for animations and sizing
-	side.set_meta("panel_width", panel_width)
-	return side
-
-func _show_settings_side():
-	# Present Settings as a fullscreen page that slides in from the LEFT and hides the board
-	var vp = get_viewport().get_visible_rect().size
-	var panel_width = vp.x
-
-	# Ensure we have a Settings node; if not, instance it
-	var scene_path = "res://scenes/SettingsDialog.tscn"
-	var inst = get_node_or_null("SettingsDialog")
-	if not inst:
-		if ResourceLoader.exists(scene_path):
-			var packed = load(scene_path)
-			if packed and packed is PackedScene:
-				inst = packed.instantiate()
-				inst.name = "SettingsDialog"
-				add_child(inst)
-				print("[GameUI] Created SettingsDialog")
-		else:
-			print("[GameUI] SettingsDialog scene not found: %s" % scene_path)
-
-	if inst and inst is Control:
-		# Configure as fullscreen
-		inst.anchor_left = 0
-		inst.anchor_top = 0
-		inst.anchor_right = 1
-		inst.anchor_bottom = 1
-		# start offscreen to the left (GameUI will animate position)
-		inst.position = Vector2(-vp.x, 0)
-		inst.size = vp
-		inst.visible = true
-		inst.mouse_filter = Control.MOUSE_FILTER_STOP
-		# mark origin so close routine knows where to slide out
-		inst.set_meta("fullscreen_origin", "left")
-		# call show helper if present
-		if inst.has_method("show_dialog"):
-			inst.call("show_dialog")
-
-	# Slide the board to the right and animate the settings in
-	var board = get_node_or_null("../GameBoard")
-	var tween = create_tween()
-	if board:
-		# Hide the board and its overlay completely
-		board.visible = false
-
-		# Also hide the tile area overlay using GameBoard method
-		if board.has_method("hide_tile_overlay"):
-			board.hide_tile_overlay()
-	# animate panel in
-	if inst:
-		tween.tween_property(inst, "position", Vector2(0,0), 0.35)
-		tween.tween_property(inst, "modulate", Color.WHITE, 0.35)
-	print("[GameUI] Settings presented fullscreen")
-
-func _show_shop_side():
-	# Present Shop as a fullscreen page that slides in from the RIGHT and hides the board
-	var vp = get_viewport().get_visible_rect().size
-	var panel_width = vp.x
-
-	# Ensure shop_ui exists, if not try to instance the scene into this UI
-	if not shop_ui or not is_instance_valid(shop_ui):
-		var scene_path = "res://scenes/ShopUI.tscn"
-		if ResourceLoader.exists(scene_path):
-			var packed = load(scene_path)
-			if packed and packed is PackedScene:
-				shop_ui = packed.instantiate()
-				shop_ui.name = "ShopUI"
-				add_child(shop_ui)
-				print("[GameUI] Created ShopUI")
-		else:
-			print("[GameUI] ShopUI scene not found: %s" % scene_path)
-
-	if shop_ui and shop_ui is Control:
-		shop_ui.anchor_left = 0
-		shop_ui.anchor_top = 0
-		shop_ui.anchor_right = 1
-		shop_ui.anchor_bottom = 1
-		shop_ui.position = Vector2(vp.x, 0)
-		shop_ui.size = vp
-		shop_ui.visible = true
-		shop_ui.mouse_filter = Control.MOUSE_FILTER_STOP
-		# mark origin so close routine knows where to slide out
-		shop_ui.set_meta("fullscreen_origin", "right")
-		# If the Shop has a show helper, call it
-		if shop_ui.has_method("show_shop"):
-			shop_ui.call("show_shop")
-
-	# Slide the board left and animate the shop in
-	var board = get_node_or_null("../GameBoard")
-	var tween = create_tween()
-	if board:
-		# Hide the board and its overlay completely
-		board.visible = false
-
-		# Also hide the tile area overlay using GameBoard method
-		if board.has_method("hide_tile_overlay"):
-			board.hide_tile_overlay()
-	if shop_ui:
-		tween.tween_property(shop_ui, "position", Vector2(0,0), 0.35)
-		tween.tween_property(shop_ui, "modulate", Color.WHITE, 0.35)
-	print("[GameUI] Shop presented fullscreen")
-
-func _show_gallery_fullscreen():
-	"""Show the gallery as a fullscreen UI"""
-	var vp = get_viewport().get_visible_rect().size
-
-	# Ensure we have a gallery_ui instance
-	if not gallery_ui or not is_instance_valid(gallery_ui):
-		var gallery_script = load("res://scripts/GalleryUI.gd")
-		if gallery_script:
-			# Create Control node since GalleryUI extends Control
-			gallery_ui = Control.new()
-			gallery_ui.set_script(gallery_script)
-			gallery_ui.name = "GalleryUI"
-
-			# Create the UI structure manually since we don't have a scene file
-			_create_gallery_ui_structure(gallery_ui)
-
-			add_child(gallery_ui)
-			print("[GameUI] Instanced GalleryUI (fullscreen)")
-
-			# Connect close signal
-			if gallery_ui.has_signal("gallery_closed"):
-				gallery_ui.connect("gallery_closed", Callable(self, "_on_gallery_closed"))
-		else:
-			print("[GameUI] ERROR: Could not load GalleryUI script")
-			return
-
-	if gallery_ui and gallery_ui is Control:
-		# Configure as fullscreen
-		gallery_ui.anchor_left = 0
-		gallery_ui.anchor_top = 0
-		gallery_ui.anchor_right = 1
-		gallery_ui.anchor_bottom = 1
-		gallery_ui.position = Vector2(vp.x, 0)  # Start offscreen right
-		gallery_ui.size = vp
-		gallery_ui.visible = true
-		gallery_ui.mouse_filter = Control.MOUSE_FILTER_STOP
-		gallery_ui.set_meta("fullscreen_origin", "right")
-
-		# Call show helper
-		if gallery_ui.has_method("show_gallery"):
-			gallery_ui.call("show_gallery")
-
-	# Hide the board
-	var board = get_node_or_null("../GameBoard")
-	var tween = create_tween()
-	if board:
-		board.visible = false
-		if board.has_method("hide_tile_overlay"):
-			board.hide_tile_overlay()
-
-	# Animate gallery in
-	if gallery_ui:
-		tween.tween_property(gallery_ui, "position", Vector2(0,0), 0.35)
-		tween.tween_property(gallery_ui, "modulate", Color.WHITE, 0.35)
-	print("[GameUI] Gallery presented fullscreen")
-
-func _create_gallery_ui_structure(gallery_node: Node):
-	"""Create the UI structure for gallery programmatically"""
-	# Main panel
-	var panel = Panel.new()
-	panel.name = "Panel"
-	panel.anchor_right = 1.0
-	panel.anchor_bottom = 1.0
-	panel.offset_left = 0
-	panel.offset_top = 0
-	panel.offset_right = 0
-	panel.offset_bottom = 0
-	gallery_node.add_child(panel)
-
-	# VBox container
-	var vbox = VBoxContainer.new()
-	vbox.name = "VBoxContainer"
-	vbox.anchor_right = 1.0
-	vbox.anchor_bottom = 1.0
-	vbox.offset_left = 20
-	vbox.offset_top = 20
-	vbox.offset_right = -20
-	vbox.offset_bottom = -20
-	vbox.add_theme_constant_override("separation", 10)
-	panel.add_child(vbox)
-
-	# Top bar with title and close button
-	var top_bar = HBoxContainer.new()
-	top_bar.name = "TopBar"
-	vbox.add_child(top_bar)
-
-	var title = Label.new()
-	title.name = "TitleLabel"
-	title.text = "Gallery"
-	title.add_theme_font_size_override("font_size", 32)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_bar.add_child(title)
-
-	var close_btn = Button.new()
-	close_btn.name = "CloseButton"
-	close_btn.text = "✕"
-	close_btn.custom_minimum_size = Vector2(50, 50)
-	top_bar.add_child(close_btn)
-
-	# Scroll container
-	var scroll = ScrollContainer.new()
-	scroll.name = "ScrollContainer"
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	vbox.add_child(scroll)
-
-	# Grid container
-	var grid = GridContainer.new()
-	grid.name = "GridContainer"
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 20)
-	grid.add_theme_constant_override("v_separation", 20)
-	scroll.add_child(grid)
-
-	# Viewer panel (hidden by default)
-	var viewer = Panel.new()
-	viewer.name = "ViewerPanel"
-	viewer.anchor_right = 1.0
-	viewer.anchor_bottom = 1.0
-	viewer.visible = false
-	gallery_node.add_child(viewer)
-
-	var viewer_vbox = VBoxContainer.new()
-	viewer_vbox.name = "VBoxContainer"
-	viewer_vbox.anchor_right = 1.0
-	viewer_vbox.anchor_bottom = 1.0
-	viewer_vbox.offset_left = 40
-	viewer_vbox.offset_top = 40
-	viewer_vbox.offset_right = -40
-	viewer_vbox.offset_bottom = -40
-	viewer.add_child(viewer_vbox)
-
-	var image_rect = TextureRect.new()
-	image_rect.name = "ImageRect"
-	image_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	image_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	image_rect.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	viewer_vbox.add_child(image_rect)
-
-	var image_title = Label.new()
-	image_title.name = "ImageTitle"
-	image_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	image_title.add_theme_font_size_override("font_size", 24)
-	viewer_vbox.add_child(image_title)
-
-	var viewer_close = Button.new()
-	viewer_close.name = "CloseViewerButton"
-	viewer_close.text = "Close"
-	viewer_close.custom_minimum_size = Vector2(200, 60)
-	viewer_vbox.add_child(viewer_close)
-
-func _on_gallery_closed():
-	"""Handle gallery close"""
-	print("[GameUI] Gallery closed signal received")
-	if gallery_ui:
-		# Don't just hide it - remove it completely to avoid leftover background
-		if is_instance_valid(gallery_ui):
-			gallery_ui.queue_free()
-			gallery_ui = null
-			print("[GameUI] Gallery UI removed completely")
-
-		# Hide the game board to prevent old level from showing underneath
-		var board = get_node_or_null("../GameBoard")
-		if board:
-			board.visible = false
-			print("[GameUI] Game board hidden after closing gallery")
-
-		# Restore start page
-		if start_page:
-			start_page.visible = true
-			# Ensure start page background is visible
-			var start_bg = start_page.get_node_or_null("Background")
-			if start_bg and start_bg is ColorRect:
-				start_bg.visible = true
-				print("[GameUI] Start page background ensured visible")
-
-			# Update start page with current level info from RewardManager
-			if RewardManager and LevelManager:
-				# Reload progress from disk to ensure we have the latest state
-				RewardManager.load_progress()
-				var current_level = RewardManager.levels_completed + 1
-				# Convert level number (1-based) to level index (0-based)
-				var level_index = current_level - 1
-				var level_data = LevelManager.get_level(level_index)
-				if level_data:
-					var description = level_data.description
-					if start_page.has_method("set_level_info"):
-						start_page.set_level_info(current_level, description)
-						print("[GameUI] Updated start page to show Level %d (from progress file)" % current_level)
-
-			print("[GameUI] Start page restored after closing gallery")
-
-
-func _dump_visible_components():
-	"""Debug function to dump all visible UI components on screen"""
-	print("\n========================================")
-	print("[DEBUG] VISIBLE SCREEN COMPONENTS DUMP")
-	print("========================================")
-
-	var viewport = get_viewport()
-	if viewport:
-		print("\n[Viewport Root Children]")
-		_dump_node_tree(viewport, 0, true)
-
-	var main_game = get_node_or_null("/root/MainGame")
-	if main_game:
-		print("\n[MainGame Children]")
-		_dump_node_tree(main_game, 0, true)
-
-	print("\n========================================")
-	print("[DEBUG] END OF DUMP")
-	print("========================================\n")
-
-func _dump_node_tree(node: Node, depth: int, visible_only: bool = true):
-	"""Recursively dump node tree with visibility and z-index info"""
-	if not node:
-		return
-
-	# Skip if we only want visible nodes and this is hidden
-	if visible_only and node is CanvasItem and not node.visible:
-		return
-
-	var indent = "  ".repeat(depth)
-	var info = indent + "├─ " + node.name
-
-	# Add type info
-	info += " [" + node.get_class() + "]"
-
-	# Add visibility info for CanvasItems
-	if node is CanvasItem:
-		info += " visible=" + str(node.visible)
-		info += " z_index=" + str(node.z_index)
-
-	# Add color info for ColorRect
-	if node is ColorRect:
-		info += " color=" + str(node.color)
-
-	# Add modulate info if not default
-	if node is CanvasItem and node.modulate != Color(1, 1, 1, 1):
-		info += " modulate=" + str(node.modulate)
-
-	# Add size info for Control nodes
-	if node is Control:
-		info += " size=" + str(node.size)
-		if node.anchor_right == 1.0 and node.anchor_bottom == 1.0:
-			info += " [FULLSCREEN]"
-
-	print(info)
-
-	# Recurse for children
-	for child in node.get_children():
-		_dump_node_tree(child, depth + 1, visible_only)
-
-
-
-func _close_fullscreen_panel(panel: Control):
-	"""Animate a fullscreen panel out (based on its origin meta) and restore the board."""
-	if not panel or not (panel is Control):
-		return
-	var vp = get_viewport().get_visible_rect().size
-	var origin = "right"
-	if panel.has_meta("fullscreen_origin"):
-		origin = panel.get_meta("fullscreen_origin")
-
-	# Animate panel out
-	var tween = create_tween()
-	if origin == "right":
-		tween.tween_property(panel, "position", Vector2(vp.x, 0), 0.35)
-	else:
-		tween.tween_property(panel, "position", Vector2(-vp.x, 0), 0.35)
-
-	# Check if this is the gallery - restore start page instead of board
-	if panel.name == "GalleryUI":
-		# Restore start page when closing gallery
-		if start_page:
-			start_page.visible = true
-			print("[GameUI] Start page restored after closing gallery")
-	else:
-		# For other panels (worldmap, shop), restore board
-		var board = get_node_or_null("../GameBoard")
-		if board:
-			# Restore board visibility
-			board.visible = true
-
-			# Also restore the tile area overlay using GameBoard method
-			if board.has_method("show_tile_overlay"):
-				board.show_tile_overlay()
-
-	await tween.finished
-	# hide the panel after animation
-	panel.visible = false
-	print("[GameUI] Fullscreen panel closed: %s" % panel.name)
-
+	swap_first_tile = null
+	if _bbar():
+		_bbar().clear_highlight()
+	print("[GameUI] Booster deactivated")
+
+func update_booster_ui() -> void:
+	## Compatibility shim kept for GameBoard callers — delegates to BoosterPanelComponent.
+	if _bbar():
+		_bbar()._refresh_counts()
+
+# ── StartPage signal handlers ─────────────────────────────────────────────────
 func _on_startpage_start_pressed():
-	print("[GameUI] Start pressed on StartPage - initializing game")
-
-	# Play UI click sound and switch to game music
-	AudioManager.play_sfx("ui_click")
-	AudioManager.play_music("game", 1.0)
-
-	# Initialize Experience Director if not already loaded
-	if ExperienceDirector:
-		# Load main story flow if not already loaded
-		if ExperienceDirector.current_flow.is_empty():
-			print("[GameUI] Loading Experience Director main_story flow...")
-			if ExperienceDirector.load_flow("main_story"):
-				print("[GameUI] ✓ Experience Director flow loaded")
-			else:
-				print("[GameUI] ⚠️ Experience Director flow failed to load - continuing without it")
-
-		# Start the flow at the current level based on progress
-		if not ExperienceDirector.current_flow.is_empty():
-			# Determine which level to start based on progress
-			var current_level_num = RewardManager.levels_completed + 1  # Next level to play
-
-			print("[GameUI] Starting Experience Director flow at level ", current_level_num, " (based on levels_completed=", RewardManager.levels_completed, ")")
-
-			# Use start_flow_at_level to jump to the correct level (includes narrative if present)
-			ExperienceDirector.start_flow_at_level(current_level_num)
-
-			print("[GameUI] ✅ Flow started at level ", current_level_num, " - ExperienceDirector will control level loading")
-			print("[GameUI] Hiding StartPage and exiting - waiting for flow to process")
-
-			# Hide StartPage
-			if start_page:
-				start_page.visible = false
-
-			# ✅ CRITICAL: Return here! Don't load level manually - flow controls it!
+	print("[GameUI] StartPage start_pressed received — routing through ExperienceDirector")
+	var pm = _get_pm()
+	if pm and pm.has_method("close"): pm.close("StartPage")
+	var ed = _get_ed()
+	if ed and ed.has_method("load_flow") and ed.has_method("start_flow"):
+		if ed.load_flow("main_story"):
+			ed.start_flow()
 			return
-
-	print("[GameUI] No ExperienceDirector flow active - continuing with manual level load")
-
-	# Immediately hide StartPage to prevent board borders being drawn on top of it
-	if start_page:
-		start_page.visible = false
-
-	# Show a quick loading indicator (simple label) so user knows something is happening
-	var loading_label = Label.new()
-	loading_label.name = "StartLoadingLabel"
-	loading_label.text = "Loading level..."
-	loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	loading_label.add_theme_font_size_override("font_size", 24)
-	add_child(loading_label)
-
-	# Ensure we remove any previous borders so the StartPage remains clean
-	var board_check = get_node_or_null("../GameBoard")
-	if board_check and board_check.has_method("_clear_board_borders"):
-		board_check._clear_board_borders()
-
-	# If GameManager already initialized, shortcut (existing code)
-	if GameManager.initialized:
-		# Load narrative effects for the current level BEFORE showing the board
-		if EffectResolver:
-			var current_level = GameManager.level if GameManager else 1
-			EffectResolver.cleanup_visual_overlays()
-
-			# Try to load level-specific chapter file
-			var level_chapter_path = "res://data/chapters/chapter_level_%d.json" % current_level
-			if FileAccess.file_exists(level_chapter_path):
-				print("[GameUI] Loading narrative effects for level %d from: %s" % [current_level, level_chapter_path])
-				if EffectResolver.load_effects_from_file(level_chapter_path):
-					print("[GameUI] Successfully loaded level-specific narrative effects")
-					# Manually emit level_loaded event now that effects are loaded
-					EventBus.emit_level_loaded("level_%d" % current_level, {"level": current_level, "target": GameManager.target_score})
-					print("[GameUI] Emitted level_loaded event for effects to trigger")
-				else:
-					print("[GameUI] Failed to load level-specific narrative effects")
-
-		# Show game board immediately
-		var board = get_node_or_null("../GameBoard")
-		if board:
-			board.visible = true
-			if board.has_method("_on_level_loaded"):
-				board._on_level_loaded()
-			if board.has_method("draw_board_borders"):
-				board.draw_board_borders()
-			if board.has_method("show_tile_overlay"):
-				board.show_tile_overlay()
-		# Cleanup loading indicator
-		if loading_label and is_instance_valid(loading_label):
-			loading_label.queue_free()
-		update_display()
-		update_booster_ui()
-		return
-
-	# Otherwise, trigger GameManager initialization/load and wait for level_loaded signal
-	var gm = get_node_or_null("/root/GameManager")
-	if not gm:
-		print("[GameUI] ERROR: GameManager not found; cannot initialize game")
-		# Restore start page
-		if start_page:
-			start_page.visible = true
-		if loading_label and is_instance_valid(loading_label):
-			loading_label.queue_free()
-		return
-
-	# Connect temporary signal handler to detect level_loaded
-	_level_loaded_flag = false
-	if not GameManager.is_connected("level_loaded", Callable(self, "_level_loaded_signal")):
-		GameManager.connect("level_loaded", Callable(self, "_level_loaded_signal"))
-
-	# Load narrative effects for level 1 BEFORE GameManager initialization
-	# This ensures effects are active when level_loaded event fires
-	if EffectResolver:
-		print("[GameUI] Loading narrative effects for level 1 before initialization")
-		EffectResolver.cleanup_visual_overlays()
-
-		var level_chapter_path = "res://data/chapters/chapter_level_1.json"
-		if FileAccess.file_exists(level_chapter_path):
-			print("[GameUI] Loading narrative effects from: %s" % level_chapter_path)
-			if EffectResolver.load_effects_from_file(level_chapter_path):
-				print("[GameUI] Successfully loaded level 1 narrative effects")
-			else:
-				print("[GameUI] Failed to load level 1 narrative effects")
-		else:
-			print("[GameUI] No chapter file found for level 1 at: %s" % level_chapter_path)
-
-	# Try preferred initialize method, otherwise fallback to load_current_level
-	if gm.has_method("initialize_game"):
+	var gm = _get_gm()
+	if gm and gm.has_method("initialize_game"):
 		gm.initialize_game()
-	elif gm.has_method("load_current_level"):
-		gm.load_current_level()
-	else:
-		print("[GameUI] WARNING: GameManager has no initialize/load_current_level method")
-
-	# Wait up to 6 seconds for level_loaded
-	var wait_timer = get_tree().create_timer(6.0)
-	while not _level_loaded_flag and wait_timer.time_left > 0:
-		await get_tree().process_frame
-
-	# Disconnect temporary handler
-	if GameManager.is_connected("level_loaded", Callable(self, "_level_loaded_signal")):
-		GameManager.disconnect("level_loaded", Callable(self, "_level_loaded_signal"))
-
-	if not _level_loaded_flag and not gm.initialized:
-		print("[GameUI] ERROR: GameManager did not emit level_loaded in time; restoring StartPage")
-		if start_page:
-			start_page.visible = true
-		if loading_label and is_instance_valid(loading_label):
-			loading_label.queue_free()
-		return
-
-	# Initialization succeeded - ensure UI updates and board setup
-	update_display()
-	update_booster_ui()
-
-	# After initialization, show the board and ensure borders are drawn
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		board.visible = true
-		if board.has_method("_on_level_loaded"):
-			board._on_level_loaded()
-		if board.has_method("draw_board_borders"):
-			board.draw_board_borders()
-		if board.has_method("show_tile_overlay"):
-			board.show_tile_overlay()
-
-	# Cleanup loading indicator
-	if loading_label and is_instance_valid(loading_label):
-		loading_label.queue_free()
-
-func _on_startpage_map_pressed():
-	"""Called when StartPage requests to open the World Map."""
-	_show_worldmap_fullscreen()
-
-func _show_worldmap_fullscreen():
-	"""Show the world map as a fullscreen UI"""
-	AudioManager.play_sfx("ui_click")
-
-	# Try to find existing WorldMap node
-	var wm = get_node_or_null("WorldMap")
-	if not wm or not is_instance_valid(wm):
-		# Prefer a scene if available, otherwise attach the script to a Control
-		var scene_path = "res://scenes/WorldMap.tscn"
-		if ResourceLoader.exists(scene_path):
-			var packed = load(scene_path)
-			if packed and packed is PackedScene:
-				wm = packed.instantiate()
-				wm.name = "WorldMap"
-				add_child(wm)
-				print("[GameUI] Instanced WorldMap from scene")
-			else:
-				print("[GameUI] Failed to instance WorldMap scene")
-		else:
-			# Fallback: load script and attach to a Control
-			var script = load("res://scripts/WorldMap.gd")
-			if script:
-				wm = Control.new()
-				wm.set_script(script)
-				wm.name = "WorldMap"
-				add_child(wm)
-				print("[GameUI] Instanced WorldMap via script fallback")
-			else:
-				print("[GameUI] ERROR: WorldMap resource not found")
-
-	if not wm:
-		print("[GameUI] ERROR: Could not create WorldMap")
-		return
-
-	# Configure as fullscreen control
-	var vp = get_viewport().get_visible_rect().size
-	wm.anchor_left = 0
-	wm.anchor_top = 0
-	wm.anchor_right = 1
-	wm.anchor_bottom = 1
-	wm.position = Vector2(0, 0)
-	wm.size = vp
-	wm.mouse_filter = Control.MOUSE_FILTER_STOP
-	wm.visible = true
-
-	# Connect signals from world map
-	if wm.has_signal("level_selected") and not wm.is_connected("level_selected", Callable(self, "_on_worldmap_level_selected")):
-		wm.connect("level_selected", Callable(self, "_on_worldmap_level_selected"))
-	if wm.has_signal("back_to_menu") and not wm.is_connected("back_to_menu", Callable(self, "_on_worldmap_back_to_menu")):
-		wm.connect("back_to_menu", Callable(self, "_on_worldmap_back_to_menu"))
-
-	# Hide start page and board while map is active
-	if start_page:
-		start_page.visible = false
-	# Hide gameplay UI (HUD, boosters) while world map shown
-	hide_gameplay_ui()
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		board.visible = false
-		if board.has_method("_clear_board_borders"):
-			board._clear_board_borders()
-
-	print("[GameUI] WorldMap shown")
-
 
 func _on_startpage_settings_pressed():
-	"""Called when StartPage requests to open Settings."""
-	print("[GameUI] Settings button pressed on StartPage")
-	AudioManager.play_sfx("ui_click")
+	var pm = _get_pm()
+	if pm: pm.open("SettingsDialog", {})
 
-	# Create or get settings dialog
-	var settings = get_node_or_null("SettingsDialog")
-	if not settings or not is_instance_valid(settings):
-		var scene_path = "res://scenes/SettingsDialog.tscn"
-		if ResourceLoader.exists(scene_path):
-			var packed = load(scene_path)
-			if packed and packed is PackedScene:
-				settings = packed.instantiate()
-				settings.name = "SettingsDialog"
-				add_child(settings)
-				print("[GameUI] Instanced SettingsDialog from scene")
-		else:
-			print("[GameUI] ERROR: SettingsDialog scene not found")
-			return
-
-	if settings:
-		# Reset position and modulate in case it was animated off-screen
-		settings.position = Vector2.ZERO
-		settings.modulate = Color.WHITE
-		settings.visible = true
-		settings.z_index = 200  # Above everything
-		print("[GameUI] SettingsDialog shown (pos: %s, visible: %s, z: %d)" % [settings.position, settings.visible, settings.z_index])
-		# Connect close signal if not already connected
-		if settings.has_signal("close_requested") and not settings.is_connected("close_requested", Callable(self, "_on_settings_closed")):
-			settings.connect("close_requested", Callable(self, "_on_settings_closed"))
-
+func _on_startpage_map_pressed():
+	var pm = _get_pm()
+	if pm: pm.open("WorldMap", {})
 
 func _on_startpage_achievements_pressed():
-	"""Called when StartPage requests to open Achievements."""
-	print("[GameUI] Achievements button pressed on StartPage")
-	AudioManager.play_sfx("ui_click")
+	var pm = _get_pm()
+	if pm: pm.open("AchievementsPage", {})
 
-	# Create or get achievements page
-	var achievements = get_node_or_null("AchievementsPage")
-	if not achievements or not is_instance_valid(achievements):
-		var scene_path = "res://scenes/AchievementsPage.tscn"
-		if ResourceLoader.exists(scene_path):
-			var packed = load(scene_path)
-			if packed and packed is PackedScene:
-				achievements = packed.instantiate()
-				achievements.name = "AchievementsPage"
-				add_child(achievements)
-				print("[GameUI] Instanced AchievementsPage from scene")
-		else:
-			# Fallback to script
-			var script = load("res://scripts/AchievementsPage.gd")
-			if script:
-				achievements = script.new()
-				achievements.name = "AchievementsPage"
-				add_child(achievements)
-				print("[GameUI] Instanced AchievementsPage from script")
+# ── FloatingMenu dispatch ─────────────────────────────────────────────────────
+func _on_floating_map_pressed() -> void:
+	if _fmc(): _fmc().collapse()
+	_get_pm().open("WorldMap", {})
 
-	if achievements:
-		# Configure as fullscreen
-		achievements.anchor_left = 0
-		achievements.anchor_top = 0
-		achievements.anchor_right = 1
-		achievements.anchor_bottom = 1
-		achievements.visible = true
-		achievements.z_index = 150
-		achievements.mouse_filter = Control.MOUSE_FILTER_STOP
+func _on_floating_shop_pressed() -> void:
+	if _fmc(): _fmc().collapse()
+	_get_pm().open("ShopUI", {})
 
-		# Connect back signal if exists
-		if achievements.has_signal("back_pressed") and not achievements.is_connected("back_pressed", Callable(self, "_on_achievements_back_pressed")):
-			achievements.connect("back_pressed", Callable(self, "_on_achievements_back_pressed"))
+func _on_floating_gallery_pressed() -> void:
+	if _fmc(): _fmc().collapse()
+	_get_pm().open("GalleryPage", {})
 
-func _on_achievements_back_pressed():
-	"""Called when back button is pressed on achievements page."""
-	var achievements = get_node_or_null("AchievementsPage")
-	if achievements:
-		achievements.visible = false
+func _on_floating_settings_pressed() -> void:
+	if _fmc(): _fmc().collapse()
+	_get_pm().open("SettingsDialog", {})
 
-func _on_startpage_exchange_pressed():
-	"""Called when StartPage requests to exchange gems for coins."""
-	print("[GameUI] Exchange button pressed on StartPage")
-	AudioManager.play_sfx("ui_click")
-
-	# Open shop UI (where gem exchange happens)
-	var shop = get_node_or_null("ShopUI")
-	if not shop or not is_instance_valid(shop):
-		var shop_script = load("res://scripts/ShopUI.gd")
-		if shop_script:
-			shop = shop_script.new()
-			shop.name = "ShopUI"
-			add_child(shop)
-			print("[GameUI] Created ShopUI")
-
-	if shop:
-		# Configure as fullscreen
-		shop.anchor_left = 0
-		shop.anchor_top = 0
-		shop.anchor_right = 1
-		shop.anchor_bottom = 1
-		shop.visible = true
-		shop.z_index = 150
-		shop.mouse_filter = Control.MOUSE_FILTER_STOP
-
-		# Connect close signal if not already connected
-		if shop.has_signal("shop_closed") and not shop.is_connected("shop_closed", Callable(self, "_on_shop_closed")):
-			shop.connect("shop_closed", Callable(self, "_on_shop_closed"))
-
-func _show_gallery_page():
-	"""Show the gallery as a fullscreen UI"""
-	AudioManager.play_sfx("ui_click")
-
-	# Try to find existing GalleryUI node
-	gallery_ui = get_node_or_null("GalleryUI")
-	if not gallery_ui or not is_instance_valid(gallery_ui):
-		# Prefer a scene if available, otherwise attach the script to a Control
-		var scene_path = "res://scenes/GalleryUI.tscn"
-		if ResourceLoader.exists(scene_path):
-			var packed = load(scene_path)
-			if packed and packed is PackedScene:
-				gallery_ui = packed.instantiate()
-				gallery_ui.name = "GalleryUI"
-				add_child(gallery_ui)
-				print("[GameUI] Instanced GalleryUI from scene")
-			else:
-				print("[GameUI] Failed to instance GalleryUI scene")
-		else:
-			# Fallback: load script and attach to a Control
-			var script = load("res://scripts/GalleryUI.gd")
-			if script:
-				gallery_ui = Control.new()
-				gallery_ui.set_script(script)
-				gallery_ui.name = "GalleryUI"
-				add_child(gallery_ui)
-				print("[GameUI] Instanced GalleryUI via script fallback")
-			else:
-				print("[GameUI] ERROR: GalleryUI resource not found")
-
-	if not gallery_ui:
-		print("[GameUI] ERROR: Could not create GalleryUI")
+# ── Booster button press handler (from BoosterPanelComponent signal) ──────────
+func _on_booster_button_pressed(booster_id: String) -> void:
+	print("[GameUI] Booster button pressed: %s" % booster_id)
+	var rm = _get_rm()
+	var am = _get_am()
+	if am: am.play_sfx("ui_click")
+	if not rm or not rm.has_method("get_booster_count"):
 		return
-
-	# Set metadata to indicate this is a fullscreen panel from the right
-	gallery_ui.set_meta("fullscreen_origin", "right")
-
-	# Configure as fullscreen control
-	var vp = get_viewport().get_visible_rect().size
-	gallery_ui.anchor_left = 0
-	gallery_ui.anchor_top = 0
-	gallery_ui.anchor_right = 1
-	gallery_ui.anchor_bottom = 1
-	gallery_ui.position = Vector2(0, 0)
-	gallery_ui.size = vp
-	gallery_ui.mouse_filter = Control.MOUSE_FILTER_STOP
-	gallery_ui.visible = true
-
-	# Connect close signal from gallery if available
-	if gallery_ui.has_signal("gallery_closed") and not gallery_ui.is_connected("gallery_closed", Callable(self, "_on_gallery_closed")):
-		gallery_ui.connect("gallery_closed", Callable(self, "_on_gallery_closed"))
-
-	# Hide start page and board while gallery is active
-	if start_page:
-		start_page.visible = false
-	# Hide gameplay UI (HUD, boosters) while gallery shown
-	hide_gameplay_ui()
-
-	# Use EffectResolver to clean up ALL visual overlays from the level
-	if EffectResolver:
-		EffectResolver.cleanup_visual_overlays()
-		print("[GameUI] Cleaned up all effect overlays via EffectResolver")
-
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		board.visible = false
-		# Also hide the tile area overlay (semi-transparent background behind tiles)
-		if board.has_method("hide_tile_overlay"):
-			board.hide_tile_overlay()
-			print("[GameUI] Tile overlay hidden for gallery")
-
-	print("[GameUI] Gallery shown")
-
-
-func _on_worldmap_level_selected(level_num: int):
-	"""Handle when a level is selected from the WorldMap."""
-	print("[GameUI] WorldMap level selected: %d" % level_num)
-	AudioManager.play_sfx("ui_click")
-
-	# Close the WorldMap first
-	var world_map = get_node_or_null("WorldMap")
-	if world_map:
-		world_map.queue_free()
-		print("[GameUI] WorldMap closed")
-
-	# Clean up old level visuals before loading new level
-	var board = get_node_or_null("../GameBoard")
-	if board:
-		# Hide tile overlay from previous level
-		if board.has_method("hide_tile_overlay"):
-			board.hide_tile_overlay()
-			print("[GameUI] Old tile overlay hidden before loading new level")
-
-	# Use EffectResolver to clean up ALL visual overlays from previous level
-	if EffectResolver:
-		EffectResolver.cleanup_visual_overlays()
-		print("[GameUI] Cleaned up all effect overlays via EffectResolver")
-
-	# Check if Experience Director flow is active
-	if ExperienceDirector and not ExperienceDirector.current_flow.is_empty():
-		print("[GameUI] ExperienceDirector flow already active")
-
-		# Jump to the selected level in the flow
-		print("[GameUI] Jumping to level %d in current flow" % level_num)
-		ExperienceDirector.start_flow_at_level(level_num)
+	if rm.get_booster_count(booster_id) <= 0:
+		return
+	if booster_id == "shuffle":
+		var board = get_node_or_null("../GameBoard")
+		if board and board.has_method("activate_shuffle_booster"):
+			board.activate_shuffle_booster()
+	elif booster_id == "extra_moves":
+		if rm.has_method("use_booster") and rm.use_booster("extra_moves"):
+			var gm = _get_gm()
+			if gm and gm.has_method("add_moves"):
+				gm.add_moves(10)
 	else:
-		# Flow not active - initialize it
-		print("[GameUI] Loading Experience Director main_story flow from WorldMap...")
-		if ExperienceDirector.load_flow("main_story"):
-			print("[GameUI] ✓ Experience Director flow loaded")
-			print("[GameUI] Starting at level %d..." % level_num)
-			# Jump to the selected level instead of starting from beginning
-			ExperienceDirector.start_flow_at_level(level_num)
-		else:
-			print("[GameUI] ⚠️ Experience Director flow failed to load - loading level directly")
-			# Fallback: load level directly if flow fails
-			await _load_level_by_number(level_num)
+		activate_booster(booster_id)
+		if booster_id == "line_blast":
+			line_blast_direction = "horizontal"
+		elif booster_id == "swap":
+			swap_first_tile = null
 
-func _on_map_button_pressed():
-	"""Handle map button press from floating menu"""
-	print("[GameUI] Map button pressed from floating menu")
-	AudioManager.play_sfx("ui_click")
+# ── PageManager event wiring ──────────────────────────────────────────────────
+func _on_page_opened(page_name: String, node: Node) -> void:
+	if page_name == "StartPage" and node:
+		var sp = node
+		if sp.has_method("show_screen"):
+			sp.call_deferred("show_screen")
+			sp.visible = true
+			sp.modulate = Color(1, 1, 1, 1)
+		if not sp.is_connected("start_pressed",        Callable(self, "_on_startpage_start_pressed")):
+			sp.connect("start_pressed",        Callable(self, "_on_startpage_start_pressed"))
+		if not sp.is_connected("settings_pressed",     Callable(self, "_on_startpage_settings_pressed")):
+			sp.connect("settings_pressed",     Callable(self, "_on_startpage_settings_pressed"))
+		if not sp.is_connected("map_pressed",          Callable(self, "_on_startpage_map_pressed")):
+			sp.connect("map_pressed",          Callable(self, "_on_startpage_map_pressed"))
+		if not sp.is_connected("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed")):
+			sp.connect("achievements_pressed", Callable(self, "_on_startpage_achievements_pressed"))
+		if sp.has_method("set_level_info"):
+			var level_num = _get_next_level_number()
+			var desc = _get_level_description(level_num)
+			# Also tell LevelManager to point at this level so it's ready when play is pressed
+			var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+			if lm and lm.has_method("get_level_index"):
+				var idx = lm.get_level_index(level_num)
+				if idx >= 0:
+					lm.set_current_level(idx)
+			sp.call_deferred("set_level_info", level_num, desc)
+			print("[GameUI] Set StartPage level info: level=%d, desc=%s" % [level_num, desc])
 
-	# Close the menu
-	menu_expanded = false
-	_animate_menu_toggle()
+	if page_name == "WorldMap" and node:
+		if not node.is_connected("level_selected", Callable(self, "_on_worldmap_level_selected")):
+			node.connect("level_selected", Callable(self, "_on_worldmap_level_selected"))
+			print("[GameUI] Connected to WorldMap.level_selected")
 
-	# Show world map
-	_show_worldmap_fullscreen()
+func _on_worldmap_level_selected(level_num: int) -> void:
+	print("[GameUI] WorldMap level_selected received: %d — routing through ExperienceDirector" % level_num)
+	var am = _get_am()
+	if am: am.play_sfx("ui_click")
+	var pm = _get_pm()
+	if pm: pm.close("WorldMap")
+	var ed = _get_ed()
+	if ed and ed.has_method("load_flow") and ed.has_method("start_flow_at_level"):
+		if ed.load_flow("main_story"):
+			ed.start_flow_at_level(level_num)
+			return
+	# Fallback
+	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	if lm and lm.has_method("get_level_index"):
+		var idx = lm.get_level_index(level_num)
+		if idx >= 0: lm.set_current_level(idx)
+	var gm = _get_gm()
+	if gm and gm.has_method("initialize_game"):
+		gm.initialize_game()
 
-func _on_audio_button_pressed():
-	"""Handle audio settings button press from floating menu"""
-	print("[GameUI] Audio settings button pressed from floating menu")
-	AudioManager.play_sfx("ui_click")
+# ── Progress helpers ──────────────────────────────────────────────────────────
+func _get_next_level_number() -> int:
+	## Returns the next level the player should play: levels_completed + 1,
+	## clamped to the total number of levels available.
+	var rm = _get_rm()
+	var completed = rm.levels_completed if (rm and "levels_completed" in rm) else 0
+	var next_level = completed + 1
+	# Clamp to available levels
+	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	if lm and "levels" in lm and lm.levels.size() > 0:
+		next_level = clamp(next_level, 1, lm.levels.size())
+	else:
+		next_level = max(1, next_level)
+	return next_level
 
-	# Close the menu
-	menu_expanded = false
-	_animate_menu_toggle()
-
-	# Show settings dialog (side panel)
-	_show_settings_side()
-
-func _on_shop_menu_button_pressed():
-	"""Handle shop button press from floating menu"""
-	print("[GameUI] Shop button pressed from floating menu")
-	AudioManager.play_sfx("ui_click")
-
-	# Close the menu
-	menu_expanded = false
-	_animate_menu_toggle()
-
-	# Show shop (side panel)
-	_show_shop_side()
-
-func _on_gallery_button_pressed():
-	"""Handle gallery button press from floating menu"""
-	print("[GameUI] Gallery button pressed from floating menu")
-	AudioManager.play_sfx("ui_click")
-
-	# Close the menu
-	menu_expanded = false
-	_animate_menu_toggle()
-
-	# Show gallery (fullscreen)
-	_show_gallery_page()
-
-func _start_menu_glow_animations():
-	"""Start pulsing glow animations for all menu button glow circles"""
-	# Animate menu button glow
-	if menu_button and menu_button.has_node("Glow"):
-		var glow = menu_button.get_node("Glow")
-		_animate_glow_pulse(glow, Color(0.2, 0.6, 1, 0.3), Color(0.2, 0.6, 1, 0.6), 1.5, 0.0)
-	# Animate map button glow
-	if map_button and map_button.has_node("Glow"):
-		var glow = map_button.get_node("Glow")
-		_animate_glow_pulse(glow, Color(0.3, 0.8, 0.3, 0.3), Color(0.3, 0.8, 0.3, 0.6), 1.5, 0.2)
-
-	# Animate audio button glow
-	if audio_button and audio_button.has_node("Glow"):
-		var glow = audio_button.get_node("Glow")
-		_animate_glow_pulse(glow, Color(1, 0.6, 0.2, 0.3), Color(1, 0.6, 0.2, 0.6), 1.5, 0.4)
-
-	# Animate shop button glow
-	if shop_menu_button and shop_menu_button.has_node("Glow"):
-		var glow = shop_menu_button.get_node("Glow")
-		_animate_glow_pulse(glow, Color(0.8, 0.3, 0.8, 0.3), Color(0.8, 0.3, 0.8, 0.6), 1.5, 0.6)
-
-	# Animate gallery button glow
-	if gallery_button and gallery_button.has_node("Glow"):
-		var glow = gallery_button.get_node("Glow")
-		_animate_glow_pulse(glow, Color(0.3, 0.3, 0.8, 0.3), Color(0.3, 0.3, 0.8, 0.6), 1.5, 0.8)
-
-func _animate_glow_pulse(glow_rect: ColorRect, color_from: Color, color_to: Color, duration: float, delay: float):
-	"""Create a pulsing glow animation for a ColorRect"""
-	if not glow_rect:
-		return
-
-	# Wait for delay
-	await get_tree().create_timer(delay).timeout
-
-	# Create infinite pulsing animation
-	var tween = create_tween()
-	tween.set_loops(-1)
-	tween.tween_property(glow_rect, "color", color_to, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(glow_rect, "color", color_from, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-func _find_node_recursive(node: Node, target_name: String) -> Node:
-	"""Recursively find a node by name in the tree"""
-	if node.name == target_name:
-		return node
-	for child in node.get_children():
-		var found = _find_node_recursive(child, target_name)
-		if found:
-			return found
-	return null
+func _get_level_description(level_num: int) -> String:
+	## Returns the description string for the given level number.
+	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	if lm and lm.has_method("get_level_index"):
+		var idx = lm.get_level_index(level_num)
+		if idx >= 0 and lm.has_method("get_level_by_index"):
+			var ld = lm.get_level_by_index(idx)
+			if ld and "description" in ld:
+				return str(ld.description)
+		# Fallback: try get_current_level after setting index
+		if idx >= 0:
+			lm.set_current_level(idx)
+			var ld2 = lm.get_current_level()
+			if ld2 and "description" in ld2:
+				return str(ld2.description)
+	return ""

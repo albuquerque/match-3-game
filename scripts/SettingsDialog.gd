@@ -22,8 +22,85 @@ const SFX_SETTING = "match3/audio/sfx_volume"
 const MUSIC_ENABLED_SETTING = "match3/audio/music_enabled"
 const SFX_ENABLED_SETTING = "match3/audio/sfx_enabled"
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+	if NodeResolvers == null:
+		var s = load("res://scripts/helpers/node_resolvers_api.gd")
+		if s != null and typeof(s) != TYPE_NIL:
+			NodeResolvers = s
+		else:
+			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
+# Cached resolved singletons for this instance
+var _cached_am: Node = null
+var _cached_rm: Node = null
+var _cached_tm: Node = null
+var _cached_vm: Node = null
+var _cached_evbus: Node = null
+
+# Helper resolvers (cached per instance)
+func _am():
+	if is_instance_valid(_cached_am):
+		return _cached_am
+	# Use fallback_autoload to avoid unresolved reference to _get_am in static analysis
+	var a = NodeResolvers._fallback_autoload("AudioManager")
+	if a == null and has_method("get_tree"):
+		var _root = get_tree().root
+		if _root:
+			a = _root.get_node_or_null("AudioManager")
+	_cached_am = a
+	return a
+
+func _rm():
+	if is_instance_valid(_cached_rm):
+		return _cached_rm
+	var r = NodeResolvers._fallback_autoload("RewardManager")
+	if r == null and has_method("get_tree"):
+		var _root = get_tree().root
+		if _root:
+			r = _root.get_node_or_null("RewardManager")
+	_cached_rm = r
+	return r
+
+func _tm():
+	if is_instance_valid(_cached_tm):
+		return _cached_tm
+	var t = NodeResolvers._fallback_autoload("ThemeManager")
+	if t == null and has_method("get_tree"):
+		var _root = get_tree().root
+		if _root:
+			t = _root.get_node_or_null("ThemeManager")
+	_cached_tm = t
+	return t
+
+func _vm():
+	if is_instance_valid(_cached_vm):
+		return _cached_vm
+	var v = NodeResolvers._fallback_autoload("VibrationManager")
+	if v == null and has_method("get_tree"):
+		var _root = get_tree().root
+		if _root:
+			v = _root.get_node_or_null("VibrationManager")
+	_cached_vm = v
+	return v
+
+func _evbus():
+	if is_instance_valid(_cached_evbus):
+		return _cached_evbus
+	var e = NodeResolvers._fallback_autoload("EventBus")
+	if e == null and has_method("get_tree"):
+		var _root = get_tree().root
+		if _root:
+			e = _root.get_node_or_null("EventBus")
+	_cached_evbus = e
+	return e
+
 func _ready():
+	# Initialize dialog
+	_ensure_resolvers()
 	visible = false
+	set_process_input(false)
 
 	# Set translated labels
 	_initialize_ui_labels()
@@ -35,11 +112,12 @@ func _ready():
 	_create_language_selector()
 
 	# Connect close
-	close_button.pressed.connect(_on_close_pressed)
+	if close_button and close_button.has_signal("pressed"):
+		close_button.connect("pressed", self, "_on_close_pressed")
 
 	# Prefer reading current runtime state from AudioManager so UI reflects actual game audio
-	var am = get_node_or_null('/root/AudioManager')
-	var rm = get_node_or_null('/root/RewardManager')
+	var am = _am()
+	var rm = _rm()
 
 	var initial_music_vol = 70
 	var initial_sfx_vol = 80
@@ -81,10 +159,15 @@ func _ready():
 	_update_toggle_visual(sfx_toggle, initial_sfx_enabled)
 
 	# Connect signals - these will apply only when user interacts
-	music_slider.connect("value_changed", Callable(self, "_on_music_slider_changed"))
-	music_toggle.toggled.connect(_on_music_toggled)
-	sfx_slider.connect("value_changed", Callable(self, "_on_sfx_slider_changed"))
-	sfx_toggle.toggled.connect(_on_sfx_toggled)
+	# Connect signals - these will apply only when user interacts
+	if music_slider and music_slider.has_signal("value_changed"):
+		music_slider.connect("value_changed", self, "_on_music_slider_changed")
+	if music_toggle and music_toggle.has_signal("toggled"):
+		music_toggle.connect("toggled", self, "_on_music_toggled")
+	if sfx_slider and sfx_slider.has_signal("value_changed"):
+		sfx_slider.connect("value_changed", self, "_on_sfx_slider_changed")
+	if sfx_toggle and sfx_toggle.has_signal("toggled"):
+		sfx_toggle.connect("toggled", self, "_on_sfx_toggled")
 
 	# Do NOT call _apply_audio_settings() here to avoid muting the game on open
 	# Controls now reflect the current runtime state; changes will be applied by handlers
@@ -115,7 +198,9 @@ func _create_vibration_toggle():
 	var label = Label.new()
 	label.text = "📳 " + tr("UI_VIBRATION") + ":"
 	label.custom_minimum_size = Vector2(150, 0)
-	ThemeManager.apply_bangers_font(label, 18)
+	var tm = _tm()
+	if tm and tm.has_method("apply_bangers_font"):
+		tm.apply_bangers_font(label, 18)
 	vibration_hbox.add_child(label)
 
 	# Add spacer
@@ -127,10 +212,13 @@ func _create_vibration_toggle():
 	# Create toggle button
 	vibration_toggle = CheckButton.new()
 	vibration_toggle.name = "VibrationToggle"
-	vibration_toggle.text = tr("UI_ON") if VibrationManager.is_vibration_enabled() else tr("UI_OFF")
-	vibration_toggle.button_pressed = VibrationManager.is_vibration_enabled()
-	ThemeManager.apply_bangers_font_to_button(vibration_toggle, 16)
-	vibration_toggle.toggled.connect(_on_vibration_toggled)
+	var vm = _vm()
+	label.text = tr("UI_ON") if vm and vm.has_method("is_vibration_enabled") and vm.is_vibration_enabled() else tr("UI_OFF")
+	vibration_toggle.button_pressed = vm.is_vibration_enabled() if vm and vm.has_method("is_vibration_enabled") else false
+	var _tm_local = _tm()
+	if _tm_local and _tm_local.has_method("apply_bangers_font_to_button"):
+		_tm_local.apply_bangers_font_to_button(vibration_toggle, 16)
+	vibration_toggle.connect("toggled", self, "_on_vibration_toggled")
 	vibration_hbox.add_child(vibration_toggle)
 
 	# Add to VBox (after SFX controls)
@@ -167,7 +255,9 @@ func _create_language_selector():
 	language_dropdown = OptionButton.new()
 	language_dropdown.name = "LanguageDropdown"
 	language_dropdown.custom_minimum_size = Vector2(150, 0)
-	ThemeManager.apply_bangers_font_to_button(language_dropdown, 16)
+	var tm2 = _tm()
+	if tm2 and tm2.has_method("apply_bangers_font_to_button"):
+		tm2.apply_bangers_font_to_button(language_dropdown, 16)
 
 	# Add language options
 	var languages = {
@@ -191,7 +281,7 @@ func _create_language_selector():
 		index += 1
 
 	language_dropdown.selected = selected_index
-	language_dropdown.item_selected.connect(_on_language_changed)
+	language_dropdown.connect("item_selected", self, "_on_language_changed")
 	language_hbox.add_child(language_dropdown)
 
 	# Add to VBox (before close button)
@@ -203,20 +293,19 @@ func _create_language_selector():
 func show_dialog():
 	visible = true
 	modulate = Color.TRANSPARENT
-	var t = create_tween()
+	var t = get_tree().create_tween()
 	t.tween_property(self, "modulate", Color.WHITE, 0.15)
 
 func _on_close_pressed():
 	_save_settings()
-	# Ensure saved settings are applied (in case user changed them)
 	_apply_audio_settings()
-	var t = create_tween()
+	var t = get_tree().create_tween()
 	t.tween_property(self, "modulate", Color.TRANSPARENT, 0.15)
 	t.tween_callback(func(): visible = false)
 
 func _save_settings():
 	# Persist to RewardManager save (user://player_progress.json)
-	var rm = get_node_or_null('/root/RewardManager')
+	var rm = _rm()
 	if rm:
 		rm.audio_music_volume = float(music_slider.value) / 100.0
 		rm.audio_sfx_volume = float(sfx_slider.value) / 100.0
@@ -234,7 +323,7 @@ func _save_settings():
 		ProjectSettings.save()
 
 func _apply_audio_settings():
-	var am = get_node_or_null("/root/AudioManager")
+	var am = _am()
 	if not am:
 		return
 	# Slider values are 0..100; AudioManager expects 0.0..1.0
@@ -243,7 +332,7 @@ func _apply_audio_settings():
 	am.set_music_enabled(bool(music_toggle.is_pressed()))
 	am.set_sfx_enabled(bool(sfx_toggle.is_pressed()))
 	# Also update RewardManager in-memory so other UIs reflect change immediately
-	var rm2 = get_node_or_null('/root/RewardManager')
+	var rm2 = _rm()
 	if rm2:
 		rm2.audio_music_volume = float(music_slider.value) / 100.0
 		rm2.audio_sfx_volume = float(sfx_slider.value) / 100.0
@@ -261,9 +350,9 @@ func _on_sfx_slider_changed(value):
 	sfx_volume_label.text = "%d%%" % int(value)
 	_apply_audio_settings()
 	# Play a short preview click so user can hear change
-	var am = get_node_or_null("/root/AudioManager")
-	if am:
-		am.play_sfx("ui_click", 0.8)
+	var am_preview = _am()
+	if am_preview:
+		am_preview.play_sfx("ui_click", 0.8)
 
 func _on_music_toggled(pressed: bool):
 	_update_toggle_visual(music_toggle, pressed)
@@ -275,12 +364,13 @@ func _on_sfx_toggled(pressed: bool):
 
 func _on_vibration_toggled(pressed: bool):
 	"""Handle vibration toggle"""
-	if VibrationManager:
-		VibrationManager.set_vibration_enabled(pressed)
+	var _vm_local = _vm()
+	if _vm_local:
+		_vm_local.set_vibration_enabled(pressed)
 		vibration_toggle.text = tr("UI_ON") if pressed else tr("UI_OFF")
 		# Give haptic feedback when toggling on
-		if pressed:
-			VibrationManager.vibrate_button_press()
+		if pressed and _vm_local.has_method("vibrate_button_press"):
+			_vm_local.vibrate_button_press()
 		print("[SettingsDialog] Vibration %s" % ("enabled" if pressed else "disabled"))
 
 func _on_language_changed(index: int):
@@ -295,7 +385,7 @@ func _on_language_changed(index: int):
 	TranslationServer.set_locale(lang_code)
 
 	# Save language preference
-	var rm = get_node_or_null('/root/RewardManager')
+	var rm = _rm()
 	if rm:
 		# Set language property
 		rm.language = lang_code
@@ -303,10 +393,14 @@ func _on_language_changed(index: int):
 		print("[SettingsDialog] Saved language preference: %s" % lang_code)
 
 	# Play feedback sound
-	AudioManager.play_sfx("ui_click")
+	var _am_local = _am()
+	if _am_local:
+		_am_local.play_sfx("ui_click")
 
 	# Broadcast language change to all listeners
-	EventBus.emit_language_changed(lang_code)
+	var _ev = _evbus()
+	if _ev and _ev.has_method("emit_language_changed"):
+		_ev.emit_language_changed(lang_code)
 
 	# Update UI text immediately by recreating labels
 	_update_ui_after_language_change()

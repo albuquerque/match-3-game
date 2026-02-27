@@ -55,7 +55,9 @@
     {
       "on": "level_loaded",
       "effect": "shader_param_lerp",
-      "params": { "shader": "test_overlay", "param": "u_intensity", "from": 0.0, "to": 1.75, "duration": 1.0 }
+      "anchor": "board",
+      "params": { "shader": "test_overlay", "param": "u_intensity", "from": 0.0, "to": 1.75, "duration": 1.0 },
+      "condition": { "level": 5 }
     },
     {
       "on": "level_loaded",

@@ -10,10 +10,20 @@ signal back_pressed
 @onready var back_button: Button
 
 # Preload gold star texture for consistent display
-var gold_star_texture = preload("res://textures/gold_star.svg")
+var gold_star_texture = load("res://textures/gold_star.svg") as Texture2D
+var Resolver = null
+
+func _ensure_resolvers():
+    if Resolver == null:
+        var s = load("res://scripts/helpers/node_resolvers_api.gd")
+        if s != null and typeof(s) != TYPE_NIL:
+            Resolver = s
+        else:
+            Resolver = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 func _ready():
 	# Create UI programmatically for flexibility
+	_ensure_resolvers()
 	_setup_ui()
 	_update_display()
 
@@ -34,7 +44,7 @@ func _setup_ui():
 	var title = Label.new()
 	title.text = tr("UI_ACHIEVEMENTS_TITLE")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(title, 40)
+	_apply_bangers_font(title, 40)
 	title.add_theme_color_override("font_color", Color(0.5, 0.3, 0.1))  # Deep warm brown
 	vbox.add_child(title)
 
@@ -67,7 +77,7 @@ func _setup_ui():
 	var streak_title = Label.new()
 	streak_title.text = tr("UI_DAILY_STREAK_TITLE")
 	streak_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(streak_title, 28)
+	_apply_bangers_font(streak_title, 28)
 	streak_title.add_theme_color_override("font_color", Color(1, 0.6, 0.2))
 	streak_vbox.add_child(streak_title)
 
@@ -75,13 +85,13 @@ func _setup_ui():
 	streak_label.name = "StreakLabel"
 	streak_label.text = tr("UI_CURRENT_STREAK") % 0
 	streak_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(streak_label, 24)
+	_apply_bangers_font(streak_label, 24)
 	streak_vbox.add_child(streak_label)
 
 	var reward_info = Label.new()
 	reward_info.text = tr("UI_LOGIN_REWARDS_INFO")
 	reward_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(reward_info, 16)
+	_apply_bangers_font(reward_info, 16)
 	reward_info.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	streak_vbox.add_child(reward_info)
 
@@ -103,7 +113,7 @@ func _setup_ui():
 	var badges_title = Label.new()
 	badges_title.text = tr("UI_MILESTONE_BADGES")
 	badges_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(badges_title, 28)
+	_apply_bangers_font(badges_title, 28)
 	badges_title.add_theme_color_override("font_color", Color(0.8, 0.8, 1.0))
 	vbox.add_child(badges_title)
 
@@ -124,7 +134,11 @@ func _setup_ui():
 	vbox.add_child(back_button)
 
 func _update_display():
-	var rm = get_node_or_null("/root/RewardManager")
+	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	if rm == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			rm = rt.get_node_or_null("RewardManager")
 	if not rm:
 		return
 
@@ -154,7 +168,11 @@ func _update_display():
 	_update_badges(streak)
 
 func _can_claim_daily_reward() -> bool:
-	var rm = get_node_or_null("/root/RewardManager")
+	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	if rm == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			rm = rt.get_node_or_null("RewardManager")
 	if not rm:
 		return false
 
@@ -172,7 +190,11 @@ func _update_badges(streak: int):
 	for child in badges_container.get_children():
 		child.queue_free()
 
-	var rm = get_node_or_null("/root/RewardManager")
+	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	if rm == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			rm = rt.get_node_or_null("RewardManager")
 	if not rm:
 		return
 
@@ -268,7 +290,7 @@ func _update_badges(streak: int):
 		var category_header = Label.new()
 		category_header.text = tr(category["title"])
 		category_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		ThemeManager.apply_bangers_font(category_header, 24)
+		_apply_bangers_font(category_header, 24)
 		category_header.add_theme_color_override("font_color", Color(0.4, 0.2, 0.1))  # Rich brown
 		category_header.custom_minimum_size = Vector2(0, 40)
 		badges_container.add_child(category_header)
@@ -351,8 +373,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 	# Title with appropriate colors for light backgrounds
 	var title_label = Label.new()
 	title_label.text = title if unlocked else "🔒 " + title
-	# Consider wrapping title in tr() earlier if titles are fixed keys
-	ThemeManager.apply_bangers_font(title_label, 20)
+	_apply_bangers_font(title_label, 20)
 	if unlocked:
 		title_label.add_theme_color_override("font_color", Color(0.6, 0.4, 0.1))  # Warm brown for completed
 	else:
@@ -362,7 +383,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 	# Description with readable colors
 	var desc_label = Label.new()
 	desc_label.text = desc
-	ThemeManager.apply_bangers_font(desc_label, 14)
+	_apply_bangers_font(desc_label, 14)
 	if unlocked:
 		desc_label.add_theme_color_override("font_color", Color(0.5, 0.3, 0.1))   # Darker brown
 	else:
@@ -385,7 +406,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 	var progress_label = Label.new()
 	progress_label.text = "%d/%d" % [current_progress, target_progress]
 	progress_label.custom_minimum_size = Vector2(60, 0)  # Fixed width for consistent alignment
-	ThemeManager.apply_bangers_font(progress_label, 16)
+	_apply_bangers_font(progress_label, 16)
 	if unlocked:
 		progress_label.add_theme_color_override("font_color", Color(0.6, 0.4, 0.1))  # Warm brown
 	else:
@@ -399,7 +420,11 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 	main_hbox.add_child(right_vbox)
 
 	# Status/reward section
-	var rm = get_node_or_null("/root/RewardManager")
+	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	if rm == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			rm = rt.get_node_or_null("RewardManager")
 	if unlocked and rm:
 		var achievement_progress = rm.get_achievement_progress(achievement_id)
 		if not achievement_progress.get("claimed", false):
@@ -407,7 +432,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 			var claim_button = Button.new()
 			claim_button.text = tr("UI_CLAIM_BUTTON")
 			claim_button.custom_minimum_size = Vector2(100, 40)
-			ThemeManager.apply_bangers_font_to_button(claim_button, 16)
+			_apply_bangers_font_to_button(claim_button, 16)
 			claim_button.add_theme_color_override("font_color", Color(0.8, 0.5, 0.1))  # Golden orange
 			claim_button.pressed.connect(_on_claim_achievement.bind(achievement_id, claim_button))
 			right_vbox.add_child(claim_button)
@@ -417,7 +442,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 			var reward_label = Label.new()
 			reward_label.text = reward
 			reward_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			ThemeManager.apply_bangers_font(reward_label, 12)
+			_apply_bangers_font(reward_label, 12)
 			reward_label.add_theme_color_override("font_color", Color(0.7, 0.45, 0.1))  # Darker gold
 			right_vbox.add_child(reward_label)
 		else:
@@ -425,7 +450,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 			var claimed_label = Label.new()
 			claimed_label.text = tr("UI_CLAIMED")
 			claimed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			ThemeManager.apply_bangers_font(claimed_label, 18)
+			_apply_bangers_font(claimed_label, 18)
 			claimed_label.add_theme_color_override("font_color", Color(0.6, 0.4, 0.1))  # Warm brown
 			right_vbox.add_child(claimed_label)
 	else:
@@ -438,7 +463,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 			status_label.text = tr("UI_LOCKED")
 			status_label.add_theme_color_override("font_color", Color(0.5, 0.6, 0.7))  # Soft blue-gray
 		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		ThemeManager.apply_bangers_font(status_label, 18)
+		_apply_bangers_font(status_label, 18)
 		right_vbox.add_child(status_label)
 
 	return panel
@@ -510,7 +535,11 @@ func _on_claim_achievement(achievement_id: String, button: Button):
 	"""Handle claiming achievement reward"""
 	AudioManager.play_sfx("ui_click")
 
-	var rm = get_node_or_null("/root/RewardManager")
+	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	if rm == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			rm = rt.get_node_or_null("RewardManager")
 	if not rm:
 		return
 
@@ -529,7 +558,11 @@ func _on_claim_achievement(achievement_id: String, button: Button):
 		print("[AchievementsPage] Failed to claim %s: %s" % [achievement_id, result["reason"]])
 
 func _on_claim_reward_pressed():
-	var rm = get_node_or_null("/root/RewardManager")
+	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	if rm == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			rm = rt.get_node_or_null("RewardManager")
 	if not rm:
 		return
 
@@ -648,7 +681,7 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 	var title = Label.new()
 	title.text = tr("UI_DAY_REWARD_CLAIMED") % streak
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(title, 32)
+	_apply_bangers_font(title, 32)
 	title.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	vbox.add_child(title)
 
@@ -661,7 +694,7 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 	var rewards_label = Label.new()
 	rewards_label.text = tr("UI_YOU_RECEIVED")
 	rewards_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(rewards_label, 20)
+	_apply_bangers_font(rewards_label, 20)
 	vbox.add_child(rewards_label)
 
 	# Spacer
@@ -693,9 +726,11 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 			icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			if str(reward_type) == "coins":
-				icon_rect.texture = ThemeManager.load_coin_icon()
+				var _tm_local = _tm()
+				icon_rect.texture = _tm_local.load_coin_icon() if _tm_local and _tm_local.has_method("load_coin_icon") else null
 			else:
-				icon_rect.texture = ThemeManager.load_gem_icon()
+				var _tm_local2 = _tm()
+				icon_rect.texture = _tm_local2.load_gem_icon() if _tm_local2 and _tm_local2.has_method("load_gem_icon") else null
 			reward_line.add_child(icon_rect)
 		else:
 			# Use gold star texture instead of emoji for cross-platform consistency
@@ -708,7 +743,7 @@ func _show_reward_notification(rewards: Dictionary, streak: int):
 
 		var reward_text = Label.new()
 		reward_text.text = " %s x%d" % [name, amount]
-		ThemeManager.apply_bangers_font(reward_text, 24)
+		_apply_bangers_font(reward_text, 24)
 		reward_text.add_theme_color_override("font_color", Color(0.9, 1, 0.9))
 		reward_line.add_child(reward_text)
 
@@ -854,3 +889,26 @@ func set_background_image(image_path: String) -> bool:
 
 	print("[AchievementsPage] Custom background image set: ", image_path)
 	return true
+
+func _tm():
+    # Resolver-first lookup for ThemeManager
+    var tm = null
+    if typeof(NodeResolvers) != TYPE_NIL:
+        tm = NodeResolvers._get_tm()
+    if tm == null and has_method("get_tree"):
+        var rt = get_tree().root
+        if rt:
+            tm = rt.get_node_or_null("ThemeManager")
+    return tm
+
+func _apply_bangers_font(node: Object, size: int):
+    var tm = _tm()
+    if tm and tm.has_method("apply_bangers_font"):
+        tm.apply_bangers_font(node, size)
+    return
+
+func _apply_bangers_font_to_button(btn: Object, size: int):
+    var tm = _tm()
+    if tm and tm.has_method("apply_bangers_font_to_button"):
+        tm.apply_bangers_font_to_button(btn, size)
+    return

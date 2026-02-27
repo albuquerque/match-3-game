@@ -250,7 +250,16 @@ func execute(context: PipelineContext) -> bool:
 	var tween = get_tree().create_tween()
 	tween.tween_property(narrative_container, "modulate:a", 1.0, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
-	var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
+	var narrative_manager = null
+	# Resolver-first fallback using inline preload to avoid static symbol issues
+	var _res = load("res://scripts/helpers/node_resolvers_api.gd")
+	if _res != null and typeof(_res) != TYPE_NIL:
+		narrative_manager = _res._fallback_autoload("NarrativeStageManager")
+	else:
+		narrative_manager = load("res://scripts/helpers/node_resolvers_shim.gd")._fallback_autoload("NarrativeStageManager")
+	# Fallback to scene root lookup without hardcoded '/root/'
+	if narrative_manager == null and root:
+		narrative_manager = root.get_node_or_null("NarrativeStageManager")
 	if not narrative_manager:
 		print("[ShowNarrativeStep] NarrativeStageManager not found - attempting local renderer fallback")
 		# Try to load the renderer script dynamically and render the stage ourselves as a fallback
@@ -309,8 +318,13 @@ func execute(context: PipelineContext) -> bool:
 		# Continue - let the pipeline wait for completion; step will finish when timer or skip triggers
 		return true
 
-	var event_bus = root.get_node_or_null("/root/EventBus")
-	print("[ShowNarrativeStep] EventBus available: %s" % (event_bus != null))
+	var event_bus = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		event_bus = NodeResolvers._get_evbus()
+	# Fallback to scene root
+	if event_bus == null and root:
+		event_bus = root.get_node_or_null("EventBus")
+		print("[ShowNarrativeStep] EventBus available: %s" % (event_bus != null))
 	if event_bus and event_bus.has_signal("narrative_stage_complete"):
 		print("[ShowNarrativeStep] Connecting to EventBus.narrative_stage_complete")
 		if not event_bus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
@@ -479,7 +493,11 @@ func _finish_narrative_stage():
 		print("[ShowNarrativeStep] Stopped auto-advance timer")
 
 	var root = get_tree().root
-	var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
+	var narrative_manager = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		narrative_manager = NodeResolvers._fallback_autoload("NarrativeStageManager")
+	if narrative_manager == null and root:
+		narrative_manager = root.get_node_or_null("NarrativeStageManager")
 	if narrative_manager and narrative_manager.has_method("unlock_stage"):
 		narrative_manager.unlock_stage()
 		print("[ShowNarrativeStep] Unlocked NarrativeStageManager")
@@ -521,11 +539,14 @@ func _finish_narrative_stage():
 	var tree = get_tree()
 	if tree:
 		var root2 = tree.root
-		event_bus = root2.get_node_or_null("/root/EventBus")
-	if event_bus and event_bus.has_signal("narrative_stage_complete"):
-		if event_bus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
-			event_bus.narrative_stage_complete.disconnect(Callable(self, "_on_narrative_complete"))
-			print("[ShowNarrativeStep] Disconnected from EventBus.narrative_stage_complete")
+		if typeof(NodeResolvers) != TYPE_NIL:
+			event_bus = NodeResolvers._get_evbus()
+		if event_bus == null and root2:
+			event_bus = root2.get_node_or_null("EventBus")
+		if event_bus and event_bus.has_signal("narrative_stage_complete"):
+			if event_bus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
+				event_bus.narrative_stage_complete.disconnect(Callable(self, "_on_narrative_complete"))
+				print("[ShowNarrativeStep] Disconnected from EventBus.narrative_stage_complete")
 
 	print("[ShowNarrativeStep] Finished")
 
@@ -539,18 +560,22 @@ func _on_skip_pressed() -> void:
 
 	# CRITICAL: Stop the controller's timers before finishing to prevent ghost state transitions
 	var root = get_tree().root
-	var narrative_manager = root.get_node_or_null("/root/NarrativeStageManager")
+	var narrative_manager = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		narrative_manager = NodeResolvers._fallback_autoload("NarrativeStageManager")
+	if narrative_manager == null and root:
+		narrative_manager = root.get_node_or_null("NarrativeStageManager")
 	if narrative_manager:
-		var controller = narrative_manager.get_node_or_null("NarrativeStageController")
-		if controller:
-			# Stop auto-advance timer
-			if controller.has_method("stop_all_timers"):
-				controller.stop_all_timers()
-				print("[ShowNarrativeStep] Stopped controller timers via stop_all_timers()")
-			# Clear stage to stop any ongoing transitions
-			if narrative_manager.has_method("clear_stage"):
-				narrative_manager.clear_stage(true)  # Force clear
-				print("[ShowNarrativeStep] Force-cleared narrative stage to stop transitions")
+			var controller = narrative_manager.get_node_or_null("NarrativeStageController")
+			if controller:
+				# Stop auto-advance timer
+				if controller.has_method("stop_all_timers"):
+					controller.stop_all_timers()
+					print("[ShowNarrativeStep] Stopped controller timers via stop_all_timers()")
+				# Clear stage to stop any ongoing transitions
+				if narrative_manager.has_method("clear_stage"):
+					narrative_manager.clear_stage(true)  # Force clear
+					print("[ShowNarrativeStep] Force-cleared narrative stage to stop transitions")
 
 	_finish_narrative_stage()
 

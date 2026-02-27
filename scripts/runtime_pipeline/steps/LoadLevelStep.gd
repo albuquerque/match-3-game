@@ -35,6 +35,13 @@ func execute(context: PipelineContext) -> bool:
 		if not EventBus.level_failed.is_connected(_on_level_failed):
 			EventBus.level_failed.connect(_on_level_failed)
 
+	# Ensure GameBoard node itself is visible — FlowCoordinator hides it (old_board.visible = false)
+	# before the flow starts, and show_board_group() only shows BoardContainer children, not
+	# the GameBoard Node2D itself. Must be set before initialize_game() so tiles render.
+	if context.game_board and is_instance_valid(context.game_board):
+		context.game_board.visible = true
+		print("[LoadLevelStep] GameBoard node made visible before level load")
+
 	# Load level via GameUI
 	print("[LoadLevelStep] Attempting to load level via GameUI (has game_ui: %s)" % (context.game_ui != null))
 	if context.game_ui and context.game_ui.has_method("_load_level_by_number"):
@@ -47,8 +54,14 @@ func execute(context: PipelineContext) -> bool:
 			print("[LoadLevelStep] GameUI loader completed for level %d" % level_number)
 		return true
 	elif GameManager:
-		print("[LoadLevelStep] Setting GameManager.level = %d" % level_number)
-		GameManager.level = level_number
+		print("[LoadLevelStep] Setting NodeResolvers._get_gm().level = %d" % level_number)
+		var gm_fb = NodeResolvers._get_gm()
+		if gm_fb:
+			gm_fb.level = level_number
+		else:
+			# Fallback to autoload object if available
+			if typeof(GameManager) != TYPE_NIL:
+				NodeResolvers._get_gm().level = level_number
 		return true
 	else:
 		push_error("[LoadLevelStep] Cannot load level - no GameUI or GameManager")
