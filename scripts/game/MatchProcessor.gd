@@ -80,3 +80,44 @@ static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, g
 				break
 
 	return out
+
+## Resolve a pending special-tile request using SpecialFactory and write it to the grid.
+## Called by GameManager.remove_matches() after scoring/combo.
+## Returns the special type placed (int), or -1 if none.
+static func resolve_special_tile(req: Dictionary, unique: Array, grid: Array, gm: Node) -> int:
+	if not (req is Dictionary) or not req.has("pos"):
+		return -1
+	var rpos = req["pos"]
+	var rtype = req.get("type", "auto")
+	if rpos == null or rpos.x < 0 or rpos.y < 0:
+		return -1
+
+	if rtype == "auto":
+		var sf = gm.SpecialFactory
+		if sf == null:
+			sf = load("res://scripts/game/SpecialFactory.gd")
+			if sf:
+				gm.SpecialFactory = sf
+		if sf == null:
+			print("[MatchProcessor] SpecialFactory script failed to load")
+			return -1
+		var special_type = -1
+		if sf.has_method("determine_special_type"):
+			special_type = sf.determine_special_type(
+				unique, Vector2(int(rpos.x), int(rpos.y)),
+				grid, gm.GRID_WIDTH, gm.GRID_HEIGHT, gm.MIN_MATCH_SIZE
+			)
+		print("[MatchProcessor] SpecialFactory.determine_special_type -> ", special_type)
+		if special_type != -1:
+			if rpos.x >= 0 and rpos.x < gm.GRID_WIDTH and rpos.y >= 0 and rpos.y < gm.GRID_HEIGHT:
+				grid[int(rpos.x)][int(rpos.y)] = int(special_type)
+				print("[MatchProcessor] Special tile placed at ", rpos, " type=", special_type)
+				return special_type
+			else:
+				print("[MatchProcessor] Warning: requested special pos out of bounds: ", rpos)
+		else:
+			print("[MatchProcessor] SpecialFactory found no special for pos ", rpos)
+	else:
+		print("[MatchProcessor] Explicit special type '", rtype, "' at ", rpos, " (future use)")
+	return -1
+
