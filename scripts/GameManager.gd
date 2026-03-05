@@ -291,9 +291,9 @@ func load_current_level():
 	# D2: Booster selection
 	select_level_boosters()
 
-	# Load level-specific chapter effects before emitting level_loaded,
-	# so EffectResolver has bindings registered when the event fires.
-	_load_chapter_effects()
+	# Load the unified level narrative file (data/narrative_stages/levels/level_N.json).
+	# This single file feeds both EffectResolver (effects key) and NarrativeStageManager (states/transitions keys).
+	_load_level_narrative()
 
 	emit_signal("level_loaded")
 
@@ -308,29 +308,45 @@ func load_current_level():
 	if collectible_target > 0:
 		call_deferred("emit_signal", "collectibles_changed", collectibles_collected, collectible_target)
 
-func _load_chapter_effects() -> void:
-	## Load level-specific chapter JSON into EffectResolver.
-	## Checks chapter_level_{N}.json first, falls back to chapter_builtin.json.
+func _load_level_narrative() -> void:
+	## Single entry point for all in-level narrative and visual-effect data.
+	##
+	## Looks for  data/narrative_stages/levels/level_N.json  first.
+	## Falls back to  data/narrative_stages/levels/default.json  when no level-specific
+	## file exists (replaces the old chapter_builtin.json role).
+	##
+	## The unified JSON schema supports both keys:
+	##   "effects"     → loaded into EffectResolver (screen-shake, brightness, etc.)
+	##   "states" / "transitions" → loaded into NarrativeStageManager (image sequences)
+	## Either key may be absent; the loaders silently skip missing keys.
+
+	var level_path    = "res://data/narrative_stages/levels/level_%d.json" % level
+	var default_path  = "res://data/narrative_stages/levels/default.json"
+	var chosen_path   = level_path if FileAccess.file_exists(level_path) else \
+	                   (default_path if FileAccess.file_exists(default_path) else "")
+
+	# --- EffectResolver ---
 	var er = get_node_or_null("/root/EffectResolver")
-	if er == null:
-		return
+	if er:
+		er.clear_effects()
+		er.cleanup_visual_overlays()
+		if chosen_path != "":
+			print("[GameManager] Loading level effects: %s" % chosen_path)
+			er.load_effects_from_file(chosen_path)
+		else:
+			print("[GameManager] No effects file found for level %d" % level)
 
-	# Clear previous level's effects so old bindings don't bleed over
-	er.clear_effects()
-	er.cleanup_visual_overlays()
-
-	var level_path = "res://data/chapters/chapter_level_%d.json" % level
-	if FileAccess.file_exists(level_path):
-		print("[GameManager] Loading chapter effects: %s" % level_path)
-		er.load_effects_from_file(level_path)
-		return
-
-	var builtin_path = "res://data/chapters/chapter_builtin.json"
-	if FileAccess.file_exists(builtin_path):
-		print("[GameManager] Loading builtin chapter effects: %s" % builtin_path)
-		er.load_effects_from_file(builtin_path)
-	else:
-		print("[GameManager] No chapter effects file found for level %d" % level)
+	# --- NarrativeStageManager ---
+	var nsm = get_node_or_null("/root/NarrativeStageManager")
+	if nsm:
+		# Force-clear any leftover active_stage_id from the pre-level cutscene so the
+		# guard inside load_stage_for_level() does not block the in-level stage.
+		if nsm.has_method("clear_stage"):
+			nsm.clear_stage(true)
+		if FileAccess.file_exists(level_path):
+			nsm.load_stage_for_level(level)
+		else:
+			print("[GameManager] No in-level narrative stage for level %d" % level)
 
 
 
@@ -842,6 +858,14 @@ func collectible_landed_at(pos: Vector2, c_type: String = "coin") -> void:
 		objective_manager_ref.report_collectible_collected(1)
 	call_deferred("emit_signal", "collectibles_changed", collectibles_collected, collectible_target)
 
+	# Check if all objectives are now met — mirrors the check in remove_matches() so
+	# collecting the final coin via landing (not just tile removal) triggers level completion.
+	if objective_manager_ref != null and objective_manager_ref.has_method("is_complete"):
+		if objective_manager_ref.is_complete():
+			print("[GameManager] Objectives complete detected (collectible_landed_at)")
+			pending_level_complete = true
+			call_deferred("_perform_level_completion_check")
+
 func _attempt_level_complete() -> void:
 	# C1: Delegated to GameFlowController
 	if _flow_ctrl: _flow_ctrl.attempt_level_complete()
@@ -980,3 +1004,4 @@ func check_and_spread_tiles() -> Array:
 		call_deferred("emit_signal", "spreaders_changed", spreader_count)
 		return new_list
 	return []
+

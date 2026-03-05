@@ -1,9 +1,7 @@
 {
-  "chapter_id": "level_15_dialogue_demo",
-  "version": "1.0.0",
-  "name": "Enhanced Dialogue Demo",
-  "description": "Demonstrates narrative dialogue with images and typewriter effects",
-
+  "id": "level_15_dialogue_demo",
+  "name": "The Prophet",
+  "description": "Enhanced dialogue with images and typewriter effects",
   "effects": [
     {
       "on": "level_loaded",
@@ -15,18 +13,12 @@
         "position": "bottom",
         "reveal_mode": "typewriter",
         "typewriter_speed": 25,
-        "emphasis": [
-          {
-            "word": "LIGHT",
-            "style": "glow"
-          }
-        ],
+        "emphasis": [{ "word": "LIGHT", "style": "glow" }],
         "duration": 0,
         "style": "gospel"
       },
-      "condition": {"level": 15}
+      "condition": { "level": 15 }
     },
-
     {
       "on": "match_cleared",
       "effect": "narrative_dialogue",
@@ -38,9 +30,8 @@
         "typewriter_speed": 35,
         "duration": 2.0
       },
-      "condition": {"level": 15}
+      "condition": { "level": 15 }
     },
-
     {
       "on": "special_tile_activated",
       "effect": "narrative_dialogue",
@@ -50,21 +41,11 @@
         "image": "res://data/images/dialogue/prophet_amazed.svg",
         "position": "center",
         "reveal_mode": "typewriter",
-        "emphasis": [
-          {
-            "word": "POWER",
-            "style": "shake"
-          },
-          {
-            "word": "divine",
-            "style": "rainbow"
-          }
-        ],
+        "emphasis": [{ "word": "POWER", "style": "shake" }, { "word": "divine", "style": "rainbow" }],
         "duration": 0
       },
-      "condition": {"level": 15}
+      "condition": { "level": 15 }
     },
-
     {
       "on": "level_complete",
       "effect": "narrative_dialogue",
@@ -75,20 +56,11 @@
         "position": "center",
         "reveal_mode": "typewriter",
         "typewriter_speed": 20,
-        "emphasis": [
-          {
-            "word": "DARKNESS",
-            "style": "shake"
-          },
-          {
-            "word": "light",
-            "style": "glow"
-          }
-        ],
+        "emphasis": [{ "word": "DARKNESS", "style": "shake" }, { "word": "light", "style": "glow" }],
         "duration": 4.0,
         "style": "gospel"
       },
-      "condition": {"level": 15}
+      "condition": { "level": 15 }
     }
   ]
 }

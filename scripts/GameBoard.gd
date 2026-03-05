@@ -1596,8 +1596,8 @@ func _check_collectibles_at_bottom():
 
 		print("[GameBoard] Collected collectible with animation")
 
-	if GameManager.pending_level_complete or GameManager.level_transitioning:
-		print("[GameBoard] Level completion pending/transitioning - skipping post-collection cascade")
+	if GameManager.level_transitioning:
+		print("[GameBoard] Level already transitioning - skipping post-collection cascade")
 		return
 
 	print("[GameBoard] Applying gravity after collectible collection")

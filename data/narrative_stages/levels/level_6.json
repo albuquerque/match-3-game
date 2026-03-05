@@ -1,10 +1,7 @@
 {
-  "chapter_id": "level_6_demo",
-  "version": "1.0.0",
-  "requires_engine_version": "1.0.0",
+  "id": "level_6_demo",
   "name": "Level 6 Demo Effects",
-  "description": "Demo effects for level 6: screen flash and background tint",
-
+  "description": "Screen flash and background tint",
   "effects": [
     {
       "on": "level_loaded",

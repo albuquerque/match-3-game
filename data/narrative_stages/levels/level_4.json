@@ -1,16 +1,12 @@
 {
-  "chapter_id": "levels_4_plus_common",
-  "version": "1.0.0",
-  "requires_engine_version": "1.0.0",
-  "name": "Levels 4+ Narrative Effects",
-  "description": "A common set of narrative effects for built-in levels 4 and above (test harness)",
-
+  "id": "levels_4_plus_common",
+  "name": "Levels 4+ Common Effects",
+  "description": "Common narrative effects for level 4 and above",
   "assets": {
     "animations": {
       "test_anim": "res://assets/animations/test_animation.tres"
     }
   },
-
   "effects": [
     {
       "on": "level_loaded",
@@ -59,7 +55,7 @@
     },
     {
       "on": "level_loaded",
-       "effect": "timeline_sequence",
+      "effect": "timeline_sequence",
       "params": {
         "sequence": [
           { "delay": 0.3, "binding": { "effect": "play_animation", "params": { "animation": "test_anim", "duration": 0.5 } } }

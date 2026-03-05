@@ -1,4 +1,4 @@
-﻿# Match-3 Game Architecture Refactoring Specification
+﻿﻿# Match-3 Game Architecture Refactoring Specification
 
 ## Document Version: 2.1 (Hub-Based Navigation with Narrative Events)
 **Date:** March 3, 2026
@@ -93,6 +93,7 @@ This section is the **single source of truth** for the refactor effort. Update i
 - [x] Spreader, Unmovable, Collectible objective types — working
 - [x] Bonus cascade after level complete — working
 - [x] Level completion detection — working
+- [x] **Data consolidation — `data/chapters/` deleted.** All in-level effect + narrative data now lives in `data/narrative_stages/levels/level_N.json` (unified schema: `effects` key → EffectResolver, `states`/`transitions` keys → NarrativeStageManager). Global fallback is `data/narrative_stages/levels/default.json`. `GameManager._load_chapter_effects()` + `_load_in_level_narrative()` collapsed into single `_load_level_narrative()`.
 
 ---
 

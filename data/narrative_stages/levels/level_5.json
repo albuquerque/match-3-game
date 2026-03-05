@@ -1,10 +1,7 @@
 {
-  "chapter_id": "level_5_demo",
-  "version": "1.0.0",
-  "requires_engine_version": "1.0.0",
+  "id": "level_5_demo",
   "name": "Level 5 Demo Effects",
-  "description": "Demo effects for level 5: screen overlay (texture & tint), narrative dialog, shader param lerp, and play animation",
-
+  "description": "Screen overlay, shader param lerp, and animation effects",
   "assets": {
     "shaders": {
       "test_overlay": "res://assets/shaders/test_overlay.shader"
@@ -18,7 +15,6 @@
       "sparkles": "res://textures/overlay_sparkles.svg"
     }
   },
-
   "effects": [
     {
       "on": "level_loaded",
@@ -32,25 +28,12 @@
     {
       "on": "level_loaded",
       "effect": "screen_overlay",
-      "params": {
-        "texture": "vignette",
-        "fade_in": 1.0,
-        "hold": 2.0,
-        "fade_out": 1.0,
-        "intensity": 0.6,
-        "scale": "cover"
-      }
+      "params": { "texture": "vignette", "fade_in": 1.0, "hold": 2.0, "fade_out": 1.0, "intensity": 0.6, "scale": "cover" }
     },
     {
       "on": "level_loaded",
       "effect": "screen_overlay",
-      "params": {
-        "tint": "gold",
-        "fade_in": 0.8,
-        "hold": 1.5,
-        "fade_out": 1.0,
-        "intensity": 0.2
-      }
+      "params": { "tint": "gold", "fade_in": 0.8, "hold": 1.5, "fade_out": 1.0, "intensity": 0.2 }
     },
     {
       "on": "level_loaded",
@@ -76,26 +59,12 @@
     {
       "on": "level_complete",
       "effect": "screen_overlay",
-      "params": {
-        "texture": "victory_rays",
-        "fade_in": 0.3,
-        "hold": 1.2,
-        "fade_out": 0.8,
-        "intensity": 0.7,
-        "scale": "cover"
-      }
+      "params": { "texture": "victory_rays", "fade_in": 0.3, "hold": 1.2, "fade_out": 0.8, "intensity": 0.7, "scale": "cover" }
     },
     {
       "on": "level_complete",
       "effect": "screen_overlay",
-      "params": {
-        "texture": "sparkles",
-        "fade_in": 0.5,
-        "hold": 1.0,
-        "fade_out": 0.6,
-        "intensity": 0.8,
-        "scale": "cover"
-      }
+      "params": { "texture": "sparkles", "fade_in": 0.5, "hold": 1.0, "fade_out": 0.6, "intensity": 0.8, "scale": "cover" }
     }
   ]
 }
