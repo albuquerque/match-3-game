@@ -1,5 +1,8 @@
 extends Node
 
+# Note: GameManager is exposed via autoload (project settings). Avoid declaring `class_name GameManager` here
+# to prevent hiding the autoload singleton during script parsing.
+
 signal score_changed(new_score)
 signal level_changed(new_level)
 signal moves_changed(moves_left)
@@ -7,8 +10,58 @@ signal game_over
 signal level_complete
 signal level_loaded
 signal collectibles_changed(collected, target)
+signal remove_matches_done(tiles_removed)
+signal gravity_applied(moved)
+signal fill_complete(created_positions)
 
 # Game configuration
+var NodeResolverAPI = null
+var SpecialFactory = null
+var MatchProcessor = null
+var GravityService = null
+
+# ObjectiveManager integration
+var ObjectiveManagerScript = null
+var objective_manager_ref: Node = null
+
+# C1: GameFlowController — owns level-complete / fail / bonus-cascade logic
+var _flow_ctrl: Node = null
+
+# D1: LevelLoader — owns level data fetching and field extraction
+var _level_loader: Node = null
+
+# D2: BoosterSelector script reference (static methods only)
+var _booster_selector = null
+
+func _init_resolvers():
+	if NodeResolverAPI == null:
+		NodeResolverAPI = load("res://scripts/helpers/node_resolvers_api.gd")
+	if SpecialFactory == null:
+		SpecialFactory = load("res://scripts/game/SpecialFactory.gd")
+	if MatchProcessor == null:
+		MatchProcessor = load("res://scripts/game/MatchProcessor.gd")
+	if typeof(GravityService) == TYPE_NIL:
+		GravityService = load("res://scripts/game/GravityService.gd")
+	if ObjectiveManagerScript == null:
+		ObjectiveManagerScript = load("res://scripts/game/ObjectiveManager.gd")
+	# C1: Instantiate GameFlowController
+	if _flow_ctrl == null:
+		var gfc_script = load("res://scripts/game/GameFlowController.gd")
+		if gfc_script and gfc_script is Script:
+			_flow_ctrl = gfc_script.new()
+			_flow_ctrl.setup(self)
+			add_child(_flow_ctrl)
+	# D1: Instantiate LevelLoader
+	if _level_loader == null:
+		var ll_script = load("res://scripts/game/LevelLoader.gd")
+		if ll_script and ll_script is Script:
+			_level_loader = ll_script.new()
+			_level_loader.setup(self)
+			add_child(_level_loader)
+	# D2: Load BoosterSelector (static methods only, no Node needed)
+	if _booster_selector == null:
+		_booster_selector = load("res://scripts/game/BoosterSelector.gd")
+
 var GRID_WIDTH = 8
 var GRID_HEIGHT = 8
 const TILE_TYPES = 6
@@ -48,7 +101,6 @@ signal unmovables_changed(cleared, target)
 # Spreader clearing tracking
 var use_spreader_objective: bool = false  # If true, level completes when spreader_count reaches 0
 var spreader_count: int = 0  # Current number of spreaders on the board
-var spreaders_destroyed_this_turn: bool = false  # Track if any spreaders were destroyed during current turn
 
 signal spreaders_changed(current_count)
 
@@ -95,6 +147,7 @@ var unmovable_map: Dictionary = {}
 
 # Spreader tracking
 var spreader_positions: Array = []  # Tracks all active spreader positions
+var spreaders_destroyed_this_turn: Array = []  # Positions cleared this turn — immune from re-infection
 var spreader_grace_default: int = 2  # Default grace period from level configuration
 var max_spreaders: int = 20  # Maximum number of spreaders allowed on board
 var spreader_spread_limit: int = 0  # Max new spreaders per move (0 = unlimited, 1 = slow spread)
@@ -115,17 +168,80 @@ const TIER_WEIGHTS = {
 	"rare": 0.10         # 10% chance
 }
 
+# Board reference - set by GameBoard at runtime to avoid repeated get_node lookups
+var board_ref: Node = null
+
+func register_board(board: Node) -> void:
+	"""Register the active GameBoard instance so GameManager can use it without scene-tree lookups.
+	Also connect to board request signals to accept delegated responsibilities (remove_matches, gravity, refill).
+	"""
+	board_ref = board
+	print("[GameManager] register_board: ", board)
+
+	# Connect request signals from board to local handlers so GameBoard can delegate logic safely
+	if board_ref:
+		if board_ref.has_signal("request_remove_matches"):
+			board_ref.connect("request_remove_matches", Callable(self, "_on_board_request_remove_matches"))
+		if board_ref.has_signal("request_apply_gravity"):
+			board_ref.connect("request_apply_gravity", Callable(self, "_on_board_request_apply_gravity"))
+		if board_ref.has_signal("request_fill_empty"):
+			board_ref.connect("request_fill_empty", Callable(self, "_on_board_request_fill_empty"))
+
+func unregister_board(board: Node) -> void:
+	"""Unregister the GameBoard if it matches the current registered instance and disconnect signals."""
+	if board_ref == board:
+		# Disconnect signals defensively
+		if board_ref.has_signal("request_remove_matches") and board_ref.is_connected("request_remove_matches", Callable(self, "_on_board_request_remove_matches")):
+			board_ref.disconnect("request_remove_matches", Callable(self, "_on_board_request_remove_matches"))
+		if board_ref.has_signal("request_apply_gravity") and board_ref.is_connected("request_apply_gravity", Callable(self, "_on_board_request_apply_gravity")):
+			board_ref.disconnect("request_apply_gravity", Callable(self, "_on_board_request_apply_gravity"))
+		if board_ref.has_signal("request_fill_empty") and board_ref.is_connected("request_fill_empty", Callable(self, "_on_board_request_fill_empty")):
+			board_ref.disconnect("request_fill_empty", Callable(self, "_on_board_request_fill_empty"))
+
+		board_ref = null
+		print("[GameManager] unregister_board: cleared board_ref")
+
+func get_board() -> Node:
+	# Preferred: return registered board_ref; fallback to direct scene root lookup only
+	if board_ref != null:
+		return board_ref
+	# Fallback: try to find GameBoard node on the scene tree root
+	var ml = Engine.get_main_loop()
+	if ml != null and ml is SceneTree:
+		var rt = ml.root
+		if rt:
+			var gb = rt.get_node_or_null("GameBoard")
+			if gb:
+				return gb
+	# No reliable resolver found
+	return null
+
 func _ready():
 	print("[GameManager] _ready() - initializing")
-	# Get the autoloaded LevelManager
-	level_manager = get_node_or_null("/root/LevelManager")
+	# Initialize resolver helper at runtime (avoid parse-time preload)
+	_init_resolvers()
+	# Get the autoloaded LevelManager via resolver
+	if typeof(NodeResolverAPI) != TYPE_NIL:
+		level_manager = NodeResolverAPI._get_lm()
+	else:
+		# fallback to root lookup
+		if has_method("get_tree"):
+			var rt = get_tree().root
+			if rt:
+				level_manager = rt.get_node_or_null("LevelManager")
 	if not level_manager:
-		print("[GameManager] WARNING: LevelManager not found as autoload!")
+		print("[GameManager] WARNING: LevelManager autoload not found via NodeResolvers!")
 
-	# Get the autoloaded ThemeManager
-	theme_manager = get_node_or_null("/root/ThemeManager")
+	# Get the autoloaded ThemeManager via resolver
+	if typeof(NodeResolverAPI) != TYPE_NIL:
+		theme_manager = NodeResolverAPI._get_tm()
+	else:
+		if has_method("get_tree"):
+			var rt2 = get_tree().root
+			if rt2:
+				theme_manager = rt2.get_node_or_null("ThemeManager")
 	if not theme_manager:
-		print("[GameManager] WARNING: ThemeManager not found as autoload!")
+		print("[GameManager] WARNING: ThemeManager autoload not found via NodeResolvers!")
 
 	# Do NOT auto-initialize the game here. The UI will present a StartPage and call initialize_game() when the
 	# player explicitly starts the level
@@ -161,354 +277,198 @@ func reset_state_for_new_level():
 	print("[GameManager] reset_state_for_new_level: cleared transient flags")
 
 func load_current_level():
-	"""Load the current level from LevelManager"""
-	# Reset transient state before loading to ensure board isn't stuck
+	# D1: Data loading delegated to LevelLoader; post-load signals emitted here.
 	reset_state_for_new_level()
-	processing_moves = false  # Reset the processing flag when loading a level
-	score = 0  # Reset score for the new level
-	combo_count = 0  # Reset combo count
+	score = 0
+	combo_count = 0
 
-	print("[GameManager] load_current_level() - loading level data")
-
-	# Ensure LevelManager is available and has loaded levels (wait briefly if needed)
-	if not level_manager or (level_manager and level_manager.levels.size() == 0):
-		print("[GameManager] LevelManager not ready yet - waiting up to 2s for levels to load")
-		var attempts = 0
-		var max_attempts = 40  # 40 * 0.05s = 2s
-		while (not level_manager or level_manager.levels.size() == 0) and attempts < max_attempts:
-			level_manager = get_node_or_null("/root/LevelManager")
-			await get_tree().create_timer(0.05).timeout
-			attempts += 1
-		if attempts >= max_attempts:
-			print("[GameManager] Waited 2s but LevelManager did not become ready")
-
-	if not level_manager:
-		print("[GameManager] ERROR: LevelManager still not available after waiting; using fallback default level")
-
-	var level_data = null
-	if level_manager:
-		level_data = level_manager.get_current_level()
-
-	if level_data:
-		print("[GameManager] Found level_data: level=", level_data.level_number)
-		print("[GameManager]   width=", level_data.width, ", height=", level_data.height)
-		print("[GameManager]   target_score=", level_data.target_score)
-		print("[GameManager]   moves=", level_data.moves)
-		print("[GameManager]   theme='", level_data.theme, "'")
-		print("[GameManager]   description='", level_data.description, "'")
-
-		GRID_WIDTH = level_data.width
-		GRID_HEIGHT = level_data.height
-		target_score = level_data.target_score
-		moves_left = level_data.moves
-		level = level_data.level_number
-
-		# Load collectible target (0 = score-based level)
-		collectible_target = level_data.collectible_target if "collectible_target" in level_data else 0
-		collectible_type = level_data.collectible_type if "collectible_type" in level_data else "coin"
-		collectibles_collected = 0
-
-		# Load unmovable type and target
-		unmovable_type = level_data.unmovable_type if "unmovable_type" in level_data else "snow"
-		unmovable_target = level_data.unmovable_target if "unmovable_target" in level_data else 0
-		unmovables_cleared = 0
-
-		# Load spreader configuration
-		spreader_grace_default = level_data.spreader_grace_moves if "spreader_grace_moves" in level_data else 2
-		max_spreaders = level_data.max_spreaders if "max_spreaders" in level_data else 20
-		spreader_spread_limit = level_data.spreader_spread_limit if "spreader_spread_limit" in level_data else 0
-		use_spreader_objective = level_data.spreader_target if "spreader_target" in level_data else false
-		spreader_type = level_data.spreader_type if "spreader_type" in level_data else "virus"
-		spreader_count = 0  # Will be set after layout is parsed
-
-		print("[GameManager]   unmovable_type='", unmovable_type, "'")
-		print("[GameManager]   spreader_type='", spreader_type, "'")
-		print("[GameManager]   spreader_grace_default=", spreader_grace_default)
-		print("[GameManager]   max_spreaders=", max_spreaders)
-		print("[GameManager]   spreader_spread_limit=", spreader_spread_limit, " (0=unlimited)")
-		print("[GameManager]   use_spreader_objective=", use_spreader_objective)
-
-		if unmovable_target > 0:
-			print("[GameManager]   unmovable_target=", unmovable_target, " (must clear all unmovables)")
-		else:
-			print("[GameManager]   No unmovable target (score/collectible based)")
-
-		if collectible_target > 0:
-			print("[GameManager]   collectible_target=", collectible_target, " (collectible-based level)")
-			print("[GameManager]   collectible_type='", collectible_type, "'")
-		else:
-			print("[GameManager]   Score-based level (no collectible target)")
-
-		# Set theme if specified in level data
-		if theme_manager:
-			if level_data.theme != "" and level_data.theme != null:
-				theme_manager.set_theme_by_name(level_data.theme)
-				print("[GameManager] Applied theme from JSON: ", level_data.theme)
-			else:
-				# Default: use legacy for odd levels, modern for even levels
-				if level % 2 == 1:
-					theme_manager.set_theme_by_name("legacy")
-				else:
-					theme_manager.set_theme_by_name("modern")
-				print("[GameManager] Applied default theme for level ", level, ": ", "legacy" if level % 2 == 1 else "modern")
-
-		create_empty_grid()
-		fill_grid_from_layout(level_data.grid_layout)
-
-		# If the level JSON provided a hard_textures mapping, attach it to unmovable_map entries
-		# so GameBoard.create_visual_grid can pick up per-tile texture lists and reveal info.
-		if typeof(level_data.hard_textures) == TYPE_DICTIONARY:
-			var ht_map = level_data.hard_textures
-			var hr_map = {}
-			if typeof(level_data.hard_reveals) == TYPE_DICTIONARY:
-				hr_map = level_data.hard_reveals
-			for key in unmovable_map.keys():
-				var entry = unmovable_map[key]
-				if typeof(entry) == TYPE_DICTIONARY and entry.has("hard") and entry["hard"]:
-					var htype = entry.get("type", "")
-					if htype != "" and ht_map.has(htype):
-						entry["textures"] = ht_map[htype]
-						print("[GameManager] Attached hard_textures for", htype, "to unmovable at", key)
-					if htype != "" and hr_map.has(htype):
-						entry["reveals"] = hr_map[htype]
-						print("[GameManager] Attached hard_reveals for", htype, "to unmovable at", key)
-
-		# Load spreader_textures mapping if provided
-		spreader_textures_map = {}
-		if "spreader_textures" in level_data and typeof(level_data.spreader_textures) == TYPE_DICTIONARY:
-			spreader_textures_map = level_data.spreader_textures
-			print("[GameManager] Loaded spreader_textures mapping with ", spreader_textures_map.size(), " types")
-
-		print("Loaded level ", level, ": ", level_data.description)
-		print("Grid size: ", GRID_WIDTH, "x", GRID_HEIGHT)
-		print("Target: ", target_score, " in ", moves_left, " moves")
-		initialized = true
-		print("[GameManager] ✓ Level loaded successfully, initialized = true")
-
-		# Debug: print a small snapshot of the grid to help UI select tiles
-		print("[GameManager] Grid snapshot after load:")
-		for y in range(GRID_HEIGHT):
-			var row = []
-			for x in range(GRID_WIDTH):
-				row.append(grid[x][y])
-			print(row)
+	if _level_loader:
+		await _level_loader.load_level()
 	else:
-		# Fallback to default grid
-		print("No level data found, using default grid")
-		GRID_WIDTH = 8
-		GRID_HEIGHT = 8
-		target_score = 10000
-		moves_left = 30
-		if theme_manager:
-			theme_manager.set_theme_by_name("modern")
-		create_empty_grid()
-		fill_initial_grid()
-		initialized = true
+		# Fallback if LevelLoader not yet instantiated
+		await _load_current_level_inline()
 
-		# Debug: print a small snapshot of the fallback grid
-		print("[GameManager] Fallback grid snapshot:")
-		for y in range(GRID_HEIGHT):
-			var row = []
-			for x in range(GRID_WIDTH):
-				row.append(grid[x][y])
-			print(row)
-
-	# Select random boosters for this level BEFORE emitting level_loaded
-	# This ensures the UI can display them when it receives the signal
+	# D2: Booster selection
 	select_level_boosters()
+
+	# Load the unified level narrative file (data/narrative_stages/levels/level_N.json).
+	# This single file feeds both EffectResolver (effects key) and NarrativeStageManager (states/transitions keys).
+	_load_level_narrative()
 
 	emit_signal("level_loaded")
 
-	# Emit EventBus event for narrative system
-	if EventBus:
-		print("[GameManager] Emitting EventBus.level_loaded for level_%d" % level)
-		EventBus.emit_level_loaded("level_%d" % level, {"level": level, "target": target_score})
-	else:
-		print("[GameManager] ⚠️ EventBus not available - cannot emit level_loaded event for narrative effects")
+	# Notify EventBus for narrative pipeline
+	var _eb = NodeResolverAPI._get_evbus() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	if _eb:
+		_eb.emit_level_loaded("level_%d" % level, {"level": level, "target": target_score})
 
-	# Emit unmovables_changed after level_loaded to ensure UI is ready
+	# Deferred HUD signals — UI may not be ready at load_level call time
 	if unmovable_target > 0:
 		call_deferred("emit_signal", "unmovables_changed", unmovables_cleared, unmovable_target)
-
-	# Emit collectibles_changed after level_loaded for consistency
 	if collectible_target > 0:
 		call_deferred("emit_signal", "collectibles_changed", collectibles_collected, collectible_target)
 
-	# Load narrative stage for this level if available
-	var narrative_manager = get_node_or_null("/root/NarrativeStageManager")
-	if narrative_manager:
-		narrative_manager.load_stage_for_level(level)
+func _load_level_narrative() -> void:
+	## Single entry point for all in-level narrative and visual-effect data.
+	##
+	## Looks for  data/narrative_stages/levels/level_N.json  first.
+	## Falls back to  data/narrative_stages/levels/default.json  when no level-specific
+	## file exists (replaces the old chapter_builtin.json role).
+	##
+	## The unified JSON schema supports both keys:
+	##   "effects"     → loaded into EffectResolver (screen-shake, brightness, etc.)
+	##   "states" / "transitions" → loaded into NarrativeStageManager (image sequences)
+	## Either key may be absent; the loaders silently skip missing keys.
 
-	print("[GameManager] ✓ load_current_level() completed, initialized =", initialized)
+	var level_path    = "res://data/narrative_stages/levels/level_%d.json" % level
+	var default_path  = "res://data/narrative_stages/levels/default.json"
+	var chosen_path   = level_path if FileAccess.file_exists(level_path) else \
+	                   (default_path if FileAccess.file_exists(default_path) else "")
 
-
-func select_level_boosters():
-	"""Select 3-5 random boosters for the current level based on tier weights"""
-	var rng = RandomNumberGenerator.new()
-	# Use level number as seed for consistent selection per level
-	rng.seed = hash(level)
-
-	# Determine how many boosters to offer (3-5)
-	var booster_count = rng.randi_range(3, 5)
-
-	available_boosters.clear()
-	var selected_set = {}  # Track selected to avoid duplicates
-
-	print("[GameManager] Selecting %d boosters for level %d" % [booster_count, level])
-
-	# Selection strategy:
-	# - Always include at least 1 common booster
-	# - Remaining slots based on weighted probability
-
-	# First, guarantee 1 common booster
-	var common_list = BOOSTER_TIERS["common"].duplicate()
-	common_list.shuffle()
-	var first_common = common_list[0]
-	available_boosters.append(first_common)
-	selected_set[first_common] = true
-	print("[GameManager]   Guaranteed common: %s" % first_common)
-
-	# Fill remaining slots with weighted random selection
-	var attempts = 0
-	var max_attempts = 50  # Prevent infinite loop
-
-	while available_boosters.size() < booster_count and attempts < max_attempts:
-		attempts += 1
-
-		# Roll for tier based on weights
-		var roll = rng.randf()
-		var tier = ""
-
-		if roll < TIER_WEIGHTS["rare"]:
-			tier = "rare"
-		elif roll < (TIER_WEIGHTS["rare"] + TIER_WEIGHTS["uncommon"]):
-			tier = "uncommon"
+	# --- EffectResolver ---
+	var er = get_node_or_null("/root/EffectResolver")
+	if er:
+		er.clear_effects()
+		er.cleanup_visual_overlays()
+		if chosen_path != "":
+			print("[GameManager] Loading level effects: %s" % chosen_path)
+			er.load_effects_from_file(chosen_path)
 		else:
-			tier = "common"
+			print("[GameManager] No effects file found for level %d" % level)
 
-		# Select random booster from tier
-		var tier_boosters = BOOSTER_TIERS[tier].duplicate()
-		tier_boosters.shuffle()
+	# --- NarrativeStageManager ---
+	var nsm = get_node_or_null("/root/NarrativeStageManager")
+	if nsm:
+		# Force-clear any leftover active_stage_id from the pre-level cutscene so the
+		# guard inside load_stage_for_level() does not block the in-level stage.
+		if nsm.has_method("clear_stage"):
+			nsm.clear_stage(true)
+		if FileAccess.file_exists(level_path):
+			nsm.load_stage_for_level(level)
+		else:
+			print("[GameManager] No in-level narrative stage for level %d" % level)
 
-		# Find first non-selected booster from this tier
-		for booster in tier_boosters:
-			if not selected_set.has(booster):
-				available_boosters.append(booster)
-				selected_set[booster] = true
-				print("[GameManager]   Selected %s: %s" % [tier, booster])
-				break
 
-	print("[GameManager] Final booster selection for level %d: " % level, available_boosters)
 
+func _load_current_level_inline():
+	## Emergency inline fallback used only when LevelLoader is unavailable.
+	if not level_manager or level_manager.levels.size() == 0:
+		var attempts = 0
+		while (not level_manager or level_manager.levels.size() == 0) and attempts < 40:
+			level_manager = NodeResolverAPI._get_lm()
+			await get_tree().create_timer(0.05).timeout
+			attempts += 1
+	var ld = level_manager.get_current_level() if level_manager else null
+	if ld:
+		# LevelData is a typed object — use direct property access
+		GRID_WIDTH = ld.width
+		GRID_HEIGHT = ld.height
+		target_score = ld.target_score
+		moves_left = ld.moves
+		level = ld.level_number
+		collectible_target = ld.collectible_target
+		collectibles_collected = 0
+		unmovable_target = ld.unmovable_target
+		unmovables_cleared = 0
+		spreader_count = 0
+		create_empty_grid()
+		fill_grid_from_layout(ld.grid_layout)
+		initialized = true
+	else:
+		GRID_WIDTH = 8; GRID_HEIGHT = 8; target_score = 10000; moves_left = 30
+		create_empty_grid(); fill_initial_grid(); initialized = true
+
+
+func select_level_boosters() -> Array:
+	# D2: Delegated to BoosterSelector — deterministic per-level selection
+	if _booster_selector and _booster_selector.has_method("select"):
+		available_boosters = _booster_selector.select(level)
+	else:
+		# Inline fallback using the constants still declared on GameManager
+		available_boosters = _select_boosters_inline()
 	return available_boosters
 
+func _select_boosters_inline() -> Array:
+	# Fallback if BoosterSelector fails to load
+	var rng = RandomNumberGenerator.new()
+	rng.seed = hash(level)
+	var count = rng.randi_range(3, 5)
+	var result: Array = []
+	var seen: Dictionary = {}
+	var common = BOOSTER_TIERS["common"].duplicate()
+	common.shuffle()
+	result.append(common[0]); seen[common[0]] = true
+	var attempts = 0
+	while result.size() < count and attempts < 50:
+		attempts += 1
+		var roll = rng.randf()
+		var tier = "rare" if roll < TIER_WEIGHTS["rare"] else ("uncommon" if roll < TIER_WEIGHTS["rare"] + TIER_WEIGHTS["uncommon"] else "common")
+		for b in BOOSTER_TIERS[tier].duplicate():
+			if not seen.has(b): result.append(b); seen[b] = true; break
+	return result
+
+func _new_game_state() -> Object:
+	# B3: Factory helper — instantiate GameState model (no class_name, so load().new() always)
+	var gs_script = load("res://scripts/model/GameState.gd")
+	if gs_script and gs_script is Script:
+		return gs_script.new(GRID_WIDTH, GRID_HEIGHT, TILE_TYPES)
+	return null
+
+func _apply_game_state(gs: Object) -> void:
+	# B3: Copy fields out of a GameState instance — use get() since gs has no class_name
+	grid = gs.get("grid") if gs.get("grid") != null else []
+	collectible_positions = gs.get("collectible_positions") if gs.get("collectible_positions") != null else []
+	unmovable_map = gs.get("unmovable_map") if gs.get("unmovable_map") != null else {}
+	spreader_positions = gs.get("spreader_positions") if gs.get("spreader_positions") != null else []
+	spreader_count = gs.get("spreader_count") if gs.get("spreader_count") != null else 0
+
 func create_empty_grid():
-	grid.clear()
-	for x in range(GRID_WIDTH):
+	# B3: Delegated to GameState model
+	var gs = _new_game_state()
+	if gs:
+		_apply_game_state(gs)
+	else:
+		create_empty_grid_fallback(GRID_WIDTH, GRID_HEIGHT)
+
+func create_empty_grid_fallback(w: int, h: int):
+	# Emergency fallback if GameState script fails to load
+	grid = []
+	for x in range(w):
 		grid.append([])
-		for y in range(GRID_HEIGHT):
+		for y in range(h):
 			grid[x].append(0)
+	collectible_positions = []
+	unmovable_map = {}
+	spreader_positions = []
+	spreader_count = 0
 
 func fill_grid_from_layout(layout: Array):
-	"""Fill the grid based on level layout. Supports layout entries as ints (-1,0,N) or single-char tokens like 'C','U','H','S'."""
-	# Clear helper structures
-	collectible_positions.clear()
-	unmovable_map.clear()
-	spreader_positions.clear()
-	spreader_count = 0  # Reset spreader count when refilling grid
-	print("[SPREADER] Reset spreader_count to 0 at start of fill_grid_from_layout")
+	# B3: Delegated to GameState model
+	var gs = _new_game_state()
+	if gs == null or not gs.has_method("fill_from_layout"):
+		create_empty_grid_fallback(GRID_WIDTH, GRID_HEIGHT)
+		return
+	_apply_layout_result(gs, layout)
 
-	for x in range(GRID_WIDTH):
-		for y in range(GRID_HEIGHT):
-			var cell_value = layout[x][y]
-
-			# Normalize string tokens if present
-			if typeof(cell_value) == TYPE_STRING:
-				# Single-char tokens expected or H{hits}:{type}
-				var token = cell_value
-				if token == "X" or token == "x":
-					grid[x][y] = -1
-					continue
-				elif token == "0":
-					grid[x][y] = 0
-					continue
-				elif token == "C":
-					# Collectible: spawn as special type that won't match with regular tiles
-					grid[x][y] = COLLECTIBLE
-					collectible_positions.append(Vector2(x, y))
-					continue
-				elif token == "S":
-					# Spreader tile
-					grid[x][y] = SPREADER
-					spreader_positions.append(Vector2(x, y))
-					spreader_count += 1
-					print("[SPREADER] Created spreader at (", x, ",", y, ") - Total: ", spreader_count)
-					continue
-				elif token.begins_with("H") and ":" in token:
-					# Hard unmovable token - parse hits and type e.g., H2:rock
-					var parts = token.substr(1, token.length()).split(":")
-					var hits = 1
-					var htype = "rock"
-					if parts.size() >= 2:
-						hits = int(parts[0]) if parts[0].is_valid_int() else 1
-						htype = parts[1]
-					# Don't set grid value - unmovables are handled via tile instances only
-					grid[x][y] = 0  # Empty cell, visual tile will be created
-					var key2 = str(x) + "," + str(y)
-					unmovable_map[key2] = {"hits": hits, "type": htype, "hard": true}
-					print("[UNMOVABLE] Created hard unmovable at (", x, ",", y, ") with key '", key2, "' hits=", hits, " type=", htype)
-					continue
-
-			# Handle numeric / existing values
-			if cell_value == -1:
-				grid[x][y] = -1
-			elif cell_value == 0:
-				# Empty - fill with random tile
-				var tile_type = get_safe_random_tile(x, y)
-				grid[x][y] = tile_type
-			else:
-				# Specific tile type number
-				grid[x][y] = int(cell_value)
-
-	print("[GameManager] fill_grid_from_layout: collected collectible_positions size=", collectible_positions.size(), ", unmovable_map size=", unmovable_map.size())
+func _apply_layout_result(gs: Object, layout: Array) -> void:
+	# Helper: calls fill_from_layout and copies results out, isolating dynamic dispatch
+	var result = gs.call("fill_from_layout", layout)
+	if not (result is Dictionary) or (result as Dictionary).get("grid", []).size() == 0:
+		create_empty_grid_fallback(GRID_WIDTH, GRID_HEIGHT)
+		return
+	var d := result as Dictionary
+	grid = d.get("grid", [])
+	collectible_positions = d.get("collectible_positions", [])
+	unmovable_map = d.get("unmovable_map", {})
+	spreader_positions = d.get("spreader_positions", [])
+	spreader_count = d.get("spreader_count", 0)
 
 func fill_initial_grid():
-	"""Legacy method for backward compatibility"""
+	# Legacy fallback — fill grid with random non-matching tiles
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
-			if grid[x][y] != -1:  # Don't fill blocked cells
-				var tile_type = get_safe_random_tile(x, y)
-				grid[x][y] = tile_type
-
-func get_safe_random_tile(x: int, y: int) -> int:
-	# Skip if cell is blocked
-	if is_cell_blocked(x, y):
-		return -1
-
-	var attempts = 0
-	while attempts < 50:
-		var tile_type = randi() % TILE_TYPES + 1
-		if not would_create_initial_match(x, y, tile_type):
-			return tile_type
-		attempts += 1
-	return 1  # Fallback
-
-func would_create_initial_match(x: int, y: int, tile_type: int) -> bool:
-	# Check horizontal
-	var h_count = 1
-	var check_x = x - 1
-	while check_x >= 0 and grid[check_x][y] == tile_type:
-		h_count += 1
-		check_x -= 1
-
-	# Check vertical
-	var v_count = 1
-	var check_y = y - 1
-	while check_y >= 0 and grid[x][check_y] == tile_type:
-		v_count += 1
-		check_y -= 1
-
-	return h_count >= MIN_MATCH_SIZE or v_count >= MIN_MATCH_SIZE
+			if grid[x][y] != -1:
+				grid[x][y] = randi() % TILE_TYPES + 1
 
 func is_cell_blocked(x: int, y: int) -> bool:
 	"""Check if a cell is blocked"""
@@ -551,12 +511,12 @@ func is_cell_movable(x: int, y: int) -> bool:
 		return false
 
 	# Get board reference to check for hard unmovable tiles
-	var board_ref = get_node_or_null("/root/MainGame/GameBoard")
+	var board_ref_local = get_board()
 
 	# Check if there's a hard unmovable tile instance at this position
-	if board_ref and board_ref.tiles and x < board_ref.tiles.size():
-		if y < board_ref.tiles[x].size():
-			var tile = board_ref.tiles[x][y]
+	if board_ref_local and board_ref_local.tiles and x < board_ref_local.tiles.size():
+		if y < board_ref_local.tiles[x].size():
+			var tile = board_ref_local.tiles[x][y]
 			if tile and "is_unmovable_hard" in tile and tile.is_unmovable_hard:
 				return false  # Hard unmovables are not movable
 
@@ -581,1693 +541,467 @@ func swap_tiles(pos1: Vector2, pos2: Vector2) -> bool:
 	return true
 
 func find_matches() -> Array:
-	var matches = []
-	print("[FIND_MATCHES] Starting search...")
+	# B1: Thin delegation to MatchFinder autoload
+	var exclude = [COLLECTIBLE, SPREADER]
+	return MatchFinder.find_matches(grid, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1)
 
-	# Find horizontal matches
-	for y in range(GRID_HEIGHT):
-		var current_type = grid[0][y]
-		var match_start = 0
+func calculate_points(tiles_removed: int) -> int:
+	# Use Scoring service to compute points; include combo_count for multiplier
+	if tiles_removed <= 0:
+		return 0
+	# Defensive: ensure Scoring class exists
+	if typeof(Scoring) == TYPE_NIL:
+		# Fallback to simple calculation
+		return int(tiles_removed * POINTS_PER_TILE * (1.0 + (0.1 * float(combo_count))))
+	return Scoring.points_for(tiles_removed, combo_count)
 
-		for x in range(1, GRID_WIDTH + 1):
-			var tile_type = grid[x][y] if x < GRID_WIDTH else -1
+func add_score(points: int) -> void:
+	if points == null:
+		return
+	if points <= 0:
+		return
+	score += int(points)
+	print("[GameManager] add_score: added ", points, " new total=", score)
+	emit_signal("score_changed", score)
 
-			# Skip blocked cells
-			if x < GRID_WIDTH and is_cell_blocked(x, y):
-				tile_type = -2  # Use -2 to break the match
+func report_spreader_destroyed(pos: Vector2) -> void:
+	# B4: Delegate count tracking to ObjectiveManager; keep spreader_positions/count in sync
+	spreader_count = max(0, spreader_count - 1)
+	if spreader_positions.has(pos):
+		spreader_positions.erase(pos)
+	if not spreaders_destroyed_this_turn.has(pos):
+		spreaders_destroyed_this_turn.append(pos)
+	if objective_manager_ref != null and objective_manager_ref.has_method("report_spreader_destroyed"):
+		objective_manager_ref.report_spreader_destroyed(1)
+	call_deferred("emit_signal", "spreaders_changed", spreader_count)
 
-			if tile_type != current_type or x == GRID_WIDTH:
-				if x - match_start >= MIN_MATCH_SIZE and current_type > 0 and current_type < 7:
-					# CRITICAL: Don't match collectibles, spreaders, or special tiles
-					# Note: Unmovables have grid value 0, so they won't match anyway
-					if current_type != COLLECTIBLE and current_type != SPREADER:
-						print("[FIND_MATCHES] Horizontal match found: y=", y, ", x from ", match_start, " to ", x-1, ", type=", current_type)
-						for i in range(match_start, x):
-							if not is_cell_blocked(i, y):
-								matches.append(Vector2(i, y))
-				current_type = tile_type
-				match_start = x
+func report_unmovable_destroyed(pos, skip_clear: bool = false) -> void:
+	# B4: Delegate count tracking to ObjectiveManager; keep unmovable_map in sync
+	var key = pos if typeof(pos) == TYPE_STRING else str(int(pos.x)) + "," + str(int(pos.y))
+	if unmovable_map.has(key):
+		unmovable_map.erase(key)
+		unmovables_cleared += 1
+		if objective_manager_ref != null and objective_manager_ref.has_method("report_unmovable_cleared"):
+			objective_manager_ref.report_unmovable_cleared(1)
+		call_deferred("emit_signal", "unmovables_changed", unmovables_cleared, unmovable_target)
+	if not skip_clear:
+		var parts = key.split(",")
+		if parts.size() == 2:
+			var gx = int(parts[0])
+			var gy = int(parts[1])
+			if gx >= 0 and gx < GRID_WIDTH and gy >= 0 and gy < GRID_HEIGHT:
+				grid[gx][gy] = 0
 
-	# Find vertical matches
-	for x in range(GRID_WIDTH):
-		var current_type = grid[x][0]
-		var match_start = 0
+# Add var to record requested special creation
+var requested_special_tile: Dictionary = {}  # {"pos": Vector2, "type": String}
 
-		for y in range(1, GRID_HEIGHT + 1):
-			var tile_type = grid[x][y] if y < GRID_HEIGHT else -1
+func request_special_tile_creation(pos: Vector2, special_type: String = "bomb") -> void:
+	requested_special_tile = {"pos": pos, "type": special_type}
+	print("[GameManager] request_special_tile_creation registered:", requested_special_tile)
 
-			# Skip blocked cells
-			if y < GRID_HEIGHT and is_cell_blocked(x, y):
-				tile_type = -2  # Use -2 to break the match
-
-			if tile_type != current_type or y == GRID_HEIGHT:
-				if y - match_start >= MIN_MATCH_SIZE and current_type > 0 and current_type < 7:
-					# CRITICAL: Don't match collectibles, spreaders, or special tiles
-					# Note: Unmovables have grid value 0, so they won't match anyway
-					if current_type != COLLECTIBLE and current_type != SPREADER:
-						print("[FIND_MATCHES] Vertical match found: x=", x, ", y from ", match_start, " to ", y-1, ", type=", current_type)
-						for i in range(match_start, y):
-							if not is_cell_blocked(x, i):
-								matches.append(Vector2(x, i))
-				current_type = tile_type
-				match_start = y
-	if DEBUG_LOGGING:
-		print("find_matches: END — grid snapshot after gravity:")
-		for x in range(GRID_WIDTH):
-			var col = []
-			for y in range(GRID_HEIGHT):
-				col.append(grid[x][y])
-			print("col[", x, "] = ", col)
-		print("find_matches = ", matches)
-	return remove_duplicates(matches)
-
-func remove_duplicates(matches: Array) -> Array:
-	var unique_matches = []
-	for match in matches:
-		if not match in unique_matches:
-			unique_matches.append(match)
-	return unique_matches
+func get_and_clear_requested_special() -> Dictionary:
+	var out = requested_special_tile
+	requested_special_tile = {}
+	return out
 
 func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> int:
+	"""Remove matched tiles from the grid, handle spreaders/unmovables/collectibles, compute scoring.
+	Returns number of tiles that counted for scoring (excludes collectibles)."""
+	if matches == null or matches.size() == 0:
+		return 0
+
 	print("[SCORING] ========== remove_matches called ==========")
 	print("[SCORING] Input matches count: ", matches.size())
 	print("[SCORING] Swapped position: ", swapped_pos)
 	print("[SCORING] Current combo_count: ", combo_count)
 
-	# Log what's actually at each match position (limit to avoid spam)
-	for i in range(min(matches.size(), 10)):
-		var pos = matches[i]
-		var val = grid[int(pos.x)][int(pos.y)] if is_valid_position(pos) else -999
-		print("[SCORING]   Match[", i, "]: pos=", pos, " grid_value=", val, " blocked=", is_cell_blocked(pos.x, pos.y))
+	# Normalize matches to Vector2 list
+	var norm_matches: Array = []
+	for m in matches:
+		var pos = m
+		if typeof(m) == TYPE_DICTIONARY and m.has("x") and m.has("y"):
+			pos = Vector2(float(m["x"]), float(m["y"]))
+		elif typeof(m) == TYPE_STRING:
+			var parts = m.split(",")
+			if parts.size() == 2:
+				pos = Vector2(int(parts[0]), int(parts[1]))
+		# Ensure valid position
+		if typeof(pos) == TYPE_VECTOR2 and is_valid_position(pos):
+			norm_matches.append(pos)
 
-	# Filter out any blocked cells from matches
-	matches = matches.filter(func(p): return not is_cell_blocked(p.x, p.y))
-	print("[SCORING] After filtering blocked: ", matches.size(), " matches")
+	# Filter out blocked or duplicate positions
+	var unique = []
+	for p in norm_matches:
+		var found = false
+		for q in unique:
+			if int(p.x) == int(q.x) and int(p.y) == int(q.y):
+				found = true
+				break
+		if not found and not is_cell_blocked(int(p.x), int(p.y)):
+			unique.append(p)
 
-	# Get board reference for checking hard unmovable tiles
-	var board_ref = get_node_or_null("/root/MainGame/GameBoard")
+	# If a swapped_pos is provided and part of the matches, record a requested special tile
+	if swapped_pos.x >= 0 and swapped_pos.y >= 0:
+		# Ensure swapped_pos is within unique matches
+		for p in unique:
+			if int(p.x) == int(swapped_pos.x) and int(p.y) == int(swapped_pos.y):
+				# Register a default special type based on match size - caller (GameBoard) may handle exact type
+				request_special_tile_creation(swapped_pos, "auto")
+				break
 
+	# Delegate clearing and special registration to MatchProcessor if available
 	var tiles_removed = 0
-	var horizontal = false
-	var vertical = false
-
-	# Only create special tiles if we have a valid swapped position
-	var create_special = swapped_pos.x >= 0 and swapped_pos.y >= 0
-
-	# Determine match directions (only if creating special tiles)
-	var matches_on_same_row = 0
-	var matches_on_same_col = 0
-
-	if create_special:
-		for match_pos in matches:
-			if match_pos.y == swapped_pos.y:
-				matches_on_same_row += 1
-		for match_pos in matches:
-			if match_pos.x == swapped_pos.x:
-				matches_on_same_col += 1
-
-		horizontal = matches_on_same_row >= 3
-		vertical = matches_on_same_col >= 3
-
-	# Determine which special tile to create (before removing tiles)
-	var special_tile_type = 0
-	if create_special:
-		print("remove_matches: create_special true, swapped_pos=", swapped_pos)
-		print("remove_matches: initial matches count=", matches.size())
-		print("remove_matches: computed matches_on_same_row=", matches_on_same_row, " matches_on_same_col=", matches_on_same_col)
-		if horizontal and vertical:
-			special_tile_type = FOUR_WAY_ARROW
-		elif horizontal and matches_on_same_row >= 4:
-			special_tile_type = HORIZTONAL_ARROW
-		elif vertical and matches_on_same_col >= 4:
-			special_tile_type = VERTICAL_ARROW
-
-		print("remove_matches: special_tile_type after basic checks =", special_tile_type)
-
-		if special_tile_type == 0:
-			for test_pos in matches:
-				var row_count = 0
-				var col_count = 0
-				for mpos in matches:
-					if mpos.y == test_pos.y:
-						row_count += 1
-					if mpos.x == test_pos.x:
-						col_count += 1
-				if row_count >= 3 and col_count >= 3:
-					special_tile_type = FOUR_WAY_ARROW
-					swapped_pos = test_pos
-					print("remove_matches: found T/L fallback at ", test_pos)
-					break
-				if row_count >= 4:
-					special_tile_type = HORIZTONAL_ARROW
-					swapped_pos = test_pos
-					print("remove_matches: found 4+ horizontal fallback at ", test_pos)
-					break
-				if col_count >= 4:
-					special_tile_type = VERTICAL_ARROW
-					swapped_pos = test_pos
-					print("remove_matches: found 4+ vertical fallback at ", test_pos)
-					break
-			print("remove_matches: fallback result special_tile_type=", special_tile_type, " swapped_pos=", swapped_pos)
-
-	# Remove matched tiles (but preserve swapped position if creating special tile)
-	for match_pos in matches:
-		if is_cell_blocked(match_pos.x, match_pos.y):
-			continue
-		var grid_val = grid[match_pos.x][match_pos.y]
-		# Note: Unmovables have grid value 0, so they won't be in matches
-		if grid_val > 0:
-			if special_tile_type > 0 and match_pos.x == swapped_pos.x and match_pos.y == swapped_pos.y:
+	if MatchProcessor != null and MatchProcessor.has_method("process_matches"):
+		# Call static method on script resource
+		var res = MatchProcessor.process_matches(grid, unique, swapped_pos, GRID_WIDTH, GRID_HEIGHT, self)
+		if typeof(res) == TYPE_DICTIONARY and res.has("tiles_removed"):
+			tiles_removed = int(res["tiles_removed"])
+	else:
+		# Fallback to legacy inline clearing if MatchProcessor unavailable
+		for p in unique:
+			var gx = int(p.x)
+			var gy = int(p.y)
+			if gx < 0 or gx >= GRID_WIDTH or gy < 0 or gy >= GRID_HEIGHT:
 				continue
-			grid[match_pos.x][match_pos.y] = 0
-			tiles_removed += 1
+			var val = grid[gx][gy]
+			if val == COLLECTIBLE:
+				# Collectible - increment collectible counter and emit
+				collectibles_collected += 1
+				if collectible_positions.has(p):
+					collectible_positions.erase(p)
+				call_deferred("emit_signal", "collectibles_changed", collectibles_collected, collectible_target)
+				# Clear the cell
+				grid[gx][gy] = 0
+				continue
+			if val == SPREADER:
+				# Report spreader destroyed
+				report_spreader_destroyed(p)
+				grid[gx][gy] = 0
+				# Spreaders may or may not count for scoring (we'll count them)
+				tiles_removed += 1
+				continue
+			# Hard unmovable handled elsewhere; if present in unmovable_map, report and clear
+			var key = str(gx) + "," + str(gy)
+			if unmovable_map.has(key):
+				# Report and clear (caller may have already called take_hit on tile instances)
+				report_unmovable_destroyed(key, true)
+				# If report_unmovable_destroyed cleared the cell, skip scoring; otherwise handle
+				if grid[gx][gy] == 0:
+					continue
+			# REGRESSION FIX: Do not clear the swapped_pos cell here - it will be converted into a special tile
+			if swapped_pos.x >= 0 and swapped_pos.y >= 0 and int(swapped_pos.x) == gx and int(swapped_pos.y) == gy:
+				# Skip clearing this cell - GameBoard will create special visual
+				print("[GameManager] Preserving swapped_pos cell for special creation at (", gx, ",", gy, ")")
+				# Still count for scoring only if its previous value would have counted
+				if val > 0 and val != COLLECTIBLE:
+					tiles_removed += 1
+				# Set grid cell to 0 only when special creation is handled by GameBoard via request
+				continue
+			# Regular tile or special tiles count for scoring
+			if val > 0 and val != COLLECTIBLE:
+				tiles_removed += 1
+			# Finally, clear the grid cell
+			grid[gx][gy] = 0
 
-	# After removing matched tiles, damage adjacent hard unmovables and spreaders
-	print("[UNMOVABLE] === CHECKING MATCH FOR ADJACENT UNMOVABLES & SPREADERS ===")
-	print("[UNMOVABLE] Matched tiles: ", matches.size(), " tiles")
-	for i in range(matches.size()):
-		print("[UNMOVABLE]   Match[", i, "]: position (", matches[i].x, ",", matches[i].y, ")")
-
-	var adj_unmovables = []
-	var adj_spreaders = []
-	for match_pos in matches:
-		var dirs = [Vector2(-1,0), Vector2(1,0), Vector2(0,-1), Vector2(0,1)]
-		for d in dirs:
-			var nx = int(match_pos.x) + int(d.x)
-			var ny = int(match_pos.y) + int(d.y)
-			if nx >= 0 and nx < GRID_WIDTH and ny >= 0 and ny < GRID_HEIGHT:
-				# Check for hard unmovable via tile instance
-				var found_unmovable = false
-
-				# Debug: Check if board_ref and tiles array exist
-				if not board_ref:
-					print("[UNMOVABLE_DEBUG] board_ref is null!")
-				elif not board_ref.tiles:
-					print("[UNMOVABLE_DEBUG] board_ref.tiles is null!")
-				elif nx >= board_ref.tiles.size():
-					print("[UNMOVABLE_DEBUG] nx=", nx, " exceeds tiles.size()=", board_ref.tiles.size())
-				elif not board_ref.tiles[nx]:
-					print("[UNMOVABLE_DEBUG] board_ref.tiles[", nx, "] is null!")
-				elif ny >= board_ref.tiles[nx].size():
-					print("[UNMOVABLE_DEBUG] ny=", ny, " exceeds tiles[", nx, "].size()=", board_ref.tiles[nx].size())
-				else:
-					var tile = board_ref.tiles[nx][ny]
-					if not tile:
-						print("[UNMOVABLE_DEBUG] Tile at (", nx, ",", ny, ") is null")
-					elif not is_instance_valid(tile):
-						print("[UNMOVABLE_DEBUG] Tile at (", nx, ",", ny, ") is not a valid instance")
-					else:
-						# Check if it's a hard unmovable
-						if "is_unmovable_hard" in tile:
-							print("[UNMOVABLE_DEBUG] Tile at (", nx, ",", ny, ") has is_unmovable_hard property: ", tile.is_unmovable_hard)
-							if tile.is_unmovable_hard:
-								var vec = Vector2(nx, ny)
-								if !adj_unmovables.has(vec):
-									adj_unmovables.append(vec)
-									print("[UNMOVABLE] Found unmovable at (", nx, ",", ny, ") adjacent to match at (", match_pos.x, ",", match_pos.y, ")")
-								found_unmovable = true
-						else:
-							print("[UNMOVABLE_DEBUG] Tile at (", nx, ",", ny, ") does NOT have is_unmovable_hard property")
-
-				# Check for spreader (only if not an unmovable)
-				if !found_unmovable:
-					var grid_value = grid[nx][ny]
-					if grid_value == SPREADER:
-						var vec = Vector2(nx, ny)
-						if !adj_spreaders.has(vec):
-							adj_spreaders.append(vec)
-							print("[SPREADER] Found spreader at (", nx, ",", ny, ") adjacent to match at (", match_pos.x, ",", match_pos.y, ")")
-					elif grid_value != -1 and grid_value != 0:
-						print("[UNMOVABLE]   Adjacent position (", nx, ",", ny, ") has grid value: ", grid_value, " (not unmovable/spreader)")
-
-	print("[UNMOVABLE] Total adjacent unmovables found: ", adj_unmovables.size())
-	print("[SPREADER] Total adjacent spreaders found: ", adj_spreaders.size())
-
-	if adj_unmovables.size() > 0:
-		var board = get_node_or_null("/root/MainGame/GameBoard")
-		var destroyed_any := false
-		for pos in adj_unmovables:
-			var key = str(int(pos.x)) + "," + str(int(pos.y))
-			print("[UNMOVABLE] Processing unmovable at (", pos.x, ",", pos.y, "), key: ", key)
-
-			# Get tile instance first to check if it's a hard unmovable
-			var tn = null
-			if board and board.tiles and int(pos.x) < board.tiles.size():
-				tn = board.tiles[int(pos.x)][int(pos.y)] if int(pos.y) < board.tiles[int(pos.x)].size() else null
-
-			# Check if this is a hard unmovable tile
-			var is_hard = false
-			if tn and "is_unmovable_hard" in tn:
-				is_hard = tn.is_unmovable_hard
-
-			if is_hard:
-				# For HARD tiles, always call take_hit and trust the tile's own hit tracking
-				if tn and tn.has_method("take_hit"):
-					var destroyed = tn.take_hit(1)
-					if destroyed:
-						destroyed_any = true
-						var revealed_keeps_cell = false
-						if tn.has_method("get"):
-							var tmp_coll = tn.get("is_collectible")
-							var tmp_tt = tn.get("tile_type")
-							if typeof(tmp_coll) != TYPE_NIL and tmp_coll == true:
-								revealed_keeps_cell = true
-							if typeof(tmp_tt) != TYPE_NIL and int(tmp_tt) > 0:
-								revealed_keeps_cell = true
-						report_unmovable_destroyed(pos, revealed_keeps_cell)
-						if not revealed_keeps_cell:
-							if board and int(pos.x) < board.tiles.size() and int(pos.y) < board.tiles[int(pos.x)].size():
-								board.tiles[int(pos.x)][int(pos.y)] = null
-			else:
-				# For SOFT tiles, use the old unmovable_map tracking system
-				var entry = null
-				if unmovable_map.has(key):
-					entry = unmovable_map[key]
-
-				var current_hits = 1
-				if entry != null and typeof(entry) == TYPE_DICTIONARY:
-					current_hits = int(entry.get("hits", 1))
-				elif entry != null:
-					current_hits = int(entry)
-				var remaining = current_hits - 1
-				print("[UNMOVABLE]   Current hits: ", current_hits, ", After damage: ", remaining)
-
-				if entry != null and typeof(entry) == TYPE_DICTIONARY:
-					entry["hits"] = remaining
-					unmovable_map[key] = entry
-				elif entry != null:
-					unmovable_map[key] = remaining
-
-				if remaining <= 0:
-					if tn and tn.has_method("take_hit"):
-						var destroyed = tn.take_hit(1)
-						if destroyed:
-							destroyed_any = true
-							var revealed_keeps_cell = false
-							if tn.has_method("get"):
-								var tmp_coll = tn.get("is_collectible")
-								var tmp_tt = tn.get("tile_type")
-								if typeof(tmp_coll) != TYPE_NIL and tmp_coll == true:
-									revealed_keeps_cell = true
-								if typeof(tmp_tt) != TYPE_NIL and int(tmp_tt) > 0:
-									revealed_keeps_cell = true
-							report_unmovable_destroyed(pos, revealed_keeps_cell)
-							if not revealed_keeps_cell:
-								if board and int(pos.x) < board.tiles.size() and int(pos.y) < board.tiles[int(pos.x)].size():
-									board.tiles[int(pos.x)][int(pos.y)] = null
-					else:
-						report_unmovable_destroyed(pos)
-
-		# After processing adj_unmovables, schedule gravity/refill if needed
-		if destroyed_any and board:
-			print("[GameManager] Unmovable destroyed - scheduling gravity+refill on GameBoard")
-			board.call_deferred("deferred_gravity_then_refill")
-
-	# Process adjacent spreaders - they get destroyed by adjacent matches
-	if adj_spreaders.size() > 0:
-		var board = get_node_or_null("/root/MainGame/GameBoard")
-		var destroyed_spreaders := false
-
-		for pos in adj_spreaders:
-			var x = int(pos.x)
-			var y = int(pos.y)
-			print("[SPREADER] Processing spreader at (", x, ",", y, ")")
-
-			# Get the tile instance to check what it was covering
-			var tile = null
-			if board and board.tiles and x < board.tiles.size() and y < board.tiles[x].size():
-				tile = board.tiles[x][y]
-
-			# Store original tile type if the spreader was covering something
-			var revealed_tile_type = 0
-			if tile and tile.has_method("get"):
-				# Check if spreader has an underlying tile_type (what it converted from)
-				var tt = tile.get("tile_type")
-				if typeof(tt) != TYPE_NIL and int(tt) > 0:
-					revealed_tile_type = int(tt)
-
-			# Remove spreader from grid
-			if revealed_tile_type > 0 and revealed_tile_type <= 6:
-				# Reveal the original tile that was converted
-				grid[x][y] = revealed_tile_type
-				print("[SPREADER] Spreader destroyed at (", x, ",", y, "), revealing tile type ", revealed_tile_type)
-				# Update visual tile
-				if tile:
-					tile.is_spreader = false
-					tile.spreader_grace_moves = 0
-					tile.tile_type = revealed_tile_type
-					tile.update_visual()
-			else:
-				# No underlying tile, just clear it
-				grid[x][y] = 0
-				print("[SPREADER] Spreader destroyed at (", x, ",", y, "), clearing to empty")
-				if tile:
-					board.tiles[x][y] = null
-					tile.queue_free()
-
-			# Remove from spreader_positions tracking
-			spreader_positions.erase(pos)
-
-			# Report spreader cleared for level objectives
-			report_spreader_destroyed(pos)
-			destroyed_spreaders = true
-
-		# Schedule gravity/refill after spreader removal
-		if destroyed_spreaders and board:
-			print("[SPREADER] Spreaders destroyed - scheduling gravity+refill on GameBoard")
-			board.call_deferred("deferred_gravity_then_refill")
-
-	# Create special tile at swapped position if applicable
-	if special_tile_type > 0 and not is_cell_blocked(swapped_pos.x, swapped_pos.y):
-		grid[swapped_pos.x][swapped_pos.y] = special_tile_type
-		print("remove_matches: placed special tile type", special_tile_type, "at", swapped_pos)
-	# Safeguard: if a special was expected but not placed for some reason, force it (avoid blocked cells)
-	if special_tile_type > 0:
-		if is_cell_blocked(swapped_pos.x, swapped_pos.y):
-			print("remove_matches: expected special at", swapped_pos, "but cell is blocked; skipping force-creation")
-		elif grid[swapped_pos.x][swapped_pos.y] != special_tile_type:
-			grid[swapped_pos.x][swapped_pos.y] = special_tile_type
-			print("remove_matches: [safeguard] forced special tile type", special_tile_type, "at", swapped_pos)
-
+	# Compute points via Scoring service
 	var points = calculate_points(tiles_removed)
-	print("[SCORING] Removed ", tiles_removed, " tiles, combo_count = ", combo_count, ", points = ", points)
-	add_score(points)
-	combo_count += 1
-	print("[SCORING] New score: ", score, ", combo_count now: ", combo_count)
+	if points > 0:
+		add_score(points)
 
-	# Track achievements
+	# Maintain combo state: increment for this removal
 	if tiles_removed > 0:
-		RewardManager.track_match_made()
-		RewardManager.track_tiles_cleared(tiles_removed)
-	RewardManager.track_combo_reached(combo_count)
+		combo_count += 1
+	else:
+		combo_count = 0
 
-	# Emit match_cleared event for narrative effects
+	print("[SCORING] remove_matches: tiles_removed=", tiles_removed, ", points=", points, ", combo_count=", combo_count)
+
+	# --- NEW: handle requested special creation (created earlier when swapped_pos participated)
+	var req = get_and_clear_requested_special()
+	if typeof(req) == TYPE_DICTIONARY and req.has("pos"):
+		var rpos = req["pos"]
+		var rtype = req.get("type", "auto")
+		if rpos != null and rpos.x >= 0 and rpos.y >= 0:
+			# Only handle auto-detection here; GameBoard can still create visuals if needed
+			if rtype == "auto" and SpecialFactory != null:
+				# Ensure SpecialFactory script is loaded (remove ordering dependency)
+				if SpecialFactory == null:
+					SpecialFactory = load("res://scripts/game/SpecialFactory.gd")
+				if SpecialFactory != null:
+					print("[GameManager] SpecialFactory loaded type=", typeof(SpecialFactory), " path=", SpecialFactory)
+					# Pass the normalized unique matches so SpecialFactory can reason about patterns
+					var special_type = -1
+					# Prefer calling the static method on the loaded script resource
+					if SpecialFactory.has_method("determine_special_type"):
+						special_type = SpecialFactory.determine_special_type(unique, Vector2(int(rpos.x), int(rpos.y)), grid, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE)
+					else:
+						print("[GameManager] SpecialFactory script missing determine_special_type")
+					print("[GameManager] SpecialFactory.determine_special_type -> ", special_type)
+					if special_type != -1:
+						# Write special tile to the grid - this will be picked up by GameBoard during visual updates
+						if rpos.x >= 0 and rpos.x < GRID_WIDTH and rpos.y >= 0 and rpos.y < GRID_HEIGHT:
+							grid[int(rpos.x)][int(rpos.y)] = int(special_type)
+							print("[GameManager] Special tile placed at ", rpos, " type=", special_type)
+						else:
+							print("[GameManager] Warning: requested special pos out of bounds:", rpos)
+					else:
+						print("[GameManager] SpecialFactory found no special for requested pos", rpos)
+				else:
+					print("[GameManager] SpecialFactory script failed to load; cannot determine special")
+		elif rtype != "auto":
+			# If an explicit type was requested, map it (future enhancement) — for now just log
+			print("[GameManager] Requested explicit special type '", rtype, "' at ", rpos)
+
+	# After scoring/combo, check objectives
+	if objective_manager_ref != null and objective_manager_ref.has_method("is_complete"):
+		if objective_manager_ref.is_complete():
+			print("[GameManager] Objectives complete detected by ObjectiveManager")
+			# schedule level completion check
+			pending_level_complete = true
+			call_deferred("_perform_level_completion_check")
+
+	# Notify EventBus so EffectResolver (narrative effects) reacts to every match
 	if tiles_removed > 0:
-		if EventBus:
-			# Include positions of cleared tiles to allow effects to anchor to tile locations
-			var tiles_list = []
-			for mpos in matches:
-				tiles_list.append({"x": int(mpos.x), "y": int(mpos.y)})
-			EventBus.emit_match_cleared(tiles_removed, {"combo": combo_count, "tiles": tiles_list})
-		else:
-			print("[GameManager] ⚠️ EventBus not available - cannot emit match_cleared event")
+		var _eb = NodeResolverAPI._get_evbus() if typeof(NodeResolverAPI) != TYPE_NIL else null
+		if _eb:
+			_eb.emit_match_cleared(tiles_removed, {"level": level, "score": score, "target": target_score})
 
 	return tiles_removed
 
-func activate_special_tile(pos: Vector2):
-	var tile_type = grid[pos.x][pos.y]
-	if tile_type == HORIZTONAL_ARROW:
-		for x in range(GRID_WIDTH):
-			if not is_cell_blocked(x, int(pos.y)):
-				# Check if this is a spreader before clearing
-				if grid[x][pos.y] == SPREADER:
-					# Use centralized reporting method so signals/EventBus are emitted correctly
-					if has_method("report_spreader_destroyed"):
-						report_spreader_destroyed(Vector2(x, pos.y))
-					else:
-						spreader_count -= 1
-						spreader_positions.erase(Vector2(x, pos.y))
-						print("[SPREADER] Special tile destroyed spreader at (", x, ",", pos.y, ") - Remaining: ", spreader_count)
-				grid[x][pos.y] = 0
-	elif tile_type == VERTICAL_ARROW:
-		for y in range(GRID_HEIGHT):
-			if not is_cell_blocked(int(pos.x), y):
-				# Check if this is a spreader before clearing
-				if grid[pos.x][y] == SPREADER:
-					if has_method("report_spreader_destroyed"):
-						report_spreader_destroyed(Vector2(pos.x, y))
-					else:
-						spreader_count -= 1
-						spreader_positions.erase(Vector2(pos.x, y))
-						print("[SPREADER] Special tile destroyed spreader at (", pos.x, ",", y, ") - Remaining: ", spreader_count)
-				grid[pos.x][y] = 0
-	elif tile_type == FOUR_WAY_ARROW:
-		for x in range(GRID_WIDTH):
-			if not is_cell_blocked(x, int(pos.y)):
-				# Check if this is a spreader before clearing
-				if grid[x][pos.y] == SPREADER:
-					if has_method("report_spreader_destroyed"):
-						report_spreader_destroyed(Vector2(x, pos.y))
-					else:
-						spreader_count -= 1
-						spreader_positions.erase(Vector2(x, pos.y))
-						print("[SPREADER] Special tile destroyed spreader at (", x, ",", pos.y, ") - Remaining: ", spreader_count)
-				grid[x][pos.y] = 0
-		for y in range(GRID_HEIGHT):
-			if not is_cell_blocked(int(pos.x), y):
-				# Check if this is a spreader before clearing
-				if grid[pos.x][y] == SPREADER:
-					if has_method("report_spreader_destroyed"):
-						report_spreader_destroyed(Vector2(pos.x, y))
-					else:
-						spreader_count -= 1
-						spreader_positions.erase(Vector2(pos.x, y))
-						print("[SPREADER] Special tile destroyed spreader at (", pos.x, ",", y, ") - Remaining: ", spreader_count)
-				grid[pos.x][y] = 0
+func get_tile_at(pos: Vector2) -> int:
+	# Safe accessor for grid values; accepts Vector2 or x,y in Vector2 form
+	var gx = int(pos.x)
+	var gy = int(pos.y)
+	if gx < 0 or gx >= GRID_WIDTH or gy < 0 or gy >= GRID_HEIGHT:
+		return -1
+	if grid.size() <= gx or grid[gx].size() <= gy:
+		return -1
+	return int(grid[gx][gy])
 
-	# Emit signal to update UI
-	if use_spreader_objective:
-		emit_signal("spreaders_changed", spreader_count)
-
-		# Debug: Verify count accuracy
-		if spreader_count < 0:
-			print("[SPREADER] ⚠️ WARNING: spreader_count went negative! Resetting to 0")
-			spreader_count = 0
-
-		# Check if all spreaders cleared
-		if spreader_count == 0:
-			print("[SPREADER] 🎯 ALL SPREADERS CLEARED by special tile - Triggering level completion")
-			if not pending_level_complete and not level_transitioning:
-				last_level_won = true
-				last_level_score = score
-				last_level_target = 0
-				last_level_number = level
-				last_level_moves_left = moves_left
-				pending_level_complete = true
-				_attempt_level_complete()
-
-func calculate_points(tiles_removed: int) -> int:
-	var base_points = tiles_removed * POINTS_PER_TILE
-	# combo_count starts at 0 for first match, so use max(0, combo_count) to ensure:
-	# First match (combo=0): 1.5^0 = 1.0x
-	# Second match (combo=1): 1.5^1 = 1.5x
-	# Third match (combo=2): 1.5^2 = 2.25x
-	var combo_bonus = pow(COMBO_MULTIPLIER, max(0, combo_count))
-	var total_points = int(base_points * combo_bonus)
-	print("[SCORING] calculate_points: tiles=", tiles_removed, ", base=", base_points, ", combo_count=", combo_count, ", bonus=", combo_bonus, ", total=", total_points)
-	return total_points
+func _is_unmovable_cell(x: int, y: int) -> bool:
+	## Returns true if the cell holds a hard unmovable tile (tracked in unmovable_map).
+	## Hard unmovables are stored as 0 in the data grid but live in unmovable_map.
+	var key = str(x) + "," + str(y)
+	return unmovable_map.has(key)
 
 func apply_gravity() -> bool:
+	## B2: Apply gravity respecting unmovable + spreader barriers as segment dividers.
+	## GravityService.apply_gravity handles simple columns; we override here for barrier logic.
 	var moved = false
-
-	# Get board reference for checking hard unmovable tiles
-	var board_ref = get_node_or_null("/root/MainGame/GameBoard")
-
-	if DEBUG_LOGGING:
-		print("apply_gravity: START - grid snapshot before gravity:")
-		for x in range(GRID_WIDTH):
-			var col = []
-			for y in range(GRID_HEIGHT):
-				col.append(grid[x][y])
-			print("col[", x, "] = ", col)
-
 	for x in range(GRID_WIDTH):
-		# Start from the bottom and work upward
-		var write_pos = GRID_HEIGHT - 1
-
-		# Skip to first non-blocked position from bottom
-		while write_pos >= 0 and is_cell_blocked(x, write_pos):
-			write_pos -= 1
-
-		# Scan from bottom to top, moving tiles down to fill gaps
-		# Hard unmovables act as fixed obstacles
-		for read_pos in range(GRID_HEIGHT - 1, -1, -1):
-			# Check if there's a hard unmovable at this position (via tile instance)
-			var has_unmovable = false
-			if board_ref and board_ref.tiles and x < board_ref.tiles.size() and read_pos < board_ref.tiles[x].size():
-				var tile_inst = board_ref.tiles[x][read_pos]
-				if tile_inst and "is_unmovable_hard" in tile_inst and tile_inst.is_unmovable_hard:
-					has_unmovable = true
-
-			if has_unmovable:
-				# Unmovable blocks gravity - set write_pos just above it
-				# This ensures tiles above won't fall past the unmovable
-				write_pos = read_pos - 1
-				# Skip any blocked cells above the unmovable
-				while write_pos >= 0 and is_cell_blocked(x, write_pos):
-					write_pos -= 1
-				continue
-
-			# Skip blocked cells
-			if is_cell_blocked(x, read_pos):
-				continue
-
-			var tile = grid[x][read_pos]
-			# Only move tiles with positive values (regular tiles, special tiles, collectibles, spreaders)
-			if tile > 0:
-				if read_pos != write_pos:
-					# Move tile down to the write_pos
-					grid[x][write_pos] = tile
-					grid[x][read_pos] = 0
-					moved = true
-
-				# Move write position up for next tile
-				write_pos -= 1
-				# Skip any blocked cells
-				while write_pos >= 0 and is_cell_blocked(x, write_pos):
-					write_pos -= 1
-
-	# Ensure that unmovable tiles remain in their original spots and not overwritten
-	# (this is handled by above logic)
-
-	if DEBUG_LOGGING:
-		print("apply_gravity: END - grid snapshot after gravity:")
-		for x in range(GRID_WIDTH):
-			var col = []
-			for y in range(GRID_HEIGHT):
-				col.append(grid[x][y])
-			print("col[", x, "] = ", col)
-		print("apply_gravity: moved = ", moved)
+		var segment_start = -1
+		var y = 0
+		while y <= GRID_HEIGHT:
+			var end_of_segment = (y == GRID_HEIGHT)
+			var is_barrier = false
+			if not end_of_segment:
+				if grid[x][y] == -1 or _is_unmovable_cell(x, y) or grid[x][y] == SPREADER:
+					is_barrier = true
+			if is_barrier or end_of_segment:
+				if segment_start >= 0:
+					var vals: Array = []
+					for sy in range(y - 1, segment_start - 1, -1):
+						var v = int(grid[x][sy])
+						if v != 0:
+							vals.append(v)
+					var write_y = y - 1
+					for val in vals:
+						if grid[x][write_y] != val:
+							moved = true
+						grid[x][write_y] = val
+						write_y -= 1
+					for sy in range(write_y, segment_start - 1, -1):
+						if grid[x][sy] != 0:
+							moved = true
+							grid[x][sy] = 0
+				segment_start = -1
+			else:
+				if segment_start == -1:
+					segment_start = y
+			y += 1
 
 	return moved
 
-func has_clear_path_from_top(x: int, y: int) -> bool:
-	"""Check if a cell has a clear path from the spawn point (first non-blocked row from top)"""
-	# Get board reference for checking hard unmovable tiles
-	var board_ref = get_node_or_null("/root/MainGame/GameBoard")
-
-	# Find the first non-blocked row in this column (the spawn row)
-	var spawn_row = -1
-	for check_y in range(GRID_HEIGHT):
-		if not is_cell_blocked(x, check_y):
-			spawn_row = check_y
-			break
-
-	if spawn_row == -1:
-		# Entire column is blocked - no tiles can spawn
-		return false
-
-	# Check all cells between spawn_row and target y for unmovables
-	# (but don't include spawn_row itself or target y in the check)
-	for check_y in range(spawn_row, y):
-		# Check for hard unmovable via tile instance
-		if board_ref and board_ref.tiles and x < board_ref.tiles.size() and check_y < board_ref.tiles[x].size():
-			var tile_inst = board_ref.tiles[x][check_y]
-			if tile_inst and "is_unmovable_hard" in tile_inst and tile_inst.is_unmovable_hard:
-				# There's an unmovable blocking the path from spawn point
-				return false
-
-	return true
-
 func fill_empty_spaces() -> Array:
-	var new_tiles = []
-
-	# Get board reference for checking hard unmovable tiles
-	var board_ref = get_node_or_null("/root/MainGame/GameBoard")
-
+	## B2: Fill empty active cells, respecting unmovable/spreader barriers as spawn blockers.
+	## Segments below an intact barrier cannot receive tiles from above.
+	var rng = RandomNumberGenerator.new()
+	rng.randomize()
+	var created_positions: Array = []
 	for x in range(GRID_WIDTH):
+		var segment_accessible := true
+		var in_barrier_run := true
 		for y in range(GRID_HEIGHT):
-			if is_cell_blocked(x, y):
-				continue  # Skip blocked cells
-
-			if grid[x][y] == 0:
-				# Check if this position has an unmovable tile
-				# Unmovables have grid value 0 but should NOT be refilled
-				var has_unmovable = false
-				if board_ref and board_ref.tiles and x < board_ref.tiles.size() and y < board_ref.tiles[x].size():
-					var tile_inst = board_ref.tiles[x][y]
-					if tile_inst and is_instance_valid(tile_inst):
-						if "is_unmovable_hard" in tile_inst and tile_inst.is_unmovable_hard:
-							has_unmovable = true
-							print("[FILL] Skipping position (", x, ",", y, ") - has unmovable tile")
-
-				if has_unmovable:
-					continue  # Don't fill positions with unmovables
-
-				# Only spawn tiles if there's a clear path from the spawn point
-				# (no unmovable tiles blocking from spawn point)
-				if not has_clear_path_from_top(x, y):
-					# This cell is blocked from spawn point by an unmovable - leave it empty
-					continue
-
-				# Check if this position should spawn a collectible
-				var should_spawn_collectible = false
-
-				# For collectible levels, check if we haven't reached the target yet
-				# AND we're not in bonus moves (level_transitioning or in_bonus_conversion)
-				if collectible_target > 0 and collectibles_collected < collectible_target:
-					# Don't spawn new collectibles during bonus moves
-					if not level_transitioning and not in_bonus_conversion:
-						# Check if there's a collectible position marker in this column that needs spawning
-						for cpos in collectible_positions:
-							if int(cpos.x) == x:
-								# Spawn collectible in this column
-								# Use a spawn rate to control frequency
-								var spawn_chance = 0.3  # 30% chance per empty cell in marked column
-								if randf() < spawn_chance:
-									should_spawn_collectible = true
-									break
-
-				# Spawn the appropriate tile type
-				if should_spawn_collectible:
-					# Spawn as collectible type
-					grid[x][y] = COLLECTIBLE
-					new_tiles.append(Vector2(x, y))
-				else:
-					# Spawn as regular tile (for all levels, whether collectible-based or not)
-					grid[x][y] = randi_range(1, TILE_TYPES)
-					new_tiles.append(Vector2(x, y))
-
-	return new_tiles
-
-func add_score(points: int):
-	score += points
-	emit_signal("score_changed", score)
-
-	# DEBUG: Verify spreader_target is loaded correctly
-	print("[GameManager] add_score called - use_spreader_objective=", use_spreader_objective, " unmovable_target=", unmovable_target, " collectible_target=", collectible_target)
-
-	# For spreader-based levels, score doesn't trigger completion - only clearing all spreaders does
-	if use_spreader_objective:
-		print("[GameManager] 🦠 SPREADER LEVEL - Score: %d/%d, Spreaders remaining: %d - Score won't trigger completion" % [score, target_score, spreader_count])
-		return
-
-	# For unmovable-based levels, score doesn't trigger completion - only clearing all unmovables does
-	if unmovable_target > 0:
-		print("[GameManager] 🧱 UNMOVABLE LEVEL - Score: %d/%d, Unmovables: %d/%d - Score won't trigger completion" % [score, target_score, unmovables_cleared, unmovable_target])
-		return
-
-	# For collectible-based levels, score doesn't trigger completion - only collecting all collectibles does
-	if collectible_target > 0:
-		print("[GameManager] 🪙 COLLECTIBLE LEVEL - Score: %d/%d, Collectibles: %d/%d - Score won't trigger completion" % [score, target_score, collectibles_collected, collectible_target])
-		return
-
-	# For score-based levels, proceed with normal score-based completion
-	print("[GameManager] 📊 SCORE LEVEL - Score: %d/%d" % [score, target_score])
-
-	# If a failure was pending but the score reached the target during a cascade, cancel failure
-	if score >= target_score and pending_level_failed:
-		print("[GameManager] ✓ Score reached target during cascade - cancelling pending failure")
-		pending_level_failed = false
-
-	# Check if level is complete based on score - but only if no other objectives exist
-	if score >= target_score and not level_transitioning:
-		# Don't complete on score alone if there's a spreader/unmovable/collectible target
-		if use_spreader_objective or unmovable_target > 0 or collectible_target > 0:
-			print("[GameManager] Score target reached but objectives remain: use_spreader_objective=", use_spreader_objective, " unmovable=", unmovable_target, " collectible=", collectible_target)
-		else:
-			print("[GameManager] 🎯 TARGET SCORE REACHED - Triggering level completion")
-			# Store level completion state
-			last_level_won = true
-			last_level_score = score
-			last_level_target = target_score
-			last_level_number = level
-			last_level_moves_left = moves_left
-
-			# Mark that a level completion should occur, but defer until board activity stops
-			if not pending_level_complete:
-				pending_level_complete = true
-				print("[GameManager] → Setting pending_level_complete = true, calling _attempt_level_complete()")
-				# Start the coroutine that will wait for ongoing activity to finish before advancing
-				_attempt_level_complete()
-
-func advance_level():
-	# Called when level is complete - just trigger the level complete flow
-	# The level will be advanced later when user clicks Continue on the transition screen
-	print("[GameManager] 🎬 advance_level() called")
-	if use_spreader_objective:
-		print("[GameManager] → Level type: SPREADER")
-		print("[GameManager] → Spreaders remaining: %d (target: 0)" % spreader_count)
-	elif unmovable_target > 0:
-		print("[GameManager] → Level type: UNMOVABLE")
-		print("[GameManager] → Unmovables: %d/%d" % [unmovables_cleared, unmovable_target])
-	elif collectible_target > 0:
-		print("[GameManager] → Level type: COLLECTIBLE")
-		print("[GameManager] → Collectibles: %d/%d, Score: %d/%d" % [collectibles_collected, collectible_target, score, target_score])
-	else:
-		print("[GameManager] → Level type: SCORE")
-		print("[GameManager] → Score: %d/%d" % [score, target_score])
-	combo_count = 0
-	on_level_complete()
-
-func check_and_spread_tiles():
-	"""Check spreader tiles and spread them if conditions are met
-	This should be called AFTER all cascades from a move complete"""
-	if spreader_positions.size() == 0:
-		return
-
-	print("[SPREADER] check_and_spread_tiles called - spreaders count: ", spreader_positions.size())
-
-	# Get the GameBoard to access tile instances
-	var board = get_node_or_null("/root/MainGame/GameBoard")
-	if not board or not board.tiles:
-		print("[SPREADER] GameBoard not available")
-		return
-
-	# Step 1: Decrement grace moves for all spreaders
-	var active_spreaders = []  # Spreaders with grace expired
-	for pos in spreader_positions:
-		var x = int(pos.x)
-		var y = int(pos.y)
-		if x >= 0 and x < board.tiles.size() and y >= 0 and y < board.tiles[x].size():
-			var tile = board.tiles[x][y]
-			if tile and tile.is_spreader:
-				if tile.spreader_grace_moves > 0:
-					tile.spreader_grace_moves -= 1
-					tile.update_visual()  # Update visual to show grace status
-					print("[SPREADER] Decremented grace at (", x, ",", y, ") to ", tile.spreader_grace_moves)
-
-				if tile.spreader_grace_moves <= 0:
-					active_spreaders.append(pos)
-
-	if active_spreaders.size() == 0:
-		print("[SPREADER] No active spreaders (all still in grace period)")
-		return
-
-	print("[SPREADER] Active spreaders ready to spread: ", active_spreaders.size())
-
-	# Step 2: Check if any spreaders were destroyed during this turn
-	if spreaders_destroyed_this_turn:
-		print("[SPREADER] Spreading prevented - spreaders were destroyed this turn")
-		return
-
-	print("[SPREADER] No spreaders destroyed this turn - spreading will occur")
-
-	# Step 3: Spread to adjacent tiles
-	var new_spreaders = []
-	for pos in active_spreaders:
-		var x = int(pos.x)
-		var y = int(pos.y)
-
-		# Check all 4 adjacent positions
-		var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
-		for dir in directions:
-			var nx = x + int(dir.x)
-			var ny = y + int(dir.y)
-
-			# Check if position is valid and can be converted
-			if nx >= 0 and nx < GRID_WIDTH and ny >= 0 and ny < GRID_HEIGHT:
-				if can_convert_to_spreader(nx, ny):
-					# Check spread limit (if set)
-					if spreader_spread_limit > 0 and new_spreaders.size() >= spreader_spread_limit:
-						print("[SPREADER] Spread limit reached (", spreader_spread_limit, " new spreaders per move)")
-						break  # Stop spreading for this move
-
-					# Check max spreaders limit
-					if spreader_positions.size() + new_spreaders.size() >= max_spreaders:
-						print("[SPREADER] Max spreaders limit reached (", max_spreaders, ")")
-						break
-
-					# Store the original tile type before converting
-					var original_tile_type = grid[nx][ny]
-
-					# Convert the tile to a spreader
-					grid[nx][ny] = SPREADER
-					new_spreaders.append(Vector2(nx, ny))
-
-					# Update the visual tile instance, preserving original tile_type
-					if nx < board.tiles.size() and ny < board.tiles[nx].size():
-						var tile = board.tiles[nx][ny]
-						if tile:
-							# Keep the original tile_type so we can reveal it when destroyed
-							# tile.tile_type stays as the original value
-							# Get textures for spreader type from spreader_textures_map
-							var textures = []
-							if spreader_textures_map.has(spreader_type):
-								textures = spreader_textures_map[spreader_type]
-							tile.configure_spreader(spreader_grace_default, spreader_type, textures)
-
-					print("[SPREADER] Converted tile at (", nx, ",", ny, ") to spreader (was type ", original_tile_type, ")")
-
-		# If spread limit reached, stop processing more active spreaders
-		if spreader_spread_limit > 0 and new_spreaders.size() >= spreader_spread_limit:
-			break
-
-	# Add new spreaders to tracking array and update count
-	for new_pos in new_spreaders:
-		spreader_positions.append(new_pos)
-		spreader_count += 1
-
-	if new_spreaders.size() > 0:
-		print("[SPREADER] Spread complete - ", new_spreaders.size(), " new spreaders created. Total spreaders: ", spreader_count)
-		emit_signal("spreaders_changed", spreader_count)
-
-func can_convert_to_spreader(x: int, y: int) -> bool:
-	"""Check if a tile can be converted to a spreader"""
-	# Get board reference for checking hard unmovable tiles
-	var board_ref = get_node_or_null("/root/MainGame/GameBoard")
-
-	if is_cell_blocked(x, y):
-		return false
-
-	var tile_val = grid[x][y]
-
-	# Can convert regular tiles (1-6)
-	if tile_val >= 1 and tile_val <= 6:
-		return true
-
-	# Cannot convert special tiles, collectibles, unmovables, or other spreaders
-	if tile_val == COLLECTIBLE or tile_val == SPREADER:
-		return false
-	if tile_val >= 7 and tile_val <= 9:  # Special tiles (arrows)
-		return false
-
-	# Check for hard unmovable via tile instance
-	if board_ref and board_ref.tiles and x < board_ref.tiles.size() and y < board_ref.tiles[x].size():
-		var tile_inst = board_ref.tiles[x][y]
-		if tile_inst and "is_unmovable_hard" in tile_inst and tile_inst.is_unmovable_hard:
-			return false  # Cannot convert unmovables
-
-	return false
-
-func use_move():
-	# Safety check: Don't decrement during bonus conversion (bonus handles its own countdown)
-	if in_bonus_conversion:
-		print("[GameManager] use_move() called during bonus conversion - IGNORING to prevent double-decrement")
-		return
-
-	# Safety check: Don't go below zero
-	if moves_left <= 0:
-		print("[GameManager] use_move() called but moves_left already at ", moves_left, " - not decrementing")
-		return
-
-	moves_left -= 1
-	emit_signal("moves_changed", moves_left)
-
-	print("[GameManager] use_move() called - moves_left now=", moves_left, ", score=", score, ", target=", target_score)
-
-	# Reset the spreaders_destroyed flag at the start of each move
-	spreaders_destroyed_this_turn = false
-
-	# Note: check_and_spread_tiles() is now called from GameBoard AFTER all cascades complete
-
-	# Determine if level is failed based on level type
-	var level_failed = false
-
-	if use_spreader_objective:
-		# Spreader-based level: fail if spreaders still remain and out of moves
-		if moves_left <= 0 and spreader_count > 0:
-			level_failed = true
-			print("[GameManager] Spreader level failed: ", spreader_count, " spreaders remaining (need 0)")
-	elif unmovable_target > 0:
-		# Unmovable-based level: fail if not all unmovables cleared and out of moves
-		if moves_left <= 0 and unmovables_cleared < unmovable_target:
-			level_failed = true
-			print("[GameManager] Unmovable level failed: ", unmovables_cleared, "/", unmovable_target, " cleared")
-	elif collectible_target > 0:
-		# Collectible-based level: fail if collectibles not collected and out of moves
-		if moves_left <= 0 and collectibles_collected < collectible_target:
-			level_failed = true
-			print("[GameManager] Collectible level failed: ", collectibles_collected, "/", collectible_target, " collected")
-	else:
-		# Score-based level: fail if score not reached and out of moves
-		if moves_left <= 0 and score < target_score:
-			level_failed = true
-			print("[GameManager] Score level failed: ", score, "/", target_score, " points")
-
-	if level_failed and not level_transitioning:
-		# Instead of immediately failing, mark a pending failure and wait for cascades to finish
-		pending_level_failed = true
-		print("[GameManager] pending_level_failed set = true")
-
-		# Emit EventBus event for narrative system
-		if EventBus:
-			var level_data = LevelManager.get_current_level() if LevelManager else null
-			var total_moves = level_data.moves if level_data else 30
-			EventBus.emit_level_failed("level_%d" % level, {
-				"level": level,
-				"score": score,
-				"target": target_score,
-				"moves_used": total_moves - moves_left
-			})
-		# Store level failure state snapshot (may be updated if goal reached during cascade)
-		last_level_won = false
-		last_level_score = score
-		last_level_target = target_score
-		last_level_number = level
-		last_level_moves_left = 0
-		_attempt_level_failed()
-
-func add_moves(amount: int):
-	"""Add moves to the current game (e.g., from purchasing extra moves)"""
-	moves_left += amount
-	emit_signal("moves_changed", moves_left)
-	print("[GameManager] Added %d moves. New total: %d" % [amount, moves_left])
-
-	# If level was previously failed due to no moves, cancel pending failure
-	if pending_level_failed:
-		pending_level_failed = false
-		print("[GameManager] Cancelled pending level failure - extra moves added")
-
-func reset_combo():
-	combo_count = 0
-
-func get_tile_at(pos: Vector2) -> int:
-	if is_valid_position(pos):
-		return grid[int(pos.x)][int(pos.y)]
-	return -1
-
-func has_possible_moves() -> bool:
-	"""Check if there are any valid moves available on the board"""
-	# First check if there are any special tiles - they're always valid moves
-	for x in range(GRID_WIDTH):
-		for y in range(GRID_HEIGHT):
-			if not is_cell_blocked(x, y):
-				var tile_type = grid[x][y]
-				if tile_type >= 7 and tile_type <= 9:
-					print("Special tile found at (", x, ", ", y, ") - valid move exists")
-					return true
-
-	# Check for regular match-creating moves
-	for x in range(GRID_WIDTH):
-		for y in range(GRID_HEIGHT):
-			if is_cell_blocked(x, y) or grid[x][y] <= 0:
+			if grid.size() <= x or grid[x].size() <= y:
 				continue
+			var cell = grid[x][y]
+			var is_unmov = _is_unmovable_cell(x, y)
+			var is_barrier_cell = is_unmov or (cell == -1) or (cell == SPREADER)
+			if is_barrier_cell:
+				if not in_barrier_run:
+					in_barrier_run = true
+				segment_accessible = not (is_unmov or cell == SPREADER)
+			else:
+				in_barrier_run = false
+				if cell == 0 and segment_accessible:
+					var tile_type = rng.randi_range(1, max(1, TILE_TYPES))
+					grid[x][y] = tile_type
+					created_positions.append(Vector2(x, y))
+	return created_positions
 
-			var pos = Vector2(x, y)
+func collectible_landed_at(pos: Vector2, c_type: String = "coin") -> void:
+	# B4: Delegate count tracking to ObjectiveManager
+	collectibles_collected += 1
+	if collectible_positions.has(pos):
+		collectible_positions.erase(pos)
+	if objective_manager_ref != null and objective_manager_ref.has_method("report_collectible_collected"):
+		objective_manager_ref.report_collectible_collected(1)
+	call_deferred("emit_signal", "collectibles_changed", collectibles_collected, collectible_target)
 
-			# Check right swap
-			if x < GRID_WIDTH - 1 and not is_cell_blocked(x + 1, y):
-				var right_pos = Vector2(x + 1, y)
-				if would_create_match_after_swap(pos, right_pos):
-					return true
-
-			# Check down swap
-			if y < GRID_HEIGHT - 1 and not is_cell_blocked(x, y + 1):
-				var down_pos = Vector2(x, y + 1)
-				if would_create_match_after_swap(pos, down_pos):
-					return true
-
-	return false
-
-func shuffle_board():
-	"""Shuffle all non-blocked tiles on the board"""
-	print("Shuffling board...")
-
-	# Collect all non-blocked, non-special tile values
-	var tile_values = []
-	for x in range(GRID_WIDTH):
-		for y in range(GRID_HEIGHT):
-			if not is_cell_blocked(x, y) and grid[x][y] > 0 and grid[x][y] < 7:
-				tile_values.append(grid[x][y])
-
-	# Shuffle the values
-	tile_values.shuffle()
-
-	# Redistribute the shuffled values (keep special tiles in place)
-	var index = 0
-	for x in range(GRID_WIDTH):
-		for y in range(GRID_HEIGHT):
-			if not is_cell_blocked(x, y) and grid[x][y] > 0 and grid[x][y] < 7:
-				grid[x][y] = tile_values[index]
-				index += 1
-
-	print("Board shuffled")
-
-func has_immediate_matches() -> bool:
-	"""Check if the current board has any matches without any moves"""
-	var matches = find_matches()
-	return matches.size() > 0
-
-func shuffle_until_moves_available() -> bool:
-	"""Shuffle the board until valid moves are available and no immediate matches exist"""
-	var max_attempts = 100
-	var attempts = 0
-
-	while attempts < max_attempts:
-		shuffle_board()
-		attempts += 1
-
-		# Check if shuffle created immediate matches - if so, reshuffle
-		if has_immediate_matches():
-			print("Shuffle created matches, reshuffling... (attempt ", attempts, ")")
-			continue
-
-		# Check if valid moves exist
-		if has_possible_moves():
-			print("Valid moves found after ", attempts, " shuffle(s)")
-			return true
-
-		print("No valid moves after shuffle attempt ", attempts)
-
-	print("WARNING: Could not find valid moves after ", max_attempts, " attempts")
-	return false
-
-func would_create_match_after_swap(pos1: Vector2, pos2: Vector2) -> bool:
-	# Temporarily swap
-	swap_tiles(pos1, pos2)
-
-	# Check for matches
-	var matches = find_matches()
-	var has_match = matches.size() > 0
-
-	# Swap back
-	swap_tiles(pos1, pos2)
-
-	return has_match
-
-func _attempt_level_complete():
-	# Wait until no board activity (swaps/cascades/refills) are in progress
-	# If another transition is already in progress, cancel
-	if level_transitioning:
-		pending_level_complete = false
-		return
-
-	# Poll until processing_moves is false, yielding small delays to avoid blocking
-	# Add timeout protection to prevent infinite wait if processing_moves gets stuck
-	var wait_time = 0.0
-	var max_wait_time = 10.0  # Maximum 10 seconds to wait for processing to complete
-
-	while processing_moves and wait_time < max_wait_time:
-		await get_tree().create_timer(0.1).timeout
-		wait_time += 0.1
-		# If a transition began while waiting, abort
-		if level_transitioning:
-			pending_level_complete = false
-			return
-
-	# If we timed out, force processing_moves to false and log warning
-	if processing_moves and wait_time >= max_wait_time:
-		print("[GameManager] ⚠️ WARNING: Timeout waiting for processing_moves to complete")
-		print("[GameManager] Forcing processing_moves = false to proceed with level completion")
-		processing_moves = false
-
-	# Give a short extra buffer so any last deferred callbacks/tweens complete
-	if get_tree() != null:
-		await get_tree().create_timer(0.2).timeout
-
-	# Clear pending flag and advance level now that the board is idle
-	pending_level_complete = false
-	advance_level()
-
-func _attempt_level_failed():
-	if level_transitioning:
-		pending_level_failed = false
-		return
-
-	# Wait until board activity completes
-	# Add timeout protection to prevent infinite wait
-	var wait_time = 0.0
-	var max_wait_time = 10.0  # Maximum 10 seconds to wait
-
-	while processing_moves and wait_time < max_wait_time:
-		await get_tree().create_timer(0.1).timeout
-		wait_time += 0.1
-		# Check if level completed while waiting based on level type
-		var goal_met = false
-		if use_spreader_objective:
-			goal_met = spreader_count == 0
-		elif unmovable_target > 0:
-			goal_met = unmovables_cleared >= unmovable_target
-		elif collectible_target > 0:
-			goal_met = collectibles_collected >= collectible_target
-		else:
-			goal_met = score >= target_score
-
-		if goal_met or level_transitioning:
-			pending_level_failed = false
-			return
-
-	# If we timed out, force processing_moves to false and log warning
-	if processing_moves and wait_time >= max_wait_time:
-		print("[GameManager] ⚠️ WARNING: Timeout waiting for processing_moves in level failure")
-		print("[GameManager] Forcing processing_moves = false to proceed with level failure")
-		processing_moves = false
-
-	# Short buffer
-	if get_tree() != null:
-		await get_tree().create_timer(0.2).timeout
-
-	# Check if the goal was reached during the wait, cancel failure
-	var goal_met = false
-	if use_spreader_objective:
-		goal_met = spreader_count == 0
-	elif unmovable_target > 0:
-		goal_met = unmovables_cleared >= unmovable_target
-	elif collectible_target > 0:
-		goal_met = collectibles_collected >= collectible_target
-	else:
-		goal_met = score >= target_score
-
-	if goal_met:
-		pending_level_failed = false
-		# Trigger completion flow
-		if not level_transitioning:
+	# Check if all objectives are now met — mirrors the check in remove_matches() so
+	# collecting the final coin via landing (not just tile removal) triggers level completion.
+	if objective_manager_ref != null and objective_manager_ref.has_method("is_complete"):
+		if objective_manager_ref.is_complete():
+			print("[GameManager] Objectives complete detected (collectible_landed_at)")
 			pending_level_complete = true
-			_attempt_level_complete()
-		return
+			call_deferred("_perform_level_completion_check")
 
-	# Proceed with failure transition
-	pending_level_failed = false
-	on_level_failed()
+func _attempt_level_complete() -> void:
+	# C1: Delegated to GameFlowController
+	if _flow_ctrl: _flow_ctrl.attempt_level_complete()
+	else:
+		if pending_level_complete: return
+		pending_level_complete = true
+		call_deferred("_perform_level_completion_check")
 
-func on_level_failed():
-	if level_transitioning:
-		return
-
-	level_transitioning = true
-	print("[GameManager] on_level_failed() called - transitioning to LevelProgressScene")
-
-	# Wait for any board activity to finish before transitioning
-	while processing_moves:
-		if get_tree() == null:
-			break
-		await get_tree().create_timer(0.1).timeout
-
-	# Short buffer to allow final tweens/deferred calls to complete
-	if get_tree() != null:
-		await get_tree().create_timer(0.2).timeout
-
-	# Ensure the last level score is the final score at transition time
-	last_level_won = false
-	last_level_score = score
-	last_level_target = target_score
-	last_level_number = level
-	last_level_moves_left = 0
-
-	print("[GameManager] Level failed - emitting game_over signal")
-	print("[GameManager]   Score: %d, Target: %d, Moves left: %d" % [score, target_score, moves_left])
-
-	# Emit game_over signal to show the enhanced game over screen
-	emit_signal("game_over")
-
-	level_transitioning = false
+func _perform_level_completion_check() -> void:
+	# C1: Delegated to GameFlowController
+	if _flow_ctrl: _flow_ctrl.perform_level_completion_check()
 
 func on_level_complete():
-	print("[GameManager] 🎯 on_level_complete() called")
-	print("[GameManager] → Level: %d" % level)
-	if use_spreader_objective:
-		print("[GameManager] → Type: SPREADER (spreaders_cleared, target=0)")
-	elif unmovable_target > 0:
-		print("[GameManager] → Type: UNMOVABLE (cleared: %d/%d)" % [unmovables_cleared, unmovable_target])
-	elif collectible_target > 0:
-		print("[GameManager] → Type: COLLECTIBLE (collected: %d/%d)" % [collectibles_collected, collectible_target])
-	else:
-		print("[GameManager] → Type: SCORE")
-	print("[GameManager] → Score: %d/%d, Moves left: %d" % [score, target_score, moves_left])
-	print("[GameManager] → level_transitioning: %s, pending_level_complete: %s" % [level_transitioning, pending_level_complete])
-
-	if level_transitioning:
-		print("[GameManager] → Already transitioning, returning WITHOUT running bonus")
-		return
-
-	level_transitioning = true
-
-	# Ensure LevelManager is initialized before transitioning
-	if not level_manager or level_manager.levels.size() == 0:
-		print("Waiting for LevelManager to initialize...")
-		if get_tree() != null:
-			await get_tree().create_timer(0.1).timeout
-		on_level_complete()
-		return
-
-	# Wait for any ongoing board activity to finish before changing scene
-	while processing_moves:
-		if get_tree() == null:
-			break
-		await get_tree().create_timer(0.1).timeout
-
-	# Small buffer to ensure tweens/deferred callbacks finish
-	if get_tree() != null:
-		await get_tree().create_timer(0.2).timeout
-
-	# Set transitioning flag to prevent any further gameplay
-	level_transitioning = true
-
-	# Store original moves_left before bonus conversion
-	var original_moves_left = moves_left
-
-	print("[GameManager] 🎁 Checking bonus conversion eligibility...")
-	print("[GameManager] → moves_left = %d" % moves_left)
-	print("[GameManager] → original_moves_left (saved) = %d" % original_moves_left)
-
-	# Bonus: Convert remaining moves to special tiles (like "Sugar Crush")
-	if moves_left > 0:
-		print("[GameManager] ✅ BONUS ELIGIBLE! Converting %d remaining moves to special tiles!" % moves_left)
-		await _convert_remaining_moves_to_bonus(moves_left)
-		# Ensure moves are consumed (should already be 0 from countdown, but just in case)
-		if moves_left != 0:
-			print("[GameManager] ⚠️ Warning: moves_left was %d after bonus, setting to 0" % moves_left)
-			moves_left = 0
-			emit_signal("moves_changed", moves_left)
-	else:
-		print("[GameManager] ❌ NO BONUS - Level completed with 0 moves remaining (used last move to win)")
-
-	# Ensure final level score snapshot is stored
-	last_level_won = true
-	last_level_score = score
-	last_level_target = target_score
-	last_level_number = level
-	last_level_moves_left = original_moves_left  # Use original count for star calculation
-
-	print("[GameManager] Level complete snapshot:")
-	print("[GameManager]   GameManager.level = ", level)
-	print("[GameManager]   last_level_number = ", last_level_number)
-	print("[GameManager]   LevelManager.current_level_index = ", level_manager.current_level_index if level_manager else "N/A")
-	print("[GameManager]   RewardManager.levels_completed (before) = ", RewardManager.levels_completed)
-
-	# Calculate stars based on performance using StarRatingManager
-	# Note: Final score includes bonus points from remaining moves conversion
-	var level_data = level_manager.get_level(level_manager.current_level_index)
-	var total_moves = level_data.moves if level_data else 20
-	var moves_used = total_moves - original_moves_left  # Use original count
-	var star_manager = get_node("/root/StarRatingManager")
-	var stars = star_manager.calculate_stars(score, target_score, moves_used, total_moves)
-	print("[GameManager] Level completed with %d stars! (Score: %d, Target: %d, Moves: %d/%d)" % [stars, score, target_score, moves_used, total_moves])
-	if original_moves_left > 0:
-		print("[GameManager] Note: Score includes bonus from %d remaining moves" % original_moves_left)
-
-	# Save star rating (only if better than previous)
-	star_manager.save_level_stars(level, stars)
-
-	# Calculate rewards (same formula as RewardManager uses)
-	var coins_earned = 100 + (50 * level)
-	var gems_earned = 0
-	if stars == 3:
-		var first_time = level > RewardManager.levels_completed
-		if first_time:
-			gems_earned = 5
-
-	print("[GameManager] Calculated rewards: %d coins, %d gems" % [coins_earned, gems_earned])
-
-	# Grant rewards through RewardManager to update levels_completed
-	RewardManager.grant_level_completion_reward(level, stars)
-
-	# Track achievements for level completion
-	print("[GameManager]   Total stars collected: ", star_manager.get_total_stars())
-
-	# Emit signal to show reward dialog in GameUI
-	print("[GameManager] Emitting level_complete signal")
-	emit_signal("level_complete")
-
-	# Emit EventBus event for narrative system (with coins/gems for ShowRewardsStep)
-	if EventBus:
-		EventBus.emit_level_complete("level_%d" % level, {
-			"level": level,
-			"score": score,
-			"stars": stars,
-			"coins_earned": coins_earned,
-			"gems_earned": gems_earned
-		})
-		print("[GameManager] EventBus level_complete emitted with rewards: %d coins, %d gems" % [coins_earned, gems_earned])
-	else:
-		print("[GameManager] ⚠️ EventBus not available - cannot emit level_complete event")
-
-	# Keep level_transitioning = true to prevent further gameplay
-	# This will be reset when the next level loads or game restarts
-	# DO NOT set to false here!
-
+	# C1: Delegated to GameFlowController
+	if _flow_ctrl: _flow_ctrl.on_level_complete()
 
 func _convert_remaining_moves_to_bonus(remaining_moves: int):
-	"""Convert remaining moves into special tiles and activate them for bonus points
-	This creates a fun visual celebration similar to Candy Crush's 'Sugar Crush'
-	Player can tap to skip and instantly calculate all bonus points"""
-
-	print("[GameManager] 🎉 _convert_remaining_moves_to_bonus called with %d moves" % remaining_moves)
-
-	# Lock player input during bonus phase
-	processing_moves = true
-	bonus_skipped = false
-
-	# Mark that we're in bonus conversion so other completion triggers defer
-	in_bonus_conversion = true
-
-	# Get GameBoard reference
-	var game_board = get_node_or_null("/root/MainGame/GameBoard")
-	if not game_board:
-		print("[GameManager] ❌ GameBoard not found, skipping bonus conversion")
-		processing_moves = false
-		in_bonus_conversion = false
-		return
-
-	print("[GameManager] ✓ GameBoard found, starting bonus conversion")
-
-	# Show "Tap to Skip" message
-	if game_board.has_method("show_skip_bonus_hint"):
-		game_board.show_skip_bonus_hint()
-		print("[GameManager] ✓ Skip hint shown")
-	else:
-		print("[GameManager] ⚠️ GameBoard doesn't have show_skip_bonus_hint method")
-
-	var bonus_points = 0
-
-	# Convert each remaining move into a special tile
-	for i in range(remaining_moves):
-		print("[GameManager] Bonus move %d/%d - Looking for position..." % [i+1, remaining_moves])
-
-		# Check if player skipped
-		if bonus_skipped:
-			print("[GameManager] ⏩ Bonus skipped! Calculating remaining points instantly...")
-			# Calculate remaining bonus points instantly
-			for j in range(i, remaining_moves):
-				var instant_bonus = 100 * (j + 1)
-				bonus_points += instant_bonus
-				add_score(instant_bonus)
-			print("[GameManager] 🌟 Instant bonus added: %d points" % (bonus_points - (100 * i * (i + 1) / 2)))
-			# Set moves to 0 to show completion
-			moves_left = 0
-			emit_signal("moves_changed", moves_left)
-			print("[GameManager] All bonus moves consumed instantly - moves_left now: 0")
-			break
-
-		# Find random active tile position
-		var random_pos = _get_random_active_tile_position()
-		if random_pos == Vector2(-1, -1):
-			print("[GameManager] ⚠️ No valid tile position found, ending bonus early at move %d/%d" % [i+1, remaining_moves])
-			break  # No more active tiles
-
-		print("[GameManager] ✓ Found position: %s" % random_pos)
-
-		# Decide which special tile to create based on move number
-		var special_type = FOUR_WAY_ARROW  # Most powerful for bonus
-
-		# Create special tile at this position
-		grid[int(random_pos.x)][int(random_pos.y)] = special_type
-		print("[GameManager] ✓ Created special tile type %d at %s" % [special_type, random_pos])
-
-		# Update visual tile if GameBoard has it
-		if game_board.has_method("update_tile_visual"):
-			game_board.update_tile_visual(random_pos, special_type)
-		else:
-			print("[GameManager] ⚠️ GameBoard doesn't have update_tile_visual method")
-
-		# Small delay between conversions for visual effect
-		await get_tree().create_timer(0.1).timeout
-
-		# Activate the special tile immediately
-		if game_board.has_method("activate_special_tile"):
-			print("[GameManager] Activating special tile at %s..." % random_pos)
-
-			# Simply await the activation - the cascade has its own safety limits
-			# and will always complete (max 20 iterations + forced processing_moves reset)
-			await game_board.activate_special_tile(random_pos)
-
-			print("[GameManager] ✓ Special tile activated")
-		else:
-			print("[GameManager] ⚠️ GameBoard doesn't have activate_special_tile method")
-
-		# Decrement moves counter for visual feedback (showing bonus progress)
-		# This lets players see how many bonus moves remain
-		moves_left -= 1
-		emit_signal("moves_changed", moves_left)
-		print("[GameManager] Bonus move consumed - moves_left now: %d" % moves_left)
-
-		# Calculate bonus points (each remaining move is worth progressively more)
-		var move_bonus = 100 * (i + 1)  # 100, 200, 300, etc.
-		bonus_points += move_bonus
-		add_score(move_bonus)
-
-		print("[GameManager] Bonus move %d/%d: Created special tile at %s, +%d points" % [i+1, remaining_moves, random_pos, move_bonus])
-
-	# Hide skip hint
-	if game_board.has_method("hide_skip_bonus_hint"):
-		game_board.hide_skip_bonus_hint()
-
-	if bonus_points > 0:
-		print("[GameManager] 🌟 Bonus complete! Total bonus points: %d" % bonus_points)
-
-	# If bonus was skipped, add a small delay to ensure board state settles
-	if bonus_skipped:
-		print("[GameManager] Bonus was skipped - adding settling delay before showing rewards")
-		await get_tree().create_timer(0.5).timeout  # Increased from 0.3 to 0.5
-
-		# Ensure board is hidden and stays hidden
-		if game_board:
-			game_board.visible = false
-			print("[GameManager] After skip delay: board.visible = ", game_board.visible)
-
-	# Mark end of bonus conversion
-	in_bonus_conversion = false
-
-	# Release processing lock
-	processing_moves = false
-	print("[GameManager] _convert_remaining_moves_to_bonus finished, processing_moves = false")
-
-	# CRITICAL FIX: Check if level completion was deferred during bonus conversion
-	# This happens when a collectible/unmovable completes the objective during bonus moves
-	if pending_level_complete and not level_transitioning:
-		print("[GameManager] ⚠️ Bonus complete - triggering deferred level completion")
-		print("[GameManager] → pending_level_complete=true detected, calling _attempt_level_complete()")
-		call_deferred("_attempt_level_complete")
-	else:
-		print("[GameManager] About to return to on_level_complete() to emit level_complete signal")
+	# C1: Delegated to GameFlowController
+	if _flow_ctrl: await _flow_ctrl.convert_remaining_moves_to_bonus(remaining_moves)
 
 func skip_bonus_animation():
-	"""Called when player taps to skip the bonus animation"""
-	if not bonus_skipped:
-		bonus_skipped = true
-		print("[GameManager] Player requested to skip bonus animation")
+	# C1: Delegated to GameFlowController
+	if _flow_ctrl: _flow_ctrl.skip_bonus_animation()
 
-func _get_random_active_tile_position() -> Vector2:
-	"""Get a random active (non-blocked, non-empty) tile position
-	Excludes special tiles (7-9) and collectibles (10)"""
-	var active_positions = []
+func _perform_level_failed_check() -> void:
+	# C1: Delegated to GameFlowController
+	if _flow_ctrl: _flow_ctrl.perform_level_failed_check()
 
+func _emit_eventbus_level_complete_with(stars: int, coins_earned: int, gems_earned: int) -> void:
+	if _flow_ctrl: _flow_ctrl._emit_eventbus_level_complete(stars, coins_earned, gems_earned)
+
+func _emit_eventbus_level_complete() -> void:
+	var stars = 1
+	if score >= int(target_score * 1.5): stars = 3
+	elif score >= int(target_score * 1.2): stars = 2
+	_emit_eventbus_level_complete_with(stars, 100 + (50 * level), 5 if stars == 3 else 0)
+
+func _emit_eventbus_level_failed() -> void:
+	if _flow_ctrl: _flow_ctrl._emit_eventbus_level_failed()
+
+func reset_combo() -> void:
+	combo_count = 0
+
+func use_move() -> void:
+	if moves_left > 0:
+		moves_left -= 1
+		emit_signal("moves_changed", moves_left)
+	if moves_left <= 0:
+		pending_level_failed = true
+		call_deferred("_perform_level_failed_check")
+
+func has_possible_moves() -> bool:
+	# C3: Check if any swap yields a match. Uses MatchFinder on a shallow grid copy.
+	if grid == null or grid.size() == 0:
+		return false
+	var exclude = [COLLECTIBLE, SPREADER]
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
-			var tile_type = grid[x][y]
-			# Include only regular tiles (1-6), exclude:
-			# - blocked cells (-1)
-			# - empty cells (0)
-			# - special tiles (7-9)
-			# - collectibles (10)
-			if not is_cell_blocked(x, y) and tile_type >= 1 and tile_type <= TILE_TYPES:
-				active_positions.append(Vector2(x, y))
+			if not is_cell_movable(x, y):
+				continue
+			if x + 1 < GRID_WIDTH and is_cell_movable(x + 1, y) and grid[x][y] != grid[x+1][y]:
+				var tg = _copy_grid()
+				var t = tg[x][y]; tg[x][y] = tg[x+1][y]; tg[x+1][y] = t
+				if MatchFinder.find_matches(tg, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
+					return true
+			if y + 1 < GRID_HEIGHT and is_cell_movable(x, y + 1) and grid[x][y] != grid[x][y+1]:
+				var tg2 = _copy_grid()
+				var t2 = tg2[x][y]; tg2[x][y] = tg2[x][y+1]; tg2[x][y+1] = t2
+				if MatchFinder.find_matches(tg2, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
+					return true
+	return false
 
-	if active_positions.size() == 0:
-		print("[GameManager] ⚠️ No valid positions for bonus conversion (active positions: 0)")
-		return Vector2(-1, -1)
+func _copy_grid() -> Array:
+	var copy = []
+	for cx in range(GRID_WIDTH):
+		var col = []
+		for cy in range(GRID_HEIGHT):
+			col.append(grid[cx][cy])
+		copy.append(col)
+	return copy
 
-	# Return random position
-	var random_index = randi() % active_positions.size()
-	return active_positions[random_index]
+func shuffle_until_moves_available(max_attempts: int = 100) -> bool:
+	# C3: Shuffle grid values until has_possible_moves() returns true.
+	# Only regular tile types (1-TILE_TYPES) are shuffled — collectibles, special tiles,
+	# and spreaders stay in place so they are never corrupted.
+	var rng = RandomNumberGenerator.new()
+	rng.randomize()
+	var cells: Array = []
+	var values: Array = []
+	for x in range(GRID_WIDTH):
+		for y in range(GRID_HEIGHT):
+			if grid.size() > x and grid[x].size() > y:
+				var v = int(grid[x][y])
+				# Only include regular movable tiles — skip blocked(-1), empty(0),
+				# special tiles (7-9), collectibles (10), spreaders (12)
+				if v >= 1 and v <= TILE_TYPES:
+					cells.append(Vector2(x, y))
+					values.append(v)
+	if cells.size() == 0:
+		return false
+	for attempt in range(max_attempts):
+		values.shuffle()
+		for i in range(cells.size()):
+			var p = cells[i]
+			grid[int(p.x)][int(p.y)] = values[i]
+		if has_possible_moves():
+			return true
+	return false
 
-func calculate_stars(final_score: int, target: int) -> int:
-	"""DEPRECATED: Use StarRatingManager.calculate_stars() instead
-	Calculate star rating (1-3) based on score performance"""
-	var performance_ratio = float(final_score) / float(target)
+var SpreaderService = null
 
-	if performance_ratio >= 2.0:
-		# 200%+ of target = 3 stars
-		return 3
-	elif performance_ratio >= 1.5:
-		# 150%-199% of target = 2 stars
-		return 2
-	elif performance_ratio >= 1.0:
-		# 100%-149% of target = 1 star
-		return 1
-	else:
-		# Below target = 0 stars (shouldn't happen as level completes when target reached)
-		return 1
+func _init_spreader_service():
+	if SpreaderService == null:
+		SpreaderService = load("res://scripts/game/SpreaderService.gd")
 
-# Collectible handling
-var _collectible_spawned_positions: Array = []  # track positions already spawned to avoid duplicates
+func check_and_spread_tiles() -> Array:
+	## B5: Delegated to SpreaderService. Returns newly infected positions.
+	_init_spreader_service()
+	if spreaders_destroyed_this_turn.size() > 0:
+		spreaders_destroyed_this_turn.clear()
+		return []
+	spreaders_destroyed_this_turn.clear()
+	if SpreaderService == null or not SpreaderService.has_method("spread"):
+		return []
+	var res = SpreaderService.spread(
+		spreader_positions, grid, GRID_WIDTH, GRID_HEIGHT,
+		spreader_spread_limit, spreader_type
+	)
+	if typeof(res) == TYPE_DICTIONARY and res.has("new_spreaders"):
+		var new_list: Array = res["new_spreaders"]
+		for np in new_list:
+			if not spreader_positions.has(np):
+				spreader_positions.append(np)
+		spreader_count = spreader_positions.size()
+		grid = res.get("grid", grid)
+		call_deferred("emit_signal", "spreaders_changed", spreader_count)
+		return new_list
+	return []
 
-func spawn_collectibles_for_targets():
-	"""Queue collectible visuals for all target positions that haven't been spawned yet."""
-	for cp in collectible_positions:
-		var key = str(int(cp.x)) + "," + str(int(cp.y))
-		if not _collectible_spawned_positions.has(key):
-			# Request GameBoard to spawn visual
-			var board = get_node_or_null("/root/MainGame/GameBoard")
-			if board and board.has_method("spawn_collectible_visual"):
-				board.spawn_collectible_visual(int(cp.x), int(cp.y), "coin")
-				_collectible_spawned_positions.append(key)
-
-func collectible_landed_at(pos: Vector2, coll_type: String):
-	"""Called by GameBoard when a falling collectible lands on its target position."""
-	print("[GameManager] 🪙 collectible_landed_at: ", pos, " type: ", coll_type)
-
-	# Increment collected counter
-	collectibles_collected += 1
-	emit_signal("collectibles_changed", collectibles_collected, collectible_target)
-	print("[GameManager] 🪙 Collected ", coll_type, " -> ", collectibles_collected, "/", collectible_target)
-
-	# Remove the collectible marker so it doesn't respawn
-	for i in range(collectible_positions.size()-1, -1, -1):
-		var cp = collectible_positions[i]
-		if int(cp.x) == int(pos.x) and int(cp.y) == int(pos.y):
-			collectible_positions.remove_at(i)
-
-	# Grant reward points
-	var reward_points = 500
-	add_score(reward_points)
-
-	# If we are currently in bonus conversion, defer triggering level completion to avoid reentrancy
-	if in_bonus_conversion:
-		print("[GameManager] 🪙 Collectible landed during bonus conversion - deferring completion handling")
-		# Do not attempt to set pending_level_complete or call _attempt_level_complete here
-		# Let the ongoing bonus conversion continue; final completion will be handled when bonus finishes
-		# Clean spawned positions tracking
-		var key = str(int(pos.x)) + "," + str(int(pos.y))
-		if _collectible_spawned_positions.has(key):
-			_collectible_spawned_positions.erase(key)
-		return
-
-	# Check if level is complete (if collectible-based level)
-	if collectible_target > 0 and collectibles_collected >= collectible_target:
-		print("[GameManager] ✨ ALL COLLECTIBLES COLLECTED! Level complete!")
-		print("[GameManager] → Collectibles: %d/%d, Score: %d/%d" % [collectibles_collected, collectible_target, score, target_score])
-		if not level_transitioning and not pending_level_complete:
-			# Store level completion state
-			last_level_won = true
-			last_level_score = score
-			last_level_target = target_score
-			last_level_number = level
-			last_level_moves_left = moves_left
-
-			# Use pending mechanism to wait for any ongoing animations
-			pending_level_complete = true
-			print("[GameManager] → Setting pending_level_complete = true, calling _attempt_level_complete()")
-			_attempt_level_complete()
-
-	# NOTE: Gravity/refill is handled by GameBoard after collection animation
-
-	# Clean spawned positions tracking
-	var key = str(int(pos.x)) + "," + str(int(pos.y))
-	if _collectible_spawned_positions.has(key):
-		_collectible_spawned_positions.erase(key)
-
-func report_unmovable_destroyed(pos: Vector2, skip_clear: bool = false) -> void:
-	"""Update model when an unmovable soft tile is destroyed.
-	This centralizes counter updates, signal emission and level-completion checks.
-	The visual/transform behavior is the responsibility of GameBoard/Tile instances; callers
-	should pass skip_clear=true if the visual already transformed the cell into a collectible or tile.
-	"""
-	var key = str(int(pos.x)) + "," + str(int(pos.y))
-
-	# Remove from map if present
-	if unmovable_map.has(key):
-		unmovable_map.erase(key)
-
-	# Clear grid cell to empty so gravity/refill can proceed unless caller requested to keep revealed cell
-	if not skip_clear:
-		if int(pos.x) < grid.size() and int(pos.y) < grid[int(pos.x)].size():
-			grid[int(pos.x)][int(pos.y)] = 0
-		# Also clear any visual tile node on the GameBoard to avoid leftover visuals
-		var board = get_node_or_null("/root/MainGame/GameBoard")
-		if board and board.tiles and int(pos.x) < board.tiles.size() and int(pos.y) < board.tiles[int(pos.x)].size():
-			var tnode = board.tiles[int(pos.x)][int(pos.y)]
-			if tnode != null:
-				# Only free if it's not already queued
-				if not tnode.is_queued_for_deletion():
-					print("[GameManager] report_unmovable_destroyed: freeing visual tile at", pos)
-					tnode.queue_free()
-			# Ensure the visual reference is cleared so gravity won't consider it
-			board.tiles[int(pos.x)][int(pos.y)] = null
-	else:
-		print("[GameManager] report_unmovable_destroyed: preserving grid cell at ", pos, " because skip_clear=true (reveal occurred)")
-
-	# Track unmovables cleared and notify UI
-	unmovables_cleared += 1
-	emit_signal("unmovables_changed", unmovables_cleared, unmovable_target)
-	print("[GameManager] Unmovable reported destroyed at (", pos.x, ",", pos.y, ") - Cleared: ", unmovables_cleared, "/", unmovable_target)
-
-	# Check completion
-	if unmovable_target > 0 and unmovables_cleared >= unmovable_target:
-		print("[GameManager] 🎯 ALL UNMOVABLES CLEARED - Triggering level completion (report_unmovable_destroyed)")
-		if not pending_level_complete and not level_transitioning:
-			last_level_won = true
-			last_level_score = score
-			last_level_target = unmovable_target
-			last_level_number = level
-			last_level_moves_left = moves_left
-			pending_level_complete = true
-			_attempt_level_complete()
-
-func report_spreader_destroyed(pos: Vector2) -> void:
-	"""Update model when a spreader tile is destroyed.
-	This centralizes counter updates, signal emission and level-completion checks.
-	"""
-	print("[SPREADER] report_spreader_destroyed at (", pos.x, ",", pos.y, ")")
-
-	# Mark that a spreader was destroyed this turn (prevents spreading)
-	spreaders_destroyed_this_turn = true
-
-	# Decrement spreader count
-	spreader_count -= 1
-	if spreader_count < 0:
-		spreader_count = 0  # Safety check
-
-	emit_signal("spreaders_changed", spreader_count)
-	print("[SPREADER] Spreader destroyed - Remaining spreaders: ", spreader_count)
-
-	# Emit EventBus event for narrative system
-	if EventBus:
-		EventBus.emit_spreader_destroyed("spreader_%d_%d" % [int(pos.x), int(pos.y)], {
-			"position": pos,
-			"remaining": spreader_count,
-			"level": level
-		})
-
-	# Check completion - level completes when spreader_count reaches 0
-	if use_spreader_objective and spreader_count == 0:
-		# Verify count matches reality
-		var actual_spreaders = 0
-		for x in range(GRID_WIDTH):
-			for y in range(GRID_HEIGHT):
-				if grid[x][y] == SPREADER:
-					actual_spreaders += 1
-					print("[SPREADER] ⚠️ Found spreader at (", x, ",", y, ") but count=0!")
-
-		if actual_spreaders != 0:
-			print("[SPREADER] ❌ ERROR: spreader_count=0 but found ", actual_spreaders, " spreaders in grid!")
-			print("[SPREADER] spreader_positions size: ", spreader_positions.size())
-			for sp_pos in spreader_positions:
-				var gx = int(sp_pos.x)
-				var gy = int(sp_pos.y)
-				print("[SPREADER]   - Tracked position: (", gx, ",", gy, ") - Grid value: ", grid[gx][gy])
-			# Correct the count
-			spreader_count = actual_spreaders
-			emit_signal("spreaders_changed", spreader_count)
-			return  # Don't trigger completion if there are still spreaders
-
-		print("[SPREADER] 🎯 ALL SPREADERS CLEARED (count=0, verified) - Triggering level completion")
-		if not pending_level_complete and not level_transitioning:
-			last_level_won = true
-			last_level_score = score
-			last_level_target = 0  # Target was to reach 0 spreaders
-			last_level_number = level
-			last_level_moves_left = moves_left
-			print("[SPREADER] Saved completion state: moves_left = %d for bonus conversion" % moves_left)
-			pending_level_complete = true
-			_attempt_level_complete()
-
-func parse_layout_string(layout_str: String, width: int, height: int) -> Array:
-	"""Parse layout string for DLC levels (same logic as LevelManager)
-	Supports tokens separated by commas or spaces, or compact single-line layouts.
-	Hard unmovable tokens are preserved as strings (e.g. "H2:rock") so the
-	caller can handle metadata parsing.
-	"""
-	var parsed = []
-	var lines = layout_str.strip_edges().split("\n")
-
-	# Normalize lines: if the entire layout is one long string equal to width*height, split into rows
-	if lines.size() == 1 and lines[0].length() == width * height:
-		var compact = lines[0]
-		lines = []
-		for r in range(height):
-			lines.append(compact.substr(r * width, width))
-
-	# Initialize parsed grid with zeros
-	for x in range(width):
-		parsed.append([])
-		for _y in range(height):
-			parsed[x].append(0)
-
-	# Parse each provided line (up to height)
-	for y in range(min(lines.size(), height)):
-		var line = lines[y].strip_edges()
-		var values = []
-
-		# Accept comma-separated or space-separated tokens; otherwise treat each char as a token
-		if "," in line:
-			values = line.split(",")
-		elif " " in line:
-			values = line.split(" ")
-		else:
-			values = []
-			for i in range(min(line.length(), width)):
-				values.append(line.substr(i, 1))
-
-		for x in range(min(values.size(), width)):
-			var val_str = values[x].strip_edges()
-
-			# Recognize blocked or empty markers and convert to integers or keep tokens
-			if val_str == "X" or val_str == "x":
-				parsed[x][y] = -1
-			elif val_str == "0" or val_str == "." or val_str == "_":
-				parsed[x][y] = 0
-			elif val_str == "C":
-				# Collectible marker
-				parsed[x][y] = COLLECTIBLE
-			elif val_str.begins_with("H") and ":" in val_str:
-				# Hard unmovable token like H2:rock - keep as string so fill_grid_from_layout can parse it
-				parsed[x][y] = val_str
-			elif val_str.is_valid_int():
-				parsed[x][y] = int(val_str)
-			else:
-				# Unknown token - default to empty
-				parsed[x][y] = 0
-
-	return parsed

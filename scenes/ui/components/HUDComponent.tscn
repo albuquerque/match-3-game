@@ -1,0 +1,124 @@
+[gd_scene load_steps=3 format=3 uid="UID_HUDCOMP"]
+
+[ext_resource type="Script" uid="uid://HUDComponent" path="res://scripts/ui/components/HUDComponent.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud"]
+bg_color = Color(0.1, 0.1, 0.15, 0.7)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_left = 12
+corner_radius_bottom_right = 12
+border_width_left = 2
+border_width_right = 2
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.4, 0.5, 0.8)
+content_margin_left = 16
+content_margin_right = 16
+content_margin_top = 8
+content_margin_bottom = 8
+
+[node name="HUDComponent" type="VBoxContainer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_bottom = 145.0
+grow_horizontal = 2
+script = ExtResource("1_hud")
+
+[node name="CurrencyPanel" type="PanelContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_hud")
+
+[node name="HBox" type="HBoxContainer" parent="CurrencyPanel"]
+layout_mode = 2
+
+[node name="CoinsLabel" type="Label" parent="CurrencyPanel/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "💰 0"
+horizontal_alignment = 1
+
+[node name="GemsLabel" type="Label" parent="CurrencyPanel/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "💎 0"
+horizontal_alignment = 1
+
+[node name="LivesLabel" type="Label" parent="CurrencyPanel/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "❤️ 5/5"
+horizontal_alignment = 1
+
+[node name="TopPanel" type="HBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+theme_override_constants/separation = 4
+
+[node name="ScoreContainer" type="VBoxContainer" parent="TopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ScoreTitle" type="Label" parent="TopPanel/ScoreContainer"]
+layout_mode = 2
+text = "SCORE"
+add_theme_font_size_override("font_size", 14)
+horizontal_alignment = 1
+
+[node name="ScoreLabel" type="Label" parent="TopPanel/ScoreContainer"]
+layout_mode = 2
+text = "0"
+add_theme_font_size_override("font_size", 28)
+horizontal_alignment = 1
+
+[node name="LevelContainer" type="VBoxContainer" parent="TopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LevelTitle" type="Label" parent="TopPanel/LevelContainer"]
+layout_mode = 2
+text = "LEVEL"
+add_theme_font_size_override("font_size", 14)
+horizontal_alignment = 1
+
+[node name="LevelLabel" type="Label" parent="TopPanel/LevelContainer"]
+layout_mode = 2
+text = "Lv 1"
+add_theme_font_size_override("font_size", 28)
+horizontal_alignment = 1
+
+[node name="MovesContainer" type="VBoxContainer" parent="TopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MovesTitle" type="Label" parent="TopPanel/MovesContainer"]
+layout_mode = 2
+text = "MOVES"
+add_theme_font_size_override("font_size", 14)
+horizontal_alignment = 1
+
+[node name="MovesLabel" type="Label" parent="TopPanel/MovesContainer"]
+layout_mode = 2
+text = "25"
+add_theme_font_size_override("font_size", 28)
+horizontal_alignment = 1
+
+[node name="TargetContainer" type="VBoxContainer" parent="TopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TargetLabel" type="Label" parent="TopPanel/TargetContainer"]
+layout_mode = 2
+text = "Goal: 10000"
+add_theme_font_size_override("font_size", 14)
+horizontal_alignment = 1
+
+[node name="TargetProgress" type="ProgressBar" parent="TopPanel/TargetContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 12)
+value = 0

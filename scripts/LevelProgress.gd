@@ -15,11 +15,22 @@ signal level_selected(level)
 @onready var restart_button = $ResultPanel/VBoxContainer/RestartButton
 @onready var menu_button = $ResultPanel/VBoxContainer/MenuButton
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+    if NodeResolvers == null:
+        var s = load("res://scripts/helpers/node_resolvers_api.gd")
+        if s != null and typeof(s) != TYPE_NIL:
+            NodeResolvers = s
+        else:
+            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
 func _ready():
 	print("LevelProgress scene is ready.")
+	_ensure_resolvers()
 
 	# Check if we're showing results or route map
-	var game_manager = get_node_or_null("/root/GameManager")
+	var game_manager = NodeResolvers._get_gm()
 	if game_manager and (game_manager.last_level_score > 0 or game_manager.last_level_number > 0):
 		# Show results
 		show_level_results()
@@ -29,7 +40,7 @@ func _ready():
 
 func show_level_results():
 	print("Showing level results...")
-	var game_manager = get_node("/root/GameManager")
+	var game_manager = NodeResolvers._get_gm()
 
 	# Hide route map, show result panel
 	if route_map:
@@ -75,7 +86,7 @@ func setup_route_map():
 	if route_map:
 		route_map.visible = true
 
-	var level_manager = get_node("/root/LevelManager")
+	var level_manager = NodeResolvers._get_lm()
 	if not level_manager:
 		print("Error: LevelManager not found!")
 		return
@@ -93,7 +104,7 @@ func _on_level_button_pressed(level):
 	print("Button pressed for Level: %d" % (level + 1))
 	emit_signal("level_selected", level)
 	# Load the selected level
-	var level_manager = get_node("/root/LevelManager")
+	var level_manager = NodeResolvers._get_lm()
 	if level_manager:
 		print("LevelManager found. Setting current level to: %d" % level)
 		level_manager.set_current_level(level)
@@ -105,15 +116,15 @@ func _on_level_button_pressed(level):
 func _on_next_level_pressed():
 	print("Next level button pressed")
 	# Level already advanced in GameManager, just load the game
-	var game_manager = get_node("/root/GameManager")
+	var game_manager = NodeResolvers._get_gm()
 	game_manager.level_transitioning = false
 	game_manager.load_current_level()
 	get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
 
 func _on_restart_level_pressed():
 	print("Restart level button pressed")
-	var game_manager = get_node("/root/GameManager")
-	var level_manager = get_node("/root/LevelManager")
+	var game_manager = NodeResolvers._get_gm()
+	var level_manager = NodeResolvers._get_lm()
 
 	# Reset to the failed level
 	level_manager.set_current_level(game_manager.last_level_number - 1)

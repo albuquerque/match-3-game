@@ -363,4 +363,9 @@ func _start_typewriter_effect(label: Control, full_text: String, params: Diction
 	if panel and panel.has_method("create_tween"):
 		var tween = panel.create_tween()
 		tween.tween_property(label, "visible_ratio", 1.0, duration)
-		tween.finished.connect(func(): typewriter_active = false)
+		var _typewriter_cb = func():
+			typewriter_active = false
+		# connect the assigned callback rather than inline lambda
+		tween.finished.connect(_typewriter_cb)
+
+	return

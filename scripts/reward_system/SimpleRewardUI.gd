@@ -23,10 +23,36 @@ var gems: int = 0
 var title_color: Color = Color(1.0, 0.9, 0.3, 1.0)  # Gold
 var text_color: Color = Color(1.0, 1.0, 1.0, 1.0)  # White
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+    if NodeResolvers == null:
+        var s = load("res://scripts/helpers/node_resolvers_api.gd")
+        if s != null and typeof(s) != TYPE_NIL:
+            NodeResolvers = s
+        else:
+            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
+# Cached AudioManager for this UI
+var _cached_am: Node = null
+
+func _am():
+	if is_instance_valid(_cached_am):
+		return _cached_am
+	var a = NodeResolvers._fallback_autoload("AudioManager")
+	if a == null and has_method("get_tree"):
+		var _root = get_tree().root
+		if _root:
+			a = _root.get_node_or_null("AudioManager")
+	_cached_am = a
+	return a
+
 func _ready():
+	_ensure_resolvers()
 	# Get theme colors from ThemeManager if available
-	if ThemeManager:
-		var theme_name = ThemeManager.get_theme_name()
+	var _tm = NodeResolvers._get_tm() if typeof(NodeResolvers) != TYPE_NIL else null
+	if _tm and _tm.has_method("get_theme_name"):
+		var theme_name = _tm.get_theme_name()
 		if theme_name == "legacy":
 			title_color = Color(1.0, 0.8, 0.2, 1.0)  # Warm gold
 			text_color = Color(0.95, 0.9, 0.8, 1.0)  # Warm white
@@ -184,16 +210,18 @@ func _animate_stars(star_count: int):
 		tween.tween_property(star_label, "scale", Vector2(1, 1), 0.2)
 
 		# Play star pop sound
-		if AudioManager:
-			AudioManager.play_sfx("match")  # Use match chime for stars
+		var _am_local = _am()
+		if _am_local and _am_local.has_method("play_sfx"):
+			_am_local.play_sfx("match")  # Use match chime for stars
 
 func _animate_rewards(target_coins: int, target_gems: int):
 	"""Count up coins and gems from 0 to target values"""
 	var duration = 0.8  # Total animation time in seconds
 
 	# Play counting start sound
-	if AudioManager:
-		AudioManager.play_sfx("combo")
+	var _am_local2 = _am()
+	if _am_local2 and _am_local2.has_method("play_sfx"):
+		_am_local2.play_sfx("combo")
 
 	# Count up using a simple loop
 	var steps = 30  # Number of steps in animation
@@ -210,8 +238,9 @@ func _animate_rewards(target_coins: int, target_gems: int):
 	rewards_label.text = tr("UI_REWARDS_SUMMARY") % [target_coins, target_gems]
 
 	# Play completion chime
-	if AudioManager:
-		AudioManager.play_sfx("combo")
+	var _am_local3 = _am()
+	if _am_local3 and _am_local3.has_method("play_sfx"):
+		_am_local3.play_sfx("combo")
 
 func hide_screen():
 	"""Hide the reward screen"""
@@ -223,8 +252,9 @@ func _on_continue_pressed():
 	print("[SimpleRewardUI] Continue pressed!")
 
 	# Play button click sound
-	if AudioManager:
-		AudioManager.play_sfx("ui_click")
+	var _am_local4 = _am()
+	if _am_local4 and _am_local4.has_method("play_sfx"):
+		_am_local4.play_sfx("ui_click")
 
 	continue_pressed.emit()
 	hide_screen()
@@ -242,4 +272,3 @@ func _on_button_unhover():
 	tween.set_ease(Tween.EASE_OUT)
 	tween.set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(continue_button, "scale", Vector2(1, 1), 0.1)
-

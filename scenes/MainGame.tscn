@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://pu3wcj43djjh"]
+[gd_scene load_steps=18 format=3 uid="uid://pu3wcj43djjh"]
 
 [ext_resource type="Script" uid="uid://doc3oxaambqkj" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
 [ext_resource type="Script" uid="uid://clght4j2ys21n" path="res://scripts/GameUI.gd" id="2_4y7z1"]
@@ -9,6 +9,9 @@
 [ext_resource type="Texture2D" path="res://textures/audio_settings.png" id="8_audio"]
 [ext_resource type="Texture2D" path="res://textures/shop.png" id="9_shop"]
 [ext_resource type="Texture2D" path="res://textures/gallery.png" id="10_gallery"]
+[ext_resource type="Texture2D" path="res://textures/settings_gear.svg" id="13_settings"]
+[ext_resource type="Script" uid="uid://cohaflicvwgwb" path="res://scripts/ui/components/BoosterPanelComponent.gd" id="11_bpc"]
+[ext_resource type="Script" uid="uid://dtl3haqx807gd" path="res://scripts/ui/components/FloatingMenuComponent.gd" id="12_fmc"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
 bg_color = Color(0.2, 0.2, 0.3, 0.8)
@@ -16,6 +19,19 @@ corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud"]
+bg_color = Color(0.08, 0.08, 0.14, 0.88)
+corner_radius_top_left = 0
+corner_radius_top_right = 0
+corner_radius_bottom_left = 10
+corner_radius_bottom_right = 10
+border_width_bottom = 2
+border_color = Color(0.35, 0.35, 0.55, 0.9)
+content_margin_left = 8
+content_margin_right = 8
+content_margin_top = 6
+content_margin_bottom = 8
 
 [sub_resource type="Theme" id="Theme_1"]
 default_font_size = 24
@@ -92,47 +108,67 @@ size_flags_horizontal = 3
 text = "❤️ 5/5"
 horizontal_alignment = 1
 
-[node name="TopPanel" type="HBoxContainer" parent="GameUI/VBoxContainer"]
+[node name="TopPanel" type="PanelContainer" parent="GameUI/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_hud")
 
-[node name="ScoreContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel"]
+[node name="HBoxContainer" type="HBoxContainer" parent="GameUI/VBoxContainer/TopPanel"]
+layout_mode = 2
+
+[node name="ScoreContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="ScoreLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/ScoreContainer"]
+[node name="ScoreLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/ScoreContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_constants/outline_size = 2
 text = "Score: 0"
 horizontal_alignment = 1
 
-[node name="LevelContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel"]
+[node name="LevelContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="LevelLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/LevelContainer"]
+[node name="LevelLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/LevelContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_constants/outline_size = 2
 text = "Level 1"
 horizontal_alignment = 1
 
-[node name="MovesContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel"]
+[node name="MovesContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="MovesLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/MovesContainer"]
+[node name="MovesLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/MovesContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_constants/outline_size = 2
 text = "Moves: 30"
 horizontal_alignment = 1
 
-[node name="TargetContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel"]
+[node name="TargetContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="TargetLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/TargetContainer"]
+[node name="TargetLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/TargetContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_constants/outline_size = 2
 text = "Target: 10000"
 horizontal_alignment = 1
 
-[node name="TargetProgress" type="ProgressBar" parent="GameUI/VBoxContainer/TopPanel/TargetContainer"]
+[node name="TargetProgress" type="ProgressBar" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/TargetContainer"]
 layout_mode = 2
 
 
@@ -189,6 +225,7 @@ offset_right = -10.0
 offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 0
+script = ExtResource("11_bpc")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="GameUI/BoosterPanel"]
 layout_mode = 2
@@ -198,6 +235,7 @@ alignment = 1
 [node name="HammerButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/HammerButton"]
 layout_mode = 1
@@ -213,6 +251,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/HammerButton"]
@@ -233,6 +272,7 @@ vertical_alignment = 2
 [node name="ShuffleButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/ShuffleButton"]
 layout_mode = 1
@@ -248,6 +288,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/ShuffleButton"]
@@ -268,6 +309,7 @@ vertical_alignment = 2
 [node name="SwapButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/SwapButton"]
 layout_mode = 1
@@ -283,6 +325,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/SwapButton"]
@@ -303,6 +346,7 @@ vertical_alignment = 2
 [node name="ChainReactionButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/ChainReactionButton"]
 layout_mode = 1
@@ -318,6 +362,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/ChainReactionButton"]
@@ -338,6 +383,7 @@ vertical_alignment = 2
 [node name="Bomb3x3Button" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/Bomb3x3Button"]
 layout_mode = 1
@@ -353,6 +399,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/Bomb3x3Button"]
@@ -373,6 +420,7 @@ vertical_alignment = 2
 [node name="LineBlastButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/LineBlastButton"]
 layout_mode = 1
@@ -388,6 +436,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/LineBlastButton"]
@@ -408,6 +457,7 @@ vertical_alignment = 2
 [node name="TileSquasherButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/TileSquasherButton"]
 layout_mode = 1
@@ -423,6 +473,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/TileSquasherButton"]
@@ -443,6 +494,7 @@ vertical_alignment = 2
 [node name="RowClearButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/RowClearButton"]
 layout_mode = 1
@@ -458,6 +510,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/RowClearButton"]
@@ -478,6 +531,7 @@ vertical_alignment = 2
 [node name="ColumnClearButton" type="Button" parent="GameUI/BoosterPanel/HBoxContainer"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
+clip_contents = true
 
 [node name="Icon" type="TextureRect" parent="GameUI/BoosterPanel/HBoxContainer/ColumnClearButton"]
 layout_mode = 1
@@ -493,6 +547,7 @@ offset_bottom = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
 stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="GameUI/BoosterPanel/HBoxContainer/ColumnClearButton"]
@@ -633,6 +688,7 @@ offset_top = 80.0
 offset_right = -10.0
 offset_bottom = 380.0
 grow_horizontal = 0
+script = ExtResource("12_fmc")
 
 [node name="MenuButton" type="TextureButton" parent="GameUI/FloatingMenu"]
 custom_minimum_size = Vector2(70, 70)
@@ -732,44 +788,6 @@ texture = ExtResource("7_map")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="AudioButton" type="TextureButton" parent="GameUI/FloatingMenu/ExpandablePanel"]
-custom_minimum_size = Vector2(70, 70)
-layout_mode = 2
-focus_mode = 0
-
-[node name="Glow" type="ColorRect" parent="GameUI/FloatingMenu/ExpandablePanel/AudioButton"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -38.0
-offset_top = -38.0
-offset_right = 38.0
-offset_bottom = 38.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(1, 0.6, 0.2, 0.3)
-
-[node name="Icon" type="TextureRect" parent="GameUI/FloatingMenu/ExpandablePanel/AudioButton"]
-texture_filter = 2
-custom_minimum_size = Vector2(56, 56)
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -28.0
-offset_top = -28.0
-offset_right = 28.0
-offset_bottom = 28.0
-grow_horizontal = 2
-grow_vertical = 2
-texture = ExtResource("8_audio")
-expand_mode = 1
-stretch_mode = 5
 
 [node name="ShopButton" type="TextureButton" parent="GameUI/FloatingMenu/ExpandablePanel"]
 custom_minimum_size = Vector2(70, 70)
@@ -846,6 +864,45 @@ offset_bottom = 28.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("10_gallery")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SettingsButton" type="TextureButton" parent="GameUI/FloatingMenu/ExpandablePanel"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+focus_mode = 0
+
+[node name="Glow" type="ColorRect" parent="GameUI/FloatingMenu/ExpandablePanel/SettingsButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.0
+offset_top = -38.0
+offset_right = 38.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.3, 0.8, 0.5, 0.3)
+
+[node name="Icon" type="TextureRect" parent="GameUI/FloatingMenu/ExpandablePanel/SettingsButton"]
+texture_filter = 2
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("13_settings")
 expand_mode = 1
 stretch_mode = 5
 

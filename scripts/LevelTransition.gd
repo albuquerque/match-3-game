@@ -108,7 +108,11 @@ func _ready():
 			var asset_name = parts[1]
 
 			# Try to load from AssetRegistry (supports DLC)
-			var asset_registry = get_node_or_null("/root/AssetRegistry")
+			var asset_registry = NodeResolvers._get_ar() if typeof(NodeResolvers) != TYPE_NIL else null
+			if asset_registry == null and has_method("get_tree"):
+				var rt = get_tree().root
+				if rt:
+					asset_registry = rt.get_node_or_null("AssetRegistry")
 			if asset_registry and asset_registry.has_method("get_texture"):
 				texture_to_load = asset_registry.get_texture(chapter_id, asset_name)
 				if texture_to_load:
@@ -410,7 +414,11 @@ func apply_theme_colors(theme_name: String = ""):
 			var asset_name = parts[1]
 
 			# Try to load from AssetRegistry (supports DLC)
-			var asset_registry = get_node_or_null("/root/AssetRegistry")
+			var asset_registry = NodeResolvers._get_ar() if typeof(NodeResolvers) != TYPE_NIL else null
+			if asset_registry == null and has_method("get_tree"):
+				var rt = get_tree().root
+				if rt:
+					asset_registry = rt.get_node_or_null("AssetRegistry")
 			if asset_registry and asset_registry.has_method("get_texture"):
 				texture_to_load = asset_registry.get_texture(chapter_id, asset_name)
 				if texture_to_load:
@@ -639,10 +647,14 @@ func _update_rewards_display(coins: int, gems: int):
 		child.free()
 
 	# Add performance summary if we have level data
-	var game_manager = get_node_or_null("/root/GameManager")
+	var game_manager = NodeResolvers._get_gm()
+	if game_manager == null:
+		game_manager = NodeResolvers._get_gm()
 	if game_manager and game_manager.last_level_moves_left >= 0:
-		var level_manager = get_node_or_null("/root/LevelManager")
-		if level_manager:
+		var level_manager = NodeResolvers._get_lm()
+		if level_manager == null:
+			level_manager = get_node_or_null("/root/LevelManager")
+		if level_manager and has_method("get_level"):
 			var level_data = level_manager.get_level(level_manager.current_level_index)
 			if level_data:
 				var total_moves = level_data.moves
@@ -963,7 +975,11 @@ func _on_multiplier_tapped():
 	print("[LevelTransition] Triggering ad to claim %.1fx multiplier" % _selected_multiplier)
 
 	# Get AdMobManager
-	var admob_manager = get_node_or_null("/root/AdMobManager")
+	var admob_manager = NodeResolvers._get_adm() if typeof(NodeResolvers) != TYPE_NIL else null
+	if admob_manager == null and has_method("get_tree"):
+		var rt3 = get_tree().root
+		if rt3:
+			admob_manager = rt3.get_node_or_null("AdMobManager")
 	print("[LevelTransition] AdMobManager found: ", admob_manager != null)
 
 	if admob_manager and admob_manager.has_method("show_rewarded_ad"):
@@ -1071,7 +1087,11 @@ func _on_continue_pressed():
 	_selected_multiplier = 1.0
 
 	# Claim rewards with current values (potentially multiplied)
-	var rm = get_node_or_null('/root/RewardManager')
+	var rm = NodeResolvers._get_rm() if typeof(NodeResolvers) != TYPE_NIL else null
+	if rm == null and has_method("get_tree"):
+		var rt4 = get_tree().root
+		if rt4:
+			rm = rt4.get_node_or_null('RewardManager')
 	if rm:
 		rm.add_coins(_base_coins)
 		rm.add_gems(_base_gems)
@@ -1096,11 +1116,11 @@ func _on_replay_pressed():
 	visible = false
 
 	# Get the level that was just completed
-	var game_manager = get_node_or_null("/root/GameManager")
+	var game_manager = NodeResolvers._get_gm()
 	if game_manager:
 		var level_to_replay = game_manager.last_level_number
 		print("[LevelTransition] Want to replay level %d" % level_to_replay)
-		print("[LevelTransition] Current GameManager.level = %d" % game_manager.level)
+		print("[LevelTransition] Current NodeResolvers._get_gm().level = %d" % game_manager.level)
 
 		# Reset GameManager state
 		game_manager.level_transitioning = false
@@ -1115,8 +1135,23 @@ func _on_replay_pressed():
 			game_manager.level_manager.current_level_index = replay_index
 			print("[LevelTransition] Set level_manager.current_level_index to %d (for level %d)" % [replay_index, level_to_replay])
 
+		# Resolve game_board (prefer NodeResolvers._get_gm().get_board())
+		var game_board = null
+		if typeof(NodeResolvers) != TYPE_NIL and NodeResolvers._get_gm() and NodeResolvers._get_gm().has_method("get_board"):
+			game_board = NodeResolvers._get_gm().get_board()
+		else:
+			var rt5 = get_tree().root
+			if rt5:
+				var main_game = rt5.get_node_or_null("MainGame")
+				if main_game:
+					game_board = main_game.get_node_or_null("GameBoard")
+				else:
+					game_board = null
+
+		if game_board == null:
+			print("[LevelTransition] Warning: GameBoard not found for level transition")
+
 		# Show the GameBoard (it was hidden during level complete)
-		var game_board = get_node_or_null("/root/MainGame/GameBoard")
 		if game_board:
 			game_board.visible = true
 			print("[LevelTransition] GameBoard set to visible")
@@ -1134,34 +1169,17 @@ func _on_replay_pressed():
 		print("[LevelTransition] ERROR: GameManager not found for replay")
 
 func _connect_admob_signals():
-	"""Connect to AdMobManager signals for rewarded ads"""
-	var admob_manager = get_node_or_null("/root/AdMobManager")
-	if not admob_manager:
+	# Connect to AdMobManager signals if available
+	var adm = NodeResolvers._get_adm()
+	if adm == null and has_method("get_tree"):
+		var rt_ad = get_tree().root
+		if rt_ad:
+			adm = rt_ad.get_node_or_null("AdMobManager")
+	if adm:
+		if adm.has_method("rewarded_ad_loaded") and adm.rewarded_ad_loaded:
+			adm.rewarded_ad_loaded.connect(_on_admob_loaded)
+		if adm.has_method("user_earned_reward") and adm.user_earned_reward:
+			adm.user_earned_reward.connect(_on_admob_rewarded)
+		print("[LevelTransition] AdMob signals connected")
+	else:
 		print("[LevelTransition] AdMobManager not found - running in test mode")
-		return
-
-	print("[LevelTransition] Found AdMobManager, connecting signals...")
-
-	# Connect user_earned_reward signal (main reward signal)
-	var reward_callable = Callable(self, "_on_ad_reward_earned_signal")
-	if not admob_manager.user_earned_reward.is_connected(reward_callable):
-		admob_manager.user_earned_reward.connect(reward_callable)
-		print("[LevelTransition] ✓ Connected user_earned_reward signal")
-	else:
-		print("[LevelTransition] user_earned_reward already connected")
-
-	# Connect rewarded_ad_closed signal
-	var closed_callable = Callable(self, "_on_ad_closed")
-	if not admob_manager.rewarded_ad_closed.is_connected(closed_callable):
-		admob_manager.rewarded_ad_closed.connect(closed_callable)
-		print("[LevelTransition] ✓ Connected rewarded_ad_closed signal")
-	else:
-		print("[LevelTransition] rewarded_ad_closed already connected")
-
-	# Connect rewarded_ad_failed_to_show signal
-	var failed_callable = Callable(self, "_on_ad_failed")
-	if not admob_manager.rewarded_ad_failed_to_show.is_connected(failed_callable):
-		admob_manager.rewarded_ad_failed_to_show.connect(failed_callable)
-		print("[LevelTransition] ✓ Connected rewarded_ad_failed_to_show signal")
-	else:
-		print("[LevelTransition] rewarded_ad_failed_to_show already connected")

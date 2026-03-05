@@ -1,0 +1,25 @@
+{
+  "id": "level_6_demo",
+  "name": "Level 6 Demo Effects",
+  "description": "Screen flash and background tint",
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "screen_flash",
+      "params": { "color": "#00FF00", "intensity": 0.4, "duration": 0.4 },
+      "condition": { "level": 6 }
+    },
+    {
+      "on": "level_loaded",
+      "effect": "background_tint",
+      "params": { "color": "#FFD700", "intensity": 0.3, "duration": 1.0 },
+      "condition": { "level": 6 }
+    },
+    {
+      "on": "level_complete",
+      "effect": "screen_flash",
+      "params": { "color": "#FFD700", "intensity": 0.8, "duration": 0.6 },
+      "condition": { "level": 6 }
+    }
+  ]
+}

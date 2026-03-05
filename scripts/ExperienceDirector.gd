@@ -26,6 +26,8 @@ var waiting_for_level_complete: bool = false
 var waiting_for_narrative_complete: bool = false
 var waiting_for_ad_complete: bool = false
 
+var _nr = null
+
 func _ready():
 	print("============================================================")
 	print("[ExperienceDirector] *** STARTING INITIALIZATION ***")
@@ -81,11 +83,12 @@ func migrate_existing_save_to_experience_state() -> bool:
 			return false
 
 	# Check if there's an existing save with progress
-	if not RewardManager:
+	var rm = _get_rm()
+	if rm == null:
 		print("[ExperienceDirector] RewardManager not available - cannot migrate")
 		return false
 
-	var levels_completed = RewardManager.levels_completed
+	var levels_completed = rm.levels_completed if rm and "levels_completed" in rm else 0
 
 	if levels_completed == 0:
 		print("[ExperienceDirector] No existing progress found - fresh start")
@@ -104,9 +107,10 @@ func migrate_existing_save_to_experience_state() -> bool:
 	# Find the level node that corresponds to the next level to play
 	var next_level_num = levels_completed + 1
 	var resume_index = -1
+	var flow_nodes = current_flow.get("flow", [])
 
-	for i in range(current_flow.size()):
-		var node = current_flow[i]
+	for i in range(flow_nodes.size()):
+		var node = flow_nodes[i]
 		if node.get("type") == "level":
 			var level_id = node.get("id", "")
 			var level_num = _extract_level_number(level_id)
@@ -117,17 +121,16 @@ func migrate_existing_save_to_experience_state() -> bool:
 
 	if resume_index == -1:
 		# Player completed all available levels - set to end
-		resume_index = current_flow.size() - 1
+		resume_index = max(0, flow_nodes.size() - 1)
 		print("[ExperienceDirector] Player completed all levels - setting to end of flow")
 
 	# Initialize ExperienceState with the correct position
 	state.current_flow_id = "main_story"
-	state.current_node_index = resume_index
-	state.level_index = levels_completed
+	state.current_level_index = resume_index
 
 	# Mark all previous nodes as completed
 	for i in range(resume_index):
-		var node = current_flow[i]
+		var node = flow_nodes[i]
 		var node_id = node.get("id", "node_%d" % i)
 		state.mark_node_completed(node_id)
 
@@ -177,11 +180,16 @@ func reset_flow():
 		print("[ExperienceDirector] WARNING: No flow loaded to reset")
 
 func start_flow():
-	"""Start the current flow from the beginning or resume from saved position"""
+	"""Start the current flow, resuming from the player's actual progress."""
 
-	# Delegate to FlowCoordinator
-	print("[ExperienceDirector] Delegating start_flow to FlowCoordinator")
-	flow_coordinator.start_flow()
+	# Always resume from RewardManager.levels_completed — it's the single source of truth.
+	var rm = _get_rm()
+	var levels_completed = rm.levels_completed if (rm and "levels_completed" in rm) else 0
+	var next_level = levels_completed + 1
+	print("[ExperienceDirector] start_flow: levels_completed=%d, resuming at level %d" % [levels_completed, next_level])
+
+	# Use start_flow_at_level so FlowCoordinator finds the correct node index
+	start_flow_at_level(next_level)
 	return
 
 func get_next_node_rewards() -> Dictionary:
@@ -310,18 +318,39 @@ func _process_level_node(node: Dictionary):
 		# Set flag to wait for level completion
 		waiting_for_level_complete = true
 
-		# Trigger level load via GameUI
-		var game_ui = get_node_or_null("/root/MainGame/GameUI")
+		# Trigger level load via GameUI (resolver-first)
+		var game_ui = NodeResolvers._get_main_game() if "_get_main_game" in NodeResolvers else null
+		if not game_ui:
+			game_ui = NodeResolvers._fallback_autoload("MainGame")
+		# Fallback to scene root (no literal '/root/')
+		if game_ui == null and has_method("get_tree"):
+			var rt = get_tree().root
+			if rt:
+				var main_game = rt.get_node_or_null("MainGame")
+				if main_game:
+					game_ui = main_game.get_node_or_null("GameUI")
+
 		if game_ui and game_ui.has_method("_load_level_by_number"):
 			print("[ExperienceDirector] Loading level %d via GameUI" % level_num)
 			# Call the level loader directly - it's async so will handle everything
 			game_ui._load_level_by_number(level_num)
-		elif GameManager:
-			# Fallback: set level number (old behavior)
-			print("[ExperienceDirector] WARNING: GameUI not available, using fallback")
-			GameManager.level = level_num
 		else:
-			print("[ExperienceDirector] ERROR: Cannot load level - no GameUI or GameManager")
+			# Fallback: set level number via GameManager
+			print("[ExperienceDirector] WARNING: GameUI not available, using fallback to GameManager")
+			var gm = NodeResolvers._get_gm()
+			if gm == null and has_method("get_tree"):
+				var rt2 = get_tree().root
+				if rt2:
+					gm = rt2.get_node_or_null("GameManager")
+			if gm:
+				if gm.has_method("set_level"):
+					gm.set_level(level_num)
+				elif "level" in gm:
+					gm.level = level_num
+				else:
+					print("[ExperienceDirector] ERROR: GameManager exists but cannot set level")
+			else:
+				print("[ExperienceDirector] ERROR: No GameManager available to set level %d" % level_num)
 			_complete_current_node()
 	else:
 		print("[ExperienceDirector] ERROR: Invalid level ID: ", level_id)
@@ -341,8 +370,14 @@ func _process_narrative_stage_node(node: Dictionary):
 	# Set flag to wait for narrative completion
 	waiting_for_narrative_complete = true
 
-	# Trigger narrative stage via NarrativeStageManager
-	var narrative_manager = get_node_or_null("/root/NarrativeStageManager")
+	# Trigger narrative stage via NarrativeStageManager (resolver-first)
+	var narrative_manager = NodeResolvers._fallback_autoload("NarrativeStageManager")
+	# scene root fallback (no '/root/')
+	if narrative_manager == null and has_method("get_tree"):
+		var rtl = get_tree().root
+		if rtl:
+			narrative_manager = rtl.get_node_or_null("NarrativeStageManager")
+
 	if narrative_manager and narrative_manager.has_method("load_stage_by_id"):
 		if narrative_manager.load_stage_by_id(stage_id):
 			# Mark as seen in state
@@ -399,23 +434,31 @@ func _process_reward_node(node: Dictionary):
 
 		match reward_type:
 			"coins":
-				if RewardManager:
-					RewardManager.add_coins(amount)
-					print("[ExperienceDirector] Granted %d coins" % amount)
-			"gems":
-				if RewardManager:
-					RewardManager.add_gems(amount)
-					print("[ExperienceDirector] Granted %d gems" % amount)
+				# Grant coins/gems via RewardManager resolver
+				var rm2 = _get_rm()
+				if rm2:
+					rm2.add_coins(amount)
+					print("[ExperienceDirector] Granted %d coins via ExperienceDirector" % amount)
+
+				var rm3 = _get_rm()
+				if rm3:
+					rm3.add_gems(amount)
+					print("[ExperienceDirector] Granted %d gems via ExperienceDirector" % amount)
+
 			"booster":
 				var booster_type = reward.get("booster_type", "")
-				if RewardManager and RewardManager.has_method("add_booster"):
-					RewardManager.add_booster(booster_type, amount)
+				# Grant booster
+				var rm4 = _get_rm()
+				if rm4 and rm4.has_method("add_booster"):
+					rm4.add_booster(booster_type, amount)
 					print("[ExperienceDirector] Granted %d x %s booster" % [amount, booster_type])
 			"card":
 				var collection_id = reward.get("collection_id", "")
 				var card_id = reward.get("card_id", "")
-				if CollectionManager and not collection_id.is_empty() and not card_id.is_empty():
-					var unlocked = CollectionManager.unlock_item(collection_id, card_id)
+				# Grant collection unlocks via CollectionManager resolver
+				var cm = _get_cm()
+				if cm:
+					var unlocked = cm.unlock_item(collection_id, card_id)
 					if unlocked:
 						print("[ExperienceDirector] ✅ Unlocked card: %s/%s" % [collection_id, card_id])
 					else:
@@ -648,8 +691,8 @@ func debug_skip_to_level(level_num: int):
 func debug_unlock_all_cards():
 	"""DEBUG: Unlock all cards in all collections"""
 	print("[DEBUG] Unlocking all cards...")
-	for collection_id in CollectionManager.get_all_collections():
-		var collection = CollectionManager.get_collection_data(collection_id)
+	for collection_id in _get_cm().get_all_collections():
+		var collection = _get_cm().get_collection_data(collection_id)
 		var items = collection.get("items", [])
 		for item in items:
 			CollectionManager.unlock_item(collection_id, item.get("id", ""))
@@ -704,7 +747,7 @@ func debug_info():
 
 	# Collections
 	print("\n[COLLECTIONS]")
-	var total_progress = CollectionManager.get_total_progress()
+	var total_progress = _get_cm().get_total_progress()
 	print("  Total Collections: ", total_progress.total_collections)
 	print("  Items Unlocked: ", total_progress.total_unlocked, "/", total_progress.total_items)
 	print("  Completion: ", "%.1f%%" % total_progress.completion_percentage)
@@ -729,7 +772,16 @@ func _process_ad_reward_node(node: Dictionary):
 	var required = node.get("required", false)
 
 	# If AdMobManager isn't available, just skip
-	var admob_manager = get_node_or_null("/root/AdMobManager")
+	var admob_manager = null
+	admob_manager = NodeResolvers._get_adm()
+	if admob_manager == null:
+		admob_manager = NodeResolvers._fallback_autoload("AdMobManager")
+	# Scene tree fallback (avoid literal '/root/')
+	if admob_manager == null and has_method("get_tree"):
+		var rt_ad = get_tree().root
+		if rt_ad:
+			admob_manager = rt_ad.get_node_or_null("AdMobManager")
+
 	if not admob_manager:
 		print("[ExperienceDirector] AdMobManager not available - skipping ad node")
 		_complete_current_node()
@@ -797,6 +849,10 @@ func _process_premium_gate_node(node: Dictionary):
 	var has_premium = false
 	if RewardManager and RewardManager.has_method("check_premium"):
 		has_premium = RewardManager.check_premium()
+	else:
+		var rm5 = _get_rm()
+		if rm5 and rm5.has_method("check_premium"):
+			has_premium = rm5.check_premium()
 
 	if required_status == "premium" and has_premium:
 		print("[ExperienceDirector] Premium gate passed")
@@ -856,3 +912,29 @@ func _on_flow_coordinator_flow_failed(flow_id: String, reason: String):
 	"""Handle FlowCoordinator flow_failed signal"""
 	push_error("[ExperienceDirector] FlowCoordinator flow failed: %s - %s" % [flow_id, reason])
 	# Could emit a failure signal or fallback to legacy behavior
+
+# Helper: resolve RewardManager safely
+func _get_rm():
+	var rm = null
+	if _nr == null:
+		_nr = load("res://scripts/helpers/node_resolvers_api.gd")
+	if _nr:
+		rm = _nr._get_rm()
+	if rm == null and has_method("get_tree"):
+		var rr = get_tree().root
+		if rr:
+			rm = rr.get_node_or_null("RewardManager")
+	return rm
+
+# Helper: resolve CollectionManager safely
+func _get_cm():
+	var cm = null
+	if _nr == null:
+		_nr = load("res://scripts/helpers/node_resolvers_api.gd")
+	if _nr:
+		cm = _nr._get_cm()
+	if cm == null and has_method("get_tree"):
+		var rc = get_tree().root
+		if rc:
+			cm = rc.get_node_or_null("CollectionManager")
+	return cm

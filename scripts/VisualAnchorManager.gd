@@ -111,8 +111,8 @@ func get_anchor(anchor_id: String) -> Node:
 	var anchor = anchors.get(anchor_id)
 
 	if not anchor:
-		push_warning("[VisualAnchorManager] Anchor not found: %s - using fallback" % anchor_id)
-		return _get_fallback_anchor()
+		push_warning("[VisualAnchorManager] Anchor not found: %s" % anchor_id)
+		return null
 
 	if anchor is Node:
 		return anchor
@@ -123,9 +123,9 @@ func get_anchor(anchor_id: String) -> Node:
 			return node
 
 	push_warning("[VisualAnchorManager] Invalid anchor reference: %s" % anchor_id)
-	return _get_fallback_anchor()
+	return null
 
-## Get fallback anchor (main scene or root)
+## Get fallback anchor (main scene or root) - only used explicitly, never as silent fallback
 func _get_fallback_anchor() -> Node:
 	if main_scene:
 		return main_scene

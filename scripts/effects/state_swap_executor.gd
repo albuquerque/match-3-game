@@ -28,10 +28,10 @@ func execute(context):
 	var node_b = _resolve_node(b, viewport, board_node)
 
 	if not node_a or not is_instance_valid(node_a):
-		print("[StateSwapExecutor] Node A not found: " + str(a))
+		push_warning("[StateSwapExecutor] Anchor '%s' not found — state_swap aborted to prevent unintended visibility changes" % a)
 		return
 	if not node_b or not is_instance_valid(node_b):
-		print("[StateSwapExecutor] Node B not found: " + str(b))
+		push_warning("[StateSwapExecutor] Anchor '%s' not found — state_swap aborted to prevent unintended visibility changes" % b)
 		return
 
 	print("[StateSwapExecutor] Executing swap %s <-> %s mode=%s" % [a, b, mode])
@@ -107,10 +107,14 @@ func _resolve_node(name: String, viewport: Node, board_node: Node) -> Node:
 		if g:
 			print("[StateSwapExecutor] Resolved '%s' via root.get_node -> %s" % [name, g.name])
 			return g
-		var gr = root.get_node_or_null("/root/" + name)
-		if gr:
-			print("[StateSwapExecutor] Resolved '%s' via /root/ path -> %s" % [name, gr.name])
-			return gr
+		# Try autoload/resolver first
+		var gr = NodeResolvers._fallback_autoload(name)
+		if gr == null:
+			# As a last resort, log and abort resolution (no scene-tree fallbacks)
+			print("[StateSwapExecutor] Could not resolve '%s' via NodeResolvers; skipping visual state swap for this anchor" % name)
+			return null
+		print("[StateSwapExecutor] Resolved '%s' via NodeResolvers -> %s" % [name, gr.name])
+		return gr
 
 	print("[StateSwapExecutor] Could not resolve '%s'" % name)
 	return null

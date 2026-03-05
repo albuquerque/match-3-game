@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <g fill="white">
+    <!-- Gear teeth (8 teeth) -->
+    <rect x="28" y="2" width="8" height="10" rx="2"/>
+    <rect x="28" y="52" width="8" height="10" rx="2"/>
+    <rect x="2" y="28" width="10" height="8" rx="2"/>
+    <rect x="52" y="28" width="10" height="8" rx="2"/>
+    <!-- Diagonal teeth -->
+    <rect x="8" y="8" width="10" height="8" rx="2" transform="rotate(45 13 12)"/>
+    <rect x="46" y="8" width="10" height="8" rx="2" transform="rotate(-45 51 12)"/>
+    <rect x="8" y="48" width="10" height="8" rx="2" transform="rotate(-45 13 52)"/>
+    <rect x="46" y="48" width="10" height="8" rx="2" transform="rotate(45 51 52)"/>
+    <!-- Outer ring -->
+    <circle cx="32" cy="32" r="20" fill="none" stroke="white" stroke-width="8"/>
+    <!-- Inner hole -->
+    <circle cx="32" cy="32" r="10" fill="#333"/>
+  </g>
+</svg>

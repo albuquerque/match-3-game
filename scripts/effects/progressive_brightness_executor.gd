@@ -7,7 +7,19 @@ var dim_overlay: ColorRect = null
 var use_score_mode: bool = false
 var target_score: int = 0
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+	if NodeResolvers == null:
+		var s = load("res://scripts/helpers/node_resolvers_api.gd")
+		if s != null and typeof(s) != TYPE_NIL and s.has_method("_get_vam"):
+			NodeResolvers = s
+		else:
+			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
 func execute(context: Dictionary) -> void:
+	_ensure_resolvers()
+
 	var params = context.get("params", {})
 	var viewport = context.get("viewport", null)
 	var event_name = context.get("binding", {}).get("on", "")
@@ -18,13 +30,23 @@ func execute(context: Dictionary) -> void:
 		print("[ProgressiveBrightnessExecutor] No viewport!")
 		return
 
+	var gm = NodeResolvers._get_gm() if typeof(NodeResolvers) != TYPE_NIL else null
+	if gm == null:
+		# Last-resort: try scene root directly for backwards compatibility
+		if has_method("get_tree"):
+			var rt2 = get_tree().root
+			if rt2:
+				gm = rt2.get_node_or_null("GameManager")
+		if gm == null:
+			print("[progressive_brightness_executor] GameManager missing via resolver or root")
+
 	if event_name == "level_loaded":
 		match_count = 0
 		use_score_mode = params.get("score_based", false)
 		if use_score_mode:
 			target_score = context.get("event_context", {}).get("target", 0)
-			if target_score == 0 and GameManager:
-				target_score = GameManager.target_score
+			if target_score == 0 and gm:
+				target_score = gm.target_score
 			print("[ProgressiveBrightnessExecutor] Using SCORE mode - target: %d" % target_score)
 		else:
 			target_matches = params.get("target_matches", 30)
@@ -63,8 +85,8 @@ func execute(context: Dictionary) -> void:
 
 		if use_score_mode:
 			var current_score = 0
-			if GameManager and "score" in GameManager:
-				current_score = GameManager.score
+			if gm and "score" in gm:
+				current_score = gm.score
 
 			if target_score > 0:
 				progress = min(float(current_score) / float(target_score), 1.0)

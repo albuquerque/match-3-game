@@ -57,7 +57,7 @@ func _ready():
 	print("[AudioManager] Initializing audio system...")
 
 	# If RewardManager exists, initialize audio values from saved progress
-	var rm = get_node_or_null('/root/RewardManager')
+	var rm = NodeResolvers._get_rm()
 	if rm:
 		# If muted, ensure music/sfx disabled
 		if rm.audio_muted:

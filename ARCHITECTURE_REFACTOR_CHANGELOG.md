@@ -80,6 +80,9 @@ scripts/
       LoadLevelStep.gd                    # Level loading step
       ShowNarrativeStep.gd                # Narrative display step
       GrantRewardsStep.gd                # Reward granting step
+  services/
+    MatchFinder.gd                        # Pure match finding utility
+    Scoring.gd                            # Simple scoring helper
 ```
 
 ### Files Modified
@@ -147,3 +150,50 @@ None yet. Legacy code paths will be removed in future updates after thorough tes
 **Performance Impact:** Positive (+30-50% faster)  
 **Testing Required:** Yes (see testing guide)  
 **Rollback Available:** Yes (via VCS revert)
+
+## 2026-02-24 Minimal Service Stubs Added
+
+- Added `scripts/services/MatchFinder.gd` - pure match finding utility (unit-test added)
+- Added `scripts/services/Scoring.gd` - simple scoring helper (unit-test added)
+- Added tests: `tests/test_matchfinder.gd`, `tests/test_scoring.gd`
+
+Commit suggestion: "chore(refactor): add MatchFinder and Scoring service stubs + tests"
+
+## 2026-03-04 Phase E — GameUI self-wiring components (HUDComponent + BoosterPanelComponent)
+
+### E1 — HUDComponent self-wiring
+- `HUDComponent._ready()` now calls `_connect_signals()` — subscribes directly to:
+  - `GameManager`: `score_changed`, `moves_changed`, `level_changed`, `collectibles_changed`, `unmovables_changed`, `level_loaded`
+  - `RewardManager`: `coins_changed`
+- Added `_refresh_from_gm()` for full HUD sync on level load / level change
+- Added `_refresh_currency()` helper
+- **Removed from GameUI** (~140 lines): `_on_score_changed`, `_on_moves_changed`, `_on_level_changed`, `_on_collectibles_changed`, `_on_unmovables_changed`, `update_display`, `update_currency_display`
+
+### E2 — BoosterPanelComponent self-wiring
+- `BoosterPanelComponent._ready()` connects to `RewardManager.booster_changed` + `GameManager.level_loaded`
+- `_on_level_loaded()` automatically refreshes available boosters, counts, and icons
+- Added `_refresh_counts()` — builds count dict from RewardManager and calls `refresh_counts()`
+- **Removed from GameUI** (~250 lines): `update_booster_ui`, `load_booster_icons`, `_update_all_boosters_legacy`, `_on_booster_changed`, 9 flat press handlers, `_animate_selected_booster`
+
+### E3 — GameUI housekeeping
+- Removed dead debug methods: `_deferred_startpage_check`, `_deferred_children_dump`
+- Removed all `gm.connect()` HUD signal wiring from `_ready()` — now owned by HUDComponent
+- Removed all flat booster `@onready` var declarations
+- **GameUI.gd reduced from 784 → ~240 lines (−544 lines)**
+
+Commit suggestion: "refactor(ui): Phase E — HUDComponent + BoosterPanelComponent self-wiring, GameUI −544 lines"
+
+## 2026-03-04 Phase F — Unit tests for new service components
+
+### New test files
+- `tests/test_booster_selector.gd` — 6 cases: returns array, count range 3-5, deterministic, always includes common booster, no duplicates, custom tiers
+- `tests/test_level_loader.gd` — 5 cases: field assignment from LevelData, grid function call verification, fallback defaults, hard texture attachment, spreader texture population
+- `tests/test_game_flow_controller.gd` — 11 cases: pending flag set, no-op when already pending, score-based completion, primary goal blocks score completion, collectible/unmovable/spreader completion, level failed emits game_over, failed skipped when score/collectible met, star calculation thresholds, skip bonus sets flag
+
+### Test design
+- All tests use lightweight mock stubs — no autoloads, no scene tree required
+- Tests follow existing project convention: `extends Node`, `assert()`, print-based reporting
+- Zero compile errors across all three files
+
+Commit suggestion: "test: Phase F — add unit tests for BoosterSelector, LevelLoader, GameFlowController"
+

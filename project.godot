@@ -21,6 +21,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+TranslationBootstrap="*res://scripts/TranslationBootstrap.gd"
+GameState="*res://scripts/model/GameState.gd"
 AdMobManager="*res://scripts/AdMobManager.gd"
 LevelManager="*res://scripts/LevelManager.gd"
 ThemeManager="*res://scripts/ThemeManager.gd"
@@ -38,7 +40,12 @@ NarrativeStageManager="*res://scripts/NarrativeStageManager.gd"
 ExperienceDirector="*res://scripts/ExperienceDirector.gd"
 CollectionManager="*res://scripts/CollectionManager.gd"
 VibrationManager="*res://scripts/VibrationManager.gd"
-TranslationBootstrap="*res://scripts/TranslationBootstrap.gd"
+PageManager="*res://scripts/ui/PageManager.gd"
+NodeResolvers="*res://scripts/helpers/node_resolvers.gd"
+ProgressManager="*res://scripts/progression/ProgressManager.gd"
+GalleryManager="*res://scripts/progression/GalleryManager.gd"
+AchievementManager="*res://scripts/progression/AchievementManager.gd"
+ProfileManager="*res://scripts/progression/ProfileManager.gd"
 
 [display]
 

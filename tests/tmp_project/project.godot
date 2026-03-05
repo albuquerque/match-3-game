@@ -1,0 +1,9 @@
+config_version=5
+
+[application]
+config/name="spreader_tmp_test"
+run/main_scene=""
+
+[display]
+window/size/viewport_width=800
+window/size/viewport_height=600

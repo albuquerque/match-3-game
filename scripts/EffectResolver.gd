@@ -60,7 +60,7 @@ func _ready():
 	print("[EffectResolver] Initializing effect resolver...")
 
 	# Get EventBus autoload
-	event_bus = get_node_or_null("/root/EventBus")
+	event_bus = NodeResolvers._get_evbus()
 	if not event_bus:
 		push_warning("[EffectResolver] EventBus autoload not found - effects disabled")
 		return
@@ -101,15 +101,13 @@ func _register_executors():
 	for key in executor_scripts.keys():
 		var script = executor_scripts.get(key)
 		if script:
-			# Use instantiate() for GDScript classes in Godot 4
 			var inst = null
-			if script.has_method("instantiate"):
+			if script is PackedScene:
 				inst = script.instantiate()
-			elif script is PackedScene:
-				inst = script.instantiate()
-			else:
-				# Fallback for older API
+			elif script is Script:
 				inst = script.new()
+			else:
+				push_warning("[EffectResolver] Executor script for '%s' is not a Script or PackedScene; skipping" % key)
 			executors[key] = inst
 
 	# Additional alias mappings
@@ -318,8 +316,10 @@ func _process_event(event_name: String, entity_id: String, context: Dictionary):
 			if condition.has("level"):
 				var required_level = condition.get("level")
 				var current_level = context.get("level", 0)
-				if current_level == 0 and GameManager:
-					current_level = GameManager.level if "level" in GameManager else 0
+				if current_level == 0:
+					var gm_local = _get_gm()
+					if gm_local:
+						current_level = gm_local.level if "level" in gm_local else 0
 
 				print("[EffectResolver] Level condition check: current=%d, required=%d" % [current_level, required_level])
 				if current_level != required_level:
@@ -406,9 +406,16 @@ func _execute_effect(binding: Dictionary, entity_id: String, context: Dictionary
 						break
 					stack.append(c)
 
-	# Last resort: absolute path
+	# Last resort: absolute path or GameManager-provided board
 	if not board_node:
-		board_node = get_node_or_null("/root/MainGame/GameBoard")
+		var gm = NodeResolvers._get_gm()
+		if gm and gm.has_method("get_board"):
+			board_node = gm.get_board()
+		else:
+			board_node = NodeResolvers._get_board()
+
+	if board_node == null:
+		print("[EffectResolver] Warning: GameBoard not found via NodeResolvers._get_gm().get_board() (STRICT)")
 
 	exec_context.board = board_node
 
@@ -432,3 +439,7 @@ func _dev_emit_level_loaded() -> void:
 		event_bus.emit_level_loaded("level_4", {"level": 4, "target": 4960})
 	else:
 		print("[EffectResolver] DEV_FLAG: Cannot emit level_loaded - EventBus missing")
+
+# Helper: resolve GameManager autoload safely
+func _get_gm():
+	return NodeResolvers._get_gm()

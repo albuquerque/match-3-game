@@ -1,133 +1,159 @@
 extends Node
 
 ## TranslationBootstrap
-## Manually loads PO files and adds them to TranslationServer
-## This is a workaround until Godot Editor imports the PO files
+## Loads and registers all PO-based translations at runtime by parsing
+## .po files directly. This avoids dependency on Godot's editor-compiled
+## .translation binary files, ensuring translations work on Android and
+## other platforms without requiring a re-import step in the editor.
+
+const SUPPORTED_LOCALES := ["en", "es", "pt", "fr"]
+
+## PO files to load: [path, locale]
+const PO_FILES := [
+	["res://data/translations/core/strings_en.po", "en"],
+	["res://data/translations/core/strings_es.po", "es"],
+	["res://data/translations/core/strings_pt.po", "pt"],
+	["res://data/translations/core/strings_fr.po", "fr"],
+	["res://data/content_packs/genesis/translations/narrative_en.po", "en"],
+	["res://data/content_packs/genesis/translations/narrative_es.po", "es"],
+	["res://data/content_packs/genesis/translations/narrative_pt.po", "pt"],
+	["res://data/content_packs/genesis/translations/narrative_fr.po", "fr"],
+]
 
 func _ready():
-	print("[TranslationBootstrap] Loading translations...")
+	# Load all PO-based translations first
+	_load_all_po_translations()
+	# Sync locale — saved preference takes priority over OS locale
+	_sync_locale()
+	print("[TranslationBootstrap] Done. Active locale: %s" % TranslationServer.get_locale())
 
-	# Load core translations
-	_load_po_file("res://data/translations/core/strings_en.po", "en")
-	_load_po_file("res://data/translations/core/strings_es.po", "es")
-	_load_po_file("res://data/translations/core/strings_pt.po", "pt")
-	_load_po_file("res://data/translations/core/strings_fr.po", "fr")
 
-	# Load all content pack translations (scan content_packs/*/translations/*.po)
-	_load_po_files_in_dir("res://data/content_packs")
+func _load_all_po_translations() -> void:
+	for entry in PO_FILES:
+		var path: String = entry[0]
+		var locale: String = entry[1]
+		var count := _load_po_file(path, locale)
+		if count > 0:
+			print("[TranslationBootstrap] Loaded %d keys from %s (%s)" % [count, path.get_file(), locale])
+		else:
+			push_warning("[TranslationBootstrap] No keys loaded from: %s" % path)
 
-	print("[TranslationBootstrap] Translations loaded!")
 
-func _load_po_file(path: String, locale: String):
+## Parse a .po file and register its translations with TranslationServer.
+## Returns the number of translation keys loaded.
+func _load_po_file(path: String, locale: String) -> int:
 	if not FileAccess.file_exists(path):
-		print("[TranslationBootstrap] File not found: %s" % path)
-		return
+		push_warning("[TranslationBootstrap] PO file not found: %s" % path)
+		return 0
 
-	var file = FileAccess.open(path, FileAccess.READ)
+	var file := FileAccess.open(path, FileAccess.READ)
 	if not file:
-		print("[TranslationBootstrap] Failed to open: %s" % path)
-		return
+		push_warning("[TranslationBootstrap] Cannot open PO file: %s" % path)
+		return 0
 
-	var translation = Translation.new()
+	var translation := Translation.new()
 	translation.locale = locale
 
-	var current_msgid = ""
-	var current_msgstr = ""
-	var in_msgid = false
-	var in_msgstr = false
+	var current_msgid := ""
+	var current_msgstr := ""
+	var in_msgstr := false
+	var count := 0
 
 	while not file.eof_reached():
-		var line = file.get_line().strip_edges()
+		var line := file.get_line().strip_edges()
 
-		# Skip comments and empty lines
-		if line.begins_with("#") or line == "":
-			continue
-
-		# Start of msgid
 		if line.begins_with("msgid "):
+			# Save previous pair
 			if current_msgid != "" and current_msgstr != "":
-				# Add previous message
 				translation.add_message(current_msgid, current_msgstr)
-
-			current_msgid = _extract_string(line.substr(6))
+				count += 1
+			current_msgid = _extract_po_string(line.substr(6))
 			current_msgstr = ""
-			in_msgid = true
 			in_msgstr = false
 
-		# Start of msgstr
 		elif line.begins_with("msgstr "):
-			current_msgstr = _extract_string(line.substr(7))
-			in_msgid = false
+			current_msgstr = _extract_po_string(line.substr(7))
 			in_msgstr = true
 
-		# Continuation line
-		elif line.begins_with('"') and (in_msgid or in_msgstr):
-			var continuation = _extract_string(line)
-			if in_msgid:
-				current_msgid += continuation
-			elif in_msgstr:
-				current_msgstr += continuation
+		elif line.begins_with('"') and in_msgstr:
+			# Continuation line for msgstr
+			current_msgstr += _extract_po_string(line)
 
-	# Add final message
+		elif line.begins_with('"') and not in_msgstr and current_msgid != "":
+			# Continuation line for msgid
+			current_msgid += _extract_po_string(line)
+
+		elif line == "" and current_msgid != "":
+			# Blank line — flush current pair
+			if current_msgstr != "":
+				translation.add_message(current_msgid, current_msgstr)
+				count += 1
+			current_msgid = ""
+			current_msgstr = ""
+			in_msgstr = false
+
+	# Flush last entry if file doesn't end with blank line
 	if current_msgid != "" and current_msgstr != "":
 		translation.add_message(current_msgid, current_msgstr)
+		count += 1
 
 	file.close()
 
-	TranslationServer.add_translation(translation)
-	print("[TranslationBootstrap] Loaded %s (%s)" % [path.get_file(), locale])
+	if count > 0:
+		TranslationServer.add_translation(translation)
 
-func _extract_string(line: String) -> String:
-	"""Extract string content from a PO file line"""
-	# Remove surrounding quotes
-	if line.begins_with('"') and line.ends_with('"'):
-		line = line.substr(1, line.length() - 2)
+	return count
 
-	# Unescape special characters
-	line = line.replace('\\n', '\n')
-	line = line.replace('\\t', '\t')
-	line = line.replace('\\"', '"')
-	line = line.replace('\\\\', '\\')
 
-	return line
+## Extract the string value from a PO quoted string token.
+func _extract_po_string(s: String) -> String:
+	s = s.strip_edges()
+	if s.begins_with('"') and s.ends_with('"'):
+		s = s.substr(1, s.length() - 2)
+	# Unescape common PO escape sequences
+	# Process double-backslash first before other escapes
+	s = s.replace("\\n", "\n")
+	s = s.replace("\\t", "\t")
+	s = s.replace("\\\"", "\"")
+	return s
 
-func _load_po_files_in_dir(root_path: String) -> void:
-	# Recursively scan content packs for .po files and load them, inferring locale from filename suffix (e.g. narrative_fr.po -> fr)
-	var dir = DirAccess.open(root_path)
-	if not dir:
-		print("[TranslationBootstrap] Content packs dir not found: %s" % root_path)
+
+func _sync_locale() -> void:
+	# 1. Try saved preference from RewardManager
+	var rm = get_node_or_null("/root/RewardManager")
+	if rm and "language" in rm and rm.language != "":
+		var saved = rm.language.substr(0, 2).to_lower()
+		print("[TranslationBootstrap] Applying saved locale preference: %s" % saved)
+		TranslationServer.set_locale(saved)
 		return
 
-	_scan_and_load(dir, root_path)
+	# 2. Fall back to OS locale, normalised to 2-letter code
+	var os_locale = OS.get_locale().substr(0, 2).to_lower()
+	if os_locale in SUPPORTED_LOCALES:
+		print("[TranslationBootstrap] Applying OS locale: %s" % os_locale)
+		TranslationServer.set_locale(os_locale)
+	else:
+		print("[TranslationBootstrap] OS locale '%s' not supported, keeping 'en'" % os_locale)
+		TranslationServer.set_locale("en")
 
-func _scan_and_load(dir: DirAccess, current_path: String) -> void:
-	dir.list_dir_begin()
-	while true:
-		var fname = dir.get_next()
-		if fname == "":
-			break
-		if fname == "." or fname == "..":
-			continue
 
-		var fullpath = "%s/%s" % [current_path, fname]
-		if dir.current_is_dir():
-			var sub = DirAccess.open(fullpath)
-			if sub:
-				_scan_and_load(sub, fullpath)
-			continue
+## Load a compiled .translation resource file at runtime (e.g. from a DLC pack).
+## Pass the full res:// or user:// path to the .translation file.
+func load_translation_resource(path: String) -> bool:
+	if not ResourceLoader.exists(path):
+		push_warning("[TranslationBootstrap] Translation resource not found: %s" % path)
+		return false
+	var translation = load(path) as Translation
+	if not translation:
+		push_warning("[TranslationBootstrap] Failed to load translation resource: %s" % path)
+		return false
+	TranslationServer.add_translation(translation)
+	print("[TranslationBootstrap] Loaded translation: %s (%s)" % [path.get_file(), translation.locale])
+	return true
 
-		# If file ends with .po, attempt to infer locale from filename and load
-		if fname.to_lower().ends_with(".po"):
-			var parts = fname.split("_")
-			var locale = ""
-			if parts.size() > 1:
-				locale = parts[parts.size() - 1].replace(".po", "")
-			else:
-				# fallback: try filename without extension
-				locale = fname.replace(".po", "")
 
-			# Only load if we have a plausible 2-letter locale
-			if locale.length() >= 2:
-				_load_po_file(fullpath, locale)
-			else:
-				print("[TranslationBootstrap] Skipping PO with unknown locale: %s" % fname)
+## Load a PO file at runtime (e.g. from a downloaded DLC pack).
+func load_po_translation(path: String, locale: String) -> bool:
+	var count := _load_po_file(path, locale)
+	return count > 0
+

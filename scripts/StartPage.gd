@@ -7,9 +7,20 @@ signal settings_pressed
 signal achievements_pressed
 signal map_pressed
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+    if NodeResolvers == null:
+        var s = load("res://scripts/helpers/node_resolvers_api.gd")
+        if s != null and typeof(s) != TYPE_NIL:
+            NodeResolvers = s
+        else:
+            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
 func _ready():
 	# Call ScreenBase ready setup
 	ensure_fullscreen()
+	_ensure_resolvers()
 	# Create a simple layout programmatically so the scene file isn't required here
 	var vbox = VBoxContainer.new()
 	vbox.name = "VBox"
@@ -20,19 +31,23 @@ func _ready():
 	# don't set margins/offsets here; anchors are sufficient
 	add_child(vbox)
 
+	# Create a theme_manager resolver for font helpers
+	var theme_manager = NodeResolvers._get_tm() if typeof(NodeResolvers) != TYPE_NIL else null
 	var level_label = Button.new()
 	level_label.name = "LevelButton"
 	level_label.text = "Level: --"
-	ThemeManager.apply_bangers_font_to_button(level_label, 36)
+	if theme_manager and theme_manager.has_method("apply_bangers_font_to_button"):
+		theme_manager.apply_bangers_font_to_button(level_label, 36)
 	# Clicking the level button starts the level
-	level_label.pressed.connect(Callable(self, "_on_start_pressed"))
+	level_label.connect("pressed", self, "_on_start_pressed")
 	vbox.add_child(level_label)
 
 	# Add lives display
 	var lives_label = Label.new()
 	lives_label.name = "LivesLabel"
 	lives_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(lives_label, 20)
+	if theme_manager and theme_manager.has_method("apply_bangers_font"):
+		theme_manager.apply_bangers_font(lives_label, 20)
 	vbox.add_child(lives_label)
 
 	# Hide lives display - no longer using lives system
@@ -43,7 +58,8 @@ func _ready():
 	desc_label.name = "LevelDescription"
 	desc_label.text = ""
 	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ThemeManager.apply_bangers_font(desc_label, 18)
+	if theme_manager and theme_manager.has_method("apply_bangers_font"):
+		theme_manager.apply_bangers_font(desc_label, 18)
 	vbox.add_child(desc_label)
 
 	var actions_h = HBoxContainer.new()
@@ -54,16 +70,18 @@ func _ready():
 	start_btn.name = "StartButton"
 	start_btn.text = tr("UI_BUTTON_START")
 	start_btn.custom_minimum_size = Vector2(200, 64)
-	ThemeManager.apply_bangers_font_to_button(start_btn, 24)
-	start_btn.pressed.connect(Callable(self, "_on_start_pressed"))
+	if theme_manager and theme_manager.has_method("apply_bangers_font_to_button"):
+		theme_manager.apply_bangers_font_to_button(start_btn, 24)
+	start_btn.connect("pressed", self, "_on_start_pressed")
 	actions_h.add_child(start_btn)
 
 	var exchange_btn = Button.new()
 	exchange_btn.name = "ExchangeButton"
 	exchange_btn.text = tr("UI_BUTTON_EXCHANGE")
 	exchange_btn.custom_minimum_size = Vector2(200, 64)
-	ThemeManager.apply_bangers_font_to_button(exchange_btn, 20)
-	exchange_btn.pressed.connect(Callable(self, "_on_exchange_pressed"))
+	if theme_manager and theme_manager.has_method("apply_bangers_font_to_button"):
+		theme_manager.apply_bangers_font_to_button(exchange_btn, 20)
+	exchange_btn.connect("pressed", self, "_on_exchange_pressed")
 	actions_h.add_child(exchange_btn)
 
 
@@ -77,24 +95,27 @@ func _ready():
 	settings_btn.name = "SettingsButton"
 	settings_btn.text = "⚙️ " + tr("UI_BUTTON_SETTINGS")
 	settings_btn.custom_minimum_size = Vector2(150, 48)
-	ThemeManager.apply_bangers_font_to_button(settings_btn, 16)
-	settings_btn.pressed.connect(Callable(self, "_on_settings_pressed"))
+	if theme_manager and theme_manager.has_method("apply_bangers_font_to_button"):
+		theme_manager.apply_bangers_font_to_button(settings_btn, 16)
+	settings_btn.connect("pressed", self, "_on_settings_pressed")
 	settings_h.add_child(settings_btn)
 
 	var map_btn = Button.new()
 	map_btn.name = "MapButton"
 	map_btn.text = "🗺️ " + tr("UI_BUTTON_MAP")
 	map_btn.custom_minimum_size = Vector2(150, 48)
-	ThemeManager.apply_bangers_font_to_button(map_btn, 16)
-	map_btn.pressed.connect(Callable(self, "_on_map_pressed"))
+	if theme_manager and theme_manager.has_method("apply_bangers_font_to_button"):
+		theme_manager.apply_bangers_font_to_button(map_btn, 16)
+	map_btn.connect("pressed", self, "_on_map_pressed")
 	settings_h.add_child(map_btn)
 
 	var achievements_btn = Button.new()
 	achievements_btn.name = "AchievementsButton"
 	achievements_btn.text = "🏆 " + tr("UI_BUTTON_ACHIEVEMENTS")
 	achievements_btn.custom_minimum_size = Vector2(150, 48)
-	ThemeManager.apply_bangers_font_to_button(achievements_btn, 16)
-	achievements_btn.pressed.connect(Callable(self, "_on_achievements_pressed"))
+	if theme_manager and theme_manager.has_method("apply_bangers_font_to_button"):
+		theme_manager.apply_bangers_font_to_button(achievements_btn, 16)
+	achievements_btn.connect("pressed", self, "_on_achievements_pressed")
 	settings_h.add_child(achievements_btn)
 
 	# Lives system removed - no checks needed
@@ -104,7 +125,15 @@ func _ready():
 	modulate = Color(1,1,1,0)
 
 	# Listen for language changes
-	EventBus.language_changed.connect(_on_language_changed)
+	var eb = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		eb = NodeResolvers._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null("EventBus")
+	if eb and eb.has_signal("language_changed"):
+		eb.connect("language_changed", self, "_on_language_changed")
 
 func set_level_info(level_number: int, description: String):
 	var btn = get_node_or_null("VBox/LevelButton")
@@ -119,22 +148,80 @@ func close():
 	# queue_free delegated to caller when desired
 
 func _on_start_pressed():
+	# Backwards-compatible local signal
 	emit_signal("start_pressed")
+	# Request navigation to Game page via EventBus
+	var eb = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		eb = NodeResolvers._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null("EventBus")
+	if eb and eb.has_method("emit_open_page"):
+		eb.emit_open_page("Game", {})
+	else:
+		print("[StartPage] EventBus not available - fallback to local start handling")
 
 func _on_booster_button_pressed(bid: String):
 	emit_signal("booster_selected", bid)
 
 func _on_exchange_pressed():
+	# Exchange opens Shop or Exchange page
 	emit_signal("exchange_pressed")
+	var eb = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		eb = NodeResolvers._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null("EventBus")
+	if eb and eb.has_method("emit_open_page"):
+		eb.emit_open_page("ShopUI", {})
+	else:
+		print("[StartPage] EventBus not available - fallback to local exchange handling")
 
 func _on_settings_pressed():
 	emit_signal("settings_pressed")
+	var eb = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		eb = NodeResolvers._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null("EventBus")
+	if eb and eb.has_method("emit_open_page"):
+		eb.emit_open_page("SettingsDialog", {})
+	else:
+		print("[StartPage] EventBus not available - fallback to local settings handling")
 
 func _on_map_pressed():
 	emit_signal("map_pressed")
+	var eb = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		eb = NodeResolvers._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null("EventBus")
+	if eb and eb.has_method("emit_open_page"):
+		eb.emit_open_page("WorldMap", {})
+	else:
+		print("[StartPage] EventBus not available - fallback to local map handling")
 
 func _on_achievements_pressed():
 	emit_signal("achievements_pressed")
+	var eb = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		eb = NodeResolvers._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null("EventBus")
+	if eb and eb.has_method("emit_open_page"):
+		eb.emit_open_page("AchievementsPage", {})
+	else:
+		print("[StartPage] EventBus not available - fallback to local achievements handling")
 
 func _on_language_changed(locale: String):
 	"""Refresh UI text when language changes"""
@@ -170,4 +257,3 @@ func _on_language_changed(locale: String):
 		if number_match.size() > 1:
 			var level_num = number_match[-1]
 			level_btn.text = tr("UI_LABEL_LEVEL") + " " + level_num
-

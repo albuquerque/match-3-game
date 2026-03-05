@@ -17,6 +17,7 @@ var fade_in_duration: float = 0.3
 var fade_out_duration: float = 0.3
 
 var override_parent: Node = null
+var NodeResolvers = null
 
 func _ready():
 	print("[NarrativeStageRenderer] === RENDERER READY ===")
@@ -42,7 +43,15 @@ func _ready():
 	print("[NarrativeStageRenderer] === RENDERER READY COMPLETE ===")
 
 	# Connect to language change events so we can re-translate visible text
-	var eb = get_node_or_null('/root/EventBus')
+	var eb = null
+	# Runtime-load resolver to avoid parse-time preload issues
+	var resolver_script = load("res://scripts/helpers/node_resolvers_api.gd")
+	if resolver_script != null and typeof(resolver_script) != TYPE_NIL and resolver_script.has_method("_get_evbus"):
+		eb = resolver_script._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null('EventBus')
 	if eb and eb.has_signal('language_changed'):
 		if not eb.language_changed.is_connected(Callable(self, '_on_language_changed')):
 			eb.language_changed.connect(Callable(self, '_on_language_changed'))
@@ -200,7 +209,13 @@ func _get_anchor_node() -> Node:
 	if override_parent and override_parent.is_inside_tree():
 		return override_parent
 
-	var anchor_manager = get_node_or_null("/root/VisualAnchorManager")
+	var anchor_manager = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		anchor_manager = NodeResolvers._get_vam()
+	if anchor_manager == null and has_method("get_tree"):
+		var rt2 = get_tree().root
+		if rt2:
+			anchor_manager = rt2.get_node_or_null("VisualAnchorManager")
 	if anchor_manager and anchor_manager.has_method("get_anchor"):
 		var anchor_node = anchor_manager.get_anchor(anchor_name)
 		if anchor_node:
@@ -317,7 +332,13 @@ func _add_text_overlay(text_content: String, position_mode: String, parent_node:
 			label.z_index = 101  # Above the image
 
 			# Try to apply Bangers font
-			var theme_manager = get_node_or_null("/root/ThemeManager")
+			var theme_manager = null
+			if typeof(NodeResolvers) != TYPE_NIL:
+				theme_manager = NodeResolvers._get_tm()
+			if theme_manager == null and has_method("get_tree"):
+				var rt_tm = get_tree().root
+				if rt_tm:
+					theme_manager = rt_tm.get_node_or_null("ThemeManager")
 			if theme_manager and theme_manager.has_method("apply_bangers_font"):
 				theme_manager.apply_bangers_font(label, 32)
 
@@ -411,7 +432,13 @@ func _load_dlc_asset(asset_id: String) -> Texture2D:
 	var asset_name = parts[1]
 
 	# Try AssetRegistry first
-	var asset_registry = get_node_or_null("/root/AssetRegistry")
+	var asset_registry = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		asset_registry = NodeResolvers._get_ar()
+	if asset_registry == null and has_method("get_tree"):
+		var rt3 = get_tree().root
+		if rt3:
+			asset_registry = rt3.get_node_or_null("AssetRegistry")
 	if asset_registry and asset_registry.has_method("get_texture"):
 		var texture = asset_registry.get_texture(chapter_id, asset_name)
 		if texture:
@@ -636,3 +663,4 @@ func _configure_texture_rect(tex_rect: TextureRect, position_mode: String):
 			tex_rect.offset_bottom = 200
 			tex_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH
 			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+

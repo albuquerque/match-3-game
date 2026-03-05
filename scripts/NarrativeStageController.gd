@@ -1,5 +1,15 @@
 extends Node
 
+var NodeResolvers = null
+
+func _ensure_resolvers():
+	if NodeResolvers == null:
+		var s = load("res://scripts/helpers/node_resolvers_api.gd")
+		if s != null and typeof(s) != TYPE_NIL:
+			NodeResolvers = s
+		else:
+			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
 ## NarrativeStageController
 ## Manages the narrative stage state machine and coordinates with renderer
 ## Load stage JSON, react to EventBus events, trigger state transitions
@@ -29,13 +39,27 @@ var _completion_timer: SceneTreeTimer = null
 
 func _ready():
 	print("[NarrativeStageController] Ready")
+	_ensure_resolvers()
 
-	# Connect to EventBus for game events
-	if EventBus:
-		EventBus.level_loaded.connect(_on_level_loaded)
-		EventBus.level_complete.connect(_on_level_complete)
-		EventBus.match_cleared.connect(_on_match_cleared)
-		print("[NarrativeStageController] Connected to EventBus")
+	# Resolve EventBus via NodeResolvers to avoid direct global references
+	var eb = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		eb = NodeResolvers._get_evbus()
+	# Fallback to root lookup if resolver isn't available or lacks the method
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null("EventBus")
+	if eb:
+		if eb.has_signal("level_loaded"):
+			eb.level_loaded.connect(Callable(self, "_on_level_loaded"))
+		if eb.has_signal("level_complete"):
+			eb.connect("level_complete", Callable(self, "_on_level_complete"))
+		if eb.has_signal("match_cleared"):
+			eb.connect("match_cleared", Callable(self, "_on_match_cleared"))
+		print("[NarrativeStageController] Connected to EventBus (resolver)")
+	else:
+		print("[NarrativeStageController] EventBus not available via resolver or root fallback")
 
 func load_stage(stage_data: Dictionary) -> bool:
 	"""Load a narrative stage from JSON data"""
@@ -137,7 +161,14 @@ func load_stage_from_file(path: String) -> bool:
 func load_stage_from_dlc(chapter_id: String, stage_name: String) -> bool:
 	"""Load stage from DLC chapter"""
 	# Try to load from DLC via AssetRegistry or DLCManager
-	var dlc_manager = get_node_or_null("/root/DLCManager")
+	var dlc_manager = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		dlc_manager = NodeResolvers._get_dlc()
+	if dlc_manager == null and has_method("get_node_or_null"):
+		var rt = get_tree().root
+		if rt:
+			dlc_manager = rt.get_node_or_null("DLCManager")
+
 	if not dlc_manager:
 		print("[NarrativeStageController] DLCManager not available")
 		return false
@@ -242,7 +273,11 @@ func _set_state(state_name: String):
 				_completion_timer.timeout.connect(Callable(self, "_on_completion_timeout"))
 			return
 		# Emit EventBus signal immediately if no duration
-		var eb = get_node_or_null("/root/EventBus")
+		var eb = NodeResolvers._get_evbus()
+		if eb == null and has_method("get_tree"):
+			var rt2 = get_tree().root
+			if rt2:
+				eb = rt2.get_node_or_null("EventBus")
 		if eb and eb.has_signal("narrative_stage_complete"):
 			eb.emit_signal("narrative_stage_complete", current_stage_data.get("id", ""))
 
@@ -271,7 +306,13 @@ func _check_condition(condition: Dictionary, context: Dictionary) -> bool:
 	"""Check if condition matches context"""
 	# Check score threshold
 	if condition.has("min_score"):
-		var score = context.get("score", GameManager.score if GameManager else 0)
+		var score = context.get("score", 0)
+		if score == 0:
+			var _gm = NodeResolvers._get_gm()
+			if _gm == null:
+				_gm = NodeResolvers._get_gm()
+			if _gm and "score" in _gm:
+				score = _gm.score
 		if score < condition["min_score"]:
 			return false
 
@@ -310,7 +351,9 @@ func _on_level_complete(level_id: String, context: Dictionary):
 func _on_match_cleared(match_size: int, context: Dictionary):
 	"""Handle match cleared event"""
 	# Check for progress-based transitions
-	var game_manager = get_node_or_null("/root/GameManager")
+	var game_manager = NodeResolvers._get_gm()
+	if game_manager == null:
+		game_manager = NodeResolvers._get_gm()
 	if game_manager:
 		var progress = 0
 
@@ -371,7 +414,11 @@ func _on_completion_timeout():
 		return
 
 	_completion_timer = null
-	var eb = get_node_or_null("/root/EventBus")
+	var eb = NodeResolvers._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt2 = get_tree().root
+		if rt2:
+			eb = rt2.get_node_or_null("EventBus")
 	if eb and eb.has_signal("narrative_stage_complete"):
 		eb.emit_signal("narrative_stage_complete", current_stage_data.get("id", ""))
 
@@ -390,4 +437,3 @@ func stop_all_timers():
 	# Reset state to prevent any further transitions
 	_active = false
 	print("[NarrativeStageController] Deactivated controller (timers stopped)")
-

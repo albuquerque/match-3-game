@@ -1,0 +1,31 @@
+{
+  "id": "creation_day_1_awakening",
+  "name": "Day 1: Awakening",
+  "description": "Progressive brightness effect — from darkness to light as score increases",
+  "effects": [
+    {
+      "on": "level_loaded",
+      "effect": "progressive_brightness",
+      "params": { "score_based": true },
+      "condition": { "level": 1 }
+    },
+    {
+      "on": "match_cleared",
+      "effect": "progressive_brightness",
+      "params": { "score_based": true },
+      "condition": { "level": 1 }
+    },
+    {
+      "on": "level_complete",
+      "effect": "screen_flash",
+      "params": { "color": "#FFFFFF", "intensity": 1.0, "duration": 1.0 },
+      "condition": { "level": 1 }
+    },
+    {
+      "on": "level_complete",
+      "effect": "background_tint",
+      "params": { "color": "#FFD700", "intensity": 0.3, "duration": 3.0 },
+      "condition": { "level": 1 }
+    }
+  ]
+}

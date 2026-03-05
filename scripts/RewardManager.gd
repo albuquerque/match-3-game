@@ -122,7 +122,14 @@ var audio_muted: bool = false
 # Language settings (persisted in player progress)
 var language: String = "en"  # Current language locale (en, es, pt, fr, etc.)
 
+var _node_resolvers_api = null
+
+func _deferred_init_resolvers():
+	if _node_resolvers_api == null:
+		_node_resolvers_api = load("res://scripts/helpers/node_resolvers_api.gd")
+
 func _ready():
+	_deferred_init_resolvers()
 	print("[RewardManager] Initializing...")
 	load_progress()
 
@@ -525,6 +532,22 @@ func load_progress():
 			lives = data.get("lives", MAX_LIVES)
 			last_life_regen_time = data.get("last_life_regen_time", Time.get_unix_time_from_system())
 			boosters = data.get("boosters", boosters)
+
+			# Migrate old saves: if all boosters are zero, grant starters
+			var all_zero = true
+			for k in boosters:
+				if boosters[k] > 0:
+					all_zero = false
+					break
+			if all_zero:
+				boosters["hammer"] = 3
+				boosters["shuffle"] = 2
+				boosters["swap"] = 2
+				boosters["chain_reaction"] = 1
+				boosters["bomb_3x3"] = 1
+				boosters["line_blast"] = 1
+				boosters["extra_moves"] = 2
+				print("[RewardManager] Migrated old save: granted starter boosters")
 			daily_streak = data.get("daily_streak", 0)
 			last_login_date = data.get("last_login_date", "")
 			total_stars = data.get("total_stars", 0)
@@ -582,7 +605,23 @@ func load_progress():
 					print("[RewardManager] Unsupported system language, defaulting to English")
 
 			# Load ExperienceState data if ExperienceDirector is available
-			var experience_director = get_node_or_null("/root/ExperienceDirector")
+			var experience_director = null
+			# Try scene-root lookup first (most reliable)
+			if has_method("get_tree"):
+				var _root_try = get_tree().root
+				if _root_try:
+					experience_director = _root_try.get_node_or_null("ExperienceDirector")
+			# Fallback: try resolver script's fallback autoload helper if present
+			if experience_director == null:
+				var resolver_script = null
+				if _node_resolvers_api != null:
+					resolver_script = _node_resolvers_api
+				else:
+					resolver_script = load("res://scripts/helpers/node_resolvers_api.gd")
+				if resolver_script != null and typeof(resolver_script) != TYPE_NIL:
+					if resolver_script.has_method("_fallback_autoload"):
+						experience_director = resolver_script._fallback_autoload("ExperienceDirector")
+
 			if experience_director and experience_director.has_method("load_state_data"):
 				var experience_state_data = data.get("experience_state", null)
 				if experience_state_data:

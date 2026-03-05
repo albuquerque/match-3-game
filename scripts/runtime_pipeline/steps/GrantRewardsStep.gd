@@ -7,13 +7,23 @@ class_name GrantRewardsStep
 
 var reward_id: String = ""
 var rewards_list: Array = []
+var NodeResolvers = null
 
 func _init(rwd_id: String = "", rwds: Array = []):
 	super("grant_rewards")
 	reward_id = rwd_id
 	rewards_list = rwds
 
+func _ensure_resolvers():
+	if NodeResolvers == null:
+		var s = load("res://scripts/helpers/node_resolvers_api.gd")
+		if s != null and typeof(s) != TYPE_NIL:
+			NodeResolvers = s
+		else:
+			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+
 func execute(context: PipelineContext) -> bool:
+	_ensure_resolvers()
 	if rewards_list.is_empty():
 		print("[GrantRewardsStep] No rewards to grant")
 		return true
@@ -38,26 +48,30 @@ func _grant_single_reward(reward: Dictionary):
 
 	match reward_type:
 		"coins":
-			if RewardManager:
-				RewardManager.add_coins(amount)
+			var rm = NodeResolvers._get_rm() if typeof(NodeResolvers) != TYPE_NIL else null
+			if rm:
+				rm.add_coins(amount)
 				print("[GrantRewardsStep] Granted %d coins" % amount)
 
 		"gems":
-			if RewardManager:
-				RewardManager.add_gems(amount)
+			var rm2 = NodeResolvers._get_rm() if typeof(NodeResolvers) != TYPE_NIL else null
+			if rm2:
+				rm2.add_gems(amount)
 				print("[GrantRewardsStep] Granted %d gems" % amount)
 
 		"booster":
 			var booster_type = reward.get("booster_type", "")
-			if RewardManager and RewardManager.has_method("add_booster") and not booster_type.is_empty():
-				RewardManager.add_booster(booster_type, amount)
+			var rm3 = NodeResolvers._get_rm() if typeof(NodeResolvers) != TYPE_NIL else null
+			if rm3 and rm3.has_method("add_booster") and not booster_type.is_empty():
+				rm3.add_booster(booster_type, amount)
 				print("[GrantRewardsStep] Granted %d x %s booster" % [amount, booster_type])
 
 		"card":
 			var collection_id = reward.get("collection_id", "")
 			var card_id = reward.get("card_id", "")
-			if CollectionManager and not collection_id.is_empty() and not card_id.is_empty():
-				var unlocked = CollectionManager.unlock_item(collection_id, card_id)
+			var cm = NodeResolvers._get_cm() if typeof(NodeResolvers) != TYPE_NIL else null
+			if cm and not collection_id.is_empty() and not card_id.is_empty():
+				var unlocked = cm.unlock_item(collection_id, card_id)
 				if unlocked:
 					print("[GrantRewardsStep] Unlocked card: %s/%s" % [collection_id, card_id])
 				else:

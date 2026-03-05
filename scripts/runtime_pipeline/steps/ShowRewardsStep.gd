@@ -13,7 +13,7 @@ var stars: int = 0
 var coins_earned: int = 0
 var gems_earned: int = 0
 
-var reward_controller: RewardTransitionController = null
+var reward_controller = null
 
 func _init(lvl_num: int = 0, completed: bool = true):
 	super("show_rewards")
@@ -37,8 +37,9 @@ func execute(context: PipelineContext) -> bool:
 			# Restart the experience flow at the same level
 			# This ensures the pipeline is active for the next attempt
 			var level_to_retry = context.get_result("current_level", level_number)
-			if ExperienceDirector:
-				ExperienceDirector.start_flow_at_level(level_to_retry)
+			var xd = NodeResolvers._get_xd()
+			if xd and xd.has_method("start_flow_at_level"):
+				xd.start_flow_at_level(level_to_retry)
 			else:
 				# Fallback: load directly if no ExperienceDirector
 				if context.game_ui:
@@ -98,8 +99,18 @@ func _show_reward_screen(context: PipelineContext) -> bool:
 		"success": level_completed
 	}
 
-	# Create controller
-	reward_controller = RewardTransitionController.new()
+	# Create controller (dynamically to avoid parse-time class resolution)
+	var controller_script_path = "res://scripts/reward_system/RewardTransitionController.gd"
+	if ResourceLoader.exists(controller_script_path):
+		var controller_scr = load(controller_script_path)
+		if controller_scr and controller_scr is Script and controller_scr.has_method("new"):
+			reward_controller = controller_scr.new()
+		else:
+			push_error("[ShowRewardsStep] Failed to instantiate RewardTransitionController from %s" % controller_script_path)
+			return false
+	else:
+		push_error("[ShowRewardsStep] RewardTransitionController script not found: %s" % controller_script_path)
+		return false
 
 	# Get parent UI
 	var ui_parent = context.game_ui if context.game_ui else null
@@ -141,4 +152,3 @@ func cleanup():
 			reward_controller.transition_completed.disconnect(_on_reward_completed)
 		reward_controller.queue_free()
 		reward_controller = null
-
