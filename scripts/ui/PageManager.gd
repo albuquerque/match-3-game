@@ -274,7 +274,10 @@ func close(page_name: String) -> bool:
 							new_node.call_deferred("set", "modulate", Color(1,1,1,1))
 			else:
 				# No pages left on the stack: return to StartPage so player isn't left on a blank overlay
-				if not is_open("StartPage"):
+				# EXCEPTION: if StartPage itself was just closed, the pipeline/flow is starting — don't re-open it.
+				if name == "StartPage":
+					print("[PageManager] StartPage was closed and stack is empty — suppressing auto-reopen (flow starting)")
+				elif not is_open("StartPage"):
 					# Only auto-open StartPage if the game is not currently running.
 					# If a level is active (GameManager.initialized == true), don't reopen StartPage now.
 					# Also suppress if ExperienceDirector has an active flow running.

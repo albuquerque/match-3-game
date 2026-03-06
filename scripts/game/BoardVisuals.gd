@@ -13,14 +13,14 @@ class_name BoardVisuals
 
 static func clear_tiles(gameboard: Node, tiles_ref: Array) -> void:
 	var tiles_to_remove = []
-	# check board_container
+	# check board_container — only remove actual Tile nodes (identified by grid_position property)
 	if gameboard.board_container and is_instance_valid(gameboard.board_container):
 		for child in gameboard.board_container.get_children():
-			if child and is_instance_valid(child) and child.name != "BorderContainer" and child.has_method("setup"):
+			if child and is_instance_valid(child) and child.name != "BorderContainer" and "grid_position" in child:
 				tiles_to_remove.append(child)
-	# legacy direct children
+	# legacy direct children — exclude known infrastructure nodes
 	for child in gameboard.get_children():
-		if child and is_instance_valid(child) and not (child.name in ["Background","BorderContainer","BoardContainer","TileAreaOverlay"]) and child.has_method("setup"):
+		if child and is_instance_valid(child) and "grid_position" in child:
 			tiles_to_remove.append(child)
 
 	for t in tiles_to_remove:
@@ -130,46 +130,50 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 						if typeof(reveals) != TYPE_DICTIONARY:
 							reveals = {}
 					tile.configure_unmovable_hard(meta.get("hits",1), meta.get("type", GameManager.unmovable_type), textures_arr, reveals)
+					print("[BoardVisuals] Configured hard unmovable at (", x, ",", y, ") hits=", meta.get("hits",1))
+				else:
+					print("[BoardVisuals] WARNING: Tile missing configure_unmovable_hard at (", x, ",", y, ")")
 			else:
-				if tile.has_method("connect"):
-					tile.connect("tile_clicked", Callable(gameboard, "_on_tile_clicked"))
-					tile.connect("tile_swiped", Callable(gameboard, "_on_tile_swiped"))
 				if tile_type == GameManager.COLLECTIBLE and tile.has_method("configure_collectible"):
 					tile.configure_collectible(GameManager.collectible_type)
+					print("[BoardVisuals] Configured collectible at (", x, ",", y, "): ", GameManager.collectible_type)
 				if tile_type == GameManager.SPREADER and tile.has_method("configure_spreader"):
 					var textures = []
 					if GameManager.spreader_textures_map.has(GameManager.spreader_type):
 						textures = GameManager.spreader_textures_map[GameManager.spreader_type]
 					tile.configure_spreader(GameManager.spreader_grace_default, GameManager.spreader_type, textures)
-			# parent
+					print("[BoardVisuals] Configured spreader at (", x, ",", y, ") type='", GameManager.spreader_type, "'")
+			# parent to board_container
 			if gameboard.board_container:
 				gameboard.board_container.add_child(tile)
 			else:
 				gameboard.add_child(tile)
 
-			# Ensure tile node positioned correctly using GameBoard helper if available
-			if tile and tile.has_method("set_position") or tile:
-				if gameboard and gameboard.has_method("grid_to_world_position"):
-					var world_pos = gameboard.grid_to_world_position(Vector2(x,y))
-					# Some tile scenes expect center-based position; GameBoard uses center offset
-					tile.position = world_pos
-					# Also ensure tile.grid_position is set for consistency
-					if tile.has_method("setup"):
-						# setup was already called earlier but ensure property is saved
-						tile.grid_position = Vector2(x,y)
+			# Always connect input signals — including unmovables (adjacency detection needs them)
+			if not tile.is_connected("tile_clicked", Callable(gameboard, "_on_tile_clicked")):
+				tile.connect("tile_clicked", Callable(gameboard, "_on_tile_clicked"))
+			if not tile.is_connected("tile_swiped", Callable(gameboard, "_on_tile_swiped")):
+				tile.connect("tile_swiped", Callable(gameboard, "_on_tile_swiped"))
+
+			# Set world position
+			if gameboard.has_method("grid_to_world_position"):
+				tile.position = gameboard.grid_to_world_position(Vector2(x, y))
 
 			tiles_ref[x].append(tile)
 			tiles_created += 1
 	gameboard.creating_visual_grid = false
+	print("[BoardVisuals] create_visual_grid: Complete (flag reset)")
 	# show group
 	if gameboard.has_method("show_board_group"):
 		gameboard.show_board_group()
+	print("[BoardVisuals] Board group made visible after tiles created")
 	# show UI if available
 	var gui = gameboard.get_node_or_null("../GameUI")
 	if gui and gui.has_method("show_gameplay_ui"):
 		gui.show_gameplay_ui()
+		print("[BoardVisuals] UI elements shown - level ready")
 
-	# DIAGNOSTIC LOGS: help debug layout issues
+	# DIAGNOSTIC LOGS
 	print("[BoardVisuals] Created ", tiles_created, " tiles; board_container child_count=", gameboard.board_container.get_child_count() if gameboard.board_container else -1)
 	# Count visible tiles
 	var visible_count = 0

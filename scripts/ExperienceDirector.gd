@@ -218,6 +218,7 @@ func get_next_node_rewards() -> Dictionary:
 func start_flow_at_level(level_num: int):
 	"""Start the flow at a specific level number (for world map selection)"""
 
+
 	# Delegate to FlowCoordinator
 	print("[ExperienceDirector] Delegating start_flow_at_level(%d) to FlowCoordinator" % level_num)
 	flow_coordinator.start_flow_at_level(level_num)
@@ -225,9 +226,14 @@ func start_flow_at_level(level_num: int):
 
 func is_flow_active() -> bool:
 	"""Check if the experience flow is currently active and running"""
+	# Prefer the pipeline's is_running flag — most accurate indicator
+	if flow_coordinator and "pipeline" in flow_coordinator:
+		var pl = flow_coordinator.pipeline
+		if pl and "is_running" in pl and pl.is_running:
+			return true
 	if flow_coordinator and flow_coordinator.has_method("is_running"):
 		return flow_coordinator.is_running()
-	# Fallback: check if we have a current flow loaded
+	# Fallback: flow is loaded = flow is active
 	return not current_flow.is_empty()
 
 func advance_to_next_node():

@@ -19,6 +19,7 @@ var NodeResolverAPI = null
 var SpecialFactory = null
 var MatchProcessor = null
 var GravityService = null
+var GQS = null  # GridQueryService
 
 # ObjectiveManager integration
 var ObjectiveManagerScript = null
@@ -42,6 +43,8 @@ func _init_resolvers():
 		MatchProcessor = load("res://scripts/game/MatchProcessor.gd")
 	if typeof(GravityService) == TYPE_NIL:
 		GravityService = load("res://scripts/game/GravityService.gd")
+	if GQS == null:
+		GQS = load("res://scripts/game/GridQueryService.gd")
 	if ObjectiveManagerScript == null:
 		ObjectiveManagerScript = load("res://scripts/game/ObjectiveManager.gd")
 	# C1: Instantiate GameFlowController
@@ -471,94 +474,73 @@ func fill_initial_grid():
 				grid[x][y] = randi() % TILE_TYPES + 1
 
 func is_cell_blocked(x: int, y: int) -> bool:
-	"""Check if a cell is blocked"""
-	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT:
-		return true
-
-	# Check if grid is properly initialized
-	if grid.size() <= x:
-		return true
-	if grid[x].size() <= y:
-		return true
-
-	# Only blocked cells (-1) are considered blocked for layout/navigation.
-	# Unmovable soft tiles are active cells (they occupy a cell and block falling until removed)
+	if GQS != null: return GQS.is_cell_blocked(self, x, y)
+	# inline fallback
+	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT: return true
+	if grid.size() <= x or grid[x].size() <= y: return true
 	return grid[x][y] == -1
 
 func is_valid_position(pos: Vector2) -> bool:
-	if pos.x < 0 or pos.x >= GRID_WIDTH or pos.y < 0 or pos.y >= GRID_HEIGHT:
-		return false
-
-	# Check if the cell is blocked
+	if GQS != null: return GQS.is_valid_position(self, pos)
+	if pos.x < 0 or pos.x >= GRID_WIDTH or pos.y < 0 or pos.y >= GRID_HEIGHT: return false
 	return not is_cell_blocked(int(pos.x), int(pos.y))
 
 func are_adjacent(pos1: Vector2, pos2: Vector2) -> bool:
-	var dx = abs(pos1.x - pos2.x)
-	var dy = abs(pos1.y - pos2.y)
+	if GQS != null: return GQS.are_adjacent(pos1, pos2)
+	var dx = abs(pos1.x - pos2.x); var dy = abs(pos1.y - pos2.y)
 	return (dx == 1 and dy == 0) or (dx == 0 and dy == 1)
 
-# New: whether cell contains a movable tile (not an unmovable_soft or spreader)
 func is_cell_movable(x: int, y: int) -> bool:
-	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT:
-		return false
-	if grid.size() <= x or grid[x].size() <= y:
-		return false
+	if GQS != null: return GQS.is_cell_movable(self, x, y)
+	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT: return false
+	if grid.size() <= x or grid[x].size() <= y: return false
 	var v = grid[x][y]
-	# Movable if it's a regular tile or a special tile; not movable if blocked, empty, or spreader
-	if v == -1 or v == 0:
-		return false
-	if v == SPREADER:
-		return false
-
-	# Get board reference to check for hard unmovable tiles
-	var board_ref_local = get_board()
-
-	# Check if there's a hard unmovable tile instance at this position
-	if board_ref_local and board_ref_local.tiles and x < board_ref_local.tiles.size():
-		if y < board_ref_local.tiles[x].size():
-			var tile = board_ref_local.tiles[x][y]
-			if tile and "is_unmovable_hard" in tile and tile.is_unmovable_hard:
-				return false  # Hard unmovables are not movable
-
+	if v == -1 or v == 0 or v == SPREADER: return false
+	var b = get_board()
+	if b and b.tiles and x < b.tiles.size() and y < b.tiles[x].size():
+		var tile = b.tiles[x][y]
+		if tile and "is_unmovable_hard" in tile and tile.is_unmovable_hard: return false
 	return true
 
 func can_swap(pos1: Vector2, pos2: Vector2) -> bool:
-	if not is_valid_position(pos1) or not is_valid_position(pos2):
-		return false
-	# Both positions must be movable (unmovable_soft cannot be swapped)
-	if not is_cell_movable(int(pos1.x), int(pos1.y)) or not is_cell_movable(int(pos2.x), int(pos2.y)):
-		return false
+	if GQS != null: return GQS.can_swap(self, pos1, pos2)
+	if not is_valid_position(pos1) or not is_valid_position(pos2): return false
+	if not is_cell_movable(int(pos1.x), int(pos1.y)) or not is_cell_movable(int(pos2.x), int(pos2.y)): return false
 	return are_adjacent(pos1, pos2)
 
+func get_tile_at(pos: Vector2) -> int:
+	if GQS != null: return GQS.get_tile_at(self, pos)
+	var gx = int(pos.x); var gy = int(pos.y)
+	if gx < 0 or gx >= GRID_WIDTH or gy < 0 or gy >= GRID_HEIGHT: return -1
+	if grid.size() <= gx or grid[gx].size() <= gy: return -1
+	return int(grid[gx][gy])
+
+func _is_unmovable_cell(x: int, y: int) -> bool:
+	if GQS != null: return GQS.is_unmovable_cell(self, x, y)
+	return unmovable_map.has(str(x) + "," + str(y))
+
 func swap_tiles(pos1: Vector2, pos2: Vector2) -> bool:
-	# Only allow swap if both cells are movable and adjacent
 	if not can_swap(pos1, pos2):
 		return false
-
 	var temp = grid[pos1.x][pos1.y]
 	grid[pos1.x][pos1.y] = grid[pos2.x][pos2.y]
 	grid[pos2.x][pos2.y] = temp
 	return true
 
 func find_matches() -> Array:
-	# B1: Thin delegation to MatchFinder autoload
-	var exclude = [COLLECTIBLE, SPREADER]
+	# Exclude special tiles (7,8,9) and non-regular tiles so they never match as normal tiles
+	var exclude = [HORIZTONAL_ARROW, VERTICAL_ARROW, FOUR_WAY_ARROW, COLLECTIBLE, SPREADER]
 	return MatchFinder.find_matches(grid, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1)
 
 func calculate_points(tiles_removed: int) -> int:
-	# Use Scoring service to compute points; include combo_count for multiplier
 	if tiles_removed <= 0:
 		return 0
-	# Defensive: ensure Scoring class exists
 	if typeof(Scoring) == TYPE_NIL:
-		# Fallback to simple calculation
 		return int(tiles_removed * POINTS_PER_TILE * (1.0 + (0.1 * float(combo_count))))
 	return Scoring.points_for(tiles_removed, combo_count)
 
 func add_score(points: int) -> void:
-	if points == null:
-		return
-	if points <= 0:
+	if points == null or points <= 0:
 		return
 	score += int(points)
 	print("[GameManager] add_score: added ", points, " new total=", score)
@@ -605,8 +587,7 @@ func get_and_clear_requested_special() -> Dictionary:
 	return out
 
 func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> int:
-	"""Remove matched tiles from the grid, handle spreaders/unmovables/collectibles, compute scoring.
-	Returns number of tiles that counted for scoring (excludes collectibles)."""
+	"""Remove matched tiles from the grid, handle spreaders/unmovables/collectibles, compute scoring."""
 	if matches == null or matches.size() == 0:
 		return 0
 
@@ -615,7 +596,7 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 	print("[SCORING] Swapped position: ", swapped_pos)
 	print("[SCORING] Current combo_count: ", combo_count)
 
-	# Normalize matches to Vector2 list
+	# Normalize and deduplicate matches — shared by both delegate and fallback paths
 	var norm_matches: Array = []
 	for m in matches:
 		var pos = m
@@ -625,142 +606,48 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 			var parts = m.split(",")
 			if parts.size() == 2:
 				pos = Vector2(int(parts[0]), int(parts[1]))
-		# Ensure valid position
 		if typeof(pos) == TYPE_VECTOR2 and is_valid_position(pos):
 			norm_matches.append(pos)
 
-	# Filter out blocked or duplicate positions
 	var unique = []
 	for p in norm_matches:
 		var found = false
 		for q in unique:
 			if int(p.x) == int(q.x) and int(p.y) == int(q.y):
-				found = true
-				break
+				found = true; break
 		if not found and not is_cell_blocked(int(p.x), int(p.y)):
 			unique.append(p)
 
-	# If a swapped_pos is provided and part of the matches, record a requested special tile
-	if swapped_pos.x >= 0 and swapped_pos.y >= 0:
-		# Ensure swapped_pos is within unique matches
-		for p in unique:
-			if int(p.x) == int(swapped_pos.x) and int(p.y) == int(swapped_pos.y):
-				# Register a default special type based on match size - caller (GameBoard) may handle exact type
-				request_special_tile_creation(swapped_pos, "auto")
-				break
-
-	# Delegate clearing and special registration to MatchProcessor if available
+	# Delegate clearing to MatchProcessor
 	var tiles_removed = 0
 	if MatchProcessor != null and MatchProcessor.has_method("process_matches"):
-		# Call static method on script resource
 		var res = MatchProcessor.process_matches(grid, unique, swapped_pos, GRID_WIDTH, GRID_HEIGHT, self)
 		if typeof(res) == TYPE_DICTIONARY and res.has("tiles_removed"):
 			tiles_removed = int(res["tiles_removed"])
 	else:
-		# Fallback to legacy inline clearing if MatchProcessor unavailable
-		for p in unique:
-			var gx = int(p.x)
-			var gy = int(p.y)
-			if gx < 0 or gx >= GRID_WIDTH or gy < 0 or gy >= GRID_HEIGHT:
-				continue
-			var val = grid[gx][gy]
-			if val == COLLECTIBLE:
-				# Collectible - increment collectible counter and emit
-				collectibles_collected += 1
-				if collectible_positions.has(p):
-					collectible_positions.erase(p)
-				call_deferred("emit_signal", "collectibles_changed", collectibles_collected, collectible_target)
-				# Clear the cell
-				grid[gx][gy] = 0
-				continue
-			if val == SPREADER:
-				# Report spreader destroyed
-				report_spreader_destroyed(p)
-				grid[gx][gy] = 0
-				# Spreaders may or may not count for scoring (we'll count them)
-				tiles_removed += 1
-				continue
-			# Hard unmovable handled elsewhere; if present in unmovable_map, report and clear
-			var key = str(gx) + "," + str(gy)
-			if unmovable_map.has(key):
-				# Report and clear (caller may have already called take_hit on tile instances)
-				report_unmovable_destroyed(key, true)
-				# If report_unmovable_destroyed cleared the cell, skip scoring; otherwise handle
-				if grid[gx][gy] == 0:
-					continue
-			# REGRESSION FIX: Do not clear the swapped_pos cell here - it will be converted into a special tile
-			if swapped_pos.x >= 0 and swapped_pos.y >= 0 and int(swapped_pos.x) == gx and int(swapped_pos.y) == gy:
-				# Skip clearing this cell - GameBoard will create special visual
-				print("[GameManager] Preserving swapped_pos cell for special creation at (", gx, ",", gy, ")")
-				# Still count for scoring only if its previous value would have counted
-				if val > 0 and val != COLLECTIBLE:
-					tiles_removed += 1
-				# Set grid cell to 0 only when special creation is handled by GameBoard via request
-				continue
-			# Regular tile or special tiles count for scoring
-			if val > 0 and val != COLLECTIBLE:
-				tiles_removed += 1
-			# Finally, clear the grid cell
-			grid[gx][gy] = 0
+		push_error("[GameManager] MatchProcessor unavailable — matches not processed")
 
-	# Compute points via Scoring service
+	# Scoring and combo
 	var points = calculate_points(tiles_removed)
 	if points > 0:
 		add_score(points)
-
-	# Maintain combo state: increment for this removal
-	if tiles_removed > 0:
-		combo_count += 1
-	else:
-		combo_count = 0
+	combo_count = combo_count + 1 if tiles_removed > 0 else 0
 
 	print("[SCORING] remove_matches: tiles_removed=", tiles_removed, ", points=", points, ", combo_count=", combo_count)
 
-	# --- NEW: handle requested special creation (created earlier when swapped_pos participated)
+	# Resolve pending special-tile creation (delegated to MatchProcessor)
 	var req = get_and_clear_requested_special()
-	if typeof(req) == TYPE_DICTIONARY and req.has("pos"):
-		var rpos = req["pos"]
-		var rtype = req.get("type", "auto")
-		if rpos != null and rpos.x >= 0 and rpos.y >= 0:
-			# Only handle auto-detection here; GameBoard can still create visuals if needed
-			if rtype == "auto" and SpecialFactory != null:
-				# Ensure SpecialFactory script is loaded (remove ordering dependency)
-				if SpecialFactory == null:
-					SpecialFactory = load("res://scripts/game/SpecialFactory.gd")
-				if SpecialFactory != null:
-					print("[GameManager] SpecialFactory loaded type=", typeof(SpecialFactory), " path=", SpecialFactory)
-					# Pass the normalized unique matches so SpecialFactory can reason about patterns
-					var special_type = -1
-					# Prefer calling the static method on the loaded script resource
-					if SpecialFactory.has_method("determine_special_type"):
-						special_type = SpecialFactory.determine_special_type(unique, Vector2(int(rpos.x), int(rpos.y)), grid, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE)
-					else:
-						print("[GameManager] SpecialFactory script missing determine_special_type")
-					print("[GameManager] SpecialFactory.determine_special_type -> ", special_type)
-					if special_type != -1:
-						# Write special tile to the grid - this will be picked up by GameBoard during visual updates
-						if rpos.x >= 0 and rpos.x < GRID_WIDTH and rpos.y >= 0 and rpos.y < GRID_HEIGHT:
-							grid[int(rpos.x)][int(rpos.y)] = int(special_type)
-							print("[GameManager] Special tile placed at ", rpos, " type=", special_type)
-						else:
-							print("[GameManager] Warning: requested special pos out of bounds:", rpos)
-					else:
-						print("[GameManager] SpecialFactory found no special for requested pos", rpos)
-				else:
-					print("[GameManager] SpecialFactory script failed to load; cannot determine special")
-		elif rtype != "auto":
-			# If an explicit type was requested, map it (future enhancement) — for now just log
-			print("[GameManager] Requested explicit special type '", rtype, "' at ", rpos)
+	if MatchProcessor != null and MatchProcessor.has_method("resolve_special_tile"):
+		MatchProcessor.resolve_special_tile(req, unique, grid, self)
 
-	# After scoring/combo, check objectives
+	# Check objectives after scoring
 	if objective_manager_ref != null and objective_manager_ref.has_method("is_complete"):
 		if objective_manager_ref.is_complete():
 			print("[GameManager] Objectives complete detected by ObjectiveManager")
-			# schedule level completion check
 			pending_level_complete = true
 			call_deferred("_perform_level_completion_check")
 
-	# Notify EventBus so EffectResolver (narrative effects) reacts to every match
+	# Notify EventBus for narrative effects
 	if tiles_removed > 0:
 		var _eb = NodeResolverAPI._get_evbus() if typeof(NodeResolverAPI) != TYPE_NIL else null
 		if _eb:
@@ -768,86 +655,19 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 
 	return tiles_removed
 
-func get_tile_at(pos: Vector2) -> int:
-	# Safe accessor for grid values; accepts Vector2 or x,y in Vector2 form
-	var gx = int(pos.x)
-	var gy = int(pos.y)
-	if gx < 0 or gx >= GRID_WIDTH or gy < 0 or gy >= GRID_HEIGHT:
-		return -1
-	if grid.size() <= gx or grid[gx].size() <= gy:
-		return -1
-	return int(grid[gx][gy])
-
-func _is_unmovable_cell(x: int, y: int) -> bool:
-	## Returns true if the cell holds a hard unmovable tile (tracked in unmovable_map).
-	## Hard unmovables are stored as 0 in the data grid but live in unmovable_map.
-	var key = str(x) + "," + str(y)
-	return unmovable_map.has(key)
 
 func apply_gravity() -> bool:
-	## B2: Apply gravity respecting unmovable + spreader barriers as segment dividers.
-	## GravityService.apply_gravity handles simple columns; we override here for barrier logic.
-	var moved = false
-	for x in range(GRID_WIDTH):
-		var segment_start = -1
-		var y = 0
-		while y <= GRID_HEIGHT:
-			var end_of_segment = (y == GRID_HEIGHT)
-			var is_barrier = false
-			if not end_of_segment:
-				if grid[x][y] == -1 or _is_unmovable_cell(x, y) or grid[x][y] == SPREADER:
-					is_barrier = true
-			if is_barrier or end_of_segment:
-				if segment_start >= 0:
-					var vals: Array = []
-					for sy in range(y - 1, segment_start - 1, -1):
-						var v = int(grid[x][sy])
-						if v != 0:
-							vals.append(v)
-					var write_y = y - 1
-					for val in vals:
-						if grid[x][write_y] != val:
-							moved = true
-						grid[x][write_y] = val
-						write_y -= 1
-					for sy in range(write_y, segment_start - 1, -1):
-						if grid[x][sy] != 0:
-							moved = true
-							grid[x][sy] = 0
-				segment_start = -1
-			else:
-				if segment_start == -1:
-					segment_start = y
-			y += 1
-
-	return moved
+	## Step 1: Delegated to GravityService (barrier-aware version).
+	if GravityService != null:
+		return GravityService.apply_gravity(grid, self)
+	# Emergency fallback — should never be reached at runtime
+	return false
 
 func fill_empty_spaces() -> Array:
-	## B2: Fill empty active cells, respecting unmovable/spreader barriers as spawn blockers.
-	## Segments below an intact barrier cannot receive tiles from above.
-	var rng = RandomNumberGenerator.new()
-	rng.randomize()
-	var created_positions: Array = []
-	for x in range(GRID_WIDTH):
-		var segment_accessible := true
-		var in_barrier_run := true
-		for y in range(GRID_HEIGHT):
-			if grid.size() <= x or grid[x].size() <= y:
-				continue
-			var cell = grid[x][y]
-			var is_unmov = _is_unmovable_cell(x, y)
-			var is_barrier_cell = is_unmov or (cell == -1) or (cell == SPREADER)
-			if is_barrier_cell:
-				if not in_barrier_run:
-					in_barrier_run = true
-				segment_accessible = not (is_unmov or cell == SPREADER)
-			else:
-				in_barrier_run = false
-				if cell == 0 and segment_accessible:
-					var tile_type = rng.randi_range(1, max(1, TILE_TYPES))
-					grid[x][y] = tile_type
-					created_positions.append(Vector2(x, y))
-	return created_positions
+	## Step 1: Delegated to GravityService (barrier-aware version).
+	if GravityService != null:
+		return GravityService.fill_empty_spaces(grid, self)
+	return []
 
 func collectible_landed_at(pos: Vector2, c_type: String = "coin") -> void:
 	# B4: Delegate count tracking to ObjectiveManager

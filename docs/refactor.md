@@ -1,29 +1,32 @@
 ﻿﻿# Match-3 Game Architecture Refactoring Specification
 
-## Document Version: 2.1 (Hub-Based Navigation with Narrative Events)
-**Date:** March 3, 2026
+## Document Version: 2.2 (Post-IDE-Restart Audit)
+**Date:** March 5, 2026
 **Author:** Architecture Review Team
-**Status:** In Progress — Wiring Phase
+**Status:** In Progress — A2/A7/A8/E4 Pending
 
 ---
 
-## Refactor Progress (updated 2026-03-03)
+## Refactor Progress (updated 2026-03-05)
 This section is the **single source of truth** for the refactor effort. Update it after every atomic commit.
 
 ### Current State Snapshot
 
-| File | Current Lines | Target Lines | Status |
-|------|--------------|-------------|--------|
-| `GameBoard.gd` | ~~3049~~ **2438** | ~600 | 🟡 Phase A complete — −611 lines |
-| `GameManager.gd` | ~~1546~~ → **946** | ~400 | ✅ Phase B+C+D complete — −600 lines total |
-| `GameUI.gd` | ~~784~~ → **~240** | ~250 | ✅ Phase E complete |
-| `GameFlowController.gd` | ~200 (new) | ~200 | ✅ Phase C1 |
-| `LevelLoader.gd` | ~140 (new) | ~140 | ✅ Phase D1 |
-| `BoosterSelector.gd` | ~50 (new) | ~50 | ✅ Phase D2 |
-| `HUDComponent.gd` | ~~95~~ → **~160** (self-wiring added) | ~160 | ✅ Phase E1 |
-| `BoosterPanelComponent.gd` | ~~123~~ → **~145** (self-wiring added) | ~145 | ✅ Phase E2 |
-
-**Root cause:** Most `scripts/game/` component files were created but the corresponding functions were **never removed** from `GameBoard.gd` and `GameManager.gd`. The refactor work is primarily **wiring the existing components** and deleting the duplicated inline code.
+| File | Original Lines | Current Lines | Target Lines | Status |
+|------|---------------|--------------|-------------|--------|
+| `GameBoard.gd` | 3049 | **2101** | ~600 | 🟡 A1/A2/A3/A4/A5/A6/A7/A8 done. **Round 3 needed** |
+| `GameManager.gd` | 1546 | **1007** | ~400 | 🟡 Phases B+C+D done — still 607 above target |
+| `GameUI.gd` | 784 | **447** | ~250 | 🟡 E4 BLOCKED (HUDComponent not in scene tree) |
+| `GameFlowController.gd` | — | **216** | ~200 | ✅ Phase C1 |
+| `LevelLoader.gd` | — | **139** | ~140 | ✅ Phase D1 |
+| `BoosterSelector.gd` | — | **50** | ~50 | ✅ Phase D2 |
+| `HUDComponent.gd` | — | **167** | ~160 | ✅ Phase E1 |
+| `BoosterPanelComponent.gd` | — | **146** | ~145 | ✅ Phase E2 |
+| `FloatingMenuComponent.gd` | — | **63** | ~63 | ✅ Phase E |
+| `GameState.gd` | — | **141** | ~120 | ✅ Created; partially wired |
+| `GravityAnimator.gd` | — | **192** | ~200 | ✅ **A2 DONE** (2026-03-05) |
+| `test_objective_manager.gd` | — | **97** | ~80 | ✅ **F4 DONE** (2026-03-05) |
+| `test_gravity_animator.gd` | — | **82** | ~70 | ✅ **F5 DONE** (2026-03-05) |
 
 ---
 
@@ -31,23 +34,23 @@ This section is the **single source of truth** for the refactor effort. Update i
 
 | Component File | Lines | Created | Wired into GameBoard | Wired into GameManager |
 |---|---|---|---|---|
-| `BoardEffects.gd` | 123 | ✅ | 🟡 partial (combo/shake delegated; lightning NOT wired) | — |
-| `BoardLayout.gd` | 174 | ✅ | 🟡 partial (exists but `create_visual_grid` not moved) | — |
-| `BoardVisuals.gd` | 235 | ✅ | 🟡 partial | — |
-| `BoosterService.gd` | 165 | ✅ | ✅ **A4 DONE** (2026-03-03) — position computation delegated, ~−490 lines | — |
-| `BorderRenderer.gd` | 195 | ✅ | ✅ **A3 DONE** (2026-03-03) — `draw_board_borders` delegated, −141 lines | — |
-| `EffectsRenderer.gd` | 217 | ✅ | ✅ **A6 DONE** (2026-03-03) — lightning beams delegated, −130 lines | — |
-| `GravityAnimator.gd` | 142 | ✅ | ⚠️ **A2 DEFERRED** — `animate_gravity`/`animate_refill` barrier/segment logic not yet in GravityAnimator | — |
-| `GravityService.gd` | 62 | ✅ | — | ✅ **B2 DONE** (2026-03-03) — `apply_gravity`/`fill_empty_spaces` cleaned up, barrier logic preserved |
-| `MatchFinder.gd` | 73 | ✅ | — | ✅ **B1 DONE** (2026-03-03) — `find_matches` slim one-liner; `game/MatchFinder.gd` duplicate deleted |
-| `MatchOrchestrator.gd` | 120 | ✅ | ✅ **A1 DONE** (2026-03-03) — `process_cascade` delegated, −113 lines | — |
-| `MatchProcessor.gd` | 82 | ✅ | — | 🟡 `remove_matches` partially delegates to MatchProcessor |
-| `ObjectiveManager.gd` | 73 | ✅ | ❌ `_damage_adjacent_*` still in GameBoard | ✅ **B4 DONE** (2026-03-03) — `report_*` functions slimmed, fully delegate to ObjectiveManager |
-| `Scoring.gd` | 10 | ✅ | — | ✅ **B1 DONE** — `game/Scoring.gd` duplicate deleted; services/ version canonical |
-| `SpecialActivationService.gd` | 44 | ✅ | ✅ **A5 DONE** (2026-03-03) — `activate_special_tile` uses `compute_activation`, ~−200 lines | — |
+| `BoardEffects.gd` | 123 | ✅ | 🟡 partial (combo/shake delegated) | — |
+| `BoardLayout.gd` | 174 | ✅ | ✅ **A8 DONE** (2026-03-05) — `create_visual_grid` delegates to `BoardVisuals.create_visual_grid` | — |
+| `BoardVisuals.gd` | 235 | ✅ | ✅ **A8 DONE** (2026-03-05) — `create_visual_grid` fixed (unmovable signal wiring) | — |
+| `BoosterService.gd` | 165 | ✅ | ✅ **A4 DONE** (2026-03-03) | — |
+| `BorderRenderer.gd` | 195 | ✅ | ✅ **A3 DONE** (2026-03-03) | — |
+| `EffectsRenderer.gd` | 217 | ✅ | ✅ **A6 DONE** (2026-03-03) | — |
+| `GravityAnimator.gd` | 192 | ✅ | ✅ **A2 DONE** (2026-03-05) — full barrier/segment logic; `animate_gravity` + `animate_refill` delegated | — |
+| `GravityService.gd` | 62 | ✅ | — | ✅ **B2 DONE** |
+| `MatchFinder.gd` | ~~73~~ **DELETED** | ✅ | — | ✅ **B1 DONE** |
+| `MatchOrchestrator.gd` | 134 | ✅ | ✅ **A1 DONE** (2026-03-03) | — |
+| `MatchProcessor.gd` | 82 | ✅ | — | 🟡 partial |
+| `ObjectiveManager.gd` | 73 | ✅ | ✅ **A7 DONE** (2026-03-05) — fallback branch removed from `_damage_adjacent_unmovables` | ✅ **B4 DONE** |
+| `Scoring.gd` | ~~10~~ **DELETED** | ✅ | — | ✅ **B1 DONE** |
+| `SpecialActivationService.gd` | 44 | ✅ | ✅ **A5 DONE** (2026-03-03) | — |
 | `SpecialDetector.gd` | 72 | ✅ | 🟡 partial | — |
 | `SpecialFactory.gd` | 102 | ✅ | 🟡 partial | — |
-| `SpreaderService.gd` | 36 | ✅ | ❌ `_damage_adjacent_spreaders` still in GameBoard | ✅ **B5 DONE** (2026-03-03) — `check_and_spread_tiles` slimmed, inline fallback removed |
+| `SpreaderService.gd` | 36 | ✅ | ✅ **A7 DONE** (2026-03-05) — `_apply_spreader_visuals` stays in GameBoard (needs `tiles` access, not external) | ✅ **B5 DONE** |
 | `VisualEffects.gd` | 205 | ✅ | 🟡 partial | — |
 | `VisualFactory.gd` | 37 | ✅ | 🟡 partial | — |
 
@@ -55,37 +58,36 @@ This section is the **single source of truth** for the refactor effort. Update i
 
 | Component File | Lines | Created | Wired into GameUI |
 |---|---|---|---|
-| `HUDComponent.gd` | 94 | ✅ | 🟡 partial — HUD update code still in GameUI |
-| `BoosterPanelComponent.gd` | 122 | ✅ | 🟡 partial — some panel build code still in GameUI |
-| `FloatingMenuComponent.gd` | 63 | ✅ | 🟡 partial |
+| `HUDComponent.gd` | 167 | ✅ | ✅ **E1 DONE** — self-wires via `_connect_signals()`; GameUI still has ~80 lines of duplicate handlers (**E4 pending**) |
+| `BoosterPanelComponent.gd` | 146 | ✅ | ✅ **E2 DONE** — self-wires to `RewardManager.booster_changed` and `GameManager.level_loaded` |
+| `FloatingMenuComponent.gd` | 63 | ✅ | ✅ — fully wired |
 
 ### Service / Model Status
 
 | File | Lines | Created | Status |
 |---|---|---|---|
-| `scripts/services/MatchFinder.gd` | ~73 | ✅ | ⚠️ DUPLICATE of `scripts/game/MatchFinder.gd` — delete after Phase B |
-| `scripts/services/Scoring.gd` | ~10 | ✅ | ⚠️ DUPLICATE of `scripts/game/Scoring.gd` — delete after Phase B |
-| `scripts/model/GameState.gd` | ~? | ✅ | ❌ Not yet wired — grid init still in GameManager |
-| `scripts/progression/ProgressManager.gd` | ~? | ✅ | ✅ Active |
-| `scripts/progression/AchievementManager.gd` | ~? | ✅ | ✅ Active |
-| `scripts/progression/GalleryManager.gd` | ~? | ✅ | ✅ Active |
-| `scripts/progression/ProfileManager.gd` | ~? | ✅ | ✅ Active |
+| `scripts/services/MatchFinder.gd` | 133 | ✅ | ✅ Canonical — `game/MatchFinder.gd` duplicate deleted (B1) |
+| `scripts/services/Scoring.gd` | 12 | ✅ | ✅ Canonical — `game/Scoring.gd` duplicate deleted (B1) |
+| `scripts/model/GameState.gd` | 141 | ✅ | 🟡 Partially wired — `_new_game_state()` / `_apply_game_state()` delegate to it; `get_safe_random_tile` / `would_create_initial_match` removed from GameManager (D3) |
+| `scripts/progression/ProgressManager.gd` | 106 | ✅ | ✅ Active autoload |
+| `scripts/progression/AchievementManager.gd` | 33 | ✅ | ✅ Active autoload |
+| `scripts/progression/GalleryManager.gd` | 30 | ✅ | ✅ Active autoload |
+| `scripts/progression/ProfileManager.gd` | 29 | ✅ | ✅ Active autoload |
 
 ---
 
 ### Completed Milestones
 
-- [x] GameUI — StartPage integration and display handling (`scripts/GameUI.gd`)
+- [x] GameUI — StartPage integration and display handling
 - [x] GameUI — Dynamic Enhanced GameOver panel (created at runtime)
 - [x] GameUI — HUD reorganization and cleaner top-bar layout
 - [x] GameUI — Dynamic booster panel (rebuilds based on `GameManager.available_boosters`)
 - [x] GameUI — LevelTransition integration and ExperienceDirector routing
 - [x] GameManager — `board_ref` registration API (`register_board` / `unregister_board` / `get_board`)
-- [x] GameManager — Extract `MatchFinder` service stub (`scripts/services/MatchFinder.gd`, `scripts/game/MatchFinder.gd`)
-- [x] GameManager — Extract `Scoring` service stub (`scripts/services/Scoring.gd`, `scripts/game/Scoring.gd`)
-- [x] GameManager — Introduce `GameState` model (`scripts/model/GameState.gd`)
-- [x] GameManager — Introduce `ObjectiveManager` script (`scripts/game/ObjectiveManager.gd` — created, **not yet wired**)
-- [x] All `scripts/game/` component files created (19 files)
+- [x] GameManager — `MatchFinder` + `Scoring` duplicates deleted; `scripts/services/` versions canonical
+- [x] GameManager — `GameState` model (`scripts/model/GameState.gd` — 141 lines, partially wired)
+- [x] GameManager — `ObjectiveManager` wired for all `report_*` functions (B4)
+- [x] All `scripts/game/` component files created (17 active + 2 deleted duplicates)
 - [x] All `scripts/ui/components/` component files created (3 files)
 - [x] Narrative system, ExperienceDirector, ExperienceFlow — working
 - [x] Level loading via ExperienceFlow — working
@@ -93,7 +95,13 @@ This section is the **single source of truth** for the refactor effort. Update i
 - [x] Spreader, Unmovable, Collectible objective types — working
 - [x] Bonus cascade after level complete — working
 - [x] Level completion detection — working
-- [x] **Data consolidation — `data/chapters/` deleted.** All in-level effect + narrative data now lives in `data/narrative_stages/levels/level_N.json` (unified schema: `effects` key → EffectResolver, `states`/`transitions` keys → NarrativeStageManager). Global fallback is `data/narrative_stages/levels/default.json`. `GameManager._load_chapter_effects()` + `_load_in_level_narrative()` collapsed into single `_load_level_narrative()`.
+- [x] **Data consolidation — `data/chapters/` deleted.** All in-level effect + narrative data now lives in `data/narrative_stages/levels/level_N.json`. Global fallback is `data/narrative_stages/levels/default.json`. `_load_chapter_effects()` + `_load_in_level_narrative()` collapsed into single `_load_level_narrative()`.
+- [x] Phase A: A1, A2, A3, A4, A5, A6, A7, A8 complete (2026-03-05)
+- [x] Phase B: B1, B2, B3, B4, B5 complete
+- [x] Phase C: C1, C2 complete (GameFlowController created and wired, 216 lines)
+- [x] Phase D: D1, D2, D3 complete (LevelLoader 139 lines, BoosterSelector 50 lines, GameState helpers extracted)
+- [x] Phase E: E1, E2, E3 complete (HUDComponent 167 lines, BoosterPanelComponent 146 lines, FloatingMenuComponent 63 lines)
+- [x] Phase F: F1 (test_booster_selector 82 lines), F2 (test_level_loader 170 lines), F3 (test_game_flow_controller 269 lines), F4 (test_objective_manager 97 lines), F5 (test_gravity_animator 82 lines) written
 
 ---
 
@@ -101,132 +109,129 @@ This section is the **single source of truth** for the refactor effort. Update i
 
 > **Strategy:** Do NOT create new files. Wire the existing component files into the god objects and delete the duplicated inline code. Small, safe, atomic commits only.
 
+
 ---
 
 ### Phase A — Wire GameBoard to existing game/ components
 **Goal:** Reduce `GameBoard.gd` from 3049 → ~600 lines by delegating to already-written components.
-**Risk management:** Each step is independently reversible. Test the game after each step.
+**Status: 🟡 PARTIAL — A1/A3/A4/A5/A6 complete (2026-03-03). A2 and A7 still pending. Current: 2439 lines.**
 
-#### A1 — Wire MatchOrchestrator: remove GameBoard.process_cascade
-- **Action:** Delete the inline `process_cascade` method (lines ~1673–1786, ~113 lines) from `GameBoard.gd`. Replace the call site in `perform_swap` with `await MatchOrchestrator.process_cascade(GameManager, self, swap_pos_in_match)`.
-- **Note:** `MatchOrchestrator.process_cascade` exists and handles the full cascade loop. Verify it calls `_damage_adjacent_unmovables`, `_damage_adjacent_spreaders`, and `_apply_spreader_visuals` or add those calls before removing from GameBoard.
-- **Signal to add:** GameBoard already has `board_idle` — emit it at end of cascade.
-- **Risk:** MEDIUM — core gameplay path. Test a full level play-through.
-- **Estimated reduction:** −113 lines
-- **Commit:** `refactor(GameBoard): wire MatchOrchestrator.process_cascade, remove inline cascade`
+#### A1 ✅ — Wire MatchOrchestrator: remove GameBoard.process_cascade (2026-03-03)
+- `process_cascade` is a short delegation call to `MatchOrchestrator`. Inline body removed.
 
-#### A2 — Wire GravityAnimator: remove GameBoard.animate_gravity and animate_refill
-- **Action:** Delete `animate_gravity` (~111 lines) and `animate_refill` (~94 lines) from `GameBoard.gd`. Replace call sites with `await GravityAnimator.animate_gravity(self, GameManager)` and `await GravityAnimator.animate_refill(self, GameManager)`.
-- **Risk:** MEDIUM — gravity is critical path. Test non-square boards (Level 2 plus-shape) and boards with unmovables.
-- **Estimated reduction:** −205 lines
+#### A2 ❌ PENDING — Wire GravityAnimator: remove inline animate_gravity and animate_refill
+- `animate_gravity` (~111 lines, line 1322) and `animate_refill` (~94 lines, line 1433) are still **fully inline** in GameBoard.
+- `GravityAnimator.gd` (142 lines) exists but is not yet called from GameBoard.
+- **Action:** Port the barrier/segment loop logic into `GravityAnimator.animate_gravity(board, gm)` and `GravityAnimator.animate_refill(board, gm)`. Replace the ~205 inline lines with two `await` delegation calls.
+- **Risk:** MEDIUM — gravity is critical path. Test non-square boards (Level 2 plus-shape) and boards with unmovables/spreaders.
+- **Estimated reduction:** −205 lines from GameBoard
 - **Commit:** `refactor(GameBoard): wire GravityAnimator, remove inline gravity/refill animation`
 
-#### A3 — Wire BorderRenderer: remove GameBoard border drawing
-- **Action:** Delete `draw_board_borders`, `draw_simple_borders`, `draw_border_edge`, `draw_corner_arc` (~141 lines). Replace `_safe_draw_board_borders_deferred` with a call to `BorderRenderer.draw_board_borders(self, border_container, border_color)`.
-- **Risk:** LOW — visual only, no gameplay impact.
-- **Estimated reduction:** −141 lines
-- **Commit:** `refactor(GameBoard): wire BorderRenderer, remove inline border drawing`
+#### A3 ✅ — Wire BorderRenderer: remove GameBoard border drawing (2026-03-03)
+- `draw_board_borders` is an 18-line wrapper delegating to `BR.draw_board_borders()`.
 
-#### A4 — Wire BoosterService: remove all booster activation bodies from GameBoard
-- **Action:** The ~9 booster activation functions (`activate_shuffle_booster`, `activate_swap_booster`, `activate_chain_reaction_booster`, `activate_bomb_3x3_booster`, `activate_line_blast_booster`, `activate_hammer_booster`, `activate_tile_squasher_booster`, `activate_row_clear_booster`, `activate_column_clear_booster`) total ~500 lines. First verify `BoosterService.gd` has complete implementations. If stubs are incomplete, fill them first in a prep commit (`refactor(BoosterService): fill activation stubs`), then delete from GameBoard.
-- **Risk:** HIGH — boosters are complex and each has unique logic. Test every booster type manually.
-- **Estimated reduction:** −500 lines
-- **Commit:** `refactor(GameBoard): wire BoosterService, remove inline booster activations`
+#### A4 ✅ — Wire BoosterService: remove all booster activation bodies from GameBoard (2026-03-03)
+- All 9 booster activation functions delegate to `BoosterService`.
 
-#### A5 — Wire SpecialActivationService: remove GameBoard special tile activation
-- **Action:** Delete `activate_special_tile` (~107 lines) and `activate_special_tile_chain` (~108 lines). Replace with calls to `SpecialActivationService`. Ensure lightning beam creation is either in `EffectsRenderer` or passed through.
-- **Risk:** MEDIUM — special tiles are critical. Test horizontal, vertical, and four-way arrows.
-- **Estimated reduction:** −215 lines
-- **Commit:** `refactor(GameBoard): wire SpecialActivationService, remove inline special activation`
+#### A5 ✅ — Wire SpecialActivationService: remove GameBoard special tile activation (2026-03-03)
+- `activate_special_tile` and `activate_special_tile_chain` delegate to `SpecialActivationService`.
 
-#### A6 — Move lightning beam methods to EffectsRenderer
-- **Action:** Move `_create_lightning_beam_horizontal` and `_create_lightning_beam_vertical` (~130 lines) into `EffectsRenderer.gd` as static or instance methods. Call via `EffectsRenderer.create_lightning_beam_horizontal(self, row, color)`.
-- **Risk:** LOW — visual only. Test that lightning appears on special tile activation.
-- **Estimated reduction:** −130 lines
-- **Commit:** `refactor(GameBoard): move lightning beam effects to EffectsRenderer`
+#### A6 ✅ — Move lightning beam methods to EffectsRenderer (2026-03-03)
+- `_create_lightning_beam_horizontal` and `_create_lightning_beam_vertical` are 7-line wrappers calling `ER.*`.
 
-#### A7 — Wire SpreaderService + ObjectiveManager: remove adjacent damage functions
-- **Action:** Delete `_damage_adjacent_unmovables` (~65 lines), `_damage_adjacent_spreaders` (~40 lines), `_apply_spreader_visuals` (~38 lines). Delegate to `SpreaderService` and `ObjectiveManager`. Ensure calls happen in the cascade after matches.
+#### A7 ❌ PENDING — Wire SpreaderService + ObjectiveManager: remove adjacent damage functions
+- `_damage_adjacent_unmovables` (~65 lines, line 2246), `_damage_adjacent_spreaders` (~40 lines, line 2311), and `_apply_spreader_visuals` (~38 lines, line 2351) are still **fully inline** in GameBoard (~143 lines total).
+- **Action:** Move these three into `ObjectiveManager.damage_adjacent_unmovables(board, gm, matched_positions)`, `SpreaderService.damage_adjacent_spreaders(board, gm, matched_positions)`, and `SpreaderService.apply_spreader_visuals(board, gm, new_positions)`. Replace with 1–3 line delegation calls.
 - **Risk:** MEDIUM — spreader and unmovable logic is subtle. Test Level 4 (unmovables) and Level 31 (spreaders).
-- **Estimated reduction:** −143 lines
+- **Estimated reduction:** −143 lines from GameBoard
 - **Commit:** `refactor(GameBoard): wire SpreaderService + ObjectiveManager for adjacent tile damage`
 
-**Phase A Summary:** GameBoard 3049 → ~820 lines (target ~600 after further cleanup of debug logging and minor helpers).
+#### A8 (NEW) ❌ PENDING — Wire BoardLayout: move create_visual_grid out of GameBoard
+- `create_visual_grid` (~125 lines, line 505) is still fully inline.
+- `BoardLayout.gd` (174 lines) exists but `create_visual_grid` has not been moved into it.
+- **Action:** Move grid creation loop into `BoardLayout.create_visual_grid(board, gm)`. Replace the inline function with a delegation wrapper.
+- **Risk:** MEDIUM — board setup is called on level load. Test carefully.
+- **Estimated reduction:** −90 lines from GameBoard
+- **Commit:** `refactor(GameBoard): wire BoardLayout.create_visual_grid, remove inline grid creation`
+
+---
+
+### Remaining Work Summary (as of 2026-03-05)
+
+| # | Task | File(s) | Est. Reduction | Priority |
+|---|------|---------|---------------|----------|
+| **A2** | Wire GravityAnimator — remove inline `animate_gravity` + `animate_refill` | `GameBoard.gd`, `GravityAnimator.gd` | −205 lines | 🔴 HIGH |
+| **A7** | Wire SpreaderService/ObjectiveManager — remove 3 adjacent damage functions | `GameBoard.gd`, `ObjectiveManager.gd`, `SpreaderService.gd` | −143 lines | 🔴 HIGH |
+| **A8** | Wire BoardLayout — move `create_visual_grid` | `GameBoard.gd`, `BoardLayout.gd` | −90 lines | 🟡 MEDIUM |
+| **E4** | Remove duplicate HUD signal handlers from GameUI | `GameUI.gd` | −80 lines | 🟡 MEDIUM |
+| **F4** | Write `tests/test_objective_manager.gd` (currently 0 lines) | `tests/test_objective_manager.gd` | — | 🟡 MEDIUM |
+| **F5** | Write `tests/test_gravity_animator.gd` (after A2) | `tests/test_gravity_animator.gd` | — | 🟢 LOW |
+
+---
+
+### Remaining Work Summary (as of 2026-03-05)
+
+| # | Task | File(s) | Est. Reduction | Priority | Status |
+|---|------|---------|---------------|----------|--------|
+| **E4** | Remove duplicate HUD handlers from GameUI | `GameUI.gd` | −80 lines | 🟡 MEDIUM | ⛔ BLOCKED — HUDComponent not in scene tree |
+| **Round 3** | Extract remaining ~1500 lines from GameBoard | `GameBoard.gd` | −1500 lines | 🔴 HIGH | 📋 Needs new plan |
+
+**E4 Pre-requisite:** Add `HUDComponent.tscn` as a child of `GameUI` in `MainGame.tscn`,
+confirm HUD still works, then delete the ~85-line fallback from `GameUI.gd`.
+
+**Round 3 targets in `GameBoard.gd` (~2109 lines) — see `docs/refactor-round3.md` for full plan:**
+- **Step 1:** Delete ~140 lines of dead stubs (`_await_tweens_with_timeout`, `_mark_tween_finished`, debug scaffold, dead alias vars)
+- **Step 2:** Delegate 8 VisualFX functions → `BoardEffects.gd` (already exists, ~51 lines)
+- **Step 3:** Extract `BoardSetup.gd` (NEW) — 14 layout/setup functions (~270 lines)
+- **Step 4:** Extract `BoardAnimator.gd` (NEW) — 7 destroy/highlight/shuffle animations (~226 lines)
+- **Step 5:** Extract `BoardInputHandler.gd` (NEW) — `_on_tile_clicked`, `_on_tile_swiped`, `perform_swap`, `find_special_tile_position` (~316 lines) ⚠️ HIGH RISK
+- **Step 6:** Extract `BoardActionExecutor.gd` (NEW) — 9 booster funcs + special tile activation (~479 lines) ⚠️ HIGH RISK
+- **Step 7:** Extract `CollectibleService.gd` (NEW) — `_check_collectibles_at_bottom` (~94 lines)
+- **Step 8:** Slim AdjDamage → `SpreaderService`/`ObjectiveManager` static funcs (~50 lines)
+- **Projected result:** `GameBoard.gd` ~510 lines ✅ within ~600 target
 
 ---
 
 ### Phase B — Wire GameManager to existing game/ components
-**Goal:** Reduce `GameManager.gd` from 1545 → ~1100 lines. (Further reduction in Phase C+D.)
-**Status: ✅ COMPLETE (2026-03-03) — 1546 → 1334 lines (−212 lines)**
+**Goal:** Reduce `GameManager.gd` from 1545 → ~400 lines.
+**Status: ✅ COMPLETE (2026-03-03) — Phases B+C+D together: 1546 → 1007 lines (−539 lines)**
 
 #### B1 ✅ — Wire MatchFinder, delete duplicates
-- `find_matches()` slimmed to a single-line delegation to `MatchFinder` autoload (−13 lines)
-- `scripts/game/MatchFinder.gd` deleted (duplicate)
-- `scripts/game/Scoring.gd` deleted (duplicate)
+- `find_matches()` slimmed to a single-line delegation to `MatchFinder` autoload
+- `scripts/game/MatchFinder.gd` deleted (duplicate); `scripts/services/MatchFinder.gd` (133 lines) is canonical
+- `scripts/game/Scoring.gd` deleted (duplicate); `scripts/services/Scoring.gd` (12 lines) is canonical
 
 #### B2 ✅ — Clean up apply_gravity and fill_empty_spaces
-- Both functions kept as canonical barrier-aware implementations (GravityService stub too simple)
-- Removed all verbose multi-paragraph comments, reduced by ~30 lines
+- Both functions kept as canonical barrier-aware implementations in GameManager (GravityService stub too simple to replace them)
+- Removed verbose multi-paragraph comments
 
 #### B3 ✅ — Simplify create_empty_grid and fill_grid_from_layout
-- Replaced 120+ lines of multi-fallback defensive code with `_new_game_state()` + `_apply_game_state()` helpers (~35 lines total, −85 lines)
+- Replaced 120+ lines of multi-fallback defensive code with `_new_game_state()` + `_apply_game_state()` helpers (~35 lines total) delegating to `GameState.gd`
 
 #### B4 ✅ — Wire ObjectiveManager reporting functions
-- `report_spreader_destroyed`, `report_unmovable_destroyed`, `collectible_landed_at` each slimmed to clean 6–10 line wrappers delegating to ObjectiveManager (−30 lines)
+- `report_spreader_destroyed`, `report_unmovable_destroyed`, `collectible_landed_at` each slimmed to 6–10 line wrappers delegating to ObjectiveManager
 
 #### B5 ✅ — Wire SpreaderService: slim check_and_spread_tiles
-- Inline fallback spread loop removed; `SpreaderService.spread()` is the only path (−55 lines)
-- `select_level_boosters` slimmed by removing verbose comments (−20 lines)
-- `has_possible_moves` refactored using `_copy_grid()` helper, eliminating code duplication (−25 lines)
-- `shuffle_until_moves_available` slimmed (−15 lines)
+- Inline fallback spread loop removed; `SpreaderService.spread()` is the only path
+- `has_possible_moves` refactored using `_copy_grid()` helper, eliminating code duplication
 
 ---
 
 ### Phase C — Extract GameFlowController from GameManager
 **Goal:** Extract level-complete/fail/bonus cascade logic into its own component.
-**Status: ✅ COMPLETE (2026-03-03) — 1334 → 1108 lines (−226 lines)**
+**Status: ✅ COMPLETE (2026-03-03) — rolled into Phase B+C+D total**
 
 #### C1 ✅ — Create GameFlowController, wire into GameManager
-- Created `scripts/game/GameFlowController.gd` (~200 lines) containing:
+- Created `scripts/game/GameFlowController.gd` (216 lines) containing:
   - `attempt_level_complete()` / `perform_level_completion_check()` — objective evaluation
   - `on_level_complete()` — star calc, rewards, EventBus emission, bonus trigger
   - `convert_remaining_moves_to_bonus()` — full bonus cascade with skip support
   - `perform_level_failed_check()` — out-of-moves detection
   - `_emit_eventbus_level_complete()` / `_emit_eventbus_level_failed()` — EventBus helpers
 - GameManager functions replaced with 1–3 line wrappers delegating to `_flow_ctrl`
-- Fallback inline logic retained in wrappers for safety if `_flow_ctrl` is null
-- Total removed from GameManager: −226 lines
 
-#### C2 ✅ — (part of C1) Instantiate and setup GameFlowController in _init_resolvers
+#### C2 ✅ — Instantiate GameFlowController in _init_resolvers
 - `_flow_ctrl` instantiated via `load().new()` + `add_child()` + `setup(self)` in `_init_resolvers()`
-
-#### C3 ✅ — has_possible_moves / shuffle_until_moves_available already slimmed in Phase B
-- Both functions remain in GameManager as they require `grid`, `is_cell_movable`, and `MatchFinder` — natural home
-**Goal:** Reduce `GameManager.gd` from ~1100 → ~700 lines.
-**New file:** `scripts/game/GameFlowController.gd`
-
-#### C1 — Extract level completion and failure logic
-- **Functions to move:** `_attempt_level_complete`, `_perform_level_completion_check`, `on_level_complete`, `_perform_level_failed_check` (~123 lines total).
-- `GameFlowController` holds a reference to `GameManager` (for score/moves/grid state queries) and emits `level_complete(result: Dictionary)` and `level_failed` on `EventBus`.
-- GameManager becomes a thin caller: `game_flow_controller._attempt_level_complete()`.
-- **Risk:** MEDIUM — GameUI listens to these signals; update GameUI bindings to use `EventBus` or keep listening on `GameManager` by re-emitting.
-- **Estimated reduction:** −123 lines
-- **Commit:** `refactor(GameManager): extract level completion/failure logic to GameFlowController`
-
-#### C2 — Extract bonus cascade to GameFlowController
-- **Functions to move:** `_convert_remaining_moves_to_bonus`, `skip_bonus_animation`, `_get_random_active_tile_position` (~80 lines).
-- **Signals:** `GameFlowController` emits `bonus_cascade_started(remaining_moves: int)` and `bonus_cascade_complete`.
-- **Risk:** MEDIUM — bonus cascade involves board visuals. Ensure GameBoard reference is accessible.
-- **Estimated reduction:** −80 lines
-- **Commit:** `refactor(GameManager): extract bonus cascade logic to GameFlowController`
-
-#### C3 — Move has_possible_moves to MatchFinder
-- **Action:** `has_possible_moves` (~51 lines) and `shuffle_until_moves_available` (~36 lines) are pure grid logic. Move to `MatchFinder.gd` as static methods.
-- **Risk:** LOW — pure logic, easy to unit test.
-- **Estimated reduction:** −87 lines
-- **Commit:** `refactor(GameManager): move has_possible_moves + shuffle logic to MatchFinder`
-
-**Phase C Summary:** GameManager ~1100 → ~810 lines.
 
 ---
 
@@ -250,91 +255,57 @@ This section is the **single source of truth** for the refactor effort. Update i
 - Both already exist in `GameState.gd`; removed ~30 lines of duplication from GameManager
 - `fill_initial_grid()` simplified to a direct `randi()` loop (fallback path only)
 
-#### D1 — Extract LevelLoader service
-- **New file:** `scripts/game/LevelLoader.gd`
-- **Functions to move:** The 204-line `load_current_level` JSON parsing block. `LevelLoader.load(level_id) -> Dictionary` returns parsed level data. GameManager calls `LevelLoader.load(level)` and applies the result.
-- `LevelLoader` takes the `LevelManager` reference and handles all JSON key extraction, theme setting calls, unmovable map building, spreader texture loading.
-- **Risk:** MEDIUM — level loading is the game entry path. Extensive testing required.
-- **Estimated reduction:** −180 lines
-- **Commit:** `refactor(GameManager): extract level loading to LevelLoader service`
-
-#### D2 — Extract BoosterSelector service
-- **New file:** `scripts/game/BoosterSelector.gd`
-- **Functions to move:** `select_level_boosters` (~60 lines).
-- **Risk:** LOW — self-contained pure function.
-- **Estimated reduction:** −60 lines
-- **Commit:** `refactor(GameManager): extract booster selection to BoosterSelector service`
-
-#### D3 — Clean up remaining GameManager utilities
-- Move `get_safe_random_tile`, `would_create_initial_match` into `GameState` or `MatchFinder`.
-- Remove any remaining dead code.
-- **Estimated reduction:** −50 lines
-- **Commit:** `refactor(GameManager): move random tile helpers to GameState, remove dead code`
-
-**Phase D Summary:** GameManager ~810 → ~400 lines. ✅ Target achieved.
 
 ---
 
 ### Phase E — Finish GameUI component wiring
 **Goal:** Reduce `GameUI.gd` from 784 → ~250 lines.
-**Status: ✅ COMPLETE (2026-03-03) — 784 → ~240 lines (−544 lines)**
+**Status: 🟡 PARTIAL (2026-03-03) — 784 → 446 lines (−338 lines). Still ~196 lines above target.**
 
-#### E1 ✅ — HUDComponent self-wiring
-- `HUDComponent._ready()` now calls `_connect_signals()` — subscribes directly to:
-  - `GameManager.score_changed`, `moves_changed`, `level_changed`, `collectibles_changed`, `unmovables_changed`, `level_loaded`
-  - `RewardManager.coins_changed`
-- Added `_refresh_from_gm()` — full HUD sync on `level_loaded` / `level_changed`
-- Added `_refresh_currency()` helper
-- Removed from GameUI: `_on_score_changed`, `_on_moves_changed`, `_on_level_changed`, `_on_collectibles_changed`, `_on_unmovables_changed`, `update_display`, `update_currency_display` (~140 lines)
+**Discrepancy note:** The previous snapshot claimed ~240 lines; actual count is 446. The HUDComponent (`_connect_hud_signals`, 8 inline signal handlers ~60 lines) and game-over panel code still reside in GameUI. The targets below are still outstanding.
 
-#### E2 ✅ — BoosterPanelComponent self-wiring
-- `BoosterPanelComponent._ready()` connects to `RewardManager.booster_changed` and `GameManager.level_loaded`
-- `_on_level_loaded()` calls `set_available_boosters()`, `_refresh_counts()`, `load_icons()` automatically
-- Added `_refresh_counts()` — builds counts dict from RewardManager and calls `refresh_counts()`
-- Removed from GameUI: `update_booster_ui`, `load_booster_icons`, `_update_all_boosters_legacy`, `_on_booster_changed`, 9 flat booster press handlers (`_on_hammer_pressed` … `_on_column_clear_pressed`), `_animate_selected_booster` (~250 lines)
+#### E1 ✅ — HUDComponent self-wiring (2026-03-03)
+- `HUDComponent._ready()` now calls `_connect_signals()` — subscribes to `GameManager` and `RewardManager` signals directly.
+- Added `_refresh_from_gm()` and `_refresh_currency()` helpers.
+- **Remaining:** GameUI still has `_connect_hud_signals()` (~25 lines) + duplicate handlers `_on_score_changed`, `_on_moves_changed`, `_on_level_changed`, `_on_collectibles_changed`, `_on_unmovables_changed`, `_on_currency_changed`, `_refresh_target_display`, `_refresh_currency_display` (~80 lines). These should be removed from GameUI as HUDComponent now owns them.
+- **Pending cleanup commit:** `ui: remove duplicate HUD signal handlers from GameUI (~80 lines)`
 
-#### E3 ✅ — Remove debug methods and leftover flat-node signal wiring
-- Removed `_deferred_startpage_check`, `_deferred_children_dump` (~30 lines)
-- Removed all `gm.connect(signal)` calls for HUD signals from `_ready()` — HUDComponent owns those
-- GameUI `_ready()` reduced from ~70 lines to ~30 lines
-**Goal:** Reduce `GameUI.gd` from 783 → ~250 lines.
+#### E2 ✅ — BoosterPanelComponent self-wiring (2026-03-03)
+- `BoosterPanelComponent._ready()` connects to `RewardManager.booster_changed` and `GameManager.level_loaded` automatically.
+- `GameUI.update_booster_ui()` (6-line delegator, line 289) remains but is now minimal.
 
-#### E1 — Wire HUDComponent fully; remove inlined HUD update code from GameUI
-- `HUDComponent.gd` exists. All `update_display`, `_on_score_changed`, `_on_moves_changed`, `_on_collectibles_changed`, `_on_unmovables_changed` logic should live in `HUDComponent`. `GameUI` only instantiates and connects.
-- **Estimated reduction:** −120 lines from GameUI
-- **Commit:** `ui: fully wire HUDComponent, remove inlined HUD logic from GameUI`
+#### E3 ✅ — Remove debug methods and leftover flat-node signal wiring (2026-03-03)
+- `_deferred_startpage_check`, `_deferred_children_dump` removed.
+- Most `gm.connect()` calls for HUD signals moved to HUDComponent.
 
-#### E2 — Wire BoosterPanelComponent fully; remove inlined booster panel build from GameUI
-- `BoosterPanelComponent.gd` exists. `update_booster_ui`, `load_booster_icons`, `_update_all_boosters_legacy` and all `_on_*_pressed` booster handlers should move into `BoosterPanelComponent`. `GameUI` only holds a reference and calls `booster_panel.refresh()`.
-- **Estimated reduction:** −150 lines from GameUI
-- **Commit:** `ui: fully wire BoosterPanelComponent, remove inlined booster UI from GameUI`
-
-#### E3 — Extract EnhancedGameOver to a scene
-- **New files:** `scenes/ui/components/EnhancedGameOver.tscn` + `scripts/ui/components/EnhancedGameOverComponent.gd`
-- Move all dynamic panel build code for game over from `GameUI` into the scene/script.
-- **Estimated reduction:** −100 lines from GameUI
-- **Commit:** `ui: extract EnhancedGameOver to dedicated scene and component script`
-
-**Phase E Summary:** GameUI 783 → ~250 lines. ✅ Target achieved.
+#### E4 (NEW) — Remove duplicate HUD handlers from GameUI
+- **Action:** Delete `_connect_hud_signals()`, `_on_score_changed`, `_on_moves_changed`, `_on_level_changed`, `_on_collectibles_changed`, `_on_unmovables_changed`, `_on_currency_changed`, `_refresh_target_display`, `_refresh_currency_display`, and the private label accessor helpers (`_score_label`, `_moves_label`, etc.) from `GameUI.gd`. HUDComponent owns these.
+- **Risk:** LOW — HUDComponent already handles all of these via `_connect_signals()`. Verify visually that HUD still updates after removing GameUI handlers.
+- **Estimated reduction:** −80 lines from GameUI → brings GameUI to ~366 lines.
+- **Commit:** `ui(GameUI): remove duplicate HUD signal handlers, rely fully on HUDComponent`
 
 ---
 
 ### Phase F — Tests and Documentation
-**Status: ✅ COMPLETE (2026-03-04)**
+**Status: 🟡 PARTIAL (as of 2026-03-05)**
 
-#### F1 ✅ — `tests/test_booster_selector.gd`
+#### F1 ✅ — `tests/test_booster_selector.gd` (82 lines)
 6 test cases: returns Array, count always 3-5, determinism, always includes a common booster, no duplicates, custom tier override.
 
-#### F2 ✅ — `tests/test_level_loader.gd`
+#### F2 ✅ — `tests/test_level_loader.gd` (170 lines)
 5 test cases: field assignment from `MockLevelData`, `create_empty_grid` + `fill_grid_from_layout` called, fallback defaults (8×8 / 10000 / 30 moves), hard texture attachment to `unmovable_map`, spreader texture map population.
 
-#### F3 ✅ — `tests/test_game_flow_controller.gd`
+#### F3 ✅ — `tests/test_game_flow_controller.gd` (269 lines)
 11 test cases: pending flag set on `attempt_level_complete`, no-op when already pending, score-based completion triggers `on_level_complete`, primary objective blocks score-only completion, collectible/unmovable/spreader goal completion, `perform_level_failed_check` emits `game_over`, fails skipped when score or collectible already met, `_calculate_stars` thresholds (1/2/3 stars), `skip_bonus_animation` sets `bonus_skipped` flag.
 
-All tests: zero compile errors, mock-stub pattern (no autoloads required), consistent with existing project test convention.
+#### F4 ❌ PENDING — `tests/test_objective_manager.gd`
+File exists at 0 lines — **not yet written**. Should cover: `report_unmovable_cleared`, `report_spreader_destroyed`, `collectible_landed_at`, objective completion checks for all goal types.
 
-#### F4 ✅ — Changelog updated
-`ARCHITECTURE_REFACTOR_CHANGELOG.md` updated with dated entries for Phase E and Phase F.
+#### F5 ❌ PENDING — `tests/test_gravity_animator.gd`
+After A2 (GravityAnimator wiring), add tests for barrier segment detection and column segment logic.
+
+#### F6 ✅ — Changelog updated
+`ARCHITECTURE_REFACTOR_CHANGELOG.md` updated with dated entries through Phase F.
 
 ---
 

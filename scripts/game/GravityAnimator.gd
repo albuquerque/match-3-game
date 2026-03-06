@@ -1,142 +1,204 @@
 extends Node
 class_name GravityAnimator
 
-# Minimal GravityAnimator stubs to keep project compiling.
-# Full async implementations will be added in a controlled follow-up.
+# GravityAnimator — barrier/segment-aware gravity and refill animations.
+# A2: Full logic ported from GameBoard.animate_gravity / GameBoard.animate_refill (2026-03-05).
+# All methods are static and receive the gameboard (GameBoard) and game_manager (GameManager
+# autoload) as parameters so they remain decoupled from both god objects.
 
 static func animate_gravity(game_manager: Node, gameboard: Node, tiles_ref: Array) -> void:
-	# Apply gravity at data level first
-	var moved = false
-	if typeof(game_manager) != TYPE_NIL and game_manager != null and game_manager.has_method("apply_gravity"):
-		moved = game_manager.apply_gravity()
-	else:
-		# fallback to GravityService (pure data)
-		var gs_res = load("res://scripts/game/GravityService.gd")
-		if gs_res != null and gs_res.has_method("apply_gravity"):
-			moved = gs_res.call("apply_gravity", game_manager.grid, game_manager.GRID_WIDTH, game_manager.GRID_HEIGHT)
+	var moved = game_manager.apply_gravity()
+	print("[GRAVITY] apply_gravity returned -> ", moved)
 
-	if not moved:
-		await gameboard.get_tree().process_frame
-		return
+	var gravity_tweens = []
 
-	# For each column, gather existing visual nodes and reassign them bottom-up according to new data grid
-	var all_tweens: Array = []
 	for x in range(game_manager.GRID_WIDTH):
-		var visual_nodes: Array = []
-		if x < tiles_ref.size():
-			# collect nodes from bottom to top so ordering matches gravity fill
-			for y in range(tiles_ref[x].size() - 1, -1, -1):
-				var n = tiles_ref[x][y]
-				if n != null and is_instance_valid(n):
-					visual_nodes.append(n)
+		# Determine which rows are "barriers" — inactive (-1), hard unmovables, or spreaders.
+		# Barriers divide the column into independent gravity segments.
+		var is_barrier: Array = []
+		for y in range(game_manager.GRID_HEIGHT):
+			var tile = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
+			var blocked = game_manager.is_cell_blocked(x, y)
+			var unmovable = tile != null and not tile.is_queued_for_deletion() and \
+				"is_unmovable_hard" in tile and tile.is_unmovable_hard
+			var is_spreader_cell = game_manager.get_tile_at(Vector2(x, y)) == game_manager.SPREADER
+			is_barrier.append(blocked or unmovable or is_spreader_cell)
 
-		# build new column with nulls
-		var new_col = []
-		for i in range(game_manager.GRID_HEIGHT):
-			new_col.append(null)
-
-		var write_y = game_manager.GRID_HEIGHT - 1
-		for node in visual_nodes:
-			# skip blocked cells in data
-			while write_y >= 0 and game_manager.get_tile_at(Vector2(x, write_y)) == -1:
-				new_col[write_y] = null
-				write_y -= 1
-			if write_y < 0:
-				break
-			new_col[write_y] = node
-			var target_world = gameboard.grid_to_world_position(Vector2(x, write_y))
-			if node.has_method("animate_to_position"):
-				var tw = node.animate_to_position(target_world, 0.18)
-				if tw != null:
-					all_tweens.append(tw)
+		# Collect visual tiles per segment (contiguous non-barrier rows), top-to-bottom order.
+		var segment_tiles: Array = []
+		var seg_start := -1
+		for y in range(game_manager.GRID_HEIGHT):
+			if is_barrier[y]:
+				if seg_start >= 0:
+					var seg: Array = []
+					for sy in range(seg_start, y):
+						var tile = tiles_ref[x][sy] if x < tiles_ref.size() and sy < tiles_ref[x].size() else null
+						if tile != null and not tile.is_queued_for_deletion():
+							seg.append(tile)
+						if x < tiles_ref.size() and sy < tiles_ref[x].size():
+							tiles_ref[x][sy] = null
+					segment_tiles.append(seg)
+					seg_start = -1
 			else:
-				var t = gameboard.create_tween()
-				t.tween_property(node, "position", target_world, 0.18)
-				all_tweens.append(t)
-			write_y -= 1
+				if seg_start < 0:
+					seg_start = y
+		if seg_start >= 0:
+			var seg: Array = []
+			for sy in range(seg_start, game_manager.GRID_HEIGHT):
+				var tile = tiles_ref[x][sy] if x < tiles_ref.size() and sy < tiles_ref[x].size() else null
+				if tile != null and not tile.is_queued_for_deletion():
+					seg.append(tile)
+				if x < tiles_ref.size() and sy < tiles_ref[x].size():
+					tiles_ref[x][sy] = null
+			segment_tiles.append(seg)
 
-		# assign new column
-		if x < tiles_ref.size():
-			tiles_ref[x] = new_col
-		else:
-			# ensure size
-			while tiles_ref.size() <= x:
-				tiles_ref.append(new_col)
+		# Reassign tiles top-to-bottom, advancing segment only on first barrier row of each run.
+		var seg_index := 0
+		var tile_index := 0
+		var current_seg: Array = segment_tiles[0] if segment_tiles.size() > 0 else []
+		var prev_was_barrier := true
 
-	# await animations
-	if all_tweens.size() > 0:
-		await all_tweens[0].finished
-	await gameboard.get_tree().process_frame
-	return
+		for y in range(game_manager.GRID_HEIGHT):
+			if is_barrier[y]:
+				if not prev_was_barrier:
+					if tile_index < current_seg.size():
+						print("[GRAVITY] Column ", x, " segment has ", current_seg.size() - tile_index, " extra tiles - freeing them")
+						for i in range(tile_index, current_seg.size()):
+							var extra = current_seg[i]
+							if extra and not extra.is_queued_for_deletion():
+								extra.queue_free()
+					seg_index += 1
+					tile_index = 0
+					current_seg = segment_tiles[seg_index] if seg_index < segment_tiles.size() else []
+				prev_was_barrier = true
+				continue
+			prev_was_barrier = false
+
+			var tile_type = game_manager.get_tile_at(Vector2(x, y))
+			if tile_type > 0:
+				if tile_index < current_seg.size():
+					var tile = current_seg[tile_index]
+					if x < tiles_ref.size() and y < tiles_ref[x].size():
+						tiles_ref[x][y] = tile
+					tile.grid_position = Vector2(x, y)
+					tile.update_type(tile_type)
+					var target_pos = gameboard.grid_to_world_position(Vector2(x, y))
+					if tile.position.distance_to(target_pos) > 1:
+						gravity_tweens.append(tile.animate_to_position(target_pos))
+					tile_index += 1
+				else:
+					print("[GRAVITY] Position (", x, ",", y, ") needs tile type ", tile_type, " but no visual tile available")
+
+		if tile_index < current_seg.size():
+			print("[GRAVITY] Column ", x, " last segment has ", current_seg.size() - tile_index, " extra tiles - freeing them")
+			for i in range(tile_index, current_seg.size()):
+				var extra = current_seg[i]
+				if extra and not extra.is_queued_for_deletion():
+					extra.queue_free()
+
+	if gravity_tweens.size() > 0:
+		for tween in gravity_tweens:
+			if tween != null:
+				await tween.finished
+	else:
+		await gameboard.get_tree().create_timer(0.01).timeout
+
+	if gameboard.has_method("_check_collectibles_at_bottom"):
+		gameboard._check_collectibles_at_bottom()
+	print("Gravity complete")
 
 static func animate_refill(game_manager: Node, gameboard: Node, tiles_ref: Array) -> Array:
-	# Ask GameManager for filled positions
-	var filled: Array = []
-	if typeof(game_manager) != TYPE_NIL and game_manager != null and game_manager.has_method("fill_empty_spaces"):
-		filled = game_manager.fill_empty_spaces()
-	else:
-		var gs_res = load("res://scripts/game/GravityService.gd")
-		if gs_res != null and gs_res.has_method("fill_empty_spaces"):
-			filled = gs_res.call("fill_empty_spaces", game_manager.grid, game_manager.GRID_WIDTH, game_manager.GRID_HEIGHT, game_manager.tile_types if game_manager.has("tile_types") else 6)
-
-	if filled == null or filled.size() == 0:
-		await gameboard.get_tree().process_frame
-		return []
-
-	var tweens: Array = []
+	var new_tile_positions = game_manager.fill_empty_spaces()
+	var spawn_tweens = []
 	var scale_factor = gameboard.tile_size / 64.0
-	var created_positions: Array = []
-	for pos in filled:
+
+	# Add any positions that have grid data but no visual tile (gap-fill safety net).
+	var positions_needing_tiles = []
+	for x in range(game_manager.GRID_WIDTH):
+		for y in range(game_manager.GRID_HEIGHT):
+			if game_manager.is_cell_blocked(x, y):
+				continue
+			var existing = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
+			if existing != null and not existing.is_queued_for_deletion() and \
+					"is_unmovable_hard" in existing and existing.is_unmovable_hard:
+				continue
+			var grid_value = game_manager.get_tile_at(Vector2(x, y))
+			if grid_value > 0:
+				var has_visual = existing != null and is_instance_valid(existing)
+				if not has_visual:
+					var pos_vec = Vector2(x, y)
+					if not new_tile_positions.has(pos_vec):
+						print("[REFILL] Position (", x, ",", y, ") has grid value ", grid_value, " but no visual — adding to spawn list")
+						positions_needing_tiles.append(pos_vec)
+	for pos in positions_needing_tiles:
+		if not new_tile_positions.has(pos):
+			new_tile_positions.append(pos)
+
+	for pos in new_tile_positions:
 		var x = int(pos.x)
 		var y = int(pos.y)
-		# ensure tiles_ref size
-		while tiles_ref.size() <= x:
-			tiles_ref.append([])
-		while tiles_ref[x].size() <= y:
-			tiles_ref[x].append(null)
-
-		var tile_type = game_manager.get_tile_at(Vector2(x, y))
-		var tile_node = null
-		# Use gameboard.instantiate_tile_visual helper (always present on GameBoard)
-		if gameboard.has_method("instantiate_tile_visual"):
-			tile_node = gameboard.instantiate_tile_visual(tile_type, Vector2(x, y), scale_factor)
-		else:
-			# last resort: instantiate tile scene directly
-			var ts = gameboard.tile_scene
-			if ts != null:
-				tile_node = ts.instantiate()
-				if tile_node != null and tile_node.has_method("setup"):
-					tile_node.setup(tile_type, Vector2(x, y), scale_factor)
-
-		if tile_node == null:
+		if game_manager.is_cell_blocked(x, y):
 			continue
+		var cur = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
+		if cur != null and not cur.is_queued_for_deletion() and \
+				"is_unmovable_hard" in cur and cur.is_unmovable_hard:
+			print("[REFILL] Skipping unmovable at (", x, ",", y, ")")
+			continue
+		if cur != null:
+			if not cur.is_queued_for_deletion():
+				print("[REFILL] WARNING: Tile already exists at (", x, ",", y, ") - freeing old tile")
+				cur.queue_free()
+			tiles_ref[x][y] = null
 
-		# initial start position above board
-		var start_world = gameboard.grid_to_world_position(Vector2(x, 0))
-		start_world.y = gameboard.grid_offset.y - gameboard.tile_size - (randf() * gameboard.tile_size)
-		tile_node.position = start_world
-		var target = gameboard.grid_to_world_position(Vector2(x, y))
-		if tile_node.has_method("animate_to_position"):
-			var tw = tile_node.animate_to_position(target, 0.28)
-			if tw != null:
-				tweens.append(tw)
+		var tile_type = game_manager.get_tile_at(pos)
+		var tile = gameboard.tile_scene.instantiate()
+		if tile_type == game_manager.COLLECTIBLE:
+			tile.setup(0, pos, scale_factor)
+			if tile.has_method("configure_collectible"):
+				tile.configure_collectible(game_manager.collectible_type)
 		else:
-			var t = gameboard.create_tween()
-			t.tween_property(tile_node, "position", target, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			tweens.append(t)
+			tile.setup(tile_type, pos, scale_factor)
 
-		tiles_ref[x][y] = tile_node
-		created_positions.append(Vector2(x, y))
+		# Spawn from just above the top of this tile's segment (barrier-aware).
+		var segment_top_row: int = y
+		for sy in range(y - 1, -1, -1):
+			if game_manager.is_cell_blocked(x, sy):
+				break
+			var st: Node = tiles_ref[x][sy] if x < tiles_ref.size() and sy < tiles_ref[x].size() else null
+			if st != null and not st.is_queued_for_deletion():
+				if ("is_unmovable_hard" in st and st.is_unmovable_hard) or \
+						("is_spreader" in st and st.is_spreader):
+					break
+			segment_top_row = sy
+		tile.position = gameboard.grid_to_world_position(Vector2(x, segment_top_row - 1))
+		tile.connect("tile_clicked", Callable(gameboard, "_on_tile_clicked"))
+		tile.connect("tile_swiped", Callable(gameboard, "_on_tile_swiped"))
+		if gameboard.board_container:
+			gameboard.board_container.add_child(tile)
+		else:
+			gameboard.add_child(tile)
+		if x < tiles_ref.size() and y < tiles_ref[x].size():
+			tiles_ref[x][y] = tile
+		var target_pos = gameboard.grid_to_world_position(pos)
+		var pos_tween = tile.animate_to_position(target_pos)
+		var spawn_tween = tile.animate_spawn()
+		if pos_tween:
+			spawn_tweens.append(pos_tween)
+		if spawn_tween:
+			spawn_tweens.append(spawn_tween)
 
-	if tweens.size() > 0:
-		await tweens[0].finished
-	await gameboard.get_tree().process_frame
-	return created_positions
+	var valid_tweens = spawn_tweens.filter(func(tw): return tw != null)
+	if valid_tweens.size() > 0:
+		await valid_tweens[0].finished
+	else:
+		await gameboard.get_tree().create_timer(0.3).timeout
+
+	print("Refill complete")
+	return new_tile_positions
 
 static func deferred_gravity_then_refill(game_manager: Node, gameboard: Node, tiles_ref: Array) -> void:
-	if typeof(game_manager) != TYPE_NIL and game_manager != null:
-		if game_manager.has_method("apply_gravity"):
-			game_manager.apply_gravity()
-		if game_manager.has_method("fill_empty_spaces"):
-			game_manager.fill_empty_spaces()
+	if game_manager.has_method("apply_gravity"):
+		game_manager.apply_gravity()
+	if game_manager.has_method("fill_empty_spaces"):
+		game_manager.fill_empty_spaces()
 	return
