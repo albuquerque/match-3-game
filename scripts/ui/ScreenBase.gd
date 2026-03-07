@@ -62,13 +62,17 @@ func set_background_color(col: Color):
 		bg.color = col
 
 func ensure_fullscreen():
-	# Utility to adjust size/anchors when needed
-	anchor_left = 0
-	anchor_top = 0
-	anchor_right = 1
+	# Set anchors to stretch full-parent. Do NOT set size manually — when opposite
+	# anchors differ Godot overrides size automatically, and calling size= here
+	# triggers "non-equal opposite anchors will have their size overridden" warnings.
+	anchor_left   = 0
+	anchor_top    = 0
+	anchor_right  = 1
 	anchor_bottom = 1
-	if get_viewport():
-		self.size = get_viewport().get_visible_rect().size
+	offset_left   = 0
+	offset_top    = 0
+	offset_right  = 0
+	offset_bottom = 0
 
 # Provide a default close hook that subclasses can call
 func close_screen():

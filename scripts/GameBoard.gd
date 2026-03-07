@@ -1,6 +1,8 @@
 extends Node2D
 class_name GameBoard
 
+signal board_idle   ## Emitted when the board has settled: no matches, gravity done
+
 
 # Safe script resource handles - avoid using load() at parse time which GDScript flags as non-constant
 var VF = null

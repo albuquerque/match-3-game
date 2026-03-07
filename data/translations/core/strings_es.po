@@ -875,3 +875,30 @@ msgstr "Bendición de la Cosecha"
 msgid "Collect 1000 coins in autumn"
 msgstr "Recolecta 1000 monedas en otoño"
 
+# Multiplier mini-game
+msgid "UI_MULTIPLIER_CHALLENGE"
+msgstr "Desafío Multiplicador"
+
+msgid "UI_TAP_TO_STOP"
+msgstr "¡Toca para Parar!"
+
+msgid "UI_START_MULTIPLIER"
+msgstr "Iniciar Multiplicador"
+
+msgid "UI_WATCH_AD_MULTIPLIER"
+msgstr "Ver Anuncio para Reclamar"
+
+msgid "UI_MULTIPLIER_JACKPOT"
+msgstr "¡JACKPOT!"
+
+msgid "UI_MULTIPLIER_GREAT"
+msgstr "¡Excelente!"
+
+msgid "UI_MULTIPLIER_GOOD"
+msgstr "¡Bien!"
+
+msgid "UI_MULTIPLIER_OK"
+msgstr "OK"
+
+msgid "UI_CLAIM"
+msgstr "Reclamar Recompensas"

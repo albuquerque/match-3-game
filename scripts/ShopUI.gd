@@ -65,13 +65,15 @@ func show_shop():
 	# Ensure size/anchors and populate minimal content
 	_compute_responsive()
 	if self is Control:
-		var vp = get_viewport().get_visible_rect().size
-		self.anchor_left = 0
-		self.anchor_top = 0
-		self.anchor_right = 1
+		self.anchor_left   = 0
+		self.anchor_top    = 0
+		self.anchor_right  = 1
 		self.anchor_bottom = 1
-		self.size = vp
-		self.mouse_filter = Control.MOUSE_FILTER_STOP
+		self.offset_left   = 0
+		self.offset_top    = 0
+		self.offset_right  = 0
+		self.offset_bottom = 0
+		self.mouse_filter  = Control.MOUSE_FILTER_STOP
 	visible = true
 	_update_currency_display(0)
 	_setup_shop_items()

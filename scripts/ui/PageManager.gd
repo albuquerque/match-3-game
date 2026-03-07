@@ -71,8 +71,10 @@ func _ready() -> void:
 		else:
 			# Fallback to shim
 			var shim = load("res://scripts/helpers/node_resolvers_shim.gd")
-			if shim != null and typeof(shim) != TYPE_NIL and shim.has_method("_get_evbus"):
-				eb = shim._get_evbus()
+			if shim != null and shim is Script and shim.has_source_code():
+				var shim_inst = shim.new()
+				if shim_inst and shim_inst.has_method("_get_evbus"):
+					eb = shim_inst._get_evbus()
 	# Wait a few frames for EventBus if still missing
 	if eb == null:
 		print("[PageManager] EventBus not ready - waiting up to 10 frames to connect")
@@ -412,12 +414,15 @@ func _configure_page_node(inst: Node, z: int) -> void:
 	var is_gameplay_placeholder = (page_name == "Game")
 
 	if inst is Control:
-		inst.anchor_left = 0
-		inst.anchor_top = 0
-		inst.anchor_right = 1
+		inst.anchor_left   = 0
+		inst.anchor_top    = 0
+		inst.anchor_right  = 1
 		inst.anchor_bottom = 1
-		inst.position = Vector2.ZERO
-		inst.size = get_viewport().get_visible_rect().size
+		inst.offset_left   = 0
+		inst.offset_top    = 0
+		inst.offset_right  = 0
+		inst.offset_bottom = 0
+		# Do NOT set inst.size — when opposite anchors differ Godot owns the size.
 		# Gameplay placeholder must pass all input through to board/boosters beneath it
 		if is_gameplay_placeholder:
 			inst.mouse_filter = Control.MOUSE_FILTER_IGNORE

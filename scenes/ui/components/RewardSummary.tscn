@@ -1,0 +1,91 @@
+[gd_scene load_steps=4 format=3 uid="uid://reward_summary_panel"]
+[ext_resource type="Script" path="res://scripts/reward_system/RewardSummaryPanel.gd" id="1_rsp"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(0.10, 0.08, 0.22, 1.0)
+border_width_left = 3
+border_width_right = 3
+border_width_top = 3
+border_width_bottom = 3
+border_color = Color(1.0, 0.82, 0.2, 1.0)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_left = 24
+corner_radius_bottom_right = 24
+content_margin_left = 32.0
+content_margin_right = 32.0
+content_margin_top = 28.0
+content_margin_bottom = 28.0
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn"]
+bg_color = Color(0.18, 0.55, 0.25, 1.0)
+border_width_left = 2
+border_width_right = 2
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(0.2, 1.0, 0.4, 1.0)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_left = 12
+corner_radius_bottom_right = 12
+[node name="RewardSummaryPanel" type="Control"]
+script = ExtResource("1_rsp")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+z_index = 1000
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.04, 0.14, 1.0)
+mouse_filter = 1
+[node name="Centre" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+[node name="Card" type="PanelContainer" parent="Centre"]
+layout_mode = 2
+custom_minimum_size = Vector2(460, 0)
+mouse_filter = 1
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+[node name="VBox" type="VBoxContainer" parent="Centre/Card"]
+layout_mode = 2
+theme_override_constants/separation = 16
+[node name="Title" type="Label" parent="Centre/Card/VBox"]
+layout_mode = 2
+text = "LEVEL COMPLETE"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(1.0, 0.9, 0.3, 1.0)
+[node name="Stars" type="Label" parent="Centre/Card/VBox"]
+layout_mode = 2
+text = "⭐⭐⭐"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+[node name="RewardsLabel" type="Label" parent="Centre/Card/VBox"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+[node name="Spacer" type="Control" parent="Centre/Card/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)
+[node name="ClaimWrapper" type="CenterContainer" parent="Centre/Card/VBox"]
+layout_mode = 2
+[node name="ClaimButton" type="Button" parent="Centre/Card/VBox/ClaimWrapper"]
+layout_mode = 2
+custom_minimum_size = Vector2(240, 64)
+text = "Claim Rewards"
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(0.2, 1.0, 0.4, 1.0)
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn")

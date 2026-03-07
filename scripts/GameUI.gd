@@ -25,6 +25,7 @@ var active_booster_type: String = ""
 var swap_first_tile = null
 var line_blast_direction: String = ""
 var _narrative_fullscreen_active: bool = false
+var _narrative_hud_hidden: bool = false  ## true while a narrative stage has hidden the HUD
 
 # ── Component accessors ───────────────────────────────────────────────────────
 func _hud():
@@ -68,8 +69,6 @@ func _ready():
 	reward_notification = get_node_or_null("RewardNotification")
 	level_transition    = get_node_or_null("LevelTransition")
 
-	# Wire HUD signals (HUDComponent.tscn not instanced — wire directly to scene labels)
-	call_deferred("_connect_hud_signals")
 
 	# Wire FloatingMenuComponent signals
 	if _fmc():
@@ -99,134 +98,19 @@ func _ready():
 	else:
 		print("[GameUI] WARNING: PageManager not available; StartPage will not be opened automatically")
 
+	# Connect NarrativeStageManager HUD visibility signal
+	var nsm = get_tree().root.get_node_or_null("NarrativeStageManager")
+	if nsm and nsm.has_signal("hud_visibility_changed"):
+		if not nsm.is_connected("hud_visibility_changed", Callable(self, "_on_narrative_hud_visibility_changed")):
+			nsm.connect("hud_visibility_changed", Callable(self, "_on_narrative_hud_visibility_changed"))
+			print("[GameUI] Connected to NarrativeStageManager.hud_visibility_changed")
+	if nsm and nsm.has_signal("stage_cleared"):
+		if not nsm.is_connected("stage_cleared", Callable(self, "_on_narrative_stage_cleared")):
+			nsm.connect("stage_cleared", Callable(self, "_on_narrative_stage_cleared"))
+			print("[GameUI] Connected to NarrativeStageManager.stage_cleared")
+
 	call_deferred("hide_gameplay_ui")
 
-# ── HUD wiring — connects GameManager signals to the labels already in the scene ──
-func _connect_hud_signals() -> void:
-	# If a HUDComponent node exists (future), let it handle its own wiring.
-	if hud != null:
-		return
-	var gm = _get_gm()
-	if gm == null:
-		push_warning("[GameUI] _connect_hud_signals: GameManager not found")
-		return
-	if not gm.is_connected("score_changed", _on_score_changed):
-		gm.connect("score_changed", _on_score_changed)
-	if not gm.is_connected("moves_changed", _on_moves_changed):
-		gm.connect("moves_changed", _on_moves_changed)
-	if not gm.is_connected("level_changed", _on_level_changed):
-		gm.connect("level_changed", _on_level_changed)
-	if not gm.is_connected("level_loaded", _on_hud_level_loaded):
-		gm.connect("level_loaded", _on_hud_level_loaded)
-	if gm.has_signal("collectibles_changed") and not gm.is_connected("collectibles_changed", _on_collectibles_changed):
-		gm.connect("collectibles_changed", _on_collectibles_changed)
-	if gm.has_signal("unmovables_changed") and not gm.is_connected("unmovables_changed", _on_unmovables_changed):
-		gm.connect("unmovables_changed", _on_unmovables_changed)
-	var rm = _get_rm()
-	if rm and rm.has_signal("coins_changed") and not rm.is_connected("coins_changed", _on_currency_changed):
-		rm.connect("coins_changed", _on_currency_changed)
-	print("[GameUI] HUD signals wired directly to scene labels")
-
-# ── HUD label helpers ─────────────────────────────────────────────────────────
-func _score_label() -> Label:
-	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/ScoreContainer/ScoreLabel")
-
-func _moves_label() -> Label:
-	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/MovesContainer/MovesLabel")
-
-func _level_label() -> Label:
-	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/LevelContainer/LevelLabel")
-
-func _target_label() -> Label:
-	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/TargetContainer/TargetLabel")
-
-func _target_progress() -> ProgressBar:
-	return get_node_or_null("VBoxContainer/TopPanel/HBoxContainer/TargetContainer/TargetProgress")
-
-func _coins_label() -> Label:
-	return get_node_or_null("VBoxContainer/CurrencyPanel/HBoxContainer/CoinsLabel")
-
-func _gems_label() -> Label:
-	return get_node_or_null("VBoxContainer/CurrencyPanel/HBoxContainer/GemsLabel")
-
-func _lives_label() -> Label:
-	return get_node_or_null("VBoxContainer/CurrencyPanel/HBoxContainer/LivesLabel")
-
-# ── HUD signal handlers ───────────────────────────────────────────────────────
-func _on_hud_level_loaded() -> void:
-	var gm = _get_gm()
-	if not gm:
-		return
-	var sl = _score_label()
-	if sl: sl.text = "%d" % gm.score
-	var ll = _level_label()
-	if ll: ll.text = "Lv %d" % gm.level
-	var ml = _moves_label()
-	if ml: ml.text = "%d" % gm.moves_left
-	_refresh_target_display(gm)
-	_refresh_currency_display()
-
-func _on_score_changed(new_score: int) -> void:
-	var sl = _score_label()
-	if sl: sl.text = "%d" % new_score
-	var gm = _get_gm()
-	if gm and gm.unmovable_target == 0 and gm.collectible_target == 0:
-		_refresh_target_display(gm)
-
-func _on_moves_changed(moves: int) -> void:
-	var ml = _moves_label()
-	if ml:
-		ml.text = "%d" % moves
-		ml.modulate = Color.RED if moves <= 5 else Color.WHITE
-
-func _on_level_changed(new_level: int) -> void:
-	var ll = _level_label()
-	if ll: ll.text = "Lv %d" % new_level
-
-func _on_collectibles_changed(collected: int, target: int) -> void:
-	var tl = _target_label()
-	if tl: tl.text = "%d / %d" % [collected, target]
-	var tp = _target_progress()
-	if tp:
-		tp.max_value = target
-		tp.value = collected
-
-func _on_unmovables_changed(cleared: int, target: int) -> void:
-	var tl = _target_label()
-	if tl: tl.text = "%d / %d" % [cleared, target]
-	var tp = _target_progress()
-	if tp:
-		tp.max_value = target
-		tp.value = cleared
-
-func _on_currency_changed(_amount: int) -> void:
-	_refresh_currency_display()
-
-func _refresh_target_display(gm: Node) -> void:
-	var tl = _target_label()
-	var tp = _target_progress()
-	if gm.unmovable_target > 0:
-		if tl: tl.text = "%d / %d" % [gm.unmovables_cleared, gm.unmovable_target]
-		if tp: tp.max_value = gm.unmovable_target; tp.value = gm.unmovables_cleared
-	elif gm.collectible_target > 0:
-		if tl: tl.text = "%d / %d" % [gm.collectibles_collected, gm.collectible_target]
-		if tp: tp.max_value = gm.collectible_target; tp.value = gm.collectibles_collected
-	else:
-		if tl: tl.text = "%d / %d" % [gm.score, gm.target_score]
-		if tp:
-			tp.max_value = gm.target_score
-			tp.value = gm.score
-
-func _refresh_currency_display() -> void:
-	var rm = _get_rm()
-	if not rm:
-		return
-	var cl = _coins_label()
-	if cl: cl.text = "💰 %d" % (rm.get_coins() if rm.has_method("get_coins") else 0)
-	var gl = _gems_label()
-	if gl: gl.text = "💎 %d" % (rm.get_gems() if rm.has_method("get_gems") else 0)
-	var ll = _lives_label()
-	if ll: ll.text = "❤️ %d/5" % (rm.get_lives() if rm.has_method("get_lives") else 5)
 
 # ── Level loading (called by ExperiencePipeline) ──────────────────────────────
 func _load_level_by_number(level_num: int) -> void:
@@ -249,26 +133,45 @@ func show_gameplay_ui() -> void:
 	print("[GameUI] Showing gameplay UI elements")
 	if _narrative_fullscreen_active:
 		return
-	var top_panel = get_node_or_null("VBoxContainer/TopPanel")
-	if top_panel: top_panel.visible = true
+	# NOTE: HUD visibility is NOT set here — it is controlled exclusively by
+	# the narrative stage system (_on_narrative_hud_visibility_changed).
+	# This prevents the HUD from popping visible on level transition screens
+	# between a hide_hud level and the next level.
 	if booster_bar: booster_bar.visible = true
-	var currency_panel = get_node_or_null("VBoxContainer/CurrencyPanel")
-	if currency_panel: currency_panel.visible = true
 	if floating_menu: floating_menu.visible = true
 	if reward_notification: reward_notification.visible = true
-	print("[GameUI] ✓ All gameplay UI elements shown")
+	print("[GameUI] ✓ Gameplay UI elements shown (HUD managed by narrative system)")
+
+func show_hud() -> void:
+	"""Explicitly show the HUD. Called by the narrative system when a level
+	that does NOT suppress the HUD starts. Never call from transition screens."""
+	if hud:
+		hud.visible = true
+		print("[GameUI] HUD shown")
 
 func hide_gameplay_ui() -> void:
 	print("[GameUI] Hiding gameplay UI elements")
-	var top_panel = get_node_or_null("VBoxContainer/TopPanel")
-	if top_panel: top_panel.visible = false; print("[GameUI]   - TopPanel hidden")
+	if hud: hud.visible = false
 	if booster_bar: booster_bar.visible = false; print("[GameUI]   - BoosterPanel hidden")
-	var currency_panel = get_node_or_null("VBoxContainer/CurrencyPanel")
-	if currency_panel: currency_panel.visible = false
 	if floating_menu: floating_menu.visible = false
 	if reward_notification: reward_notification.visible = false
 	if level_transition: level_transition.visible = false
 	print("[GameUI] ✓ All gameplay UI elements hidden")
+
+func _on_narrative_hud_visibility_changed(hud_visible: bool) -> void:
+	"""Called when a stage with hide_hud:true loads."""
+	print("[GameUI] Narrative HUD visibility → ", hud_visible)
+	_narrative_hud_hidden = not hud_visible
+	if hud:
+		hud.visible = hud_visible
+		print("[GameUI] HUD visibility set to: ", hud_visible)
+
+func _on_narrative_stage_cleared() -> void:
+	"""Stage cleared (level ended). Reset flag silently — do NOT show the HUD.
+	The HUD will become visible only when the next level's narrative stage
+	is loaded and it does not suppress the HUD."""
+	print("[GameUI] Narrative stage cleared — HUD stays hidden until next level narrative loads")
+	_narrative_hud_hidden = false
 
 # ── Booster activation (GameUI still owns the activation state) ───────────────
 func activate_booster(booster_type: String) -> void:

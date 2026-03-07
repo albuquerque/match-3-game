@@ -346,10 +346,10 @@ func _load_level_narrative() -> void:
 		# guard inside load_stage_for_level() does not block the in-level stage.
 		if nsm.has_method("clear_stage"):
 			nsm.clear_stage(true)
-		if FileAccess.file_exists(level_path):
-			nsm.load_stage_for_level(level)
-		else:
-			print("[GameManager] No in-level narrative stage for level %d" % level)
+		# Always call load_stage_for_level — it handles the no-file case internally
+		# and emits hud_visibility_changed(true) so the HUD is correctly shown for
+		# levels that have no narrative stage (e.g. level 12).
+		nsm.load_stage_for_level(level)
 
 
 

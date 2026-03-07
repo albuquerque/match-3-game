@@ -67,8 +67,17 @@ func execute(context: PipelineContext) -> bool:
 		push_error("[LoadLevelStep] Cannot load level - no GameUI or GameManager")
 		return false
 
+func _clear_narrative_stage() -> void:
+	var nsm = Engine.get_main_loop().root.get_node_or_null("NarrativeStageManager")
+	if nsm and nsm.has_method("clear_stage"):
+		nsm.clear_stage(true)  # force=true so lock doesn't block it
+		print("[LoadLevelStep] NarrativeStageManager cleared")
+
 func _on_level_complete(lvl_id: String, context: Dictionary = {}):
 	print("[LoadLevelStep] Level completed: %s, context: %s" % [lvl_id, context])
+
+	# Clear any in-level narrative stage BEFORE the rewards screen appears
+	_clear_narrative_stage()
 
 	# Store completion data in pipeline context for ShowRewardsStep
 	if pipeline_context:
@@ -84,6 +93,9 @@ func _on_level_complete(lvl_id: String, context: Dictionary = {}):
 
 func _on_level_failed(lvl_id: String, context: Dictionary = {}):
 	print("[LoadLevelStep] Level failed: %s, context: %s" % [lvl_id, context])
+
+	# Clear any in-level narrative stage BEFORE the failure screen appears
+	_clear_narrative_stage()
 
 	# Store failure data in pipeline context
 	if pipeline_context:

@@ -281,9 +281,15 @@ func execute(context: PipelineContext) -> bool:
 				var txt = f.get_as_text()
 				f.close()
 				var parsed = JSON.parse_string(txt)
-				if typeof(parsed) == TYPE_DICTIONARY and parsed.has("result"):
-					var sd = parsed.get("result")
-					if sd and sd.has("states") and sd["states"].size() > 0:
+				# Godot 4: parse_string returns the value directly.
+				# Godot 3 legacy wrapped it in {"result": ...} — handle both.
+				var sd = null
+				if typeof(parsed) == TYPE_DICTIONARY:
+					if parsed.has("result") and typeof(parsed["result"]) == TYPE_DICTIONARY:
+						sd = parsed["result"]  # legacy format
+					else:
+						sd = parsed             # Godot 4 format
+				if sd and sd.has("states") and sd["states"].size() > 0:
 						var first_state = sd["states"][0]
 						# If we have a renderer instance, ask it to render the full state (text+asset)
 						if local_renderer and local_renderer.has_method("render_state"):

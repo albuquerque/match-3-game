@@ -189,105 +189,85 @@ func _show_with_container(config: Dictionary):
 	# Wait for reveal to complete
 	await reward_container.revealing_complete
 
+	# Chest has done its job — free it before showing the summary so it
+	# never sits behind (or overlaps) the CLAIM button.
+	if reward_container and is_instance_valid(reward_container):
+		reward_container.queue_free()
+		reward_container = null
+
 	# Show reward summary with Continue button
 	_show_container_summary()
 
 func _show_container_summary():
-	"""Minimal, parser-safe summary overlay with a Continue button.
-	This keeps the UX while avoiding complex inline code that triggered parser errors.
-	"""
-	# Create overlay
-	var summary_overlay = Control.new()
-	summary_overlay.name = "ContainerSummaryOverlay"
-	summary_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	summary_overlay.z_index = 1000
-	summary_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	"""Instantiate the RewardSummary scene and populate it with reward data."""
+	var scene = load("res://scenes/ui/components/RewardSummary.tscn")
+	if not scene:
+		push_error("[RewardTransitionController] RewardSummary.tscn not found — falling back to stage complete")
+		_on_stage_completed(Stage.SUMMARY)
+		return
+
+	var panel: RewardSummaryPanel = scene.instantiate() as RewardSummaryPanel
+	if not panel:
+		push_error("[RewardTransitionController] RewardSummary.tscn root is not a RewardSummaryPanel")
+		_on_stage_completed(Stage.SUMMARY)
+		return
+
 	if ui_parent:
-		ui_parent.add_child(summary_overlay)
+		ui_parent.add_child(panel)
 	else:
-		add_child(summary_overlay)
+		add_child(panel)
 
-	last_summary_overlay = summary_overlay
+	last_summary_overlay = panel
 
-	# Simple semi-transparent background
-	var bg = ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.5)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_STOP
-	summary_overlay.add_child(bg)
+	panel.setup(rewards_data)
+	panel.continue_pressed.connect(_on_ui_continue_pressed)
 
-	# Centered simple VBox
-	var vbox = VBoxContainer.new()
-	vbox.anchor_left = 0.5
-	vbox.anchor_top = 0.5
-	vbox.anchor_right = 0.5
-	vbox.anchor_bottom = 0.5
-	vbox.offset_left = -150
-	vbox.offset_top = -80
-	vbox.offset_right = 150
-	vbox.offset_bottom = 80
-	summary_overlay.add_child(vbox)
+	print("[RewardTransitionController] RewardSummary scene instantiated")
 
-	# Title
-	var title = Label.new()
-	title.text = tr("UI_LEVEL_COMPLETE")
-	title.add_theme_font_size_override("font_size", 28)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
 
-	# Rewards summary (simple lines)
-	var coins = rewards_data.get("coins", 0)
-	var gems = rewards_data.get("gems", 0)
-	var rewards_text = ""
-	if coins > 0:
-		rewards_text += tr("UI_REWARDS_COINS") % coins + "\n"
-	if gems > 0:
-		rewards_text += tr("UI_REWARDS_GEMS") % gems + "\n"
-	if rewards_text == "":
-		rewards_text = tr("UI_REWARDS_NONE")
+func _on_multiplier_chosen(multiplier: float, rewards_label: Label, base_coins: int, base_gems: int) -> void:
+	"""Apply the chosen multiplier to the rewards and update the display."""
+	print("[RewardTransitionController] Multiplier chosen: %.1f×" % multiplier)
+	var final_coins = int(round(base_coins * multiplier))
+	var final_gems  = int(round(base_gems  * multiplier))
+	rewards_data["coins"] = final_coins
+	rewards_data["gems"]  = final_gems
+	# Update the already-visible rewards label
+	if rewards_label and is_instance_valid(rewards_label):
+		var text = ""
+		if final_coins > 0: text += tr("UI_REWARDS_COINS") % final_coins + "\n"
+		if final_gems  > 0: text += tr("UI_REWARDS_GEMS")  % final_gems  + "\n"
+		if text == "": text = tr("UI_REWARDS_NONE")
+		rewards_label.text = text.strip_edges()
+	# Grant the multiplied rewards
+	var rm = get_node_or_null("/root/RewardManager")
+	if rm:
+		if rm.has_method("add_coins") and final_coins > 0: rm.add_coins(final_coins)
+		if rm.has_method("add_gems")  and final_gems  > 0: rm.add_gems(final_gems)
 
-	var rewards_label = Label.new()
-	rewards_label.text = rewards_text
-	rewards_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(rewards_label)
+func _on_multiplier_ad_requested(mmg: Node) -> void:
+	_on_no_ad_timer(mmg)
 
-	# Continue button
-	var continue_btn = Button.new()
-	continue_btn.text = tr("UI_CONTINUE")
-	continue_btn.custom_minimum_size = Vector2(200, 56)
-	vbox.add_child(continue_btn)
+func _on_no_ad_timer(mmg: Node) -> void:
+	if mmg and is_instance_valid(mmg):
+		mmg.confirm_ad_watched()
 
-	# Connect via Callable to avoid anonymous func parsing issues
-	continue_btn.pressed.connect(Callable(self, "_on_ui_continue_pressed"))
-	bg.gui_input.connect(Callable(self, "_on_summary_bg_gui_input"))
-
-	print("[RewardTransitionController] Minimal container summary displayed")
-	print("[RewardTransitionController] Summary overlay z_index: %d, visible: %s" % [summary_overlay.z_index, summary_overlay.visible])
-
+func _on_admob_reward_for_multiplier(_type, _amount, mmg: Node) -> void:
+	if mmg and is_instance_valid(mmg):
+		mmg.confirm_ad_watched()
 
 func _on_container_complete():
-	"""Handle container completion"""
-	print("[RewardTransitionController] Container animation complete")
-	# For now, auto-advance (TODO: wait for Continue button)
 	await get_tree().create_timer(1.0).timeout
 	_on_stage_completed(Stage.SUMMARY)
 
 func _on_ui_continue_pressed():
-	"""Handle Continue button from SimpleRewardUI and summary overlay"""
-	print("[RewardTransitionController] User clicked Continue")
 	if last_summary_overlay and is_instance_valid(last_summary_overlay):
 		last_summary_overlay.queue_free()
 		last_summary_overlay = null
 	_on_stage_completed(Stage.SUMMARY)
 
-func _on_summary_bg_gui_input(event):
-	# Called when the semi-transparent background is clicked; advance as if Continue
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		print("[RewardTransitionController] Background clicked, advancing")
-		if last_summary_overlay and is_instance_valid(last_summary_overlay):
-			last_summary_overlay.queue_free()
-			last_summary_overlay = null
-		_on_stage_completed(Stage.SUMMARY)
+func _on_summary_bg_gui_input(_event):
+	pass  # Input handling is now owned by RewardSummary.tscn
 
 func _run_exit_stage():
 	"""Clean up and signal completion"""

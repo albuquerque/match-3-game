@@ -33,11 +33,15 @@ func _ready():
 	print("[NarrativeStageRenderer] has_method('_display_texture'): ", has_method("_display_texture"))
 
 	# Set up as fullscreen control for anchoring
-	anchor_left = 0
-	anchor_top = 0
-	anchor_right = 1
+	anchor_left   = 0
+	anchor_top    = 0
+	anchor_right  = 1
 	anchor_bottom = 1
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	offset_left   = 0
+	offset_top    = 0
+	offset_right  = 0
+	offset_bottom = 0
+	mouse_filter  = Control.MOUSE_FILTER_IGNORE
 
 	print("[NarrativeStageRenderer] ✓ Configured as fullscreen (anchors set to 0,0,1,1)")
 	print("[NarrativeStageRenderer] === RENDERER READY COMPLETE ===")
@@ -127,11 +131,11 @@ func render_state(state_data: Dictionary):
 				# No rect_min_size on ColorRect in Godot 4; anchors suffice
 				bg.z_index = 99
 			"top_banner":
-				bg.anchor_left = 0
-				bg.anchor_top = 0
-				bg.anchor_right = 1
-				bg.anchor_bottom = 0.25
-				bg.z_index = -5
+				bg.anchor_left   = 0.0
+				bg.anchor_top    = 0.0
+				bg.anchor_right  = 0.0
+				bg.anchor_bottom = 0.0
+				bg.z_index       = -5
 			_:
 				bg.anchor_left = 0
 				bg.anchor_top = 0
@@ -141,6 +145,8 @@ func render_state(state_data: Dictionary):
 		bg.color = bg_col
 		anchor_node.add_child(bg)
 		current_visual = bg
+		if position_mode == "top_banner" or position_mode == "":
+			_size_banner_rect_deferred_cr(bg)
 
 		# Add the text overlay (pass text_color if provided)
 		var text_color = state_data.get("text_color", "#FFFFFF")
@@ -345,25 +351,20 @@ func _add_text_overlay(text_content: String, position_mode: String, parent_node:
 			print("[NarrativeStageRenderer] ✓ Configured fullscreen text")
 
 		"top_banner":
-			# Full area from top of screen to top of board (HUD overlays on top)
-			label.anchor_left = 0
-			label.anchor_top = 0
-			label.anchor_right = 1
-			label.anchor_bottom = 1
-			label.offset_left = 20
-			label.offset_top = 20
-			label.offset_right = -20
-			label.offset_bottom = -20
-			label.add_theme_font_size_override("font_size", 24)
+			# Sized explicitly after tree entry — matches the TextureRect banner bounds
+			label.anchor_left   = 0.0
+			label.anchor_top    = 0.0
+			label.anchor_right  = 0.0
+			label.anchor_bottom = 0.0
+			label.offset_left   = 20
+			label.offset_top    = 10
+			label.offset_right  = 0.0
+			label.offset_bottom = 0.0
+			label.add_theme_font_size_override("font_size", 20)
 			label.add_theme_color_override("font_color", parsed_color)
 			label.add_theme_color_override("font_outline_color", outline_col)
 			label.add_theme_constant_override("outline_size", 4)
-			# If parent is override_parent (overlay), place text above dimmer
-			if parent_node == override_parent:
-				label.z_index = 101
-			else:
-				label.z_index = 1
-
+			label.z_index = 1 if parent_node != override_parent else 101
 			print("[NarrativeStageRenderer] ✓ Configured banner text")
 
 		_:
@@ -382,6 +383,9 @@ func _add_text_overlay(text_content: String, position_mode: String, parent_node:
 	# Add to parent
 	parent_node.add_child(label)
 	current_text_label = label
+	# Size banner-mode labels after layout resolves
+	if position_mode == "top_banner" or position_mode == "":
+		_size_banner_label_deferred(label)
 
 	print("[NarrativeStageRenderer] ✓ Label added to: ", parent_node.name)
 	print("[NarrativeStageRenderer] ✓ Label path: ", label.get_path())
@@ -560,6 +564,12 @@ func _display_texture(texture: Texture2D, state_data: Dictionary):
 	anchor_node.add_child(tex_rect)
 	current_visual = tex_rect
 
+	# For top_banner (and default), set size explicitly in pixels one frame later
+	# so the viewport has resolved its own size. Anchors cannot reliably produce
+	# a rect that is BOTH full-width AND a fixed pixel height simultaneously.
+	if position_mode == "top_banner" or position_mode == "":
+		_size_banner_rect_deferred(tex_rect)
+
 	print("[NarrativeStageRenderer] ✓ TextureRect added to: ", anchor_node.name)
 	print("[NarrativeStageRenderer] ✓ TextureRect path: ", tex_rect.get_path())
 	print("[NarrativeStageRenderer] ✓ TextureRect size: ", tex_rect.size)
@@ -586,6 +596,52 @@ func _display_texture(texture: Texture2D, state_data: Dictionary):
 
 	print("[NarrativeStageRenderer] === TEXTURE DISPLAY COMPLETE ===")
 
+func _size_banner_rect_deferred(tex_rect: TextureRect) -> void:
+	"""Wait one frame then set the banner rect to exactly fill the area from the
+	top of the screen down to the top of the board grid. We read grid_offset.y
+	from GameBoard so the height is always correct regardless of screen size or
+	board centering — never hardcode a pixel value here."""
+	await get_tree().process_frame
+	if not is_instance_valid(tex_rect):
+		return
+	var banner_height := _get_banner_height()
+	var vp_size := get_viewport().get_visible_rect().size
+	tex_rect.position = Vector2.ZERO
+	tex_rect.size     = Vector2(vp_size.x, banner_height)
+	print("[NarrativeStageRenderer] Banner TextureRect sized to: ", tex_rect.size)
+
+func _size_banner_rect_deferred_cr(cr: ColorRect) -> void:
+	"""Same as _size_banner_rect_deferred but for ColorRect."""
+	await get_tree().process_frame
+	if not is_instance_valid(cr):
+		return
+	var banner_height := _get_banner_height()
+	var vp_size := get_viewport().get_visible_rect().size
+	cr.position = Vector2.ZERO
+	cr.size     = Vector2(vp_size.x, banner_height)
+	print("[NarrativeStageRenderer] Banner ColorRect sized to: ", cr.size)
+
+func _size_banner_label_deferred(lbl: Label) -> void:
+	"""Size the text label to match the full banner area."""
+	await get_tree().process_frame
+	if not is_instance_valid(lbl):
+		return
+	var banner_height := _get_banner_height()
+	var vp_size := get_viewport().get_visible_rect().size
+	lbl.position = Vector2(20, 10)
+	lbl.size     = Vector2(vp_size.x - 40.0, banner_height - 10.0)
+	print("[NarrativeStageRenderer] Banner Label sized to: ", lbl.size)
+
+func _get_banner_height() -> float:
+	"""Return the height of the narrative banner = board grid_offset.y."""
+	var board = get_tree().root.find_child("GameBoard", true, false)
+	if board and "grid_offset" in board:
+		var h: float = (board as Node2D).get("grid_offset").y
+		print("[NarrativeStageRenderer] Banner height from grid_offset.y: ", h)
+		return h
+	print("[NarrativeStageRenderer] GameBoard not found — using fallback banner height: 292.5")
+	return 292.5
+
 func _configure_texture_rect(tex_rect: TextureRect, position_mode: String):
 	"""Configure TextureRect based on position mode"""
 	match position_mode:
@@ -601,14 +657,16 @@ func _configure_texture_rect(tex_rect: TextureRect, position_mode: String):
 			print("[NarrativeStageRenderer] Configured as FULLSCREEN")
 
 		"top_banner":
-			# Full area from top of screen to top of board (HUD overlays on top)
-			tex_rect.anchor_left = 0
-			tex_rect.anchor_top = 0  # Start at very top
-			tex_rect.anchor_right = 1
-			tex_rect.anchor_bottom = 0.25  # Extend to ~25% (fills to board)
-			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED  # Centered, shows full image
-			tex_rect.z_index = -5  # Above ALL background effects (brightness overlay is -75), below HUD
+			# Size is set explicitly in pixels after the node enters the tree
+			# (see _size_banner_rect call below). Use SCALE so the image fills
+			# the exact pixel rect we assign — no aspect-ratio clipping.
+			tex_rect.anchor_left  = 0.0
+			tex_rect.anchor_top   = 0.0
+			tex_rect.anchor_right = 0.0
+			tex_rect.anchor_bottom= 0.0
+			tex_rect.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+			tex_rect.stretch_mode = TextureRect.STRETCH_SCALE
+			tex_rect.z_index      = -5
 
 		"left_panel":
 			# Panel on left side
@@ -655,12 +713,12 @@ func _configure_texture_rect(tex_rect: TextureRect, position_mode: String):
 			tex_rect.z_index = 50  # In front of UI
 
 		_:
-			# Default: top banner
-			tex_rect.anchor_left = 0
-			tex_rect.anchor_top = 0
-			tex_rect.anchor_right = 1
-			tex_rect.anchor_bottom = 0
-			tex_rect.offset_bottom = 200
-			tex_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH
-			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			# Default: treat as top_banner — sized explicitly after tree entry
+			tex_rect.anchor_left   = 0.0
+			tex_rect.anchor_top    = 0.0
+			tex_rect.anchor_right  = 0.0
+			tex_rect.anchor_bottom = 0.0
+			tex_rect.expand_mode   = TextureRect.EXPAND_IGNORE_SIZE
+			tex_rect.stretch_mode  = TextureRect.STRETCH_SCALE
+			tex_rect.z_index       = -5
 
