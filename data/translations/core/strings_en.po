@@ -875,3 +875,31 @@ msgstr "Harvest Blessing"
 msgid "Collect 1000 coins in autumn"
 msgstr "Collect 1000 coins in autumn"
 
+# Multiplier mini-game
+msgid "UI_MULTIPLIER_CHALLENGE"
+msgstr "Multiplier Challenge"
+
+msgid "UI_TAP_TO_STOP"
+msgstr "Tap to Stop!"
+
+msgid "UI_START_MULTIPLIER"
+msgstr "Start Multiplier"
+
+msgid "UI_WATCH_AD_MULTIPLIER"
+msgstr "Watch Ad to Claim"
+
+msgid "UI_MULTIPLIER_JACKPOT"
+msgstr "JACKPOT!"
+
+msgid "UI_MULTIPLIER_GREAT"
+msgstr "Great!"
+
+msgid "UI_MULTIPLIER_GOOD"
+msgstr "Good!"
+
+msgid "UI_MULTIPLIER_OK"
+msgstr "OK"
+
+msgid "UI_CLAIM"
+msgstr "Claim Rewards"
+

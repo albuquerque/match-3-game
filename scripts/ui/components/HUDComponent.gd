@@ -1,22 +1,26 @@
-extends Control
+extends VBoxContainer
 class_name HUDComponent
 
 ## HUDComponent: owns and updates all in-game HUD elements.
 ## E1: Self-wiring — connects directly to GameManager + RewardManager signals.
-## GameUI no longer needs to call set_score/set_moves/etc. on every signal.
+## GameUI no longer needs HUD signal handlers.
+## Registered with VisualAnchorManager as "hud" so narrative effects can
+## show/hide it independently without touching GameUI.
 
 signal hud_ready
 
-@onready var score_label: Label        = get_node_or_null("TopPanel/ScoreContainer/ScoreLabel")
-@onready var level_label: Label        = get_node_or_null("TopPanel/LevelContainer/LevelLabel")
-@onready var moves_label: Label        = get_node_or_null("TopPanel/MovesContainer/MovesLabel")
-@onready var target_label: Label       = get_node_or_null("TopPanel/TargetContainer/TargetLabel")
-@onready var target_progress: ProgressBar = get_node_or_null("TopPanel/TargetContainer/TargetProgress")
-@onready var coins_label: Label = get_node_or_null("CurrencyPanel/HBox/CoinsLabel")
-@onready var gems_label: Label  = get_node_or_null("CurrencyPanel/HBox/GemsLabel")
-@onready var lives_label: Label = get_node_or_null("CurrencyPanel/HBox/LivesLabel")
+@onready var score_label: Label        = get_node_or_null("TopPanel/HBoxContainer/ScoreContainer/ScoreLabel")
+@onready var moves_label: Label        = get_node_or_null("TopPanel/HBoxContainer/MovesContainer/MovesLabel")
+@onready var target_label: Label       = get_node_or_null("TopPanel/HBoxContainer/TargetContainer/TargetLabel")
+@onready var target_progress: ProgressBar = get_node_or_null("TopPanel/HBoxContainer/TargetContainer/TargetProgress")
+@onready var coins_label: Label        = get_node_or_null("CurrencyPanel/HBox/CoinsLabel")
+@onready var gems_label: Label         = get_node_or_null("CurrencyPanel/HBox/GemsLabel")
+@onready var lives_label: Label        = get_node_or_null("CurrencyPanel/HBox/LivesLabel")
 
 func _ready() -> void:
+	# Register with VisualAnchorManager so effects can hide/show the HUD independently
+	if VisualAnchorManager:
+		VisualAnchorManager.register_anchor("hud", self)
 	_connect_signals()
 	emit_signal("hud_ready")
 
@@ -107,9 +111,7 @@ func set_score(score: int) -> void:
 		_flash(score_label, Color.YELLOW)
 
 func set_level(level: int) -> void:
-	if level_label:
-		level_label.text = "Lv %d" % level
-		_pulse(level_label)
+	pass  # Level label removed from HUD per redesign (shown on StartPage)
 
 func set_moves(moves: int) -> void:
 	if moves_label:

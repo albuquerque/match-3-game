@@ -3,6 +3,7 @@
   "name": "The Parting of the Red Sea",
   "description": "Watch as Moses parts the Red Sea during gameplay",
   "anchor": "top_banner",
+  "hide_hud": true,
   "states": [
     {
       "name": "intro",

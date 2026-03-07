@@ -283,7 +283,7 @@ func _reveal_single_reward_interactive(reward: Dictionary, spawn_pos: Vector2):
 	tween.tween_property(icon, "scale", Vector2(2.5, 2.5), 0.5)
 	await tween.finished
 
-	# Create CLAIM button (use global screen center for button positioning)
+	# Create CLAIM button below the icon
 	_create_claim_button(pause_position_global)
 
 	# Emit signal so other systems know we're waiting
@@ -322,60 +322,45 @@ func _reveal_single_reward_interactive(reward: Dictionary, spawn_pos: Vector2):
 
 
 
-## Create CLAIM button
-func _create_claim_button(screen_center: Vector2):
-	"""Create the CLAIM button for interactive mode"""
+## Create CLAIM button from scene, 280 px below the reward icon
+func _create_claim_button(icon_global_pos: Vector2):
 	if claim_button:
-		return  # Already exists
+		return
 
-	claim_button = Button.new()
-	claim_button.text = "CLAIM"
-	claim_button.custom_minimum_size = Vector2(200, 70)
-	claim_button.position = screen_center + Vector2(-100, 200)  # Lower - 200px below center
-	claim_button.z_index = 300
+	# Instantiate from tscn for reliable styling
+	var scene = load("res://scenes/ui/components/RewardClaimButton.tscn")
+	if scene:
+		claim_button = scene.instantiate() as Button
+	else:
+		push_warning("[RewardRevealSystem] RewardClaimButton.tscn not found, using plain button")
+		claim_button = Button.new()
+		claim_button.custom_minimum_size = Vector2(200, 70)
+		claim_button.add_theme_font_size_override("font_size", 32)
 
-	# Style the button
-	claim_button.add_theme_font_size_override("font_size", 32)
+	claim_button.text = "Claim"
 
-	# Create StyleBoxFlat for button
-	var style_normal = StyleBoxFlat.new()
-	style_normal.bg_color = Color(0.2, 0.8, 0.3, 0.9)  # Green
-	style_normal.border_width_left = 3
-	style_normal.border_width_right = 3
-	style_normal.border_width_top = 3
-	style_normal.border_width_bottom = 3
-	style_normal.border_color = Color(1.0, 1.0, 1.0, 1.0)
-	style_normal.corner_radius_top_left = 10
-	style_normal.corner_radius_top_right = 10
-	style_normal.corner_radius_bottom_left = 10
-	style_normal.corner_radius_bottom_right = 10
-	claim_button.add_theme_stylebox_override("normal", style_normal)
+	# CanvasLayer gives true screen-space coordinates regardless of parent transforms
+	var canvas = CanvasLayer.new()
+	canvas.name  = "ClaimButtonLayer"
+	canvas.layer = 200
+	get_tree().root.add_child(canvas)
 
-	var style_hover = StyleBoxFlat.new()
-	style_hover.bg_color = Color(0.3, 1.0, 0.4, 1.0)  # Brighter green
-	style_hover.border_width_left = 3
-	style_hover.border_width_right = 3
-	style_hover.border_width_top = 3
-	style_hover.border_width_bottom = 3
-	style_hover.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Gold border on hover
-	style_hover.corner_radius_top_left = 10
-	style_hover.corner_radius_top_right = 10
-	style_hover.corner_radius_bottom_left = 10
-	style_hover.corner_radius_bottom_right = 10
-	claim_button.add_theme_stylebox_override("hover", style_hover)
+	# Full-screen wrapper so the Button's position is in screen pixels
+	var wrapper = Control.new()
+	wrapper.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	canvas.add_child(wrapper)
 
-	# Connect button
+	# 280 px below the icon, horizontally centred on it
+	claim_button.position = Vector2(
+		icon_global_pos.x - claim_button.custom_minimum_size.x * 0.5,
+		icon_global_pos.y + 280.0
+	)
+	wrapper.add_child(claim_button)
+
 	claim_button.pressed.connect(_on_claim_pressed)
-
-	# Add to scene tree (needs to be in a CanvasLayer or Control node)
-	var root = get_tree().root
-	if root:
-		root.add_child(claim_button)
-
-	# Pulse animation - create a looping tween without triggering infinite loop detection
 	_start_button_pulse()
 
-	print("[RewardRevealSystem] CLAIM button created")
+	print("[RewardRevealSystem] CLAIM button created at: ", claim_button.position)
 
 ## Start pulsing animation for CLAIM button
 func _start_button_pulse():
@@ -391,18 +376,17 @@ func _start_button_pulse():
 	pulse_tween.finished.connect(_start_button_pulse)
 
 
-## Remove CLAIM button
+## Remove CLAIM button and its CanvasLayer wrapper
 func _remove_claim_button():
-	"""Remove the CLAIM button and stop pulse animation"""
 	if claim_button and is_instance_valid(claim_button):
-		# Disconnect any connected signals to stop the pulse loop
-		var connections = claim_button.get_signal_connection_list("tree_exiting")
-		for connection in connections:
-			if connection.get("callable"):
-				claim_button.disconnect("tree_exiting", connection.callable)
-
+		var wrapper = claim_button.get_parent()
+		var canvas  = wrapper.get_parent() if wrapper else null
 		claim_button.queue_free()
 		claim_button = null
+		if wrapper and is_instance_valid(wrapper):
+			wrapper.queue_free()
+		if canvas and is_instance_valid(canvas) and canvas.name == "ClaimButtonLayer":
+			canvas.queue_free()
 
 ## Handle CLAIM button press
 func _on_claim_pressed():

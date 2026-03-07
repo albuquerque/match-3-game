@@ -12,6 +12,7 @@
 [ext_resource type="Texture2D" path="res://textures/settings_gear.svg" id="13_settings"]
 [ext_resource type="Script" uid="uid://cohaflicvwgwb" path="res://scripts/ui/components/BoosterPanelComponent.gd" id="11_bpc"]
 [ext_resource type="Script" uid="uid://dtl3haqx807gd" path="res://scripts/ui/components/FloatingMenuComponent.gd" id="12_fmc"]
+[ext_resource type="PackedScene" uid="uid://pu3wcj43djjh_hud" path="res://scenes/ui/components/HUDComponent.tscn" id="14_hud"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
 bg_color = Color(0.2, 0.2, 0.3, 0.8)
@@ -19,19 +20,6 @@ corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud"]
-bg_color = Color(0.08, 0.08, 0.14, 0.88)
-corner_radius_top_left = 0
-corner_radius_top_right = 0
-corner_radius_bottom_left = 10
-corner_radius_bottom_right = 10
-border_width_bottom = 2
-border_color = Color(0.35, 0.35, 0.55, 0.9)
-content_margin_left = 8
-content_margin_right = 8
-content_margin_top = 6
-content_margin_bottom = 8
 
 [sub_resource type="Theme" id="Theme_1"]
 default_font_size = 24
@@ -74,112 +62,31 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2_4y7z1")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="GameUI"]
+[node name="HUDComponent" parent="GameUI" instance=ExtResource("14_hud")]
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 10
+anchor_left = 0.0
+anchor_top = 0.0
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_bottom = -120.0
+anchor_bottom = 0.0
+offset_left = 80.0
+offset_right = -80.0
+offset_bottom = 120.0
 grow_horizontal = 2
-grow_vertical = 2
+grow_vertical = 1
 
-[node name="CurrencyPanel" type="PanelContainer" parent="GameUI/VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 0
-
-[node name="HBoxContainer" type="HBoxContainer" parent="GameUI/VBoxContainer/CurrencyPanel"]
-layout_mode = 2
-
-[node name="CoinsLabel" type="Label" parent="GameUI/VBoxContainer/CurrencyPanel/HBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "💰 0"
-horizontal_alignment = 1
-
-[node name="GemsLabel" type="Label" parent="GameUI/VBoxContainer/CurrencyPanel/HBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "💎 0"
-horizontal_alignment = 1
-
-[node name="LivesLabel" type="Label" parent="GameUI/VBoxContainer/CurrencyPanel/HBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "❤️ 5/5"
-horizontal_alignment = 1
-
-[node name="TopPanel" type="PanelContainer" parent="GameUI/VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_hud")
-
-[node name="HBoxContainer" type="HBoxContainer" parent="GameUI/VBoxContainer/TopPanel"]
-layout_mode = 2
-
-[node name="ScoreContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="ScoreLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/ScoreContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
-theme_override_constants/outline_size = 2
-text = "Score: 0"
-horizontal_alignment = 1
-
-[node name="LevelContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="LevelLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/LevelContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
-theme_override_constants/outline_size = 2
-text = "Level 1"
-horizontal_alignment = 1
-
-[node name="MovesContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="MovesLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/MovesContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
-theme_override_constants/outline_size = 2
-text = "Moves: 30"
-horizontal_alignment = 1
-
-[node name="TargetContainer" type="VBoxContainer" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="TargetLabel" type="Label" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/TargetContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
-theme_override_constants/outline_size = 2
-text = "Target: 10000"
-horizontal_alignment = 1
-
-[node name="TargetProgress" type="ProgressBar" parent="GameUI/VBoxContainer/TopPanel/HBoxContainer/TargetContainer"]
-layout_mode = 2
-
-
-
-[node name="Spacer" type="Control" parent="GameUI/VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="BottomPanel" type="HBoxContainer" parent="GameUI/VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 0
+[node name="ProfileSlot" type="Control" parent="GameUI"]
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 5.0
+offset_top = 0.0
+offset_right = 75.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 1
 
 [node name="LevelCompletePanel" type="Panel" parent="GameUI"]
 visible = false
@@ -683,23 +590,27 @@ layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -85.0
-offset_top = 80.0
-offset_right = -10.0
-offset_bottom = 380.0
+offset_left = -75.0
+offset_top = 0.0
+offset_right = -5.0
+offset_bottom = 120.0
 grow_horizontal = 0
 script = ExtResource("12_fmc")
 
 [node name="MenuButton" type="TextureButton" parent="GameUI/FloatingMenu"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -70.0
-offset_right = 0.0
-offset_bottom = 70.0
-grow_horizontal = 0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -35.0
+offset_right = 35.0
+offset_bottom = 35.0
+grow_horizontal = 2
+grow_vertical = 2
 focus_mode = 0
 
 [node name="Glow" type="ColorRect" parent="GameUI/FloatingMenu/MenuButton"]
@@ -743,9 +654,9 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -70.0
-offset_top = 80.0
+offset_top = 125.0
 offset_right = 0.0
-offset_bottom = 320.0
+offset_bottom = 405.0
 grow_horizontal = 0
 theme_override_constants/separation = 10
 

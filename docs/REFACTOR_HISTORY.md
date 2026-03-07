@@ -405,6 +405,6 @@ var exclude = [HORIZTONAL_ARROW, VERTICAL_ARROW, FOUR_WAY_ARROW, COLLECTIBLE, SP
 
 | Item | Status | Blocker |
 |------|--------|---------|
-| E4 — Remove duplicate HUD handlers from `GameUI` | ⛔ BLOCKED | `HUDComponent.tscn` must be added to `MainGame.tscn` first |
+| E4 — Remove duplicate HUD handlers from `GameUI` | ✅ Complete | `HUDComponent` added to `MainGame.tscn`; HUD redesigned with MOVES/SCORE/GOAL layout; GameUI −134 lines |
 | `GameManager.gd` reduction to ~400 lines | 🔵 FUTURE | Separate refactor branch needed |
-| `GameUI.gd` further reduction to ~250 lines | 🔵 FUTURE | Depends on E4 unblock |
+| `GameUI.gd` further reduction to ~250 lines | 🔵 FUTURE | On track: now 313 lines |

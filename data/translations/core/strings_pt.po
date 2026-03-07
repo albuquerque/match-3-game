@@ -206,19 +206,31 @@ msgid "UI_UNLOCKED"
 msgstr "%s Desbloqueado!"
 
 msgid "UI_MULTIPLIER_CHALLENGE"
-msgstr "Desafio Multiplicador!"
+msgstr "Desafio Multiplicador"
 
 msgid "UI_START_MULTIPLIER"
-msgstr "Iniciar Desafio Multiplicador!"
+msgstr "Iniciar Multiplicador"
 
 msgid "UI_TAP_TO_STOP"
-msgstr "TOQUE AQUI PARA PARAR!"
+msgstr "Toque para Parar!"
 
 msgid "UI_WATCH_AD_MULTIPLIER"
-msgstr "Assista ao anúncio para obter multiplicador %.1fx!"
+msgstr "Assistir Anúncio para Obter"
 
-msgid "UI_MULTIPLIER_APPLIED"
-msgstr "Multiplicador %.1fx Aplicado!"
+msgid "UI_MULTIPLIER_JACKPOT"
+msgstr "JACKPOT!"
+
+msgid "UI_MULTIPLIER_GREAT"
+msgstr "Excelente!"
+
+msgid "UI_MULTIPLIER_GOOD"
+msgstr "Bom!"
+
+msgid "UI_MULTIPLIER_OK"
+msgstr "OK"
+
+msgid "UI_CLAIM"
+msgstr "Reivindicar Recompensas"
 
 msgid "UI_OUT_OF_LIVES"
 msgstr "Sem Vidas!"

@@ -77,11 +77,17 @@ func load_game() -> void:
 		return
 	var txt = f.get_as_text()
 	f.close()
-	# Use JSON.parse_string for Godot 4 compatibility
 	var parsed = JSON.parse_string(txt)
-	if typeof(parsed) == TYPE_DICTIONARY and parsed.has("result"):
-		player_data = parsed["result"]
-		print("[ProgressManager] Loaded progress")
+	if typeof(parsed) == TYPE_DICTIONARY:
+		# Godot 3 legacy format: {"result": {...}, "error": 0, ...}
+		if parsed.has("result") and typeof(parsed["result"]) == TYPE_DICTIONARY:
+			player_data = parsed["result"]
+			print("[ProgressManager] Loaded progress (migrated from Godot 3 format)")
+			save_game()  # Re-save in clean Godot 4 format
+		else:
+			# Godot 4 format: the dictionary IS the data
+			player_data = parsed
+			print("[ProgressManager] Loaded progress")
 	else:
 		print("[ProgressManager] Save parse error or unexpected format; creating new data")
 		create_new_player_data()

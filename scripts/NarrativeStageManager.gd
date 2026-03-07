@@ -18,8 +18,10 @@ var _watchdog_duration: float = 15.0
 
 signal stage_shown(stage_id: String, fullscreen: bool)
 signal stage_cleared()
+signal hud_visibility_changed(visible: bool)  ## Emitted when a stage requires HUD hide/show
 
 var NodeResolvers = null
+var _hud_hidden_by_stage: bool = false  ## tracks whether WE hid the HUD
 
 func _ready():
 	print("[NarrativeStageManager] Ready")
@@ -115,6 +117,18 @@ func load_stage_for_level(level_num: int) -> bool:
 			var is_full = _stage_is_fullscreen(stage_data)
 			emit_signal("stage_shown", active_stage_id, is_full)
 
+			# Control HUD visibility based on stage's hide_hud flag
+			if stage_data.get("hide_hud", false):
+				_hud_hidden_by_stage = true
+				emit_signal("hud_visibility_changed", false)
+				print("[NarrativeStageManager] HUD hidden for stage: ", active_stage_id)
+			else:
+				# Stage doesn't hide HUD — make sure it's shown (may have been
+				# hidden by a previous level's narrative stage)
+				_hud_hidden_by_stage = false
+				emit_signal("hud_visibility_changed", true)
+				print("[NarrativeStageManager] HUD shown for stage: ", active_stage_id)
+
 			return true
 
 	# Try DLC stages
@@ -122,6 +136,9 @@ func load_stage_for_level(level_num: int) -> bool:
 		return true
 
 	print("[NarrativeStageManager] No narrative stage for level ", level_num)
+	# No stage for this level — always show HUD
+	_hud_hidden_by_stage = false
+	emit_signal("hud_visibility_changed", true)
 	return false
 
 func load_stage_by_id(stage_id: String) -> bool:
@@ -200,6 +217,15 @@ func clear_stage(force: bool=false):
 
 	active_stage_id = ""
 	print("[NarrativeStageManager] Stage cleared (active_stage_id reset)")
+
+	# Reset the HUD-hidden flag. We do NOT emit hud_visibility_changed(true) here
+	# because clear_stage is called at level completion — the transition/rewards
+	# screen is about to appear and the HUD should remain hidden. GameUI's
+	# show_gameplay_ui() will re-show the HUD when the next level actually starts.
+	if _hud_hidden_by_stage:
+		_hud_hidden_by_stage = false
+		print("[NarrativeStageManager] HUD-hidden flag reset (HUD restore deferred to show_gameplay_ui)")
+
 	# Emit cleared signal so UI can reactivate gameplay elements
 	emit_signal("stage_cleared")
 

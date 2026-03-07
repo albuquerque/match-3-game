@@ -875,3 +875,30 @@ msgstr "Bénédiction des Récoltes"
 msgid "Collect 1000 coins in autumn"
 msgstr "Collectez 1000 pièces en automne"
 
+# Multiplier mini-game
+msgid "UI_MULTIPLIER_CHALLENGE"
+msgstr "Défi Multiplicateur"
+
+msgid "UI_TAP_TO_STOP"
+msgstr "Appuyez pour Arrêter!"
+
+msgid "UI_START_MULTIPLIER"
+msgstr "Démarrer le Multiplicateur"
+
+msgid "UI_WATCH_AD_MULTIPLIER"
+msgstr "Voir la Pub pour Obtenir"
+
+msgid "UI_MULTIPLIER_JACKPOT"
+msgstr "JACKPOT!"
+
+msgid "UI_MULTIPLIER_GREAT"
+msgstr "Excellent!"
+
+msgid "UI_MULTIPLIER_GOOD"
+msgstr "Bien!"
+
+msgid "UI_MULTIPLIER_OK"
+msgstr "OK"
+
+msgid "UI_CLAIM"
+msgstr "Réclamer les Récompenses"

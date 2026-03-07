@@ -12,7 +12,7 @@ static func calculate_responsive_layout(board: Node) -> void:
 	var viewport = board.get_viewport()
 	var screen_size = viewport.get_visible_rect().size
 
-	var ui_top_space = 180.0
+	var ui_top_space = 125.0   # HUDComponent is 120px tall; 5px gap above board
 	var ui_bottom_space = 100.0
 	var available_width = screen_size.x - (board.board_margin * 2)
 	var available_height = screen_size.y - ui_top_space - ui_bottom_space - (board.board_margin * 2)
