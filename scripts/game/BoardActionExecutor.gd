@@ -24,6 +24,8 @@ static func execute_board_action(board: Node, positions: Array, effect_fn: Calla
 		GameManager.add_score(pts)
 	await board.animate_gravity()
 	await board.animate_refill()
+	if board.has_method("_check_collectibles_at_bottom"):
+		await board._check_collectibles_at_bottom()
 	await board.process_cascade()
 
 ## Clear positions that may include hard unmovables (row/column clear).
@@ -53,6 +55,8 @@ static func execute_line_clear(board: Node, positions: Array, tiles_ref: Array) 
 		GameManager.add_score(pts)
 	await board.animate_gravity()
 	await board.animate_refill()
+	if board.has_method("_check_collectibles_at_bottom"):
+		await board._check_collectibles_at_bottom()
 	await board.process_cascade()
 
 # ── Booster executors ─────────────────────────────────────────────────────────
@@ -141,6 +145,8 @@ static func activate_chain_reaction_booster(board: Node, BS, x: int, y: int) -> 
 	if pts > 0: GameManager.add_score(pts)
 	await board.animate_gravity()
 	await board.animate_refill()
+	if board.has_method("_check_collectibles_at_bottom"):
+		await board._check_collectibles_at_bottom()
 	await board.process_cascade()
 	GameManager.processing_moves = false
 
@@ -306,6 +312,8 @@ static func activate_special_tile(board: Node, pos: Vector2) -> void:
 
 	await board.animate_gravity()
 	await board.animate_refill()
+	if board.has_method("_check_collectibles_at_bottom"):
+		await board._check_collectibles_at_bottom()
 	await board.process_cascade()
 	print("[BoardActionExecutor] activate_special_tile: complete")
 

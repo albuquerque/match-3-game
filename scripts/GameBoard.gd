@@ -529,6 +529,7 @@ func _task_deferred_gravity_then_refill() -> void:
 
 	await animate_gravity()
 	await animate_refill()
+	await _check_collectibles_at_bottom()
 
 	var new_matches = GameManager.find_matches() if GameManager.has_method("find_matches") else []
 	if new_matches and new_matches.size() > 0:

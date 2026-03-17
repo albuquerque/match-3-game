@@ -35,7 +35,7 @@ static func is_cell_movable(gm: Node, x: int, y: int) -> bool:
 	if gm.grid.size() <= x or gm.grid[x].size() <= y:
 		return false
 	var v = gm.grid[x][y]
-	if v == -1 or v == 0:
+	if v == -1 or v == 0 or v == gm.UNMOVABLE:
 		return false
 	if v == gm.SPREADER:
 		return false

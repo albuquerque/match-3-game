@@ -181,12 +181,14 @@ func update_visual():
     # If this tile is marked as a collectible, prefer collectible texture
     if is_collectible:
         # Prefer resolved theme_name
-        # Try SVG then PNG in theme folder, then root
+        # Try SVG then PNG in theme folder, then root, then assets/gallery
         var coll_candidates = [
             "res://textures/%s/%s.svg" % [theme_name, collectible_type],
             "res://textures/%s/%s.png" % [theme_name, collectible_type],
             "res://textures/%s.svg" % collectible_type,
-            "res://textures/%s.png" % collectible_type
+            "res://textures/%s.png" % collectible_type,
+            "res://assets/gallery/%s.png" % collectible_type,
+            "res://assets/gallery/%s.svg" % collectible_type,
         ]
         var found_coll = _find_existing_texture(coll_candidates)
         if found_coll != "":
@@ -396,6 +398,8 @@ func update_visual():
             old_label2.queue_free()
 
 # New helper methods for mechanics (no new classes)
+
+
 func configure_collectible(c_type: String) -> void:
     is_collectible = true
     collectible_type = c_type
@@ -702,6 +706,10 @@ func _create_unmovable_destruction_particles():
 func update_type(new_type: int):
     """Update the tile to a new type and refresh its visual appearance"""
     print("Updating tile at ", grid_position, " from type ", tile_type, " to type ", new_type)
+    # Collectible tiles (shards/coins) must never be reconfigured as regular tiles
+    # by the gravity reassignment pass — their visual is already correct.
+    if is_collectible:
+        return
     tile_type = new_type
     # When recycled into a regular or special-arrow tile, clear any stale
     # special-state flags so update_visual doesn't apply wrong textures/scales.

@@ -464,7 +464,7 @@ enum Page {
 var _page_lookup: Dictionary = {
 	Page.HOME: "StartPage",
 	Page.WORLD_MAP: "WorldMap",
-	Page.GALLERY: "GalleryPage",
+	Page.GALLERY: "gallery/gallery_screen",
 	Page.ACHIEVEMENTS: "AchievementsPage",
 	Page.SETTINGS: "SettingsDialog",
 	Page.ABOUT: "AboutPage",

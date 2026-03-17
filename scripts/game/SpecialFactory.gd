@@ -1,7 +1,8 @@
 extends Node
-class_name SpecialFactory
-
-# Simplified special tile detector.
+# SpecialFactory — determines which special tile type a match qualifies for.
+# Loaded as a script resource by GameManager._init_resolvers().
+# NOTE: No class_name declared — GameManager stores this as var SpecialFactory;
+# a global class_name would conflict with that variable and break has_method() checks.
 # API:
 #   SpecialFactory.determine_special_type(matches, swapped_pos, grid, grid_w, grid_h, min_match_size=3) -> int
 # Returns: HORIZ (7), VERT (8), FOUR (9) or -1 for none

@@ -44,8 +44,12 @@ PageManager="*res://scripts/ui/PageManager.gd"
 NodeResolvers="*res://scripts/helpers/node_resolvers.gd"
 ProgressManager="*res://scripts/progression/ProgressManager.gd"
 GalleryManager="*res://scripts/progression/GalleryManager.gd"
+GalleryImageLoader="*res://scripts/systems/GalleryImageLoader.gd"
+StoryManager="*res://scripts/systems/StoryManager.gd"
 AchievementManager="*res://scripts/progression/AchievementManager.gd"
 ProfileManager="*res://scripts/progression/ProfileManager.gd"
+ShardDropSystem="*res://scripts/systems/ShardDropSystem.gd"
+ShardToastNotifier="*res://scripts/ui/ShardToastNotifier.gd"
 
 [display]
 

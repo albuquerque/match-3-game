@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://pu3wcj43djjh"]
+[gd_scene load_steps=19 format=3 uid="uid://pu3wcj43djjh"]
 
 [ext_resource type="Script" uid="uid://doc3oxaambqkj" path="res://scripts/GameBoard.gd" id="1_2x8k3"]
 [ext_resource type="Script" uid="uid://clght4j2ys21n" path="res://scripts/GameUI.gd" id="2_4y7z1"]
@@ -13,6 +13,7 @@
 [ext_resource type="Script" uid="uid://cohaflicvwgwb" path="res://scripts/ui/components/BoosterPanelComponent.gd" id="11_bpc"]
 [ext_resource type="Script" uid="uid://dtl3haqx807gd" path="res://scripts/ui/components/FloatingMenuComponent.gd" id="12_fmc"]
 [ext_resource type="PackedScene" uid="uid://pu3wcj43djjh_hud" path="res://scenes/ui/components/HUDComponent.tscn" id="14_hud"]
+[ext_resource type="Script" path="res://scripts/ui/ShardToastNotifier.gd" id="15_shard_toast"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
 bg_color = Color(0.2, 0.2, 0.3, 0.8)
@@ -818,3 +819,8 @@ expand_mode = 1
 stretch_mode = 5
 
 [node name="MainMenuPopup" type="PopupMenu" parent="GameUI"]
+
+[node name="ShardToastNotifier" type="CanvasLayer" parent="."]
+layer = 90
+script = ExtResource("15_shard_toast")
+

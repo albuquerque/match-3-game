@@ -1,0 +1,83 @@
+[
+	{
+		"id": "artifact_001",
+		"name": "Ancient Relic",
+		"rarity": "rare",
+		"category": "artifacts",
+		"shards_required": 9,
+		"art_asset": "https://fbi.cults3d.com/uploaders/16457623/illustration-file/e5cc28d1-d0ac-4148-b510-df597ef3cbff/AR2.jpg",
+		"silhouette_asset": "res://assets/gallery/relic_silhouette.png"
+	},
+	{
+		"id": "artifact_002",
+		"name": "Golden Idol",
+		"rarity": "epic",
+		"category": "artifacts",
+		"shards_required": 12,
+		"art_asset": "https://i.ebayimg.com/images/g/4dgAAOSwmiFlWG-F/s-l1600.webp",
+		"silhouette_asset": "res://assets/gallery/golden_idol_silhouette.png"
+	},
+	{
+		"id": "artifact_003",
+		"name": "Mystic Vial",
+		"rarity": "uncommon",
+		"category": "artifacts",
+		"shards_required": 6,
+		"art_asset": "https://cdn-ildnbco.nitrocdn.com/tnfnSqsgKoHbHTHsaDrbjhwBRpzziHrS/assets/images/optimized/cottagecoreholly.com/wp-content/uploads/2025/05/il_794xN.5817689052_3zdu.jpg",
+		"silhouette_asset": "res://assets/gallery/mystic_vial_silhouette.png"
+	},
+	{
+		"id": "artifact_004",
+		"name": "Bronze Mask",
+		"rarity": "common",
+		"category": "artifacts",
+		"shards_required": 5,
+		"art_asset": "https://i.ebayimg.com/images/g/4dgAAOSwmiFlWG-F/s-l1600.webp",
+		"silhouette_asset": "res://assets/gallery/bronze_mask_silhouette.png"
+	},
+	{
+		"id": "artifact_005",
+		"name": "Crimson Coin",
+		"rarity": "uncommon",
+		"category": "relics",
+		"shards_required": 8,
+		"art_asset": "res://assets/gallery/crimson_coin.png",
+		"silhouette_asset": "res://assets/gallery/crimson_coin_silhouette.png"
+	},
+	{
+		"id": "artifact_006",
+		"name": "Emerald Brooch",
+		"rarity": "rare",
+		"category": "relics",
+		"shards_required": 10,
+		"art_asset": "res://assets/gallery/emerald_brooch.png",
+		"silhouette_asset": "res://assets/gallery/emerald_brooch_silhouette.png"
+	},
+	{
+		"id": "artifact_007",
+		"name": "Sapphire Tablet",
+		"rarity": "rare",
+		"category": "relics",
+		"shards_required": 9,
+		"art_asset": "res://assets/gallery/sapphire_tablet.png",
+		"silhouette_asset": "res://assets/gallery/sapphire_tablet_silhouette.png"
+	},
+	{
+		"id": "artifact_008",
+		"name": "Ivory Figurine",
+		"rarity": "common",
+		"category": "heroes",
+		"shards_required": 4,
+		"art_asset": "res://assets/gallery/ivory_figurine.png",
+		"silhouette_asset": "res://assets/gallery/ivory_figurine_silhouette.png"
+	},
+	{
+		"id": "artifact_009",
+		"name": "Obsidian Mirror",
+		"rarity": "epic",
+		"category": "heroes",
+		"shards_required": 11,
+		"art_asset": "res://assets/gallery/obsidian_mirror.png",
+		"silhouette_asset": "res://assets/gallery/obsidian_mirror_silhouette.png"
+	}
+]

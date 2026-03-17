@@ -93,17 +93,19 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 		tiles_ref.append([])
 		for y in range(GameManager.GRID_HEIGHT):
 			var tile_type = GameManager.get_tile_at(Vector2(x,y))
-			if tile_type == -1:
-				tiles_ref[x].append(null)
-				continue
-			var tile = null
 			var key = str(x) + "," + str(y)
+			# If an unmovable_map entry exists, create the unmovable regardless of the grid sentinel
+			var tile = null
 			if GameManager.unmovable_map.has(key) and typeof(GameManager.unmovable_map[key]) == TYPE_DICTIONARY:
 				# hard unmovable
 				tile = gameboard.tile_scene.instantiate()
 				if tile and tile.has_method("setup"):
 					tile.setup(0, Vector2(x,y), scale_factor, true)
 			else:
+				# Not an unmovable — respect the grid sentinel
+				if tile_type == -1:
+					tiles_ref[x].append(null)
+					continue
 				var vf_local = load("res://scripts/game/VisualFactory.gd")
 				if vf_local != null and vf_local.has_method("create_tile_instance"):
 					tile = vf_local.call("create_tile_instance", gameboard.tile_scene, tile_type, Vector2(x,y), scale_factor)
@@ -148,17 +150,14 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 				gameboard.board_container.add_child(tile)
 			else:
 				gameboard.add_child(tile)
-
 			# Always connect input signals — including unmovables (adjacency detection needs them)
 			if not tile.is_connected("tile_clicked", Callable(gameboard, "_on_tile_clicked")):
 				tile.connect("tile_clicked", Callable(gameboard, "_on_tile_clicked"))
 			if not tile.is_connected("tile_swiped", Callable(gameboard, "_on_tile_swiped")):
 				tile.connect("tile_swiped", Callable(gameboard, "_on_tile_swiped"))
-
 			# Set world position
 			if gameboard.has_method("grid_to_world_position"):
 				tile.position = gameboard.grid_to_world_position(Vector2(x, y))
-
 			tiles_ref[x].append(tile)
 			tiles_created += 1
 	gameboard.creating_visual_grid = false

@@ -17,6 +17,9 @@ func setup(game_manager: Node) -> void:
 # ─── Level completion ───────────────────────────────────────────────────────
 
 func attempt_level_complete() -> void:
+	# Do not trigger level-complete checks while the bonus cascade is already running
+	if gm.in_bonus_conversion:
+		return
 	if gm.pending_level_complete:
 		return
 	gm.pending_level_complete = true
@@ -24,6 +27,10 @@ func attempt_level_complete() -> void:
 
 func perform_level_completion_check() -> void:
 	if not gm.pending_level_complete:
+		return
+	# Do not re-trigger if we are already in the bonus conversion or transitioning
+	if gm.in_bonus_conversion or gm.level_transitioning:
+		gm.pending_level_complete = false
 		return
 
 	var has_collectible_goal = gm.collectible_target > 0
@@ -55,7 +62,7 @@ func perform_level_completion_check() -> void:
 
 func on_level_complete() -> void:
 	print("[GFC] on_level_complete()")
-	if gm.level_transitioning:
+	if gm.level_transitioning or gm.in_bonus_conversion:
 		return
 	gm.level_transitioning = true
 

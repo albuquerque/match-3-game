@@ -118,6 +118,16 @@ func _ready():
 	achievements_btn.connect("pressed", self, "_on_achievements_pressed")
 	settings_h.add_child(achievements_btn)
 
+	# Gallery button (quick access from StartPage)
+	var gallery_btn = Button.new()
+	gallery_btn.name = "GalleryButton"
+	gallery_btn.text = "🖼️ " + tr("UI_BUTTON_GALLERY")
+	gallery_btn.custom_minimum_size = Vector2(150, 48)
+	if theme_manager and theme_manager.has_method("apply_bangers_font_to_button"):
+		theme_manager.apply_bangers_font_to_button(gallery_btn, 16)
+	gallery_btn.connect("pressed", self, "_on_gallery_pressed")
+	settings_h.add_child(gallery_btn)
+
 	# Lives system removed - no checks needed
 	print("[StartPage] Start button enabled - no lives restrictions")
 	# ensure hidden until explicitly shown
@@ -223,6 +233,29 @@ func _on_achievements_pressed():
 	else:
 		print("[StartPage] EventBus not available - fallback to local achievements handling")
 
+func _on_gallery_pressed():
+	# Open the Gallery page via EventBus when available, otherwise fallback to PageManager.open
+	var eb = null
+	if typeof(NodeResolvers) != TYPE_NIL:
+		eb = NodeResolvers._get_evbus()
+	if eb == null and has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			eb = rt.get_node_or_null("EventBus")
+	if eb and eb.has_method("emit_open_page"):
+		eb.emit_open_page("GalleryPage", {})
+	else:
+		print("[StartPage] EventBus not available - fallback to PageManager.open('GalleryPage')")
+		# Try to find PageManager in the scene tree and open the page
+		if has_method("get_tree"):
+			var pm = get_tree().root.get_node_or_null("PageManager")
+			if pm and pm.has_method("open"):
+				pm.call_deferred("open", "GalleryPage", {})
+			elif pm and pm.has_method("go_to_page"):
+				pm.call_deferred("go_to_page", "GalleryPage", {})
+			else:
+				print("[StartPage] PageManager not found; cannot open GalleryPage")
+
 func _on_language_changed(locale: String):
 	"""Refresh UI text when language changes"""
 	print("[StartPage] Refreshing UI for language: %s" % locale)
@@ -247,6 +280,10 @@ func _on_language_changed(locale: String):
 	var achievements_btn = get_node_or_null("VBox/SettingsH/AchievementsButton")
 	if achievements_btn and achievements_btn is Button:
 		achievements_btn.text = "🏆 " + tr("UI_BUTTON_ACHIEVEMENTS")
+
+	var gallery_btn = get_node_or_null("VBox/SettingsH/GalleryButton")
+	if gallery_btn and gallery_btn is Button:
+		gallery_btn.text = "🖼️ " + tr("UI_BUTTON_GALLERY")
 
 	# Refresh level info if it was set
 	var level_btn = get_node_or_null("VBox/LevelButton")

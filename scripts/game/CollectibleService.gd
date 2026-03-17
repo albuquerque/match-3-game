@@ -42,6 +42,23 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 		if AudioManager and AudioManager.has_method("play_sfx"):
 			AudioManager.play_sfx("coin_collect")
 
+		# Clear grid state immediately — don't wait for the animation
+		tiles_ref[int(pos.x)][int(pos.y)] = null
+		GameManager.grid[int(pos.x)][int(pos.y)] = 0
+
+		# Notify game systems immediately so shard/objective logic fires at once
+		if coll_type == "shard":
+			var item_id: String = ""
+			if tile and tile.has_meta("shard_item_id"):
+				item_id = str(tile.get_meta("shard_item_id"))
+			if EventBus and not item_id.is_empty():
+				EventBus.emit_shard_tile_collected(item_id)
+		elif GameManager.has_method("collectible_landed_at"):
+			GameManager.collectible_landed_at(pos, coll_type)
+
+		print("[CollectibleService] Collected ", coll_type, " at ", pos)
+
+		# Play fly-to-HUD animation concurrently (fire-and-forget)
 		var particles = CPUParticles2D.new()
 		particles.name         = "CollectionParticles"
 		particles.position     = tile.position if tile else board.grid_to_world_position(pos)
@@ -51,6 +68,7 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 		particles.lifetime     = 0.8
 		particles.explosiveness = 1.0
 		board.add_child(particles)
+		board.get_tree().create_timer(1.0).timeout.connect(particles.queue_free)
 
 		if tile and is_instance_valid(tile):
 			var viewport    = board.get_viewport()
@@ -61,32 +79,19 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 			tween.tween_property(tile, "global_position", target_pos, 0.6).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BACK)
 			tween.tween_property(tile, "scale", Vector2(0.5, 0.5), 0.6)
 			tween.tween_property(tile, "modulate:a", 0.0, 0.4).set_delay(0.2)
-			board.get_tree().create_timer(1.0).timeout.connect(particles.queue_free)
-			await tween.finished
+			# Free tile after animation — no await so cascade continues immediately
+			tween.finished.connect(tile.queue_free)
 		else:
-			await board.get_tree().create_timer(0.6).timeout
-			particles.queue_free()
+			if tile and is_instance_valid(tile):
+				tile.queue_free()
 
-		tiles_ref[int(pos.x)][int(pos.y)] = null
-		GameManager.grid[int(pos.x)][int(pos.y)] = 0
-
-		if tile and is_instance_valid(tile):
-			tile.queue_free()
-
-		if GameManager.has_method("collectible_landed_at"):
-			GameManager.collectible_landed_at(pos, coll_type)
-
-		print("[CollectibleService] Collected ", coll_type, " at ", pos)
 
 	if GameManager.level_transitioning:
 		return
-
-	await board.animate_gravity()
-	await board.animate_refill()
-
-	var new_matches = GameManager.find_matches() if GameManager.has_method("find_matches") else []
-	if new_matches.size() > 0:
-		await board.process_cascade()
+	# NOTE: Do NOT call animate_gravity/animate_refill/process_cascade here.
+	# MatchOrchestrator's while-loop handles all gravity, refill, and cascade detection
+	# after _check_collectibles_at_bottom returns. Calling them here causes re-entrant
+	# cascade execution and freezes the board.
 
 static func spawn_level_collectibles() -> void:
 	if GameManager.has_method("spawn_collectibles_for_targets"):

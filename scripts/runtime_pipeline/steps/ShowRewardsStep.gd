@@ -96,7 +96,9 @@ func _show_reward_screen(context: PipelineContext) -> bool:
 		"stars": stars,
 		"coins": coins_earned,
 		"gems": gems_earned,
-		"success": level_completed
+		"success": level_completed,
+		"shards_collected": GalleryManager.session_shards_collected if GalleryManager else 0,
+		"items_unlocked": GalleryManager.session_items_unlocked.duplicate() if GalleryManager else []
 	}
 
 	# Create controller (dynamically to avoid parse-time class resolution)

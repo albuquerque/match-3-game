@@ -20,7 +20,7 @@ static func apply_gravity(grid: Array, gm: Node) -> bool:
 			var end_of_segment = (y == grid_h)
 			var is_barrier = false
 			if not end_of_segment:
-				if grid[x][y] == -1 or gm._is_unmovable_cell(x, y) or grid[x][y] == gm.SPREADER:
+				if grid[x][y] == -1 or grid[x][y] == gm.UNMOVABLE or gm._is_unmovable_cell(x, y) or grid[x][y] == gm.SPREADER:
 					is_barrier = true
 			if is_barrier or end_of_segment:
 				if segment_start >= 0:
@@ -61,7 +61,7 @@ static func fill_empty_spaces(grid: Array, gm: Node) -> Array:
 				continue
 			var cell = grid[x][y]
 			var is_unmov = gm._is_unmovable_cell(x, y)
-			var is_barrier_cell = is_unmov or (cell == -1) or (cell == gm.SPREADER)
+			var is_barrier_cell = is_unmov or (cell == -1) or (cell == gm.UNMOVABLE) or (cell == gm.SPREADER)
 			if is_barrier_cell:
 				if not in_barrier_run:
 					in_barrier_run = true

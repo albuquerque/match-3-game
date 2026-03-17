@@ -73,8 +73,8 @@ const HORIZTONAL_ARROW = 7
 const VERTICAL_ARROW = 8
 const FOUR_WAY_ARROW = 9
 const COLLECTIBLE = 10  # Special type for collectibles - won't match with regular tiles
-# Note: UNMOVABLE_SOFT (11) was removed - all unmovables are now hard unmovables with hit counters
-const SPREADER = 12  # Special type for spreader tiles - convert adjacent tiles
+const UNMOVABLE = 11    # Sentinel stored in grid cells occupied by unmovable tiles
+const SPREADER = 12     # Special type for spreader tiles - convert adjacent tiles
 
 # Scoring
 const POINTS_PER_TILE = 100
@@ -88,6 +88,8 @@ var target_score = 10000
 var grid = []
 var combo_count = 0
 var processing_moves = false
+
+var _pending_in_level_stage: int = -1  # deferred load_stage_for_level when NSM is locked
 
 # Collectible tracking
 var collectibles_collected = 0
@@ -277,6 +279,9 @@ func reset_state_for_new_level():
 	pending_level_failed = false
 	in_bonus_conversion = false
 	bonus_skipped = false
+	# Reset per-level shard session counters so the reward summary shows this level's drops only
+	if GalleryManager and GalleryManager.has_method("reset_session"):
+		GalleryManager.reset_session()
 	print("[GameManager] reset_state_for_new_level: cleared transient flags")
 
 func load_current_level():
@@ -342,15 +347,31 @@ func _load_level_narrative() -> void:
 	# --- NarrativeStageManager ---
 	var nsm = get_node_or_null("/root/NarrativeStageManager")
 	if nsm:
-		# Force-clear any leftover active_stage_id from the pre-level cutscene so the
-		# guard inside load_stage_for_level() does not block the in-level stage.
-		if nsm.has_method("clear_stage"):
-			nsm.clear_stage(true)
-		# Always call load_stage_for_level — it handles the no-file case internally
-		# and emits hud_visibility_changed(true) so the HUD is correctly shown for
-		# levels that have no narrative stage (e.g. level 12).
-		nsm.load_stage_for_level(level)
+		# Only force-clear active_stage_id when the manager is NOT locked.
+		# When locked, ShowNarrativeStep is actively displaying a narrative and
+		# owns the lifecycle — force-clearing would destroy the visible content.
+		var is_locked: bool = nsm.get("_locked") == true
+		if not is_locked:
+			if nsm.has_method("clear_stage"):
+				nsm.clear_stage(true)
+			nsm.load_stage_for_level(level)
+		else:
+			# ShowNarrativeStep owns the manager right now.
+			# Defer load_stage_for_level until stage_cleared fires (after unlock).
+			_pending_in_level_stage = level
+			nsm.stage_cleared.connect(_on_narrative_cleared_load_level_stage, CONNECT_ONE_SHOT)
 
+
+
+## Called via CONNECT_ONE_SHOT on stage_cleared when NSM was locked during initialize_game.
+## Loads the in-level narrative stage once ShowNarrativeStep has finished and unlocked.
+func _on_narrative_cleared_load_level_stage() -> void:
+	if _pending_in_level_stage < 0:
+		return
+	var nsm := get_node_or_null("/root/NarrativeStageManager")
+	if nsm:
+		nsm.load_stage_for_level(_pending_in_level_stage)
+	_pending_in_level_stage = -1
 
 
 func _load_current_level_inline():
@@ -495,7 +516,8 @@ func is_cell_movable(x: int, y: int) -> bool:
 	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT: return false
 	if grid.size() <= x or grid[x].size() <= y: return false
 	var v = grid[x][y]
-	if v == -1 or v == 0 or v == SPREADER: return false
+	# Blocked, empty, collectibles (coins/shards), and spreaders cannot be moved by the player
+	if v == -1 or v == 0 or v == COLLECTIBLE or v == SPREADER or v == UNMOVABLE: return false
 	var b = get_board()
 	if b and b.tiles and x < b.tiles.size() and y < b.tiles[x].size():
 		var tile = b.tiles[x][y]
@@ -528,8 +550,10 @@ func swap_tiles(pos1: Vector2, pos2: Vector2) -> bool:
 	return true
 
 func find_matches() -> Array:
-	# Exclude special tiles (7,8,9) and non-regular tiles so they never match as normal tiles
-	var exclude = [HORIZTONAL_ARROW, VERTICAL_ARROW, FOUR_WAY_ARROW, COLLECTIBLE, SPREADER]
+	# Exclude special tiles and unmovable sentinel so they never match as normal tiles.
+	# UNMOVABLE (11) is excluded rather than used as blocked_value so that runs of regular
+	# tiles on either side of an unmovable are detected independently and correctly.
+	var exclude = [HORIZTONAL_ARROW, VERTICAL_ARROW, FOUR_WAY_ARROW, COLLECTIBLE, SPREADER, UNMOVABLE]
 	return MatchFinder.find_matches(grid, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1)
 
 func calculate_points(tiles_removed: int) -> int:
@@ -618,14 +642,32 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 		if not found and not is_cell_blocked(int(p.x), int(p.y)):
 			unique.append(p)
 
+	# Lazy-reload MatchProcessor in case _init_resolvers ran before the script was ready
+	if MatchProcessor == null:
+		MatchProcessor = load("res://scripts/game/MatchProcessor.gd")
+
 	# Delegate clearing to MatchProcessor
 	var tiles_removed = 0
-	if MatchProcessor != null and MatchProcessor.has_method("process_matches"):
+	if MatchProcessor != null:
 		var res = MatchProcessor.process_matches(grid, unique, swapped_pos, GRID_WIDTH, GRID_HEIGHT, self)
 		if typeof(res) == TYPE_DICTIONARY and res.has("tiles_removed"):
 			tiles_removed = int(res["tiles_removed"])
 	else:
-		push_error("[GameManager] MatchProcessor unavailable — matches not processed")
+		# Inline fallback — should never be reached, but guarantees grid is cleared
+		push_error("[GameManager] MatchProcessor unavailable — using inline fallback")
+		for p in unique:
+			var gx = int(p.x)
+			var gy = int(p.y)
+			var val = int(grid[gx][gy])
+			if val == COLLECTIBLE:
+				grid[gx][gy] = 0
+				continue
+			if swapped_pos.x >= 0 and int(swapped_pos.x) == gx and int(swapped_pos.y) == gy:
+				tiles_removed += 1
+				continue
+			if val > 0:
+				tiles_removed += 1
+				grid[gx][gy] = 0
 
 	# Scoring and combo
 	var points = calculate_points(tiles_removed)
@@ -637,7 +679,7 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 
 	# Resolve pending special-tile creation (delegated to MatchProcessor)
 	var req = get_and_clear_requested_special()
-	if MatchProcessor != null and MatchProcessor.has_method("resolve_special_tile"):
+	if MatchProcessor != null and req.has("pos"):
 		MatchProcessor.resolve_special_tile(req, unique, grid, self)
 
 	# Check objectives after scoring
@@ -647,24 +689,28 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 			pending_level_complete = true
 			call_deferred("_perform_level_completion_check")
 
-	# Notify EventBus for narrative effects
+	# Notify EventBus for narrative effects and shard drop system
 	if tiles_removed > 0:
-		var _eb = NodeResolverAPI._get_evbus() if typeof(NodeResolverAPI) != TYPE_NIL else null
-		if _eb:
-			_eb.emit_match_cleared(tiles_removed, {"level": level, "score": score, "target": target_score})
+		if EventBus:
+			EventBus.emit_match_cleared(tiles_removed, {"level": level, "score": score, "target": target_score})
 
 	return tiles_removed
 
 
 func apply_gravity() -> bool:
 	## Step 1: Delegated to GravityService (barrier-aware version).
+	if GravityService == null:
+		GravityService = load("res://scripts/game/GravityService.gd")
 	if GravityService != null:
 		return GravityService.apply_gravity(grid, self)
 	# Emergency fallback — should never be reached at runtime
+	push_error("[GameManager] GravityService unavailable")
 	return false
 
 func fill_empty_spaces() -> Array:
 	## Step 1: Delegated to GravityService (barrier-aware version).
+	if GravityService == null:
+		GravityService = load("res://scripts/game/GravityService.gd")
 	if GravityService != null:
 		return GravityService.fill_empty_spaces(grid, self)
 	return []
@@ -739,23 +785,33 @@ func use_move() -> void:
 
 func has_possible_moves() -> bool:
 	# C3: Check if any swap yields a match. Uses MatchFinder on a shallow grid copy.
+	# Only considers regular tiles (1-TILE_TYPES) as candidates for swapping —
+	# collectibles, special tiles, and spreaders never form colour matches.
 	if grid == null or grid.size() == 0:
 		return false
 	var exclude = [COLLECTIBLE, SPREADER]
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
-			if not is_cell_movable(x, y):
-				continue
-			if x + 1 < GRID_WIDTH and is_cell_movable(x + 1, y) and grid[x][y] != grid[x+1][y]:
-				var tg = _copy_grid()
-				var t = tg[x][y]; tg[x][y] = tg[x+1][y]; tg[x+1][y] = t
-				if MatchFinder.find_matches(tg, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
-					return true
-			if y + 1 < GRID_HEIGHT and is_cell_movable(x, y + 1) and grid[x][y] != grid[x][y+1]:
-				var tg2 = _copy_grid()
-				var t2 = tg2[x][y]; tg2[x][y] = tg2[x][y+1]; tg2[x][y+1] = t2
-				if MatchFinder.find_matches(tg2, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
-					return true
+			if not is_cell_movable(x, y): continue
+			# Skip non-regular tiles — special tiles activate on swap but don't form matches
+			var v = int(grid[x][y])
+			if v < 1 or v > TILE_TYPES: continue
+			if x + 1 < GRID_WIDTH and is_cell_movable(x + 1, y):
+				var v2 = int(grid[x + 1][y])
+				if v2 < 1 or v2 > TILE_TYPES: continue
+				if v != v2:
+					var tg = _copy_grid()
+					var t = tg[x][y]; tg[x][y] = tg[x+1][y]; tg[x+1][y] = t
+					if MatchFinder.find_matches(tg, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
+						return true
+			if y + 1 < GRID_HEIGHT and is_cell_movable(x, y + 1):
+				var v3 = int(grid[x][y + 1])
+				if v3 < 1 or v3 > TILE_TYPES: continue
+				if v != v3:
+					var tg2 = _copy_grid()
+					var t2 = tg2[x][y]; tg2[x][y] = tg2[x][y+1]; tg2[x][y+1] = t2
+					if MatchFinder.find_matches(tg2, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
+						return true
 	return false
 
 func _copy_grid() -> Array:

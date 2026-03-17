@@ -903,3 +903,62 @@ msgstr "OK"
 msgid "UI_CLAIM"
 msgstr "Claim Rewards"
 
+# Gallery UI keys
+msgid "GALLERY_TAB_STORY"
+msgstr "Story"
+msgid "GALLERY_STORY_EMPTY"
+msgstr "Complete levels to unlock story entries."
+msgid "GALLERY_ITEM_UNKNOWN_TITLE"
+msgstr "???"
+msgid "GALLERY_NOT_DISCOVERED"
+msgstr "Not yet discovered"
+msgid "GALLERY_STORY_HINT"
+msgstr "Tap to read >"
+msgid "GALLERY_DOWNLOAD"
+msgstr "Download Image"
+msgid "GALLERY_OPEN"
+msgstr "Open Image"
+msgid "GALLERY_LOADING_AD"
+msgstr "Loading Ad..."
+msgid "GALLERY_DOWNLOADING"
+msgstr "Downloading..."
+msgid "GALLERY_DOWNLOAD_FAILED"
+msgstr "Download Failed"
+msgid "LOADING"
+msgstr "Loading..."
+msgid "UNKNOWN"
+msgstr "Unknown"
+
+# Story navigation
+msgid "STORY_PREV"
+msgstr "Previous"
+
+msgid "STORY_NEXT"
+msgstr "Next"
+
+# Shard toast notifications
+msgid "SHARD_TOAST_FOUND"
+msgstr "Shard Found!"
+
+msgid "SHARD_TOAST_UNLOCKED"
+msgstr "Item Unlocked!"
+
+msgid "SHARD_TOAST_PROGRESS"
+msgstr "%d / %d shards"
+
+# Reward summary panel
+msgid "UI_REWARDS_COINS"
+msgstr "%d Coins"
+
+msgid "UI_REWARDS_GEMS"
+msgstr "%d Gems"
+
+msgid "UI_REWARDS_NONE"
+msgstr "—"
+
+msgid "UI_REWARDS_SHARDS"
+msgstr "%d Shard(s) collected"
+
+msgid "UI_REWARDS_SHARD_UNLOCKED"
+msgstr "✨ %s Unlocked!"
+
