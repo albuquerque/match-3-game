@@ -42,6 +42,8 @@ var _level_start_in_progress: bool = false
 var gold_star_texture = load("res://textures/gold_star.svg") as Texture2D
 
 func _ready():
+	# Debug: indicate migrated UI WorldMap loaded
+	print("[WorldMap] loaded (res://scripts/ui/WorldMap.gd) _ready()")
 	"""Initialize the world map"""
 	screen_size = get_viewport_rect().size
 	_ensure_resolvers()

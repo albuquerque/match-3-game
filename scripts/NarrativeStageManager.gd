@@ -88,6 +88,12 @@ func load_stage_for_level(level_num: int) -> bool:
 	# the situation where a flow's requested stage is immediately replaced by a level-specific stage.
 	if active_stage_id != "":
 		print("[NarrativeStageManager] Active stage present (", active_stage_id, ") - skipping auto-load")
+		# Still emit hud_visibility_changed so GameUI gets the correct state
+		# for the already-active stage (avoids HUD staying hidden when it shouldn't).
+		var active_data = controller.current_stage_data if controller else null
+		var should_hide = active_data.get("hide_hud", false) if active_data else false
+		_hud_hidden_by_stage = should_hide
+		emit_signal("hud_visibility_changed", not should_hide)
 		return false
 
 	# Clear any existing stage

@@ -89,8 +89,17 @@ static func process_cascade(board: Node, gm: Node, initial_swap_pos: Vector2 = V
 		# --- Gravity and refill ---
 		print("[MatchOrchestrator] Applying gravity...")
 		await board.animate_gravity()
+		# Signal listeners (e.g. ShardDropSystem) can now inject COLLECTIBLE cells
+		# into empty grid slots before fill_empty_spaces assigns random tile types.
+		EventBus.emit_pre_refill()
 		print("[MatchOrchestrator] Refilling empty spaces...")
 		await board.animate_refill()
+		# Allow systems to tag freshly spawned tiles (e.g. shard_item_id meta).
+		EventBus.post_refill.emit()
+
+		# --- Collect any collectibles that have settled at the bottom row ---
+		if board.has_method("_check_collectibles_at_bottom"):
+			await board._check_collectibles_at_bottom()
 
 	# --- Post-cascade: check for remaining empty cells ---
 	var has_empties := false
@@ -106,6 +115,8 @@ static func process_cascade(board: Node, gm: Node, initial_swap_pos: Vector2 = V
 		print("[MatchOrchestrator] Empty cells found - running final gravity+refill")
 		await board.animate_gravity()
 		await board.animate_refill()
+		if board.has_method("_check_collectibles_at_bottom"):
+			await board._check_collectibles_at_bottom()
 
 	# --- Spreader spreading after all cascades ---
 	if gm.has_method("check_and_spread_tiles"):
@@ -120,15 +131,15 @@ static func process_cascade(board: Node, gm: Node, initial_swap_pos: Vector2 = V
 	# Emit board_idle signal
 	board.emit_signal("board_idle")
 
-	# Level completion check
-	if gm.has_method("_attempt_level_complete"):
+	# Level completion check — skip during bonus cascade to avoid re-entrant on_level_complete
+	if not gm.in_bonus_conversion and gm.has_method("_attempt_level_complete"):
 		gm._attempt_level_complete()
 
 	if board.get_tree() != null:
 		await board.get_tree().create_timer(0.2).timeout
 
-	# Auto-shuffle if no moves available
-	if not gm.has_possible_moves():
+	# Auto-shuffle if no moves available — skip during bonus (board state is managed by GFC)
+	if not gm.in_bonus_conversion and not gm.has_possible_moves():
 		print("[MatchOrchestrator] No valid moves detected! Auto-shuffling...")
 		await board.get_tree().create_timer(1.0).timeout
 		await board.perform_auto_shuffle()

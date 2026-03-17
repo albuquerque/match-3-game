@@ -16,7 +16,9 @@ var _setup_done : bool = false
 func setup(rewards_data: Dictionary) -> void:
 	_base_coins = rewards_data.get("coins", 0)
 	_base_gems  = rewards_data.get("gems",  0)
-	var stars_val : int = rewards_data.get("stars", 0)
+	var stars_val     : int   = rewards_data.get("stars", 0)
+	var shards_count  : int   = rewards_data.get("shards_collected", 0)
+	var items_unlocked: Array = rewards_data.get("items_unlocked", [])
 
 	# Resolve nodes now — the scene was instantiated and add_child called before
 	# setup(), so _ready has already fired and the tree is live.
@@ -40,6 +42,34 @@ func setup(rewards_data: Dictionary) -> void:
 	if _stars_label:
 		_stars_label.text = "⭐".repeat(stars_val) + "☆".repeat(max(0, 3 - stars_val))
 	_refresh_rewards_label(_base_coins, _base_gems)
+
+	# Shard summary — only shown when at least one shard was collected this level
+	if vbox and shards_count > 0:
+		var shard_label := Label.new()
+		shard_label.name = "ShardSummaryLabel"
+		shard_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		shard_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		shard_label.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))  # soft purple
+		var shard_text := "🔮 " + tr("UI_REWARDS_SHARDS") % shards_count
+		# List each newly unlocked item name on its own line
+		for item_id in items_unlocked:
+			var def := GalleryManager.get_progress(item_id) if GalleryManager else {}
+			var item_name: String = ""
+			if GalleryManager and GalleryManager._definitions.has(item_id):
+				item_name = str(GalleryManager._definitions[item_id].get("name", item_id))
+			else:
+				item_name = item_id
+			shard_text += "\n" + tr("UI_REWARDS_SHARD_UNLOCKED") % item_name
+		shard_label.text = shard_text
+		if tm and tm.has_method("apply_bangers_font"):
+			tm.apply_bangers_font(shard_label, 20)
+		# Insert before the spacer / MultiplierMiniGame / ClaimWrapper
+		var spacer := vbox.get_node_or_null("Spacer")
+		if spacer:
+			vbox.add_child(shard_label)
+			vbox.move_child(shard_label, spacer.get_index())
+		else:
+			vbox.add_child(shard_label)
 
 	# Wire claim button
 	if _claim_btn and not _claim_btn.pressed.is_connected(_on_claim_pressed):

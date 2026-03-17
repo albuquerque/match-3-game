@@ -77,6 +77,16 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 						tile.queue_free()
 				if GameManager.has_method("report_unmovable_destroyed"):
 					GameManager.report_unmovable_destroyed(key, revealed_type > 0 or is_coll)
+				# Notify EventBus so ShardDropSystem can react to obstacle clears
+				var _eb = EventBus if Engine.has_singleton("EventBus") else null
+				if not _eb:
+					var root = Engine.get_main_loop().root if Engine.get_main_loop() else null
+					if root:
+						_eb = root.get_node_or_null("EventBus")
+				if _eb:
+					var parts = key.split(",")
+					var gp := Vector2(int(parts[0]), int(parts[1])) if parts.size() == 2 else Vector2(-1, -1)
+					_eb.emit_tile_destroyed(key, {"is_obstacle": true, "grid_position": gp})
 
 static func damage_adjacent_spreaders(board: Node, tiles_ref: Array, matched_positions: Array) -> void:
 	## Destroy any spreader tile orthogonally adjacent to a matched position.

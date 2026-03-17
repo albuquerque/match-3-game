@@ -16,12 +16,12 @@ func _ready():
 	# Play menu music
 	var _am = NodeResolvers._get_am()
 	if _am and _am.has_method("play_music"):
-	 	_am.play_music("menu", 1.0)
+		_am.play_music("menu", 1.0)
 
 func _on_play_pressed():
 	var _am2 = NodeResolvers._get_am()
 	if _am2 and _am2.has_method("play_sfx"):
-	 	_am2.play_sfx("ui_click")
+		_am2.play_sfx("ui_click")
 	get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
 
 func _on_settings_pressed():

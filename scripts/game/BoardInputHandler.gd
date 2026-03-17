@@ -182,7 +182,6 @@ func perform_swap(tile1, tile2) -> void:
 	var matches = GameManager.find_matches()
 	if matches.size() > 0:
 		GameManager.use_move()
-		GameManager.add_score(GameManager.calculate_points(matches.size()))
 
 		var swap_pos_in_match = Vector2(-1, -1)
 		if pos1 in matches:

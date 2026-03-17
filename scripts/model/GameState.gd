@@ -15,6 +15,7 @@ var spreader_count: int = 0
 
 var TILE_TYPES: int = 6
 var COLLECTIBLE: int = 10
+var UNMOVABLE: int = 11  # Sentinel for unmovable cells — excluded from matching, not a hard blocker
 var SPREADER: int = 12
 
 func _init(w: int = 8, h: int = 8, tile_types: int = 6):
@@ -72,6 +73,12 @@ func fill_from_layout(layout: Array):
 					spreader_positions.append(Vector2(x, y))
 					spreader_count += 1
 					continue
+				elif token == "U" or token == "u":
+					# Soft unmovable — 1 hit, uses level default type
+					grid[x][y] = UNMOVABLE
+					var key_u = str(x) + "," + str(y)
+					unmovable_map[key_u] = {"hits": 1, "type": "snow", "hard": false}
+					continue
 				elif token.begins_with("H") and ":" in token:
 					var parts = token.substr(1, token.length()).split(":")
 					var hits = 1
@@ -79,7 +86,12 @@ func fill_from_layout(layout: Array):
 					if parts.size() >= 2:
 						hits = int(parts[0]) if parts[0].is_valid_int() else 1
 						htype = parts[1]
-					grid[x][y] = 0
+					# Use UNMOVABLE sentinel (11) so:
+					# - GravityService skips it via _is_unmovable_cell()
+					# - MatchFinder excludes it but does NOT break adjacent tile runs
+					# - is_cell_blocked() returns false (it's not a hard X cell)
+					# - Tile overlay correctly draws over it
+					grid[x][y] = UNMOVABLE
 					var key2 = str(x) + "," + str(y)
 					unmovable_map[key2] = {"hits": hits, "type": htype, "hard": true}
 					continue

@@ -133,14 +133,13 @@ func show_gameplay_ui() -> void:
 	print("[GameUI] Showing gameplay UI elements")
 	if _narrative_fullscreen_active:
 		return
-	# NOTE: HUD visibility is NOT set here — it is controlled exclusively by
-	# the narrative stage system (_on_narrative_hud_visibility_changed).
-	# This prevents the HUD from popping visible on level transition screens
-	# between a hide_hud level and the next level.
+	# Show HUD unless a narrative stage explicitly suppressed it for this level
+	if hud and not _narrative_hud_hidden:
+		hud.visible = true
 	if booster_bar: booster_bar.visible = true
 	if floating_menu: floating_menu.visible = true
 	if reward_notification: reward_notification.visible = true
-	print("[GameUI] ✓ Gameplay UI elements shown (HUD managed by narrative system)")
+	print("[GameUI] ✓ Gameplay UI elements shown")
 
 func show_hud() -> void:
 	"""Explicitly show the HUD. Called by the narrative system when a level
@@ -151,12 +150,13 @@ func show_hud() -> void:
 
 func hide_gameplay_ui() -> void:
 	print("[GameUI] Hiding gameplay UI elements")
-	if hud: hud.visible = false
+	# NOTE: HUD visibility is managed exclusively by _on_narrative_hud_visibility_changed.
+	# Do NOT touch hud.visible here — it races with the narrative system on level load.
 	if booster_bar: booster_bar.visible = false; print("[GameUI]   - BoosterPanel hidden")
 	if floating_menu: floating_menu.visible = false
 	if reward_notification: reward_notification.visible = false
 	if level_transition: level_transition.visible = false
-	print("[GameUI] ✓ All gameplay UI elements hidden")
+	print("[GameUI] ✓ Non-HUD gameplay UI elements hidden")
 
 func _on_narrative_hud_visibility_changed(hud_visible: bool) -> void:
 	"""Called when a stage with hide_hud:true loads."""

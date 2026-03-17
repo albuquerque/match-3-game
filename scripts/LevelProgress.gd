@@ -18,12 +18,12 @@ signal level_selected(level)
 var NodeResolvers = null
 
 func _ensure_resolvers():
-    if NodeResolvers == null:
-        var s = load("res://scripts/helpers/node_resolvers_api.gd")
-        if s != null and typeof(s) != TYPE_NIL:
-            NodeResolvers = s
-        else:
-            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
+	if NodeResolvers == null:
+		var s = load("res://scripts/helpers/node_resolvers_api.gd")
+		if s != null and typeof(s) != TYPE_NIL:
+			NodeResolvers = s
+		else:
+			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 func _ready():
 	print("LevelProgress scene is ready.")

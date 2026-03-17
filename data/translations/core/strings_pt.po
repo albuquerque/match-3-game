@@ -268,11 +268,7 @@ msgstr "TENTAR NOVAMENTE"
 msgid "UI_EXIT_TO_MAP"
 msgstr "SAIR PARA O MAPA"
 
-msgid "UI_REWARDS_COINS"
-msgstr "💰 Moedas: +%d"
 
-msgid "UI_REWARDS_GEMS"
-msgstr "💎 Gemas: +%d"
 
 msgid "UI_REWARDS_LIVES"
 msgstr "❤️ +%d Vidas"
@@ -286,8 +282,6 @@ msgstr "%d Estrelas!"
 msgid "UI_REWARDS_GENERIC"
 msgstr "🎁 Recompensa!"
 
-msgid "UI_REWARDS_NONE"
-msgstr "Completo!"
 
 msgid "UI_GALLERY_IMAGES_UNLOCKED"
 msgstr "🖼️ Imagens da Galeria Desbloqueadas: %d"
@@ -886,4 +880,63 @@ msgid "Harvest Blessing"
 msgstr "Bênção da Colheita"
 msgid "Collect 1000 coins in autumn"
 msgstr "Colete 1000 moedas no outono"
+
+# Gallery UI keys
+msgid "GALLERY_TAB_STORY"
+msgstr "História"
+msgid "GALLERY_STORY_EMPTY"
+msgstr "Complete níveis para desbloquear entradas da história."
+msgid "GALLERY_ITEM_UNKNOWN_TITLE"
+msgstr "???"
+msgid "GALLERY_NOT_DISCOVERED"
+msgstr "Ainda não descoberto"
+msgid "GALLERY_STORY_HINT"
+msgstr "Toque para ler >"
+msgid "GALLERY_DOWNLOAD"
+msgstr "Baixar Imagem"
+msgid "GALLERY_OPEN"
+msgstr "Abrir Imagem"
+msgid "GALLERY_LOADING_AD"
+msgstr "Carregando anúncio..."
+msgid "GALLERY_DOWNLOADING"
+msgstr "Baixando..."
+msgid "GALLERY_DOWNLOAD_FAILED"
+msgstr "Falha no download"
+msgid "LOADING"
+msgstr "Carregando..."
+msgid "UNKNOWN"
+msgstr "Desconhecido"
+
+# Story navigation
+msgid "STORY_PREV"
+msgstr "Anterior"
+
+msgid "STORY_NEXT"
+msgstr "Próximo"
+
+# Shard toast notifications
+msgid "SHARD_TOAST_FOUND"
+msgstr "Fragmento Encontrado!"
+
+msgid "SHARD_TOAST_UNLOCKED"
+msgstr "Item Desbloqueado!"
+
+msgid "SHARD_TOAST_PROGRESS"
+msgstr "%d / %d fragmentos"
+
+# Reward summary panel
+msgid "UI_REWARDS_COINS"
+msgstr "%d Moedas"
+
+msgid "UI_REWARDS_GEMS"
+msgstr "%d Gemas"
+
+msgid "UI_REWARDS_NONE"
+msgstr "—"
+
+msgid "UI_REWARDS_SHARDS"
+msgstr "%d fragmento(s) coletado(s)"
+
+msgid "UI_REWARDS_SHARD_UNLOCKED"
+msgstr "✨ %s Desbloqueado!"
 

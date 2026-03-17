@@ -26,8 +26,21 @@ func _ready() -> void:
 		for id in BOOSTER_KEYS:
 			var btn: Button = hbox.get_node_or_null(BUTTON_NAMES.get(id, ""))
 			if btn:
+				# Ensure the visual children don't intercept input (but keep the button interactive)
+				_ignore_children_recursive(btn)
 				btn.pressed.connect(_on_button_pressed.bind(id))
 	_connect_signals()
+
+# Recursively set mouse_filter IGNORE on all children of node (but not node itself)
+static func _ignore_children_recursive(node: Node) -> void:
+	for child in node.get_children():
+		if child is Control:
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+			# recurse into grandchildren
+			_ignore_children_recursive(child)
+		else:
+			# still recurse to handle nested control trees
+			_ignore_children_recursive(child)
 
 func _connect_signals() -> void:
 	var rm = _rm()

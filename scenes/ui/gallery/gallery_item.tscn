@@ -1,0 +1,49 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="GalleryItem" type="Control"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+rect_min_size = Vector2(210, 240)
+
+[node name="SilhouetteContainer" type="CenterContainer" parent="."]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.72
+
+[node name="Silhouette" type="TextureRect" parent="SilhouetteContainer"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+expand = false
+stretch_mode = 2
+rect_min_size = Vector2(120,96)
+margin_left = 6.0
+margin_top = 6.0
+margin_right = 6.0
+margin_bottom = 6.0
+size_flags_horizontal = 0
+size_flags_vertical = 0
+
+[node name="Title" type="Label" parent="."]
+anchor_left = 0.02
+anchor_top = 0.74
+anchor_right = 0.98
+anchor_bottom = 0.88
+text = "Unknown Artifact"
+valign = 0
+autowrap = true
+margin_left = 6.0
+margin_right = 6.0
+
+[node name="Progress" type="Label" parent="."]
+anchor_left = 0.02
+anchor_top = 0.88
+anchor_right = 0.98
+anchor_bottom = 0.98
+text = "0 / 9"
+valign = 0
+align = 2

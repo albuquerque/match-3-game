@@ -1,0 +1,9 @@
+{
+	"shards": {
+		"max_shards_per_level": 2,
+		"shard_unlock_from_level": 5,
+		"spawn_chance_per_match": 0.25,
+		"spawn_bonus_per_extra": 0.05,
+		"obstacle_reveal_chance": 0.40
+	}
+}

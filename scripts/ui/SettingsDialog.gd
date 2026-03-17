@@ -65,6 +65,7 @@ const MUSIC_ENABLED_SETTING = "match3/audio/music_enabled"
 const SFX_ENABLED_SETTING = "match3/audio/sfx_enabled"
 
 func _ready():
+	print("[SettingsDialog] loaded (res://scripts/ui/SettingsDialog.gd) _ready()")
 	# Ensure UI nodes exist (creates Panel/VBoxContainer/etc if missing)
 	_create_ui_if_missing()
 

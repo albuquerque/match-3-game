@@ -256,11 +256,7 @@ msgstr "RÉESSAYER"
 msgid "UI_EXIT_TO_MAP"
 msgstr "RETOUR À LA CARTE"
 
-msgid "UI_REWARDS_COINS"
-msgstr "💰 Pièces: +%d"
 
-msgid "UI_REWARDS_GEMS"
-msgstr "💎 Gemmes: +%d"
 
 msgid "UI_REWARDS_LIVES"
 msgstr "❤️ +%d Vies"
@@ -274,8 +270,6 @@ msgstr "%d Étoiles!"
 msgid "UI_REWARDS_GENERIC"
 msgstr "🎁 Récompense!"
 
-msgid "UI_REWARDS_NONE"
-msgstr "Complété!"
 
 msgid "UI_GALLERY_IMAGES_UNLOCKED"
 msgstr "🖼️ Images de Galerie Débloquées: %d"
@@ -902,3 +896,62 @@ msgstr "OK"
 
 msgid "UI_CLAIM"
 msgstr "Réclamer les Récompenses"
+# Gallery UI keys
+msgid "GALLERY_TAB_STORY"
+msgstr "Histoire"
+msgid "GALLERY_STORY_EMPTY"
+msgstr "Complétez les niveaux pour débloquer des entrées d'histoire."
+msgid "GALLERY_ITEM_UNKNOWN_TITLE"
+msgstr "???"
+msgid "GALLERY_NOT_DISCOVERED"
+msgstr "Pas encore découvert"
+msgid "GALLERY_STORY_HINT"
+msgstr "Appuyez pour lire >"
+msgid "GALLERY_DOWNLOAD"
+msgstr "Télécharger l'image"
+msgid "GALLERY_OPEN"
+msgstr "Ouvrir l'image"
+msgid "GALLERY_LOADING_AD"
+msgstr "Chargement annonce..."
+msgid "GALLERY_DOWNLOADING"
+msgstr "Téléchargement..."
+msgid "GALLERY_DOWNLOAD_FAILED"
+msgstr "Téléchargement échoué"
+msgid "LOADING"
+msgstr "Chargement..."
+msgid "UNKNOWN"
+msgstr "Inconnu"
+
+# Story navigation
+msgid "STORY_PREV"
+msgstr "Précédent"
+
+msgid "STORY_NEXT"
+msgstr "Suivant"
+
+# Shard toast notifications
+msgid "SHARD_TOAST_FOUND"
+msgstr "Fragment Trouvé !"
+
+msgid "SHARD_TOAST_UNLOCKED"
+msgstr "Objet Débloqué !"
+
+msgid "SHARD_TOAST_PROGRESS"
+msgstr "%d / %d fragments"
+
+# Reward summary panel
+msgid "UI_REWARDS_COINS"
+msgstr "%d Pièces"
+
+msgid "UI_REWARDS_GEMS"
+msgstr "%d Gemmes"
+
+msgid "UI_REWARDS_NONE"
+msgstr "—"
+
+msgid "UI_REWARDS_SHARDS"
+msgstr "%d fragment(s) collecté(s)"
+
+msgid "UI_REWARDS_SHARD_UNLOCKED"
+msgstr "✨ %s Débloqué !"
+
