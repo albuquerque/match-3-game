@@ -28,6 +28,12 @@ var waiting_for_ad_complete: bool = false
 
 var _nr = null
 
+# ── PR 3: Shadow Mode ─────────────────────────────────────────────────────────
+## Match3Game instance running in parallel with the old system.
+## Its signals are observed (logged) but the old system still drives gameplay.
+## In PR 4 we will cut over and let this node be the sole driver.
+var _match3_game: Node = null
+
 func _ready():
 	print("============================================================")
 	print("[ExperienceDirector] *** STARTING INITIALIZATION ***")
@@ -65,6 +71,23 @@ func _create_components():
 	flow_coordinator.connect("flow_failed", Callable(self, "_on_flow_coordinator_flow_failed"))
 
 	print("[ExperienceDirector] FlowCoordinator created (legacy components removed)")
+
+	# ── PR 3: Shadow Mode — instantiate Match3Game alongside the old system ────
+	# Match3Game.tscn is loaded as a PackedScene so Godot sets it up properly.
+	# We add it as a child so it exists in the tree, receives _ready(), and its
+	# GameBoard child can register with GameManager.  The old system is untouched.
+	var m3_scene = load("res://games/match3/Match3Game.tscn")
+	if m3_scene:
+		_match3_game = m3_scene.instantiate()
+		_match3_game.name = "Match3GameShadow"
+		add_child(_match3_game)
+		# Connect BaseGame signals for shadow observation only — no old-flow changes.
+		_match3_game.connect("game_won", _on_shadow_game_won)
+		_match3_game.connect("game_lost", _on_shadow_game_lost)
+		print("[ExperienceDirector] [PR3] Match3Game shadow instance active — old system still drives gameplay")
+	else:
+		push_warning("[ExperienceDirector] [PR3] Could not load Match3Game.tscn — shadow mode skipped")
+
 	print("[ExperienceDirector] Components created")
 
 # Phase 12.3: Migration for existing players
@@ -898,6 +921,19 @@ func _process_dlc_flow_node(node: Dictionary):
 			print("[ExperienceDirector] ERROR: Required DLC missing")
 		# Continue
 		_complete_current_node()
+
+# ============================================
+# PR 3: Shadow Mode — Match3Game signal observers
+# These handlers ONLY log. The old system (GameManager / GameFlowController)
+# still drives all actual gameplay behaviour.  In PR 4 these will become the
+# live handlers and the old system will be removed.
+# ============================================
+
+func _on_shadow_game_won() -> void:
+	print("[ExperienceDirector] [PR3 SHADOW] game_won received from Match3Game — old system handles transition")
+
+func _on_shadow_game_lost() -> void:
+	print("[ExperienceDirector] [PR3 SHADOW] game_lost received from Match3Game — old system handles transition")
 
 # ============================================
 # FlowCoordinator Signal Forwarding

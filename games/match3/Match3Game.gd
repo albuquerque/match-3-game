@@ -1,13 +1,15 @@
-## Match3Game — Thin wrapper that owns the Match3 board and surfaces win/loss
-## through the BaseGame interface.
+## Match3Game — Thin wrapper that surfaces win/loss through the BaseGame interface.
 ##
 ## Responsibilities (and ONLY these):
-##   1. Hold a reference to GameBoard (its direct child in Match3Game.tscn).
-##   2. Bridge GameManager.level_complete → BaseGame.game_won signal.
-##   3. Bridge GameManager.game_over    → BaseGame.game_lost signal.
-##   4. Implement start() / stop() as required by BaseGame.
+##   1. Bridge GameManager.level_complete → BaseGame.game_won signal.
+##   2. Bridge GameManager.game_over    → BaseGame.game_lost signal.
+##   3. Implement start() / stop() as required by BaseGame.
 ##
-## ✅ PR 2 — old system still drives gameplay; this node is wired in parallel.
+## ⚠️  GameBoard is NOT a child of Match3Game.tscn in shadow mode (PR 2–3).
+##     The board lives in MainGame.tscn and is driven by GameManager.
+##     In PR 6 the board will be moved here and the tscn updated.
+##
+## ✅ PR 2/3 — old system still drives gameplay; this node observes in parallel.
 ## ❌ Does NOT touch MatchOrchestrator, EventBus, or any other subsystem.
 class_name Match3Game
 extends BaseGame
