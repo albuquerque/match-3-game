@@ -47,6 +47,86 @@
         "duration": { "type": "number", "example": 1.0 }
       },
       "example": { "particle_type": "spark", "count": 30, "duration": 1.0 }
+    },
+    {
+      "id": "narrative_dialogue",
+      "description": "Show narrative dialogue UI",
+      "params": {}
+    },
+    {
+      "id": "camera_impulse",
+      "description": "Small camera impulse/shake effect (alias for screen shake-like effects)",
+      "params": {}
+    },
+    {
+      "id": "play_animation",
+      "description": "Play a named UI or sprite animation",
+      "params": { "animation": { "type": "string" } }
+    },
+    {
+      "id": "vignette",
+      "description": "Apply vignette post-process effect",
+      "params": {}
+    },
+    {
+      "id": "background_dim",
+      "description": "Dim the background layer",
+      "params": {}
+    },
+    {
+      "id": "gameplay_pause",
+      "description": "Temporarily pause gameplay for a cutscene or dialog",
+      "params": {}
+    },
+    {
+      "id": "shader_param_lerp",
+      "description": "Animate a shader parameter over time",
+      "params": {}
+    },
+    {
+      "id": "foreground_dim",
+      "description": "Dim the foreground UI layer",
+      "params": {}
+    },
+    {
+      "id": "camera_lerp",
+      "description": "Smoothly move camera to a target offset",
+      "params": {}
+    },
+    {
+      "id": "cutscene",
+      "description": "Trigger a cutscene sequence",
+      "params": {}
+    },
+    {
+      "id": "symbolic_overlay",
+      "description": "Show an overlay element (symbolic) on screen",
+      "params": {}
+    },
+    {
+      "id": "state_swap",
+      "description": "Swap visual or logical states as part of a scene transition",
+      "params": {}
+    },
+    {
+      "id": "screen_overlay",
+      "description": "Show a full-screen overlay (e.g., tint, UI)",
+      "params": {}
+    },
+    {
+      "id": "spawn_particles",
+      "description": "Spawn particles of a given type",
+      "params": { "particle_type": { "type": "string" }, "count": { "type": "integer" } }
+    },
+    {
+      "id": "timeline_sequence",
+      "description": "Execute a timeline of sequenced actions",
+      "params": {}
+    },
+    {
+      "id": "screen_shake",
+      "description": "Alias for camera_shake / screen impulse effects (used in some narrative JSON)",
+      "params": { "magnitude": { "type": "number" }, "duration": { "type": "number" } }
     }
   ]
 }
