@@ -28,10 +28,11 @@ var waiting_for_ad_complete: bool = false
 
 var _nr = null
 
-# ── PR 3: Shadow Mode ─────────────────────────────────────────────────────────
-## Match3Game instance running in parallel with the old system.
-## Its signals are observed (logged) but the old system still drives gameplay.
-## In PR 4 we will cut over and let this node be the sole driver.
+# ── PR 4: Match3Game is now the live win/loss signal source ──────────────────
+## ExperienceDirector listens to game_won / game_lost from Match3Game and
+## advances the flow accordingly. GameManager still drives the board internals
+## (gravity, matching, scoring) — that is PR 5's concern.
+## ExperienceDirector no longer reaches into GameManager directly for level routing.
 var _match3_game: Node = null
 
 func _ready():
@@ -72,21 +73,20 @@ func _create_components():
 
 	print("[ExperienceDirector] FlowCoordinator created (legacy components removed)")
 
-	# ── PR 3: Shadow Mode — instantiate Match3Game alongside the old system ────
-	# Match3Game.tscn is loaded as a PackedScene so Godot sets it up properly.
-	# We add it as a child so it exists in the tree, receives _ready(), and its
-	# GameBoard child can register with GameManager.  The old system is untouched.
+	# ── PR 4: Instantiate Match3Game — now the live win/loss signal source ────
+	# Match3Game.tscn has no GameBoard child (fixed in PR 3 ghost-tile bugfix).
+	# It connects to GameManager signals internally and re-emits them as
+	# game_won / game_lost on the BaseGame interface.
 	var m3_scene = load("res://games/match3/Match3Game.tscn")
 	if m3_scene:
 		_match3_game = m3_scene.instantiate()
-		_match3_game.name = "Match3GameShadow"
+		_match3_game.name = "Match3Game"
 		add_child(_match3_game)
-		# Connect BaseGame signals for shadow observation only — no old-flow changes.
-		_match3_game.connect("game_won", _on_shadow_game_won)
-		_match3_game.connect("game_lost", _on_shadow_game_lost)
-		print("[ExperienceDirector] [PR3] Match3Game shadow instance active — old system still drives gameplay")
+		_match3_game.connect("game_won", _on_match3_game_won)
+		_match3_game.connect("game_lost", _on_match3_game_lost)
+		print("[ExperienceDirector] [PR4] Match3Game live — win/loss routed through BaseGame signals")
 	else:
-		push_warning("[ExperienceDirector] [PR3] Could not load Match3Game.tscn — shadow mode skipped")
+		push_warning("[ExperienceDirector] [PR4] Could not load Match3Game.tscn")
 
 	print("[ExperienceDirector] Components created")
 
@@ -335,54 +335,41 @@ func _process_current_node():
 
 # Node processors
 func _process_level_node(node: Dictionary):
-	"""Process a level node"""
-
+	"""Process a level node.
+	PR 4: ExperienceDirector only triggers the load via GameUI.
+	Completion is signalled by Match3Game.game_won → _on_match3_game_won.
+	ExperienceDirector no longer reads from or writes to GameManager directly.
+	"""
 	var level_id = node.get("id", "")
 	print("[ExperienceDirector] Triggering level: ", level_id)
 
-	# Extract level number from ID (e.g., "level_01" -> 1)
 	var level_num = _extract_level_number(level_id)
 
-	if level_num > 0:
-		# Set flag to wait for level completion
-		waiting_for_level_complete = true
-
-		# Trigger level load via GameUI (resolver-first)
-		var game_ui = NodeResolvers._get_main_game() if "_get_main_game" in NodeResolvers else null
-		if not game_ui:
-			game_ui = NodeResolvers._fallback_autoload("MainGame")
-		# Fallback to scene root (no literal '/root/')
-		if game_ui == null and has_method("get_tree"):
-			var rt = get_tree().root
-			if rt:
-				var main_game = rt.get_node_or_null("MainGame")
-				if main_game:
-					game_ui = main_game.get_node_or_null("GameUI")
-
-		if game_ui and game_ui.has_method("_load_level_by_number"):
-			print("[ExperienceDirector] Loading level %d via GameUI" % level_num)
-			# Call the level loader directly - it's async so will handle everything
-			game_ui._load_level_by_number(level_num)
-		else:
-			# Fallback: set level number via GameManager
-			print("[ExperienceDirector] WARNING: GameUI not available, using fallback to GameManager")
-			var gm = NodeResolvers._get_gm()
-			if gm == null and has_method("get_tree"):
-				var rt2 = get_tree().root
-				if rt2:
-					gm = rt2.get_node_or_null("GameManager")
-			if gm:
-				if gm.has_method("set_level"):
-					gm.set_level(level_num)
-				elif "level" in gm:
-					gm.level = level_num
-				else:
-					print("[ExperienceDirector] ERROR: GameManager exists but cannot set level")
-			else:
-				print("[ExperienceDirector] ERROR: No GameManager available to set level %d" % level_num)
-			_complete_current_node()
-	else:
+	if level_num <= 0:
 		print("[ExperienceDirector] ERROR: Invalid level ID: ", level_id)
+		_complete_current_node()
+		return
+
+	# Mark that we are waiting — _on_match3_game_won will clear this.
+	waiting_for_level_complete = true
+
+	# Resolve GameUI from the scene tree — ExperienceDirector's only legal
+	# point of contact with the gameplay layer for level loading.
+	var game_ui: Node = null
+	if has_method("get_tree"):
+		var rt = get_tree().root
+		if rt:
+			var main_game = rt.get_node_or_null("MainGame")
+			if main_game:
+				game_ui = main_game.get_node_or_null("GameUI")
+
+	if game_ui and game_ui.has_method("_load_level_by_number"):
+		print("[ExperienceDirector] Loading level %d via GameUI" % level_num)
+		game_ui._load_level_by_number(level_num)
+		# Flow stays open — _on_match3_game_won / _on_match3_game_lost will advance it.
+	else:
+		push_warning("[ExperienceDirector] GameUI not found — cannot load level %d" % level_num)
+		waiting_for_level_complete = false
 		_complete_current_node()
 
 func _process_narrative_stage_node(node: Dictionary):
@@ -399,10 +386,9 @@ func _process_narrative_stage_node(node: Dictionary):
 	# Set flag to wait for narrative completion
 	waiting_for_narrative_complete = true
 
-	# Trigger narrative stage via NarrativeStageManager (resolver-first)
-	var narrative_manager = NodeResolvers._fallback_autoload("NarrativeStageManager")
-	# scene root fallback (no '/root/')
-	if narrative_manager == null and has_method("get_tree"):
+	# Resolve NarrativeStageManager from the scene tree.
+	var narrative_manager: Node = null
+	if has_method("get_tree"):
 		var rtl = get_tree().root
 		if rtl:
 			narrative_manager = rtl.get_node_or_null("NarrativeStageManager")
@@ -923,17 +909,28 @@ func _process_dlc_flow_node(node: Dictionary):
 		_complete_current_node()
 
 # ============================================
-# PR 3: Shadow Mode — Match3Game signal observers
-# These handlers ONLY log. The old system (GameManager / GameFlowController)
-# still drives all actual gameplay behaviour.  In PR 4 these will become the
-# live handlers and the old system will be removed.
+# PR 4: Match3Game win/loss handlers — now drive the flow
 # ============================================
 
-func _on_shadow_game_won() -> void:
-	print("[ExperienceDirector] [PR3 SHADOW] game_won received from Match3Game — old system handles transition")
+func _on_match3_game_won() -> void:
+	print("[ExperienceDirector] [PR4] game_won — advancing flow")
+	if not waiting_for_level_complete:
+		# Spurious signal (e.g. fired before a level node was active). Ignore.
+		print("[ExperienceDirector] [PR4] game_won ignored — not waiting for level completion")
+		return
+	waiting_for_level_complete = false
+	# The pipeline's LoadLevelStep already received level_complete via EventBus
+	# and called step_completed. _complete_current_node() keeps ExperienceDirector's
+	# own legacy state in sync (marked-completed, auto-advance).
+	if processing_node:
+		_complete_current_node()
 
-func _on_shadow_game_lost() -> void:
-	print("[ExperienceDirector] [PR3 SHADOW] game_lost received from Match3Game — old system handles transition")
+func _on_match3_game_lost() -> void:
+	print("[ExperienceDirector] [PR4] game_lost — flow stays at current level node (player can retry)")
+	# On loss we do NOT advance the flow — the player retries the same level.
+	# waiting_for_level_complete stays true so the next game_won will advance normally.
+	# LoadLevelStep already handled the failure path via EventBus.level_failed.
+	waiting_for_level_complete = false
 
 # ============================================
 # FlowCoordinator Signal Forwarding
