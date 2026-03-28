@@ -176,6 +176,67 @@ const TIER_WEIGHTS = {
 # Board reference - set by GameBoard at runtime to avoid repeated get_node lookups
 var board_ref: Node = null
 
+# ── PR 5a: GameRunState delegation ───────────────────────────────────────────
+## Resolve the GameRunState autoload safely (available after _ready).
+func _grs() -> Node:
+	return get_node_or_null("/root/GameRunState")
+
+## Push all mutable game data to GameRunState so PR-5b call sites can read
+## from GameRunState directly without any other changes.
+## Call this after any batch of field mutations.
+func _push_to_grs() -> void:
+	var grs = _grs()
+	if grs == null:
+		return
+	# Grid dimensions
+	grs.GRID_WIDTH  = GRID_WIDTH
+	grs.GRID_HEIGHT = GRID_HEIGHT
+	# Core state
+	grs.score        = score
+	grs.level        = level
+	grs.moves_left   = moves_left
+	grs.target_score = target_score
+	grs.grid         = grid
+	grs.combo_count  = combo_count
+	grs.initialized  = initialized
+	# Flow flags
+	grs.processing_moves       = processing_moves
+	grs.level_transitioning    = level_transitioning
+	grs.pending_level_complete = pending_level_complete
+	grs.pending_level_failed   = pending_level_failed
+	grs.in_bonus_conversion    = in_bonus_conversion
+	grs.bonus_skipped          = bonus_skipped
+	# Last-level snapshot
+	grs.last_level_won        = last_level_won
+	grs.last_level_score      = last_level_score
+	grs.last_level_target     = last_level_target
+	grs.last_level_number     = last_level_number
+	grs.last_level_moves_left = last_level_moves_left
+	# Collectibles
+	grs.collectibles_collected = collectibles_collected
+	grs.collectible_target     = collectible_target
+	grs.collectible_type       = collectible_type
+	grs.collectible_positions  = collectible_positions
+	# Unmovables
+	grs.unmovable_type     = unmovable_type
+	grs.unmovables_cleared = unmovables_cleared
+	grs.unmovable_target   = unmovable_target
+	grs.unmovable_map      = unmovable_map
+	# Spreaders
+	grs.use_spreader_objective       = use_spreader_objective
+	grs.spreader_count               = spreader_count
+	grs.spreader_positions           = spreader_positions
+	grs.spreaders_destroyed_this_turn = spreaders_destroyed_this_turn
+	grs.spreader_grace_default       = spreader_grace_default
+	grs.max_spreaders                = max_spreaders
+	grs.spreader_spread_limit        = spreader_spread_limit
+	grs.spreader_textures_map        = spreader_textures_map
+	grs.spreader_type                = spreader_type
+	# Boosters
+	grs.available_boosters = available_boosters
+	# Special tile request
+	grs.requested_special_tile = requested_special_tile
+
 func register_board(board: Node) -> void:
 	"""Register the active GameBoard instance so GameManager can use it without scene-tree lookups.
 	Also connect to board request signals to accept delegated responsibilities (remove_matches, gravity, refill).
@@ -283,6 +344,7 @@ func reset_state_for_new_level():
 	if GalleryManager and GalleryManager.has_method("reset_session"):
 		GalleryManager.reset_session()
 	print("[GameManager] reset_state_for_new_level: cleared transient flags")
+	_push_to_grs()
 
 func load_current_level():
 	# D1: Data loading delegated to LevelLoader; post-load signals emitted here.
@@ -304,6 +366,9 @@ func load_current_level():
 	_load_level_narrative()
 
 	emit_signal("level_loaded")
+
+	# PR 5a: push all level data to GameRunState so sub-services can migrate to it in PR 5b
+	_push_to_grs()
 
 	# Notify EventBus for narrative pipeline
 	var _eb = NodeResolverAPI._get_evbus() if typeof(NodeResolverAPI) != TYPE_NIL else null
@@ -569,6 +634,7 @@ func add_score(points: int) -> void:
 	score += int(points)
 	print("[GameManager] add_score: added ", points, " new total=", score)
 	emit_signal("score_changed", score)
+	var grs = _grs(); if grs: grs.score = score
 
 func report_spreader_destroyed(pos: Vector2) -> void:
 	# B4: Delegate count tracking to ObjectiveManager; keep spreader_positions/count in sync
@@ -580,6 +646,7 @@ func report_spreader_destroyed(pos: Vector2) -> void:
 	if objective_manager_ref != null and objective_manager_ref.has_method("report_spreader_destroyed"):
 		objective_manager_ref.report_spreader_destroyed(1)
 	call_deferred("emit_signal", "spreaders_changed", spreader_count)
+	var grs = _grs(); if grs: grs.spreader_count = spreader_count; grs.spreader_positions = spreader_positions; grs.spreaders_destroyed_this_turn = spreaders_destroyed_this_turn
 
 func report_unmovable_destroyed(pos, skip_clear: bool = false) -> void:
 	# B4: Delegate count tracking to ObjectiveManager; keep unmovable_map in sync
@@ -597,6 +664,7 @@ func report_unmovable_destroyed(pos, skip_clear: bool = false) -> void:
 			var gy = int(parts[1])
 			if gx >= 0 and gx < GRID_WIDTH and gy >= 0 and gy < GRID_HEIGHT:
 				grid[gx][gy] = 0
+	var grs = _grs(); if grs: grs.unmovable_map = unmovable_map; grs.unmovables_cleared = unmovables_cleared; grs.grid = grid
 
 # Add var to record requested special creation
 var requested_special_tile: Dictionary = {}  # {"pos": Vector2, "type": String}
@@ -694,6 +762,8 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 		if EventBus:
 			EventBus.emit_match_cleared(tiles_removed, {"level": level, "score": score, "target": target_score})
 
+	var grs = _grs(); if grs: grs.grid = grid; grs.combo_count = combo_count
+
 	return tiles_removed
 
 
@@ -723,6 +793,7 @@ func collectible_landed_at(pos: Vector2, c_type: String = "coin") -> void:
 	if objective_manager_ref != null and objective_manager_ref.has_method("report_collectible_collected"):
 		objective_manager_ref.report_collectible_collected(1)
 	call_deferred("emit_signal", "collectibles_changed", collectibles_collected, collectible_target)
+	var grs = _grs(); if grs: grs.collectibles_collected = collectibles_collected; grs.collectible_positions = collectible_positions
 
 	# Check if all objectives are now met — mirrors the check in remove_matches() so
 	# collecting the final coin via landing (not just tile removal) triggers level completion.
@@ -782,6 +853,7 @@ func use_move() -> void:
 	if moves_left <= 0:
 		pending_level_failed = true
 		call_deferred("_perform_level_failed_check")
+	var grs = _grs(); if grs: grs.moves_left = moves_left; grs.pending_level_failed = pending_level_failed
 
 func has_possible_moves() -> bool:
 	# C3: Check if any swap yields a match. Uses MatchFinder on a shallow grid copy.
@@ -878,6 +950,7 @@ func check_and_spread_tiles() -> Array:
 		spreader_count = spreader_positions.size()
 		grid = res.get("grid", grid)
 		call_deferred("emit_signal", "spreaders_changed", spreader_count)
+		var grs = _grs(); if grs: grs.spreader_positions = spreader_positions; grs.spreader_count = spreader_count; grs.grid = grid
 		return new_list
 	return []
 
