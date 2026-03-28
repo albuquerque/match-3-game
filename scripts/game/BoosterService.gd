@@ -96,7 +96,7 @@ static func activate_row_clear(row: int) -> void:
 		board._create_row_clear_effect(row)
 	# Logic: clear all tiles in row via GameManager
 	var to_clear = []
-	for x in range(GameManager.GRID_WIDTH):
+	for x in range(GameRunState.GRID_WIDTH):
 		if not GameManager.is_cell_blocked(x, row):
 			to_clear.append(Vector2(x, row))
 	GameManager.remove_matches(to_clear)
@@ -107,7 +107,7 @@ static func activate_column_clear(col: int) -> void:
 	if board and board.has_method("_create_column_clear_effect"):
 		board._create_column_clear_effect(col)
 	var to_clear = []
-	for y in range(GameManager.GRID_HEIGHT):
+	for y in range(GameRunState.GRID_HEIGHT):
 		if not GameManager.is_cell_blocked(col, y):
 			to_clear.append(Vector2(col, y))
 	GameManager.remove_matches(to_clear)
@@ -126,7 +126,7 @@ static func activate_bomb_3x3(x: int, y: int) -> void:
 		for dy in range(-1,2):
 			var nx = x + dx
 			var ny = y + dy
-			if nx >= 0 and nx < GameManager.GRID_WIDTH and ny >=0 and ny < GameManager.GRID_HEIGHT and not GameManager.is_cell_blocked(nx, ny):
+			if nx >= 0 and nx < GameRunState.GRID_WIDTH and ny >=0 and ny < GameRunState.GRID_HEIGHT and not GameManager.is_cell_blocked(nx, ny):
 				positions.append(Vector2(nx, ny))
 	var board = _get_board()
 	if board and board.has_method("_create_impact_particles"):
@@ -138,11 +138,11 @@ static func activate_line_blast(direction: String, x: int, y: int) -> void:
 	print("[BoosterService] activate_line_blast:", direction, x, y)
 	var positions = []
 	if direction == "horizontal":
-		for cx in range(GameManager.GRID_WIDTH):
+		for cx in range(GameRunState.GRID_WIDTH):
 			if not GameManager.is_cell_blocked(cx, y):
 				positions.append(Vector2(cx, y))
 	else:
-		for cy in range(GameManager.GRID_HEIGHT):
+		for cy in range(GameRunState.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(x, cy):
 				positions.append(Vector2(x, cy))
 	var board = _get_board()

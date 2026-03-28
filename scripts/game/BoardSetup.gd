@@ -17,13 +17,13 @@ static func calculate_responsive_layout(board: Node) -> void:
 	var available_width = screen_size.x - (board.board_margin * 2)
 	var available_height = screen_size.y - ui_top_space - ui_bottom_space - (board.board_margin * 2)
 
-	var max_tile_size_width  = available_width  / GameManager.GRID_WIDTH
-	var max_tile_size_height = available_height / GameManager.GRID_HEIGHT
+	var max_tile_size_width  = available_width  / GameRunState.GRID_WIDTH
+	var max_tile_size_height = available_height / GameRunState.GRID_HEIGHT
 	board.tile_size = min(max_tile_size_width, max_tile_size_height)
 	board.tile_size = max(board.tile_size, 50.0)
 
-	var total_grid_width  = GameManager.GRID_WIDTH  * board.tile_size
-	var total_grid_height = GameManager.GRID_HEIGHT * board.tile_size
+	var total_grid_width  = GameRunState.GRID_WIDTH  * board.tile_size
+	var total_grid_height = GameRunState.GRID_HEIGHT * board.tile_size
 
 	board.grid_offset = Vector2(
 		(screen_size.x - total_grid_width) / 2,
@@ -41,8 +41,8 @@ static func setup_background(board: Node) -> void:
 	if background:
 		background.visible = false
 		var board_size = Vector2(
-			GameManager.GRID_WIDTH  * board.tile_size + 20,
-			GameManager.GRID_HEIGHT * board.tile_size + 20
+			GameRunState.GRID_WIDTH  * board.tile_size + 20,
+			GameRunState.GRID_HEIGHT * board.tile_size + 20
 		)
 		background.color    = board.BOARD_BACKGROUND_COLOR
 		background.size     = board_size
@@ -78,8 +78,8 @@ static func setup_tile_area_overlay(board: Node) -> void:
 	overlay.z_index      = -50
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
+	for x in range(GameRunState.GRID_WIDTH):
+		for y in range(GameRunState.GRID_HEIGHT):
 			if not GameManager.is_cell_blocked(x, y):
 				var rect = ColorRect.new()
 				rect.color        = Color(0.1, 0.15, 0.25, 0.5)
@@ -194,7 +194,7 @@ static func show_skip_bonus_hint(board: Node) -> void:
 	lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 0.3, 1.0))
 
 	var viewport_size = board.get_viewport().get_visible_rect().size
-	var board_bottom  = board.grid_offset.y + (board.tile_size * GameManager.GRID_HEIGHT)
+	var board_bottom  = board.grid_offset.y + (board.tile_size * GameRunState.GRID_HEIGHT)
 	lbl.position              = Vector2(viewport_size.x / 2 - 150, board_bottom + 20)
 	lbl.custom_minimum_size   = Vector2(300, 60)
 
@@ -225,11 +225,11 @@ static func on_level_loaded_setup(board: Node) -> void:
 
 	# Reset game-state flags
 	if typeof(GameManager) != TYPE_NIL:
-		GameManager.processing_moves       = false
-		GameManager.level_transitioning    = false
-		GameManager.pending_level_complete = false
-		GameManager.pending_level_failed   = false
-		GameManager.in_bonus_conversion    = false
+		GameRunState.processing_moves       = false
+		GameRunState.level_transitioning    = false
+		GameRunState.pending_level_complete = false
+		GameRunState.pending_level_failed   = false
+		GameRunState.in_bonus_conversion    = false
 		GameManager.reset_combo()
 		print("[BoardSetup] Safety flags cleared")
 

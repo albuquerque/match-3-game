@@ -239,7 +239,7 @@ func instantiate_tile_visual(tile_type: int, grid_pos: Vector2, scale_factor: fl
 				textures_arr = []
 			if typeof(reveals) != TYPE_DICTIONARY:
 				reveals = {}
-			tile.configure_unmovable_hard(unmovable_meta.get("hits", 1), unmovable_meta.get("type", GameManager.unmovable_type), textures_arr, reveals)
+			tile.configure_unmovable_hard(unmovable_meta.get("hits", 1), unmovable_meta.get("type", GameRunState.unmovable_type), textures_arr, reveals)
 
 	if tile != null:
 		tile.connect("tile_clicked", Callable(self, "_on_tile_clicked"))
@@ -259,7 +259,7 @@ func create_visual_grid():
 
 # Collectible spawning and handling
 func spawn_collectible_visual(x: int, y: int, coll_type: String = "coin"):
-	if x < 0 or x >= GameManager.GRID_WIDTH or y < 0 or y >= GameManager.GRID_HEIGHT:
+	if x < 0 or x >= GameRunState.GRID_WIDTH or y < 0 or y >= GameRunState.GRID_HEIGHT:
 		return
 
 	var existing_tile = tiles[x][y] if x < tiles.size() and y < tiles[x].size() else null
@@ -329,8 +329,8 @@ func _apply_screen_shake(duration: float, intensity: float):
 func _on_game_over():
 	print("[GameBoard] Game Over")
 	# Cleanup or final actions on game over
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
+	for x in range(GameRunState.GRID_WIDTH):
+		for y in range(GameRunState.GRID_HEIGHT):
 			var tile = tiles[x][y]
 			if tile:
 				tile.set_process_input(false)  # Disable input processing for tiles
@@ -379,9 +379,9 @@ func world_to_grid_position(world_pos: Vector2) -> Vector2:
 func update_tile_visual(grid_pos: Vector2, new_type: int):
 	"""Update a tile's visual appearance to match a new type
 	Used for bonus moves conversion"""
-	if grid_pos.x < 0 or grid_pos.x >= GameManager.GRID_WIDTH:
+	if grid_pos.x < 0 or grid_pos.x >= GameRunState.GRID_WIDTH:
 		return
-	if grid_pos.y < 0 or grid_pos.y >= GameManager.GRID_HEIGHT:
+	if grid_pos.y < 0 or grid_pos.y >= GameRunState.GRID_HEIGHT:
 		return
 
 	var tile = tiles[int(grid_pos.x)][int(grid_pos.y)]
@@ -523,7 +523,7 @@ func deferred_gravity_then_refill() -> void:
 
 func _task_deferred_gravity_then_refill() -> void:
 	print("[GameBoard] deferred_gravity_then_refill started")
-	if GameManager.pending_level_complete or GameManager.level_transitioning:
+	if GameRunState.pending_level_complete or GameRunState.level_transitioning:
 		print("[GameBoard] deferred_gravity_then_refill aborted: level transition pending")
 		return
 
@@ -622,7 +622,7 @@ func draw_board_borders():
 	# A3: Delegated to BorderRenderer
 	if typeof(GameManager) == TYPE_NIL:
 		return
-	if not GameManager.initialized or GameManager.grid == null or GameManager.grid.size() == 0:
+	if not GameRunState.initialized or GameRunState.grid == null or GameRunState.grid.size() == 0:
 		return
 	if border_container == null:
 		border_container = Node2D.new()

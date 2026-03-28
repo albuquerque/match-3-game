@@ -23,11 +23,11 @@ func handle_tile_clicked(tile) -> void:
 		print("[BoardInputHandler] Clicked tile is unmovable, ignoring")
 		return
 
-	if GameManager.processing_moves:
+	if GameRunState.processing_moves:
 		print("[BoardInputHandler] Move processing blocked")
 		return
 
-	if GameManager.level_transitioning:
+	if GameRunState.level_transitioning:
 		print("[BoardInputHandler] Level transitioning, clicks blocked")
 		return
 
@@ -115,9 +115,9 @@ func handle_tile_swiped(tile, direction: Vector2) -> void:
 
 	if tile.is_unmovable:
 		return
-	if GameManager.processing_moves:
+	if GameRunState.processing_moves:
 		return
-	if GameManager.level_transitioning:
+	if GameRunState.level_transitioning:
 		return
 
 	if board.selected_tile:
@@ -139,7 +139,7 @@ func handle_tile_swiped(tile, direction: Vector2) -> void:
 # ── Swap execution ────────────────────────────────────────────────────────────
 
 func perform_swap(tile1, tile2) -> void:
-	GameManager.processing_moves = true
+	GameRunState.processing_moves = true
 	print("[BoardInputHandler] perform_swap: start")
 
 	tile1.set_selected(false)
@@ -159,7 +159,7 @@ func perform_swap(tile1, tile2) -> void:
 		tw.tween_property(tile2, "position", tile2.position, 0.08)
 		if tw:
 			await tw.finished
-		GameManager.processing_moves = false
+		GameRunState.processing_moves = false
 		print("[BoardInputHandler] perform_swap: denied")
 		return
 
@@ -194,7 +194,7 @@ func perform_swap(tile1, tile2) -> void:
 				swap_pos_in_match = fallback
 
 		await board.process_cascade(swap_pos_in_match)
-		GameManager.processing_moves = false
+		GameRunState.processing_moves = false
 		print("[BoardInputHandler] perform_swap: matched, cascade done")
 	else:
 		# Revert
@@ -211,5 +211,5 @@ func perform_swap(tile1, tile2) -> void:
 		if rt1: await rt1.finished
 		if rt2: await rt2.finished
 
-		GameManager.processing_moves = false
+		GameRunState.processing_moves = false
 		print("[BoardInputHandler] perform_swap: no match, reverted")

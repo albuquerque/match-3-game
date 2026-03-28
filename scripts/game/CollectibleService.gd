@@ -11,9 +11,9 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 	## After collecting, triggers gravity → refill → cascade on the board.
 	var collectibles_to_remove = []
 
-	for x in range(GameManager.GRID_WIDTH):
+	for x in range(GameRunState.GRID_WIDTH):
 		var last_active_row = -1
-		for y in range(GameManager.GRID_HEIGHT - 1, -1, -1):
+		for y in range(GameRunState.GRID_HEIGHT - 1, -1, -1):
 			if not GameManager.is_cell_blocked(x, y):
 				last_active_row = y
 				break
@@ -44,7 +44,7 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 
 		# Clear grid state immediately — don't wait for the animation
 		tiles_ref[int(pos.x)][int(pos.y)] = null
-		GameManager.grid[int(pos.x)][int(pos.y)] = 0
+		GameRunState.grid[int(pos.x)][int(pos.y)] = 0
 
 		# Notify game systems immediately so shard/objective logic fires at once
 		if coll_type == "shard":
@@ -86,7 +86,7 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 				tile.queue_free()
 
 
-	if GameManager.level_transitioning:
+	if GameRunState.level_transitioning:
 		return
 	# NOTE: Do NOT call animate_gravity/animate_refill/process_cascade here.
 	# MatchOrchestrator's while-loop handles all gravity, refill, and cascade detection

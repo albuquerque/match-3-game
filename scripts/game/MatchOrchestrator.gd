@@ -103,9 +103,9 @@ static func process_cascade(board: Node, gm: Node, initial_swap_pos: Vector2 = V
 
 	# --- Post-cascade: check for remaining empty cells ---
 	var has_empties := false
-	for x in range(gm.GRID_WIDTH):
-		for y in range(gm.GRID_HEIGHT):
-			if not gm.is_cell_blocked(x, y) and gm.grid[x][y] == 0:
+	for x in range(GameRunState.GRID_WIDTH):
+		for y in range(GameRunState.GRID_HEIGHT):
+			if not gm.is_cell_blocked(x, y) and GameRunState.grid[x][y] == 0:
 				has_empties = true
 				break
 		if has_empties:
@@ -124,7 +124,7 @@ static func process_cascade(board: Node, gm: Node, initial_swap_pos: Vector2 = V
 		if new_spreader_positions.size() > 0:
 			board._apply_spreader_visuals(new_spreader_positions)
 
-	gm.processing_moves = false
+	GameRunState.processing_moves = false
 	gm.reset_combo()
 	print("=== Cascade process complete (MatchOrchestrator, depth=", cascade_depth, ") ===")
 
@@ -132,14 +132,14 @@ static func process_cascade(board: Node, gm: Node, initial_swap_pos: Vector2 = V
 	board.emit_signal("board_idle")
 
 	# Level completion check — skip during bonus cascade to avoid re-entrant on_level_complete
-	if not gm.in_bonus_conversion and gm.has_method("_attempt_level_complete"):
+	if not GameRunState.in_bonus_conversion and gm.has_method("_attempt_level_complete"):
 		gm._attempt_level_complete()
 
 	if board.get_tree() != null:
 		await board.get_tree().create_timer(0.2).timeout
 
 	# Auto-shuffle if no moves available — skip during bonus (board state is managed by GFC)
-	if not gm.in_bonus_conversion and not gm.has_possible_moves():
+	if not GameRunState.in_bonus_conversion and not gm.has_possible_moves():
 		print("[MatchOrchestrator] No valid moves detected! Auto-shuffling...")
 		await board.get_tree().create_timer(1.0).timeout
 		await board.perform_auto_shuffle()

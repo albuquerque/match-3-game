@@ -46,7 +46,7 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 		for dir in directions:
 			var nx = int(pos.x) + int(dir.x)
 			var ny = int(pos.y) + int(dir.y)
-			if nx < 0 or nx >= GameManager.GRID_WIDTH or ny < 0 or ny >= GameManager.GRID_HEIGHT:
+			if nx < 0 or nx >= GameRunState.GRID_WIDTH or ny < 0 or ny >= GameRunState.GRID_HEIGHT:
 				continue
 			var key = str(nx) + "," + str(ny)
 			if already_hit.has(key):
@@ -67,11 +67,11 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 				var revealed_type = tile.tile_type if "tile_type" in tile else 0
 				var is_coll = tile.is_collectible if "is_collectible" in tile else false
 				if is_coll:
-					GameManager.grid[nx][ny] = GameManager.COLLECTIBLE
+					GameRunState.grid[nx][ny] = GameRunState.COLLECTIBLE
 				elif revealed_type > 0:
-					GameManager.grid[nx][ny] = revealed_type
+					GameRunState.grid[nx][ny] = revealed_type
 				else:
-					GameManager.grid[nx][ny] = 0
+					GameRunState.grid[nx][ny] = 0
 					tiles_ref[nx][ny] = null
 					if not tile.is_queued_for_deletion():
 						tile.queue_free()
@@ -97,16 +97,16 @@ static func damage_adjacent_spreaders(board: Node, tiles_ref: Array, matched_pos
 		for dir in directions:
 			var nx = int(pos.x) + int(dir.x)
 			var ny = int(pos.y) + int(dir.y)
-			if nx < 0 or nx >= GameManager.GRID_WIDTH or ny < 0 or ny >= GameManager.GRID_HEIGHT:
+			if nx < 0 or nx >= GameRunState.GRID_WIDTH or ny < 0 or ny >= GameRunState.GRID_HEIGHT:
 				continue
 			var key = str(nx) + "," + str(ny)
 			if already_hit.has(key):
 				continue
-			if GameManager.get_tile_at(Vector2(nx, ny)) != GameManager.SPREADER:
+			if GameManager.get_tile_at(Vector2(nx, ny)) != GameRunState.SPREADER:
 				continue
 			already_hit[key] = true
 
-			GameManager.grid[nx][ny] = 0
+			GameRunState.grid[nx][ny] = 0
 			GameManager.report_spreader_destroyed(Vector2(nx, ny))
 			if nx < tiles_ref.size() and ny < tiles_ref[nx].size():
 				var tile = tiles_ref[nx][ny]
@@ -126,8 +126,8 @@ static func apply_spreader_visuals(board: Node, tiles_ref: Array, new_positions:
 	## Reconfigure visual tiles at newly-infected spreader positions.
 	var scale_factor = board.tile_size / 64.0
 	var textures: Array = []
-	if GameManager.spreader_textures_map.has(GameManager.spreader_type):
-		textures = GameManager.spreader_textures_map[GameManager.spreader_type]
+	if GameRunState.spreader_textures_map.has(GameRunState.spreader_type):
+		textures = GameRunState.spreader_textures_map[GameRunState.spreader_type]
 
 	for pos in new_positions:
 		var x = int(pos.x)
@@ -138,9 +138,9 @@ static func apply_spreader_visuals(board: Node, tiles_ref: Array, new_positions:
 		var tile = tiles_ref[x][y]
 		if tile == null or not is_instance_valid(tile) or tile.is_queued_for_deletion():
 			var new_tile = board.tile_scene.instantiate()
-			new_tile.setup(GameManager.SPREADER, pos, scale_factor)
+			new_tile.setup(GameRunState.SPREADER, pos, scale_factor)
 			if new_tile.has_method("configure_spreader"):
-				new_tile.configure_spreader(GameManager.spreader_grace_default, GameManager.spreader_type, textures)
+				new_tile.configure_spreader(GameRunState.spreader_grace_default, GameRunState.spreader_type, textures)
 			new_tile.position = board.grid_to_world_position(pos)
 			new_tile.connect("tile_clicked",  Callable(board, "_on_tile_clicked"))
 			new_tile.connect("tile_swiped",   Callable(board, "_on_tile_swiped"))
@@ -151,6 +151,6 @@ static func apply_spreader_visuals(board: Node, tiles_ref: Array, new_positions:
 			tiles_ref[x][y] = new_tile
 		else:
 			if tile.has_method("configure_spreader"):
-				tile.configure_spreader(GameManager.spreader_grace_default, GameManager.spreader_type, textures)
+				tile.configure_spreader(GameRunState.spreader_grace_default, GameRunState.spreader_type, textures)
 			else:
-				tile.update_type(GameManager.SPREADER)
+				tile.update_type(GameRunState.SPREADER)
