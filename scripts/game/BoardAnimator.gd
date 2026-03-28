@@ -18,7 +18,7 @@ static func animate_destroy_tiles(board: Node, tiles_ref: Array, positions: Arra
 	for pos in positions:
 		if pos.x < 0 or pos.y < 0:
 			continue
-		if pos.x >= GameManager.GRID_WIDTH or pos.y >= GameManager.GRID_HEIGHT:
+		if pos.x >= GameRunState.GRID_WIDTH or pos.y >= GameRunState.GRID_HEIGHT:
 			continue
 
 		var gx = int(pos.x)
@@ -125,8 +125,8 @@ static func animate_destroy_matches_except(board: Node, tiles_ref: Array, matche
 
 static func animate_shuffle(board: Node, tiles_ref: Array) -> void:
 	var shuffle_tweens = []
-	for x in range(GameManager.GRID_WIDTH):
-		for y in range(GameManager.GRID_HEIGHT):
+	for x in range(GameRunState.GRID_WIDTH):
+		for y in range(GameRunState.GRID_HEIGHT):
 			var tile = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
 			if tile and not GameManager.is_cell_blocked(x, y):
 				var new_type = GameManager.get_tile_at(Vector2(x, y))
@@ -171,7 +171,7 @@ static func highlight_special_activation(board: Node, tiles_ref: Array, position
 	for pos in positions:
 		if pos.x < 0 or pos.y < 0:
 			continue
-		if pos.x >= GameManager.GRID_WIDTH or pos.y >= GameManager.GRID_HEIGHT:
+		if pos.x >= GameRunState.GRID_WIDTH or pos.y >= GameRunState.GRID_HEIGHT:
 			continue
 		var tile = tiles_ref[int(pos.x)][int(pos.y)] if int(pos.x) < tiles_ref.size() else null
 		if tile:

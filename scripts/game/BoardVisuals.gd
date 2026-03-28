@@ -34,7 +34,7 @@ static func clear_tiles(gameboard: Node, tiles_ref: Array) -> void:
 	for i in range(tiles_ref.size()):
 		tiles_ref[i] = []
 	# ensure length
-	while tiles_ref.size() < GameManager.GRID_WIDTH:
+	while tiles_ref.size() < GameRunState.GRID_WIDTH:
 		tiles_ref.append([])
 
 static func instantiate_tile_visual(gameboard: Node, tile_scene: PackedScene, tile_type: int, grid_pos: Vector2, scale_factor: float, unmovable_meta = null) -> Node:
@@ -63,7 +63,7 @@ static func instantiate_tile_visual(gameboard: Node, tile_scene: PackedScene, ti
 				textures_arr = []
 			if typeof(reveals) != TYPE_DICTIONARY:
 				reveals = {}
-			tile.configure_unmovable_hard(unmovable_meta.get("hits",1), unmovable_meta.get("type", GameManager.unmovable_type), textures_arr, reveals)
+			tile.configure_unmovable_hard(unmovable_meta.get("hits",1), unmovable_meta.get("type", GameRunState.unmovable_type), textures_arr, reveals)
 
 	# connect and parent under board_container
 	if tile != null:
@@ -84,19 +84,19 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 	clear_tiles(gameboard, tiles_ref)
 	await gameboard.get_tree().process_frame
 	tiles_ref.clear()
-	if GameManager.grid.size() == 0:
+	if GameRunState.grid.size() == 0:
 		gameboard.creating_visual_grid = false
 		return
 	var scale_factor = gameboard.tile_size / 64.0
 	var tiles_created = 0
-	for x in range(GameManager.GRID_WIDTH):
+	for x in range(GameRunState.GRID_WIDTH):
 		tiles_ref.append([])
-		for y in range(GameManager.GRID_HEIGHT):
+		for y in range(GameRunState.GRID_HEIGHT):
 			var tile_type = GameManager.get_tile_at(Vector2(x,y))
 			var key = str(x) + "," + str(y)
 			# If an unmovable_map entry exists, create the unmovable regardless of the grid sentinel
 			var tile = null
-			if GameManager.unmovable_map.has(key) and typeof(GameManager.unmovable_map[key]) == TYPE_DICTIONARY:
+			if GameRunState.unmovable_map.has(key) and typeof(GameRunState.unmovable_map[key]) == TYPE_DICTIONARY:
 				# hard unmovable
 				tile = gameboard.tile_scene.instantiate()
 				if tile and tile.has_method("setup"):
@@ -117,8 +117,8 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 				tiles_ref[x].append(null)
 				continue
 			# configure unmovable or normal wiring
-			if GameManager.unmovable_map.has(key) and typeof(GameManager.unmovable_map[key]) == TYPE_DICTIONARY:
-				var meta = GameManager.unmovable_map[key]
+			if GameRunState.unmovable_map.has(key) and typeof(GameRunState.unmovable_map[key]) == TYPE_DICTIONARY:
+				var meta = GameRunState.unmovable_map[key]
 				if tile.has_method("configure_unmovable_hard"):
 					var textures_arr = []
 					var reveals = {}
@@ -131,20 +131,20 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 							textures_arr = []
 						if typeof(reveals) != TYPE_DICTIONARY:
 							reveals = {}
-					tile.configure_unmovable_hard(meta.get("hits",1), meta.get("type", GameManager.unmovable_type), textures_arr, reveals)
+					tile.configure_unmovable_hard(meta.get("hits",1), meta.get("type", GameRunState.unmovable_type), textures_arr, reveals)
 					print("[BoardVisuals] Configured hard unmovable at (", x, ",", y, ") hits=", meta.get("hits",1))
 				else:
 					print("[BoardVisuals] WARNING: Tile missing configure_unmovable_hard at (", x, ",", y, ")")
 			else:
-				if tile_type == GameManager.COLLECTIBLE and tile.has_method("configure_collectible"):
-					tile.configure_collectible(GameManager.collectible_type)
-					print("[BoardVisuals] Configured collectible at (", x, ",", y, "): ", GameManager.collectible_type)
-				if tile_type == GameManager.SPREADER and tile.has_method("configure_spreader"):
+				if tile_type == GameRunState.COLLECTIBLE and tile.has_method("configure_collectible"):
+					tile.configure_collectible(GameRunState.collectible_type)
+					print("[BoardVisuals] Configured collectible at (", x, ",", y, "): ", GameRunState.collectible_type)
+				if tile_type == GameRunState.SPREADER and tile.has_method("configure_spreader"):
 					var textures = []
-					if GameManager.spreader_textures_map.has(GameManager.spreader_type):
-						textures = GameManager.spreader_textures_map[GameManager.spreader_type]
-					tile.configure_spreader(GameManager.spreader_grace_default, GameManager.spreader_type, textures)
-					print("[BoardVisuals] Configured spreader at (", x, ",", y, ") type='", GameManager.spreader_type, "'")
+					if GameRunState.spreader_textures_map.has(GameRunState.spreader_type):
+						textures = GameRunState.spreader_textures_map[GameRunState.spreader_type]
+					tile.configure_spreader(GameRunState.spreader_grace_default, GameRunState.spreader_type, textures)
+					print("[BoardVisuals] Configured spreader at (", x, ",", y, ") type='", GameRunState.spreader_type, "'")
 			# parent to board_container
 			if gameboard.board_container:
 				gameboard.board_container.add_child(tile)
@@ -201,7 +201,7 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 		print("[BoardVisuals] sample positions col0: ", samples_col)
 
 static func spawn_collectible_visual(gameboard: Node, tiles_ref: Array, x: int, y: int, coll_type: String = "coin") -> void:
-	if x < 0 or x >= GameManager.GRID_WIDTH or y < 0 or y >= GameManager.GRID_HEIGHT:
+	if x < 0 or x >= GameRunState.GRID_WIDTH or y < 0 or y >= GameRunState.GRID_HEIGHT:
 		return
 	var existing_tile = null
 	if x < tiles_ref.size() and y < tiles_ref[x].size():

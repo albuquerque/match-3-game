@@ -18,8 +18,8 @@ static func calculate_responsive_layout(gameboard: Node) -> void:
     var available_width = screen_size.x - (board_margin * 2)
     var available_height = screen_size.y - ui_top_space - ui_bottom_space - (board_margin * 2)
 
-    var grid_w = GameManager.GRID_WIDTH
-    var grid_h = GameManager.GRID_HEIGHT
+    var grid_w = GameRunState.GRID_WIDTH
+    var grid_h = GameRunState.GRID_HEIGHT
     var max_tile_size_width = available_width / max(1, grid_w)
     var max_tile_size_height = available_height / max(1, grid_h)
     var tile_size = min(max_tile_size_width, max_tile_size_height)
@@ -48,8 +48,8 @@ static func setup_background(gameboard: Node) -> void:
         return
 
     var board_size = Vector2(
-        GameManager.GRID_WIDTH * gameboard.tile_size + 20,
-        GameManager.GRID_HEIGHT * gameboard.tile_size + 20
+        GameRunState.GRID_WIDTH * gameboard.tile_size + 20,
+        GameRunState.GRID_HEIGHT * gameboard.tile_size + 20
     )
 
     if gameboard.has_node("Background"):
@@ -100,8 +100,8 @@ static func setup_tile_area_overlay(gameboard: Node) -> void:
         gameboard.tile_area_overlay = overlay
         return
 
-    for x in range(GameManager.GRID_WIDTH):
-        for y in range(GameManager.GRID_HEIGHT):
+    for x in range(GameRunState.GRID_WIDTH):
+        for y in range(GameRunState.GRID_HEIGHT):
             if not GameManager.is_cell_blocked(x, y):
                 var tile_overlay = ColorRect.new()
                 tile_overlay.color = Color(0.1, 0.15, 0.25, 0.5)
