@@ -48,11 +48,6 @@ static func _get_xd():
         return inst.call("_get_xd")
     return _get_root_instance("ExperienceDirector")
 
-static func _get_evbus():
-    var inst = _get_root_instance("NodeResolvers")
-    if inst and inst.has_method("_get_evbus"):
-        return inst.call("_get_evbus")
-    return _get_root_instance("EventBus")
 
 static func _get_am():
     var inst = _get_root_instance("NodeResolvers")

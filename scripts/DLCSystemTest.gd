@@ -116,14 +116,7 @@ func test_autoloads() -> bool:
 		success = false
 	else:
 		print("  ✅ DLCManager found")
-
-	# Check EventBus
-	if EventBus == null:
-		print("  ❌ EventBus not found")
-		print("     Add to project.godot autoloads")
-		success = false
-	else:
-		print("  ✅ EventBus found")
+	# EventBus removed in PR 5d — no longer checked
 
 	if success:
 		print("  ✅ TEST PASSED: All autoloads present")

@@ -35,7 +35,6 @@ var _pending_random: int = 0
 
 func _ready() -> void:
 	_load_config()
-	# PR 5c: connect directly to GameManager signals — EventBus no longer routes these
 	var gm: Node = get_node_or_null("/root/GameManager")
 	if gm:
 		gm.match_cleared.connect(_on_match_cleared)
@@ -43,18 +42,14 @@ func _ready() -> void:
 		gm.pre_refill.connect(_on_pre_refill)
 		gm.post_refill.connect(_on_post_refill)
 		gm.level_loaded_ctx.connect(_on_level_loaded)
-		print("[ShardDropSystem] Connected to GameManager signals (PR 5c)")
+		print("[ShardDropSystem] Connected to GameManager signals")
 	else:
-		# Fallback to EventBus while GameManager resolves (removed in PR 5d)
-		EventBus.match_cleared.connect(_on_match_cleared)
-		EventBus.shard_tile_collected.connect(_on_shard_tile_collected)
-		EventBus.pre_refill.connect(_on_pre_refill)
-		EventBus.post_refill.connect(_on_post_refill)
-		EventBus.level_loaded.connect(_on_level_loaded)
-		push_warning("[ShardDropSystem] GameManager not found — fell back to EventBus")
-	# tile_destroyed stays on EventBus for now (emitter not yet migrated)
-	if EventBus:
-		EventBus.tile_destroyed.connect(_on_tile_destroyed)
+		push_error("[ShardDropSystem] GameManager not found — shard drops disabled")
+	# TODO PR 6: tile_destroyed emitter (BoardActionExecutor) moves to direct GameManager signal
+	# For now connect via EventBus which still carries tile_destroyed only
+	var eb = get_node_or_null("/root/EventBus")
+	if eb and eb.has_signal("tile_destroyed"):
+		eb.tile_destroyed.connect(_on_tile_destroyed)
 	print("[ShardDropSystem] ready (max_per_level=%d unlock_from=%d)" % [max_shards_per_level, shard_unlock_from_level])
 
 func _load_config() -> void:

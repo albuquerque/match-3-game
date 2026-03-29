@@ -2,9 +2,7 @@ extends Node
 ## EffectResolver - Central dispatcher that maps events to visual effects
 ## Loads effect definitions from JSON and instantiates executors
 ## This class must NOT contain story-specific logic
-
-# Reference to EventBus (autoload)
-var event_bus: Node = null
+## PR 5d: EventBus removed — all signals now connected directly to GameManager
 
 # Active effect definitions loaded from chapter JSON
 var active_effects: Array = []
@@ -59,12 +57,6 @@ var DEV_FORCE_LOAD_LEVEL4_CHAPTER: bool = false
 func _ready():
 	print("[EffectResolver] Initializing effect resolver...")
 
-	# Get EventBus autoload
-	event_bus = NodeResolvers._get_evbus()
-	if not event_bus:
-		push_warning("[EffectResolver] EventBus autoload not found - effects disabled")
-		return
-
 	# Cache viewport reference for executors
 	cached_viewport = get_tree().root
 	if cached_viewport:
@@ -72,10 +64,10 @@ func _ready():
 	else:
 		push_warning("[EffectResolver] Failed to cache viewport reference")
 
-	# Register effect executors (stub implementations)
+	# Register effect executors
 	_register_executors()
 
-	# Connect to all gameplay events
+	# Connect directly to GameManager signals (EventBus removed in PR 5d)
 	_connect_event_signals()
 
 	# Dev: force-load test chapter for level 4 if enabled
@@ -84,8 +76,7 @@ func _ready():
 		if FileAccess.file_exists(dev_path):
 			print("[EffectResolver] DEV_FLAG: Loading dev chapter for testing: %s" % dev_path)
 			load_effects_from_file(dev_path)
-			# Schedule a delayed emit of level_loaded so executors run after scene is up
-			if event_bus and has_method("get_tree") and get_tree() != null:
+			if has_method("get_tree") and get_tree() != null:
 				var t = get_tree().create_timer(0.25)
 				t.timeout.connect(Callable(self, "_dev_emit_level_loaded"))
 		else:
@@ -115,25 +106,23 @@ func _register_executors():
 
 	print("[EffectResolver] Registered %d executors" % executors.size())
 
-## Connect to all EventBus signals
+## Connect to gameplay signals directly on GameManager (EventBus removed PR 5d)
 func _connect_event_signals():
-	if not event_bus:
+	var gm = get_node_or_null("/root/GameManager")
+	if not gm:
+		push_warning("[EffectResolver] GameManager not found — visual effects disabled")
 		return
 
-	event_bus.level_loaded.connect(_on_event.bind("level_loaded"))
-	event_bus.level_start.connect(_on_event.bind("level_start"))
-	event_bus.level_complete.connect(_on_event.bind("level_complete"))
-	event_bus.level_failed.connect(_on_event.bind("level_failed"))
-	event_bus.tile_spawned.connect(_on_event_with_entity.bind("tile_spawned"))
-	event_bus.tile_matched.connect(_on_event_with_entity.bind("tile_matched"))
-	event_bus.tile_destroyed.connect(_on_event_with_entity.bind("tile_destroyed"))
-	event_bus.match_cleared.connect(_on_match_cleared)
-	event_bus.special_tile_activated.connect(_on_event_with_entity.bind("special_tile_activated"))
-	event_bus.spreader_tick.connect(_on_event_with_entity.bind("spreader_tick"))
-	event_bus.spreader_destroyed.connect(_on_event_with_entity.bind("spreader_destroyed"))
-	event_bus.custom_event.connect(_on_custom_event)
+	gm.level_loaded_ctx.connect(_on_level_loaded_ctx)
+	gm.level_complete.connect(_on_level_complete_direct)
+	gm.match_cleared.connect(_on_match_cleared)
+	gm.special_tile_activated.connect(_on_event_with_entity.bind("special_tile_activated"))
+	# tile_destroyed still on EventBus until PR 6 migrates BoardActionExecutor emitter
+	var eb = get_node_or_null("/root/EventBus")
+	if eb and eb.has_signal("tile_destroyed"):
+		eb.tile_destroyed.connect(_on_event_with_entity.bind("tile_destroyed"))
 
-	print("[EffectResolver] Connected to EventBus signals")
+	print("[EffectResolver] Connected to GameManager signals")
 
 ## Load effect definitions from chapter JSON
 func load_effects(chapter_data: Dictionary) -> bool:
@@ -278,6 +267,16 @@ func _exit_tree():
 				node.queue_free()
 
 	print("[EffectResolver] Cleanup complete")
+
+## PR 5d: GameManager.level_loaded_ctx handler (level_id: String, context: Dictionary)
+func _on_level_loaded_ctx(level_id: String, context: Dictionary):
+	_process_event("level_loaded", level_id, context)
+
+## PR 5d: GameManager.level_complete handler (no-arg signal)
+func _on_level_complete_direct():
+	_process_event("level_complete", "level_%d" % GameRunState.level, {
+		"level": GameRunState.level, "score": GameRunState.score
+	})
 
 ## Generic event handler (level events)
 func _on_event(level_id: String, context: Dictionary, event_name: String):
@@ -434,11 +433,8 @@ func _is_version_compatible(required: String) -> bool:
 	return true
 
 func _dev_emit_level_loaded() -> void:
-	if event_bus:
-		print("[EffectResolver] DEV_FLAG: Emitting level_loaded for testing (level_4)")
-		event_bus.emit_level_loaded("level_4", {"level": 4, "target": 4960})
-	else:
-		print("[EffectResolver] DEV_FLAG: Cannot emit level_loaded - EventBus missing")
+	print("[EffectResolver] DEV_FLAG: Simulating level_loaded for testing (level_4)")
+	_on_level_loaded_ctx("level_4", {"level": 4, "target": 4960})
 
 # Helper: resolve GameManager autoload safely
 func _get_gm():

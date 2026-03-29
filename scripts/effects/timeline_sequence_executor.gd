@@ -5,12 +5,11 @@ class_name EffectExecutorTimelineSequence
 # Params:
 #  - sequence: Array of step dictionaries. Each step supports:
 #     - delay (float): seconds to wait before running the step (relative to previous)
-#     - event (String): name of EventBus event to emit
-#     - event_args (Array): optional array of arguments to pass to the event
-#     - binding (Dictionary): effect binding to execute via EffectResolver (if provided)
+#     - binding (Dictionary): effect binding to execute via EffectResolver (preferred)
 #     - callable (Dictionary): { "node": "path_or_name", "method": "method_name", "args": [] }
 #  - id: optional id used for logging
-# The executor will use EventBus if available and will attempt to call EffectResolver via /root/EffectResolver if needed.
+# NOTE: The legacy "event"/"event_args" step type (EventBus emit) was removed in PR 5d.
+#       Convert any remaining event steps to "binding" steps using EffectResolver.
 func execute(context: Dictionary) -> void:
 	var params = context.get("params", {})
 	var viewport = context.get("viewport", null)
@@ -61,8 +60,7 @@ func _run_step(step: Dictionary, viewport: Node, params: Dictionary, context: Di
 	if not step or typeof(step) != TYPE_DICTIONARY:
 		return
 
-	# Resolve EventBus/EffectResolver from SceneTree root
-	# Use board_node or viewport to get the tree, not self (which may not be in tree)
+	# Resolve EffectResolver from SceneTree root
 	var root = null
 	if board_node and is_instance_valid(board_node):
 		var tree = board_node.get_tree()
@@ -72,10 +70,8 @@ func _run_step(step: Dictionary, viewport: Node, params: Dictionary, context: Di
 		var tree = viewport.get_tree()
 		if tree:
 			root = tree.get_root()
-	var event_bus = null
 	var resolver = null
 	if root:
-		event_bus = root.get_node_or_null("EventBus")
 		resolver = root.get_node_or_null("EffectResolver")
 
 	# If step has "effect" directly (new format), convert to binding format
@@ -104,12 +100,6 @@ func _run_step(step: Dictionary, viewport: Node, params: Dictionary, context: Di
 			resolver._execute_effect(binding, step.get("entity_id", ""), exec_context)
 			return
 
-	# If event specified, emit on EventBus (with safe arg expansion)
-	if step.has("event") and event_bus:
-		var ev_name = step.get("event")
-		var ev_args = step.get("event_args", [])
-		_emit_signal_wrapped(event_bus, ev_name, ev_args)
-		return
 
 	# If callable specified, resolve node and call method
 	if step.has("callable"):
@@ -136,33 +126,6 @@ func _run_step(step: Dictionary, viewport: Node, params: Dictionary, context: Di
 	# Nothing matched
 	print("[TimelineSequenceExecutor] Step had no actionable items: %s" % str(step))
 
-# Helper to emit signals with argument expansion (supports up to 5 args; extend if needed)
-func _emit_signal_wrapped(bus: Node, name: String, args: Array) -> void:
-	if not bus:
-		return
-	if args == null or args.size() == 0:
-		bus.emit_signal(name)
-		return
-	match args.size():
-		1:
-			bus.emit_signal(name, args[0])
-			return
-		2:
-			bus.emit_signal(name, args[0], args[1])
-			return
-		3:
-			bus.emit_signal(name, args[0], args[1], args[2])
-			return
-		4:
-			bus.emit_signal(name, args[0], args[1], args[2], args[3])
-			return
-		5:
-			bus.emit_signal(name, args[0], args[1], args[2], args[3], args[4])
-			return
-		_:
-			# Fallback: call via callv
-			var call_args = [name] + args
-			bus.callv("emit_signal", call_args)
 
 # Helper: resolve node under a root Node recursively by name or path
 func _resolve_node_under(root: Node, name: String) -> Node:

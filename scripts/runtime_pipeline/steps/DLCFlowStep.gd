@@ -20,11 +20,6 @@ func execute(context: PipelineContext) -> bool:
 	var manager = DLCManager if typeof(DLCManager) != TYPE_NIL else null
 	if manager and manager.has_method("trigger_flow"):
 		manager.call("trigger_flow", dlc_id)
-		step_completed.emit(true)
-		return true
-	# fallback: emit EventBus custom event
-	if EventBus and EventBus.has_method("emit_custom"):
-		EventBus.emit_custom("dlc_flow_triggered", dlc_id, {})
 	step_completed.emit(true)
 	return true
 

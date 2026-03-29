@@ -28,20 +28,13 @@ func execute(context: PipelineContext) -> bool:
 	context.waiting_for_completion = true
 	context.completion_type = "level"
 
-	# Connect to level completion events
-	# PR 5c: connect directly to GameManager autoload — EventBus no longer routes these
-	# NOTE: LoadLevelStep is a RefCounted — cannot use get_node_or_null; use autoload directly
+	# Connect to level completion signals on GameManager autoload
 	if GameManager:
 		if GameManager.has_signal("level_complete") and not GameManager.level_complete.is_connected(_on_level_complete_direct):
 			GameManager.level_complete.connect(_on_level_complete_direct)
 		if GameManager.has_signal("level_failed") and not GameManager.level_failed.is_connected(_on_level_failed):
 			GameManager.level_failed.connect(_on_level_failed)
-		print("[LoadLevelStep] Connected to GameManager signals (PR 5c)")
-	elif EventBus:  # fallback until PR 5d
-		if not EventBus.level_complete.is_connected(_on_level_complete):
-			EventBus.level_complete.connect(_on_level_complete)
-		if not EventBus.level_failed.is_connected(_on_level_failed):
-			EventBus.level_failed.connect(_on_level_failed)
+		print("[LoadLevelStep] Connected to GameManager signals")
 
 	# Ensure GameBoard node itself is visible — FlowCoordinator hides it (old_board.visible = false)
 	# before the flow starts, and show_board_group() only shows BoardContainer children, not
@@ -77,14 +70,23 @@ func _clear_narrative_stage() -> void:
 		nsm.clear_stage(true)
 		print("[LoadLevelStep] NarrativeStageManager cleared")
 
-## PR 5c: shim for GameManager.level_complete (no-arg signal)
 func _on_level_complete_direct():
 	print("[LoadLevelStep] _on_level_complete_direct fired for level %d (pipeline_context=%s)" % [level_number, str(pipeline_context)])
+	var root := (Engine.get_main_loop() as SceneTree).root
+	# Stars were already saved to StarRatingManager by GameFlowController
+	var stars := 0
+	var srm := root.get_node_or_null("StarRatingManager") if root else null
+	if srm and srm.has_method("get_level_stars"):
+		stars = srm.get_level_stars(level_number)
+	# Coins formula matches RewardManager.grant_level_completion_reward
+	var coins := 100 + (50 * level_number)
+	var gems := 5 if stars == 3 else 0
+	print("[LoadLevelStep] Resolved rewards — stars=%d coins=%d gems=%d" % [stars, coins, gems])
 	_on_level_complete("level_%d" % level_number, {
 		"score": GameRunState.score,
-		"stars": 0,  # stars computed by GameFlowController; pipeline reads from context
-		"coins_earned": 0,
-		"gems_earned": 0
+		"stars": stars,
+		"coins_earned": coins,
+		"gems_earned": gems,
 	})
 
 func _on_level_complete(lvl_id: String, context: Dictionary = {}):
@@ -117,17 +119,11 @@ func _on_level_failed(lvl_id: String = "", context: Dictionary = {}):
 	step_completed.emit(true)
 
 func cleanup():
-	# NOTE: LoadLevelStep is a RefCounted — use autoload directly, not get_node_or_null
 	if GameManager:
 		if GameManager.has_signal("level_complete") and GameManager.level_complete.is_connected(_on_level_complete_direct):
 			GameManager.level_complete.disconnect(_on_level_complete_direct)
 		if GameManager.has_signal("level_failed") and GameManager.level_failed.is_connected(_on_level_failed):
 			GameManager.level_failed.disconnect(_on_level_failed)
-	if EventBus:  # passthrough cleanup until PR 5d
-		if EventBus.level_complete.is_connected(_on_level_complete):
-			EventBus.level_complete.disconnect(_on_level_complete)
-		if EventBus.level_failed.is_connected(_on_level_failed):
-			EventBus.level_failed.disconnect(_on_level_failed)
 
 func _extract_level_number(lvl_id: String) -> int:
 	var num_str = lvl_id.replace("level_", "").replace("level", "")

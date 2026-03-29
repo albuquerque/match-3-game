@@ -106,8 +106,6 @@ func add_shard(item_id: String) -> bool:
 	shard_added.emit(item_id, st["shards"], required)
 	# PR 5c: emit directly — EventBus no longer carries shard_discovered traffic
 	shard_discovered.emit(item_id, {"shards": st["shards"], "required": required})
-	if EventBus:  # passthrough until PR 5d
-		EventBus.emit_shard_discovered(item_id, {"shards": st["shards"], "required": required})
 	if st["shards"] >= required:
 		st["unlocked"] = true
 		session_items_unlocked.append(item_id)
@@ -115,10 +113,7 @@ func add_shard(item_id: String) -> bool:
 		item_unlocked.emit(item_id)
 		var cat: String = str(_definitions[item_id].get("category", "artifacts"))
 		gallery_item_unlocked.emit(cat, item_id)  # legacy
-		# PR 5c: emit directly — EventBus no longer carries gallery_item_unlocked traffic
 		gallery_unlocked.emit(item_id)
-		if EventBus:  # passthrough until PR 5d
-			EventBus.emit_gallery_item_unlocked(item_id)
 		_persist_state()
 		return true
 	_persist_state()
