@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name GrantRewardsStep
 
 ## GrantRewardsStep
@@ -22,7 +22,7 @@ func _ensure_resolvers():
 		else:
 			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	_ensure_resolvers()
 	if rewards_list.is_empty():
 		print("[GrantRewardsStep] No rewards to grant")

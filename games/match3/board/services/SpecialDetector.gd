@@ -1,5 +1,4 @@
 extends Node
-class_name SpecialDetector
 
 # Pure logic to detect special tile creation positions from a set of matched positions.
 # API: SpecialDetector.find_special_position(matches: Array, grid_w: int, grid_h: int, min_match_size: int = 3) -> Vector2

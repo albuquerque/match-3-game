@@ -507,23 +507,7 @@ func _process_cutscene_node(node: Dictionary):
 	"""Process a cutscene node"""
 
 	var cutscene_id = node.get("id", "")
-	print("[ExperienceDirector] Playing cutscene: ", cutscene_id)
-
-	# Use CutsceneExecutor if available
-	var executor = CutsceneExecutor.new()
-	add_child(executor)  # CRITICAL: Must add to tree for await to work
-
-	var context = {
-		"params": node.get("params", {})
-	}
-
-	# Run executor asynchronously and wait for completion
-	await executor.execute(context)
-
-	# Clean up executor
-	if is_instance_valid(executor):
-		remove_child(executor)
-		executor.queue_free()
+	print("[ExperienceDirector] Playing cutscene: ", cutscene_id, " (CutsceneExecutor not implemented — skipping)")
 
 	_complete_current_node()
 

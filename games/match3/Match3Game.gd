@@ -12,7 +12,7 @@
 ## ✅ PR 2/3 — old system still drives gameplay; this node observes in parallel.
 ## ❌ Does NOT touch MatchOrchestrator, EventBus, or any other subsystem.
 class_name Match3Game
-extends BaseGame
+extends "res://games/base/BaseGame.gd"
 
 ## Emitted after game_won to pass along final score and stars (convenience).
 signal match3_level_won(level: int, score: int, stars: int)

@@ -1,7 +1,7 @@
 extends Node
 
 func _ready():
-	var sf = load("res://scripts/game/SpecialFactory.gd")
+	var sf = load("res://games/match3/board/services/SpecialFactory.gd")
 	print("Loaded SF type=", typeof(sf), " has_method=", sf.has_method("determine_special_type"))
 	var cases = {
 		"vertical4": [Vector2(2,3), Vector2(2,4), Vector2(2,5), Vector2(2,6)],

@@ -179,7 +179,13 @@ static func highlight_special_activation(board: Node, tiles_ref: Array, position
 			t.tween_property(tile, "modulate", Color(2, 2, 1, 1), 0.06)
 			t.tween_property(tile, "modulate", Color.WHITE, 0.12)
 			tweens.append(t)
-			BoardEffects.create_special_activation_particles(board, board.grid_to_world_position(pos))
+			# BoardEffects loaded via board's BE var to avoid bare class_name dependency
+			if board.get("BE") and board.BE != null:
+				board.BE.create_special_activation_particles(board, board.grid_to_world_position(pos))
+			else:
+				var be = load("res://games/match3/board/services/BoardEffects.gd")
+				if be:
+					be.create_special_activation_particles(board, board.grid_to_world_position(pos))
 
 	if tweens.size() > 0:
 		await tweens[0].finished

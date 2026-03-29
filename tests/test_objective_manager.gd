@@ -4,7 +4,7 @@ extends Node
 func _ready():
 	print("[TEST] test_objective_manager starting")
 
-	var OMScript = load("res://scripts/game/ObjectiveManager.gd")
+	var OMScript = load("res://games/match3/board/services/ObjectiveManager.gd")
 	assert(OMScript != null, "ObjectiveManager script must load")
 
 	# ── Test 1: report_unmovable_cleared increments counter ──────────────────

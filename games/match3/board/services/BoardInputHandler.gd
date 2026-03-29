@@ -33,12 +33,22 @@ func handle_tile_clicked(tile) -> void:
 
 	# Booster mode — delegate action back to GameBoard
 	var game_ui = board.get_node_or_null("../GameUI")
-	if game_ui and game_ui is GameUI and game_ui.booster_mode_active:
+	if game_ui and game_ui.get("booster_mode_active") and game_ui.booster_mode_active:
 		await _handle_booster_click(tile, game_ui)
 		return
 
-	# Special tile tap
-	var tile_type = GameManager.get_tile_at(tile.grid_position)
+	# Special tile tap — read tile_type from the Tile node itself (authoritative),
+	# not from the grid which may lag behind after an unmovable reveal transform.
+	var tile_type = tile.tile_type if "tile_type" in tile else GameManager.get_tile_at(tile.grid_position)
+	# Also sync the grid in case it's stale (unmovable reveal writes tile_type but grid may still say 11)
+	if tile_type >= 7 and tile_type <= 9:
+		var gx = int(tile.grid_position.x)
+		var gy = int(tile.grid_position.y)
+		var grid_val = GameManager.get_tile_at(tile.grid_position)
+		if grid_val != tile_type:
+			# Grid is stale — update it so activate_special_tile works correctly
+			GameManager.grid[gx][gy] = tile_type
+			GameRunState.grid[gx][gy] = tile_type
 	if tile_type >= 7 and tile_type <= 9:
 		print("[BoardInputHandler] Special tile tapped at ", tile.grid_position)
 		if board.selected_tile:

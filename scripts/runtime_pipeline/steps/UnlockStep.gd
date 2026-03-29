@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name UnlockStep
 
 # UnlockStep
@@ -10,7 +10,7 @@ func _init(id: String = ""):
 	super("unlock")
 	unlock_id = id
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	if unlock_id == "":
 		push_warning("[UnlockStep] No unlock_id provided")
 		step_completed.emit(true)

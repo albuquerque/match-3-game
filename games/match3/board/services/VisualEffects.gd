@@ -1,5 +1,4 @@
 extends Node
-class_name VisualEffects
 
 # VisualEffects: centralized visual helpers for GameBoard
 # Provides static functions so GameBoard can delegate particle/beam/combo text creation.

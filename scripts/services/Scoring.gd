@@ -1,5 +1,5 @@
-extends Node
-class_name Scoring
+extends RefCounted
+# class_name removed — loaded via load() in GameManager._Scoring
 
 # Simple scoring utility
 

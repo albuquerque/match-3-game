@@ -1,5 +1,4 @@
 extends Node
-class_name ObjectiveManager
 
 # Tracks level objectives: collectibles, unmovables, spreaders
 var collectible_goal: int = 0

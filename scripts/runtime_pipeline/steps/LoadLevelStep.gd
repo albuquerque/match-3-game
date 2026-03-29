@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name LoadLevelStep
 
 ## LoadLevelStep
@@ -6,14 +6,14 @@ class_name LoadLevelStep
 
 var level_id: String = ""
 var level_number: int = 0
-var pipeline_context: PipelineContext = null  # Store reference to pass completion data
+var pipeline_context = null  # PipelineContext  # Store reference to pass completion data
 
 func _init(lvl_id: String = ""):
 	super("load_level")
 	level_id = lvl_id
 	level_number = _extract_level_number(lvl_id)
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	if level_number <= 0:
 		push_error("[LoadLevelStep] Invalid level number: %d" % level_number)
 		return false

@@ -1,5 +1,4 @@
 extends Node
-class_name BoardLayout
 
 # BoardLayout: visual layout and border helpers extracted from GameBoard
 # Public API (static functions) so callers can delegate to these utilities.
@@ -163,7 +162,7 @@ static func draw_borders(gameboard: Node, border_container: Node, color: Color, 
     # Delegate to BorderRenderer if available - avoid accessing module-level var from static context
     var br = null
     # Try loading the renderer script resource locally
-    var br_local = load("res://scripts/game/BorderRenderer.gd")
+    var br_local = load("res://games/match3/board/services/BorderRenderer.gd")
     if br_local != null:
         br = br_local
     # If br is still null, we intentionally do not reference module-level BorderRenderer here

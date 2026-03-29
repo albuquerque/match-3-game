@@ -1,8 +1,8 @@
-extends Node
-class_name MatchFinder
+extends RefCounted
+# class_name removed — loaded via load() in GameManager._MatchFinder
 
 # Pure match-finding utility. No node access, no side-effects.
-# API: MatchFinder.find_matches(grid, width, height, min_match_size=3, exclude_values=[], blocked_value=-1) -> Array of Vector2 positions
+# API: find_matches(grid, width, height, min_match_size=3, exclude_values=[], blocked_value=-1) -> Array of Vector2 positions
 
 static func _is_matchable_helper(tile_type, exclude_values: Array, blocked_value: int) -> bool:
 	if typeof(tile_type) != TYPE_INT:
@@ -130,4 +130,4 @@ static func find_matches(grid: Array, width: int, height: int, min_match_size: i
 	return unique
 
 func find_matches_instance(grid: Array, width: int, height: int, min_match_size: int = 3, exclude_values: Array = [], blocked_value: int = -1) -> Array:
-	return MatchFinder.find_matches(grid, width, height, min_match_size, exclude_values, blocked_value)
+	return self.find_matches(grid, width, height, min_match_size, exclude_values, blocked_value)

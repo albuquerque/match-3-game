@@ -1,5 +1,4 @@
 extends Node
-class_name BoardVisuals
 
 # BoardVisuals: tile creation / clearing / visual grid helpers
 # API:
@@ -40,7 +39,7 @@ static func clear_tiles(gameboard: Node, tiles_ref: Array) -> void:
 static func instantiate_tile_visual(gameboard: Node, tile_scene: PackedScene, tile_type: int, grid_pos: Vector2, scale_factor: float, unmovable_meta = null) -> Node:
 	var tile: Node = null
 	# prefer VisualFactory via safe call (load locally to keep static function safe)
-	var vf_local = load("res://scripts/game/VisualFactory.gd")
+	var vf_local = load("res://games/match3/board/services/VisualFactory.gd")
 	if vf_local != null and vf_local.has_method("create_tile_instance") and (unmovable_meta == null):
 		tile = vf_local.call("create_tile_instance", tile_scene, tile_type, grid_pos, scale_factor)
 	else:
@@ -106,7 +105,7 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 				if tile_type == -1:
 					tiles_ref[x].append(null)
 					continue
-				var vf_local = load("res://scripts/game/VisualFactory.gd")
+				var vf_local = load("res://games/match3/board/services/VisualFactory.gd")
 				if vf_local != null and vf_local.has_method("create_tile_instance"):
 					tile = vf_local.call("create_tile_instance", gameboard.tile_scene, tile_type, Vector2(x,y), scale_factor)
 				else:
@@ -212,7 +211,7 @@ static func spawn_collectible_visual(gameboard: Node, tiles_ref: Array, x: int, 
 			return
 	var scale_factor = gameboard.tile_size / 64.0
 	var tile = null
-	var vf_local = load("res://scripts/game/VisualFactory.gd")
+	var vf_local = load("res://games/match3/board/services/VisualFactory.gd")
 	if vf_local != null and vf_local.has_method("create_collectible_tile"):
 		tile = vf_local.call("create_collectible_tile", gameboard.tile_scene, coll_type, Vector2(x,y), scale_factor)
 	else:

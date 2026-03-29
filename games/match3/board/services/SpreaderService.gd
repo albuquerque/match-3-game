@@ -38,7 +38,8 @@ static func spread(spreader_positions: Array, grid: Array, grid_w: int, grid_h: 
 # Step 8: Adjacent unmovable/spreader damage and spreader visual application added here.
 
 static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_positions: Array) -> void:
-	## Deal 1 hit to every hard unmovable orthogonally adjacent to any matched position.
+	## Hit hard-unmovable tiles orthogonally adjacent to any matched position.
+	## Updates the grid and tile visual state; syncs both GameRunState and GameManager grids.
 	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
 	var already_hit: Dictionary = {}
 
@@ -51,9 +52,10 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 			var key = str(nx) + "," + str(ny)
 			if already_hit.has(key):
 				continue
-			if GameRunState.grid[nx][ny] != GameRunState.UNMOVABLE:
+			if not GameManager.unmovable_map.has(key):
 				continue
 			already_hit[key] = true
+
 			if nx >= tiles_ref.size() or ny >= tiles_ref[nx].size():
 				continue
 			var tile = tiles_ref[nx][ny]
@@ -64,20 +66,23 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 
 			var destroyed = tile.take_hit(1)
 			if destroyed:
-				var revealed_type = tile.tile_type if "tile_type" in tile else 0
+				# tile.tile_type is now the revealed type (set by _transform_on_hard_destroy)
 				var is_coll = tile.is_collectible if "is_collectible" in tile else false
+				var revealed_type = tile.tile_type if "tile_type" in tile else 0
 				if is_coll:
 					GameRunState.grid[nx][ny] = GameRunState.COLLECTIBLE
+					GameManager.grid[nx][ny] = GameRunState.COLLECTIBLE
 				elif revealed_type > 0:
 					GameRunState.grid[nx][ny] = revealed_type
+					GameManager.grid[nx][ny] = revealed_type
 				else:
 					GameRunState.grid[nx][ny] = 0
+					GameManager.grid[nx][ny] = 0
 					tiles_ref[nx][ny] = null
 					if not tile.is_queued_for_deletion():
 						tile.queue_free()
-				# PR 5d: call via GameManager (still exists) for now; will move to Match3Game in PR 6
-				if GameManager and GameManager.has_method("report_unmovable_destroyed"):
-					GameManager.report_unmovable_destroyed(key, revealed_type > 0 or is_coll)
+				if GameManager.has_method("report_unmovable_destroyed"):
+					GameManager.report_unmovable_destroyed(key, true)  # skip_clear=true, grid already set
 
 static func damage_adjacent_spreaders(board: Node, tiles_ref: Array, matched_positions: Array) -> void:
 	## Destroy any spreader tile orthogonally adjacent to a matched position.

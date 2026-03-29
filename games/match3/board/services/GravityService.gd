@@ -69,7 +69,19 @@ static func fill_empty_spaces(grid: Array, gm: Node) -> Array:
 			else:
 				in_barrier_run = false
 				if cell == 0 and segment_accessible:
+					# Pick a tile type that won't create a 3-in-a-row match
+					var forbidden: Array = []
+					# Check left two neighbours horizontally
+					if x >= 2 and grid[x-1][y] == grid[x-2][y] and int(grid[x-1][y]) >= 1:
+						forbidden.append(int(grid[x-1][y]))
+					# Check above two neighbours vertically
+					if y >= 2 and grid[x][y-1] == grid[x][y-2] and int(grid[x][y-1]) >= 1:
+						forbidden.append(int(grid[x][y-1]))
 					var tile_type = rng.randi_range(1, max(1, gm.TILE_TYPES))
+					var safety = 0
+					while tile_type in forbidden and safety < gm.TILE_TYPES:
+						tile_type = rng.randi_range(1, max(1, gm.TILE_TYPES))
+						safety += 1
 					grid[x][y] = tile_type
 					created_positions.append(Vector2(x, y))
 	return created_positions

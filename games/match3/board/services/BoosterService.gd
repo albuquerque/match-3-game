@@ -1,5 +1,4 @@
 extends Node
-class_name BoosterService
 
 # Pure helper functions to compute positions affected by boosters.
 # These work on grid coordinates and do not touch nodes or visuals.

@@ -114,14 +114,25 @@ func _init_objective_manager(ld) -> void:
 		return
 	var omscript = gm.ObjectiveManagerScript
 	var om = null
-	if omscript is Script and omscript.has_method("new"):
-		om = omscript.new()
-	elif omscript is PackedScene:
+	if omscript is PackedScene:
 		om = omscript.instantiate()
-	if om != null and om.has_method("initialize"):
+	elif omscript is Script:
+		om = omscript.new()
+	if om == null:
+		push_error("[LevelLoader] Failed to instantiate ObjectiveManager")
+		return
+	# ObjectiveManager extends Node — add as child of GameManager so it lives in tree
+	if om is Node:
+		# Remove any previous instance
+		var prev = gm.get_node_or_null("ObjectiveManager")
+		if prev:
+			prev.queue_free()
+		om.name = "ObjectiveManager"
+		gm.add_child(om)
+	if om.has_method("initialize"):
 		om.initialize(ld)
-		gm.objective_manager_ref = om
-		print("[LevelLoader] ObjectiveManager initialized")
+	gm.objective_manager_ref = om
+	print("[LevelLoader] ObjectiveManager initialized")
 
 func _attach_hard_textures(ht_map: Dictionary, hr_map: Dictionary) -> void:
 	if ht_map.size() == 0 and hr_map.size() == 0:

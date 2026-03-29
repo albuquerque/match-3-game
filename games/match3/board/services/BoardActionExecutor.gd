@@ -275,7 +275,7 @@ static func activate_special_tile(board: Node, pos: Vector2) -> void:
 	var _ctx := {"position": pos, "tile_type": tile_type, "level": GameRunState.level}
 	GameManager.emit_signal("special_tile_activated", "tile_%d_%d" % [int(pos.x), int(pos.y)], _ctx)
 
-	var sas = load("res://scripts/game/SpecialActivationService.gd")
+	var sas = load("res://games/match3/board/services/SpecialActivationService.gd")
 	var activation_result = {}
 	if sas != null:
 		activation_result = sas.call("compute_activation", pos, tile_type, GameRunState.grid,
@@ -319,7 +319,7 @@ static func activate_special_tile(board: Node, pos: Vector2) -> void:
 
 static func activate_special_tile_chain(board: Node, pos: Vector2, tile_type: int) -> void:
 	print("[BoardActionExecutor] chain at ", pos, " type ", tile_type)
-	var sas = load("res://scripts/game/SpecialActivationService.gd")
+	var sas = load("res://games/match3/board/services/SpecialActivationService.gd")
 	var chain_result = {}
 	if sas != null:
 		chain_result = sas.call("compute_chain_activation", pos, tile_type, GameRunState.grid,

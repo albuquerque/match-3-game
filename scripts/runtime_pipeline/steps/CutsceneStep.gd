@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name CutsceneStep
 
 # CutsceneStep
@@ -8,13 +8,13 @@ var scene_path: String = ""
 var _cutscene_node: Node = null
 var _connected_signal: String = ""
 var _timeout_timer: Timer = null
-var _context: PipelineContext = null
+var _context = null  # PipelineContext
 
 func _init(path: String = ""):
 	super("cutscene")
 	scene_path = path
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	# Store context for callbacks
 	_context = context
 

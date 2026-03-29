@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name DLCFlowStep
 
 # DLCFlowStep
@@ -10,7 +10,7 @@ func _init(id: String = ""):
 	super("dlc_flow")
 	dlc_id = id
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	if dlc_id == "":
 		push_warning("[DLCFlowStep] No dlc_id provided")
 		step_completed.emit(true)

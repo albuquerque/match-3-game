@@ -1,34 +1,32 @@
 extends Node
-class_name GravityAnimator
 
 # GravityAnimator — barrier/segment-aware gravity and refill animations.
 # A2: Full logic ported from GameBoard.animate_gravity / GameBoard.animate_refill (2026-03-05).
-# All methods are static and receive the gameboard (GameBoard) and game_manager (GameManager
-# autoload) as parameters so they remain decoupled from both god objects.
+# PR 6: game_manager parameter removed — GameManager and GameRunState autoloads referenced directly.
 
-static func animate_gravity(game_manager: Node, gameboard: Node, tiles_ref: Array) -> void:
-	var moved = game_manager.apply_gravity()
+static func animate_gravity(gameboard: Node, tiles_ref: Array) -> void:
+	var moved = GameManager.apply_gravity()
 	print("[GRAVITY] apply_gravity returned -> ", moved)
 
 	var gravity_tweens = []
 
-	for x in range(game_manager.GRID_WIDTH):
+	for x in range(GameRunState.GRID_WIDTH):
 		# Determine which rows are "barriers" — inactive (-1), hard unmovables, or spreaders.
 		# Barriers divide the column into independent gravity segments.
 		var is_barrier: Array = []
-		for y in range(game_manager.GRID_HEIGHT):
+		for y in range(GameRunState.GRID_HEIGHT):
 			var tile = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
-			var blocked = game_manager.is_cell_blocked(x, y)
+			var blocked = GameManager.is_cell_blocked(x, y)
 			var unmovable = tile != null and not tile.is_queued_for_deletion() and \
 				"is_unmovable_hard" in tile and tile.is_unmovable_hard
-			var is_spreader_cell = game_manager.get_tile_at(Vector2(x, y)) == game_manager.SPREADER
+			var is_spreader_cell = GameManager.get_tile_at(Vector2(x, y)) == GameRunState.SPREADER
 			is_barrier.append(blocked or unmovable or is_spreader_cell)
 
 		# Collect visual tiles per segment bottom-to-top so index 0 = bottommost tile.
 		# This matches GravityService which packs values to the bottom (high Y).
 		var segment_tiles: Array = []
 		var seg_start := -1
-		for y in range(game_manager.GRID_HEIGHT):
+		for y in range(GameRunState.GRID_HEIGHT):
 			if is_barrier[y]:
 				if seg_start >= 0:
 					var seg: Array = []
@@ -45,7 +43,7 @@ static func animate_gravity(game_manager: Node, gameboard: Node, tiles_ref: Arra
 					seg_start = y
 		if seg_start >= 0:
 			var seg: Array = []
-			for sy in range(game_manager.GRID_HEIGHT - 1, seg_start - 1, -1):  # bottom-to-top
+			for sy in range(GameRunState.GRID_HEIGHT - 1, seg_start - 1, -1):  # bottom-to-top
 				var tile = tiles_ref[x][sy] if x < tiles_ref.size() and sy < tiles_ref[x].size() else null
 				if tile != null and not tile.is_queued_for_deletion():
 					seg.append(tile)
@@ -61,7 +59,7 @@ static func animate_gravity(game_manager: Node, gameboard: Node, tiles_ref: Arra
 		var current_seg: Array = segment_tiles[seg_index] if segment_tiles.size() > 0 else []
 		var prev_was_barrier := true
 
-		for y in range(game_manager.GRID_HEIGHT - 1, -1, -1):  # bottom-to-top
+		for y in range(GameRunState.GRID_HEIGHT - 1, -1, -1):  # bottom-to-top
 			if is_barrier[y]:
 				if not prev_was_barrier:
 					if tile_index < current_seg.size():
@@ -77,7 +75,7 @@ static func animate_gravity(game_manager: Node, gameboard: Node, tiles_ref: Arra
 				continue
 			prev_was_barrier = false
 
-			var tile_type = game_manager.get_tile_at(Vector2(x, y))
+			var tile_type = GameManager.get_tile_at(Vector2(x, y))
 			if tile_type > 0:
 				if tile_index < current_seg.size():
 					var tile = current_seg[tile_index]
@@ -111,22 +109,22 @@ static func animate_gravity(game_manager: Node, gameboard: Node, tiles_ref: Arra
 	# fall to the bottom row are detected after the board is fully settled.
 	print("Gravity complete")
 
-static func animate_refill(game_manager: Node, gameboard: Node, tiles_ref: Array) -> Array:
-	var new_tile_positions = game_manager.fill_empty_spaces()
+static func animate_refill(gameboard: Node, tiles_ref: Array) -> Array:
+	var new_tile_positions = GameManager.fill_empty_spaces()
 	var spawn_tweens = []
 	var scale_factor = gameboard.tile_size / 64.0
 
 	# Add any positions that have grid data but no visual tile (gap-fill safety net).
 	var positions_needing_tiles = []
-	for x in range(game_manager.GRID_WIDTH):
-		for y in range(game_manager.GRID_HEIGHT):
-			if game_manager.is_cell_blocked(x, y):
+	for x in range(GameRunState.GRID_WIDTH):
+		for y in range(GameRunState.GRID_HEIGHT):
+			if GameManager.is_cell_blocked(x, y):
 				continue
 			var existing = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
 			if existing != null and not existing.is_queued_for_deletion() and \
 					"is_unmovable_hard" in existing and existing.is_unmovable_hard:
 				continue
-			var grid_value = game_manager.get_tile_at(Vector2(x, y))
+			var grid_value = GameManager.get_tile_at(Vector2(x, y))
 			if grid_value > 0:
 				var has_visual = existing != null and is_instance_valid(existing)
 				if not has_visual:
@@ -141,7 +139,7 @@ static func animate_refill(game_manager: Node, gameboard: Node, tiles_ref: Array
 	for pos in new_tile_positions:
 		var x = int(pos.x)
 		var y = int(pos.y)
-		if game_manager.is_cell_blocked(x, y):
+		if GameManager.is_cell_blocked(x, y):
 			continue
 		var cur = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
 		if cur != null and not cur.is_queued_for_deletion() and \
@@ -149,11 +147,11 @@ static func animate_refill(game_manager: Node, gameboard: Node, tiles_ref: Array
 			print("[REFILL] Skipping unmovable at (", x, ",", y, ")")
 			continue
 
-		var tile_type = game_manager.get_tile_at(pos)
+		var tile_type = GameManager.get_tile_at(pos)
 
 		# If a collectible tile already has a valid visual at this position, leave it alone.
 		# Spawning a replacement would create a ghost tile on top of the existing shard/coin.
-		if tile_type == game_manager.COLLECTIBLE and cur != null \
+		if tile_type == GameRunState.COLLECTIBLE and cur != null \
 				and is_instance_valid(cur) and not cur.is_queued_for_deletion():
 			continue  # visual already correct — nothing to do
 
@@ -164,14 +162,14 @@ static func animate_refill(game_manager: Node, gameboard: Node, tiles_ref: Array
 			tiles_ref[x][y] = null
 
 		var tile = gameboard.tile_scene.instantiate()
-		if tile_type == game_manager.COLLECTIBLE:
+		if tile_type == GameRunState.COLLECTIBLE:
 			tile.setup(0, pos, scale_factor)
 			if tile.has_method("configure_collectible"):
 				# Check if this cell is a pending shard drop
 				var cell_key: String = str(x) + "," + str(y)
-				var coll_type: String = game_manager.collectible_type
-				if game_manager.has_meta("pending_shard_cells"):
-					var pending: Dictionary = game_manager.get_meta("pending_shard_cells")
+				var coll_type: String = GameRunState.collectible_type
+				if GameManager.has_meta("pending_shard_cells"):
+					var pending: Dictionary = GameManager.get_meta("pending_shard_cells")
 					if pending.has(cell_key):
 						coll_type = "shard"
 				tile.configure_collectible(coll_type)
@@ -181,7 +179,7 @@ static func animate_refill(game_manager: Node, gameboard: Node, tiles_ref: Array
 		# Spawn from just above the top of this tile's segment (barrier-aware).
 		var segment_top_row: int = y
 		for sy in range(y - 1, -1, -1):
-			if game_manager.is_cell_blocked(x, sy):
+			if GameManager.is_cell_blocked(x, sy):
 				break
 			var st: Node = tiles_ref[x][sy] if x < tiles_ref.size() and sy < tiles_ref[x].size() else null
 			if st != null and not st.is_queued_for_deletion():
@@ -215,9 +213,7 @@ static func animate_refill(game_manager: Node, gameboard: Node, tiles_ref: Array
 	print("Refill complete")
 	return new_tile_positions
 
-static func deferred_gravity_then_refill(game_manager: Node, gameboard: Node, tiles_ref: Array) -> void:
-	if game_manager.has_method("apply_gravity"):
-		game_manager.apply_gravity()
-	if game_manager.has_method("fill_empty_spaces"):
-		game_manager.fill_empty_spaces()
-	return
+static func deferred_gravity_then_refill(gameboard: Node, tiles_ref: Array) -> void:
+	GameManager.apply_gravity()
+	GameManager.fill_empty_spaces()
+

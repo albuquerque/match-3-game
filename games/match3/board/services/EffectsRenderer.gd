@@ -1,5 +1,4 @@
 extends Node
-class_name EffectsRenderer
 
 # EffectsRenderer: pure visual effect helpers moved out of GameBoard
 # API (static):

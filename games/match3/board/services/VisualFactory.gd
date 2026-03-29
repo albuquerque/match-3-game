@@ -1,5 +1,4 @@
 extends Node
-class_name VisualFactory
 
 # Existing helpers may exist above; add safe factory functions used by GameBoard
 

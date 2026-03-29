@@ -68,7 +68,7 @@ func _make_layout(w: int, h: int) -> Array:
 	return layout
 
 func _make_loader(gm_node: Node) -> Node:
-	var script = load("res://scripts/game/LevelLoader.gd")
+	var script = load("res://games/match3/board/services/LevelLoader.gd")
 	var loader = script.new()
 	loader.setup(gm_node)
 	return loader

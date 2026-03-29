@@ -1,5 +1,4 @@
 extends Node2D
-class_name GameBoard
 
 signal board_idle   ## Emitted when the board has settled: no matches, gravity done
 
@@ -19,6 +18,8 @@ var BIH = null # BoardInputHandler (Node child — loaded via script var)
 var BAX = null # BoardActionExecutor
 var CS = null  # CollectibleService
 var SS = null  # SpreaderService
+var BV = null  # BoardVisuals
+var BE = null  # BoardEffects
 
 
 
@@ -60,35 +61,39 @@ var board_container: Node2D = null  # Master container for ALL board visual elem
 func _ready():
 	# Lazy-load helper modules to avoid parse-time non-constant assignment errors
 	if VF == null:
-		VF = load("res://scripts/game/VisualFactory.gd")
+		VF = load("res://games/match3/board/services/VisualFactory.gd")
 	if VE == null:
-		VE = load("res://scripts/game/VisualEffects.gd")
+		VE = load("res://games/match3/board/services/VisualEffects.gd")
 	if ER == null:
-		ER = load("res://scripts/game/EffectsRenderer.gd")
+		ER = load("res://games/match3/board/services/EffectsRenderer.gd")
 	if GS == null:
-		GS = load("res://scripts/game/GravityService.gd")
+		GS = load("res://games/match3/board/services/GravityService.gd")
 	if BR == null:
-		BR = load("res://scripts/game/BorderRenderer.gd")
+		BR = load("res://games/match3/board/services/BorderRenderer.gd")
 	if BS == null:
-		BS = load("res://scripts/game/BoosterService.gd")
+		BS = load("res://games/match3/board/services/BoosterService.gd")
 	if MO == null:
-		MO = load("res://scripts/game/MatchOrchestrator.gd")
+		MO = load("res://games/match3/board/services/MatchOrchestrator.gd")
 	if GA == null:
-		GA = load("res://scripts/game/GravityAnimator.gd")
+		GA = load("res://games/match3/board/services/GravityAnimator.gd")
 	if BLS == null:
-		BLS = load("res://scripts/game/BoardSetup.gd")
+		BLS = load("res://games/match3/board/services/BoardSetup.gd")
 	if BA == null:
-		BA = load("res://scripts/game/BoardAnimator.gd")
+		BA = load("res://games/match3/board/services/BoardAnimator.gd")
 	if BAX == null:
-		BAX = load("res://scripts/game/BoardActionExecutor.gd")
+		BAX = load("res://games/match3/board/services/BoardActionExecutor.gd")
 	if CS == null:
-		CS = load("res://scripts/game/CollectibleService.gd")
+		CS = load("res://games/match3/board/services/CollectibleService.gd")
 	if SS == null:
-		SS = load("res://scripts/game/SpreaderService.gd")
+		SS = load("res://games/match3/board/services/SpreaderService.gd")
+	if BV == null:
+		BV = load("res://games/match3/board/services/BoardVisuals.gd")
+	if BE == null:
+		BE = load("res://games/match3/board/services/BoardEffects.gd")
 
 	# Step 5: Instantiate BoardInputHandler as a child Node via loaded script
 	if BIH == null:
-		var bih_script = load("res://scripts/game/BoardInputHandler.gd")
+		var bih_script = load("res://games/match3/board/services/BoardInputHandler.gd")
 		BIH = bih_script.new()
 		BIH.name = "BoardInputHandler"
 		add_child(BIH)
@@ -253,8 +258,8 @@ func instantiate_tile_visual(tile_type: int, grid_pos: Vector2, scale_factor: fl
 
 
 func create_visual_grid():
-	# A8: Delegated to BoardVisuals.create_visual_grid
-	await BoardVisuals.create_visual_grid(self, tiles)
+	# A8: Delegated to BV.create_visual_grid
+	await BV.create_visual_grid(self, tiles)
 	return
 
 # Collectible spawning and handling
@@ -302,10 +307,10 @@ func highlight_special_activation(positions: Array):
 	await BA.highlight_special_activation(self, tiles, positions)
 
 func _create_special_activation_particles(world_pos: Vector2):
-	BoardEffects.create_special_activation_particles(self, world_pos)
+	BE.create_special_activation_particles(self, world_pos)
 
 func _create_impact_particles(pos: Vector2, color: Color = Color(1,1,1,1)):
-	BoardEffects.create_impact_particles(self, pos, color)
+	BE.create_impact_particles(self, pos, color)
 
 func _create_lightning_beam_horizontal(row: int, color: Color = Color.YELLOW):
 	# A6: Delegated to EffectsRenderer
@@ -320,10 +325,10 @@ func _create_lightning_beam_vertical(col: int, color: Color = Color.CYAN):
 	return null
 
 func _show_combo_text(match_count: int, positions: Array, combo_multiplier: int = 1):
-	BoardEffects.show_combo_text(self, match_count, positions, combo_multiplier)
+	BE.show_combo_text(self, match_count, positions, combo_multiplier)
 
 func _apply_screen_shake(duration: float, intensity: float):
-	BoardEffects.apply_screen_shake(self, duration, intensity)
+	BE.apply_screen_shake(self, duration, intensity)
 
 
 func _on_game_over():
@@ -463,14 +468,14 @@ func animate_destroy_matches_except(matches: Array, skip_pos: Vector2):
 func animate_gravity() -> void:
 	# A2: Delegated to GravityAnimator.animate_gravity (via GA loaded script var)
 	if GA != null:
-		await GA.animate_gravity(GameManager, self, tiles)
+		await GA.animate_gravity(self, tiles)
 	else:
 		push_error("[GameBoard] GravityAnimator not loaded")
 
 func animate_refill() -> Array:
 	# A2: Delegated to GravityAnimator.animate_refill (via GA loaded script var)
 	if GA != null:
-		return await GA.animate_refill(GameManager, self, tiles)
+		return await GA.animate_refill(self, tiles)
 	push_error("[GameBoard] GravityAnimator not loaded")
 	return []
 
@@ -489,7 +494,7 @@ func _spawn_level_collectibles():
 func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
 	# A1: Delegated to MatchOrchestrator
 	if MO != null:
-		await MO.process_cascade(self, GameManager, initial_swap_pos)
+		await MO.process_cascade(self, null, initial_swap_pos)
 	else:
 		print("[GameBoard] ERROR: MatchOrchestrator not loaded")
 
@@ -531,7 +536,7 @@ func _task_deferred_gravity_then_refill() -> void:
 	await animate_refill()
 	await _check_collectibles_at_bottom()
 
-	var new_matches = GameManager.find_matches() if GameManager.has_method("find_matches") else []
+	var new_matches = GameManager.find_matches()
 	if new_matches and new_matches.size() > 0:
 		print("[GameBoard] deferred_gravity_then_refill: new matches found, processing cascade")
 		await process_cascade()
@@ -620,8 +625,6 @@ func _apply_spreader_visuals(new_positions: Array) -> void:
 
 func draw_board_borders():
 	# A3: Delegated to BorderRenderer
-	if typeof(GameManager) == TYPE_NIL:
-		return
 	if not GameRunState.initialized or GameRunState.grid == null or GameRunState.grid.size() == 0:
 		return
 	if border_container == null:
@@ -632,7 +635,7 @@ func draw_board_borders():
 		else:
 			add_child(border_container)
 	if BR != null:
-		border_container = BR.draw_board_borders(self, border_container, GameManager, grid_offset, tile_size, border_color, BORDER_WIDTH)
+		border_container = BR.draw_board_borders(self, border_container, null, grid_offset, tile_size, border_color, BORDER_WIDTH)
 	else:
 		print("[GameBoard] BorderRenderer not loaded, skipping border draw")
 

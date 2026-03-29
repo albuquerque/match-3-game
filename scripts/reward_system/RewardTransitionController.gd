@@ -1,6 +1,15 @@
 extends Node
 class_name RewardTransitionController
 
+const _RewardContainer    = preload("res://scripts/reward_system/RewardContainer.gd")
+const _RewardSummaryPanel = preload("res://scripts/reward_system/RewardSummaryPanel.gd")
+
+func _config_loader():
+	return load("res://scripts/reward_system/ContainerConfigLoader.gd")
+
+func _selection_rules():
+	return load("res://scripts/reward_system/ContainerSelectionRules.gd")
+
 ## RewardTransitionController
 ## Manages the complete reward reveal experience with stages and animations
 ## Orchestrates: Intro → Container Spawn → Interaction → Reveal → Summary → Exit
@@ -36,7 +45,7 @@ var score: int = 0
 var stars: int = 0
 
 # Animated reward container
-var reward_container: RewardContainer = null
+var reward_container = null  # RewardContainer
 var container_override: String = ""  # Optional: Override which container config to load
 
 # Parent UI reference
@@ -121,10 +130,9 @@ func _run_summary_stage():
 	# Priority 1: Manual override (highest priority)
 	if container_override != "":
 		print("[RewardTransitionController] Using manual override: %s" % container_override)
-		container_config = ContainerConfigLoader.load_container(container_override)
+		container_config = _config_loader().load_container(container_override)
 	else:
-		# Priority 2: Data-driven rules evaluation
-		var rule_container = ContainerSelectionRules.get_container_for_context(
+		var rule_container = _selection_rules().get_container_for_context(
 			level_number,
 			rewards_data.get("coins", 0),
 			rewards_data.get("gems", 0),
@@ -133,16 +141,15 @@ func _run_summary_stage():
 
 		if rule_container != "":
 			print("[RewardTransitionController] Using rule-selected container: %s" % rule_container)
-			container_config = ContainerConfigLoader.load_container(rule_container)
+			container_config = _config_loader().load_container(rule_container)
 		else:
-			# Priority 3: Theme-based selection (fallback)
 			var theme_name = "modern"
 			if ThemeManager and ThemeManager.has_method("get_theme_name"):
 				theme_name = ThemeManager.get_theme_name()
 			elif ThemeManager and "current_theme" in ThemeManager:
 				theme_name = ThemeManager.current_theme
 			print("[RewardTransitionController] No rules matched, using theme container for: %s" % theme_name)
-			container_config = ContainerConfigLoader.load_for_theme(theme_name)
+			container_config = _config_loader().load_for_theme(theme_name)
 
 	if not container_config.is_empty():
 		print("[RewardTransitionController] Using container: %s" % container_config.get("container_id", "unknown"))
@@ -155,7 +162,7 @@ func _show_with_container(config: Dictionary):
 	"""Show rewards using animated container system"""
 	# Create container
 	if not reward_container:
-		reward_container = RewardContainer.new()
+		reward_container = _RewardContainer.new()
 		reward_container.name = "RewardContainer"
 		ui_parent.add_child(reward_container)
 
@@ -206,8 +213,8 @@ func _show_container_summary():
 		_on_stage_completed(Stage.SUMMARY)
 		return
 
-	var panel: RewardSummaryPanel = scene.instantiate() as RewardSummaryPanel
-	if not panel:
+	var panel = scene.instantiate()
+	if not panel or not panel.has_method("setup"):
 		push_error("[RewardTransitionController] RewardSummary.tscn root is not a RewardSummaryPanel")
 		_on_stage_completed(Stage.SUMMARY)
 		return

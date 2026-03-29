@@ -1,8 +1,8 @@
 extends Node
-class_name BorderRenderer
 
 # Pure rendering helpers for drawing board borders as Line2D children under a container.
-# API: BorderRenderer.draw_board_borders(board_node, border_container, game_manager, grid_offset, tile_size, border_color, border_width)
+# PR 6: game_manager parameter removed — GameRunState and GameManager autoloads used directly.
+# API: BorderRenderer.draw_board_borders(board_node, border_container, grid_offset, tile_size, border_color, border_width)
 
 static func _ensure_container(board_node: Node, border_container: Node) -> Node2D:
 	if border_container != null and is_instance_valid(border_container):
@@ -12,52 +12,42 @@ static func _ensure_container(board_node: Node, border_container: Node) -> Node2
 	board_node.add_child(bc)
 	return bc
 
-static func draw_board_borders(board_node: Node, border_container: Node, game_manager, grid_offset: Vector2, tile_size: float, border_color: Color, border_width: float = 3.0) -> Node2D:
-	print("[BorderRenderer] draw_board_borders called: grid=", game_manager.GRID_WIDTH, "x", game_manager.GRID_HEIGHT, " tile_size=", tile_size)
-	# Validate game_manager
-	if typeof(game_manager) == TYPE_NIL:
-		print("[BorderRenderer] WARNING: game_manager is NIL")
-		return border_container
-	if not game_manager.initialized or game_manager.grid == null or game_manager.grid.size() == 0:
-		print("[BorderRenderer] WARNING: game_manager not initialized or grid empty")
+static func draw_board_borders(board_node: Node, border_container: Node, game_manager = null, grid_offset: Vector2 = Vector2.ZERO, tile_size: float = 64.0, border_color: Color = Color.WHITE, border_width: float = 3.0) -> Node2D:
+	# game_manager kept as optional param for backward compat — ignored, uses autoloads
+	print("[BorderRenderer] draw_board_borders called: grid=", GameRunState.GRID_WIDTH, "x", GameRunState.GRID_HEIGHT, " tile_size=", tile_size)
+	if not GameRunState.initialized or GameRunState.grid == null or GameRunState.grid.size() == 0:
+		print("[BorderRenderer] WARNING: GameRunState not initialized or grid empty")
 		return border_container
 
-	# Ensure container exists
 	var bc = _ensure_container(board_node, border_container)
-	# Clear old children
 	for c in bc.get_children():
 		c.queue_free()
 
-	# Draw simple borders (returns counts)
-	var counts = draw_simple_borders(bc, game_manager, grid_offset, tile_size, border_color, border_width)
-	# Keep z and visibility consistent
+	var counts = draw_simple_borders(bc, grid_offset, tile_size, border_color, border_width)
 	bc.visible = board_node.visible
 	print("[BorderRenderer] draw_board_borders completed: edges=", counts.get("edges", 0), " arcs=", counts.get("arcs", 0))
 	return bc
 
-static func draw_simple_borders(border_container: Node2D, game_manager, grid_offset: Vector2, tile_size: float, border_color: Color, border_width: float = 3.0) -> Dictionary:
-	if typeof(game_manager) == TYPE_NIL:
-		return {"edges":0, "arcs":0}
-	if not game_manager.initialized or game_manager.grid == null or game_manager.grid.size() == 0:
+static func draw_simple_borders(border_container: Node2D, grid_offset: Vector2, tile_size: float, border_color: Color, border_width: float = 3.0) -> Dictionary:
+	if not GameRunState.initialized or GameRunState.grid == null or GameRunState.grid.size() == 0:
 		return {"edges":0, "arcs":0}
 
 	var corner_radius = max(4.0, border_width * 4.0)
 	var edge_count = 0
 	var arc_count = 0
-	# Iterate cells and draw outer edges where neighbor is blocked/out of bounds
-	for x in range(game_manager.GRID_WIDTH):
-		for y in range(game_manager.GRID_HEIGHT):
-			if game_manager.is_cell_blocked(x, y):
+	for x in range(GameRunState.GRID_WIDTH):
+		for y in range(GameRunState.GRID_HEIGHT):
+			if GameManager.is_cell_blocked(x, y):
 				continue
 			var left = grid_offset.x + x * tile_size
 			var right = grid_offset.x + (x + 1) * tile_size
 			var top = grid_offset.y + y * tile_size
 			var bottom = grid_offset.y + (y + 1) * tile_size
 
-			var has_top = (y == 0 or game_manager.is_cell_blocked(x, y - 1))
-			var has_bottom = (y == game_manager.GRID_HEIGHT - 1 or game_manager.is_cell_blocked(x, y + 1))
-			var has_left = (x == 0 or game_manager.is_cell_blocked(x - 1, y))
-			var has_right = (x == game_manager.GRID_WIDTH - 1 or game_manager.is_cell_blocked(x + 1, y))
+			var has_top = (y == 0 or GameManager.is_cell_blocked(x, y - 1))
+			var has_bottom = (y == GameRunState.GRID_HEIGHT - 1 or GameManager.is_cell_blocked(x, y + 1))
+			var has_left = (x == 0 or GameManager.is_cell_blocked(x - 1, y))
+			var has_right = (x == GameRunState.GRID_WIDTH - 1 or GameManager.is_cell_blocked(x + 1, y))
 
 			# Top border
 			if has_top:

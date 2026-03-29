@@ -1,5 +1,4 @@
 extends Node
-class_name SpecialActivationService
 
 # Pure logic for computing the positions affected by special tile activations.
 # compute_activation(pos: Vector2, tile_type: int, grid: Array, grid_w: int, grid_h: int, collectible_type: int = 10) -> Dictionary

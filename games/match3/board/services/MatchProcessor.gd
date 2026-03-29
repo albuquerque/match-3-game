@@ -103,7 +103,7 @@ static func resolve_special_tile(req: Dictionary, unique: Array, grid: Array, gm
 
 	var sf = gm.SpecialFactory
 	if sf == null:
-		sf = load("res://scripts/game/SpecialFactory.gd")
+		sf = load("res://games/match3/board/services/SpecialFactory.gd")
 		if sf:
 			gm.SpecialFactory = sf
 	if sf == null:

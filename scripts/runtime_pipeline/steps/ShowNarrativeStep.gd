@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name ShowNarrativeStep
 
 ## ShowNarrativeStep
@@ -12,7 +12,7 @@ var skippable: bool = true
 var _overlay_layer: CanvasLayer = null
 var _dimmer_rect: ColorRect = null
 var _board_prev_visible: bool = true
-var _context: PipelineContext = null
+var _context = null  # PipelineContext
 var _auto_timer = null
 var _safety_timer = null
 var _hud_prev_visible: bool = true
@@ -32,7 +32,7 @@ func _init(stg_id: String = "", delay: float = 3.0, skip: bool = true):
 	auto_advance_delay = delay
 	skippable = skip
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	# store context for cleanup
 	_context = context
 
@@ -60,8 +60,8 @@ func execute(context: PipelineContext) -> bool:
 	# IMMEDIATELY hide the GameBoard to prevent old level from showing
 	var board = _context.game_board if _context else null
 	if not board:
-		# Try to find it dynamically
-		board = ExecutionContextBuilder._find_game_board() if ExecutionContextBuilder else null
+		var _ecb = load("res://scripts/runtime_pipeline/ContextBuilder.gd")
+		board = _ecb._find_game_board() if _ecb else null
 
 	if board:
 		_board_prev_visible = board.visible
@@ -106,6 +106,11 @@ func execute(context: PipelineContext) -> bool:
 
 	# Ensure a full-screen overlay exists (create if needed)
 	_overlay_layer = _context.overlay_layer if _context else null
+	# Guard against a freed overlay stored from a previous narrative step
+	if _overlay_layer and not is_instance_valid(_overlay_layer):
+		_overlay_layer = null
+		if _context:
+			_context.overlay_layer = null
 	if not _overlay_layer:
 		_overlay_layer = CanvasLayer.new()
 		_overlay_layer.name = "NarrativeOverlay"
@@ -530,6 +535,10 @@ func _finish_narrative_stage():
 		print("[ShowNarrativeStep] Removed narrative overlay")
 	else:
 		print("[ShowNarrativeStep] Narrative overlay not found or already removed")
+	# Clear from context so the next step doesn't reuse a freed instance
+	if _context:
+		_context.overlay_layer = null
+	_overlay_layer = null
 
 	var root2 = (Engine.get_main_loop() as SceneTree).root
 	var nm2 = root2.get_node_or_null("NarrativeStageManager") if root2 else null

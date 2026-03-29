@@ -1,10 +1,9 @@
 extends Node
-class_name BoardEffects
 
 # No module-level mutable VE; load VisualEffects locally within static functions to avoid static access errors
 
 static func create_special_activation_particles(gameboard: Node, world_pos: Vector2) -> void:
-	var ve_local = load("res://scripts/game/VisualEffects.gd")
+	var ve_local = load("res://games/match3/board/services/VisualEffects.gd")
 	if ve_local != null and ve_local.has_method("create_special_activation_particles"):
 		ve_local.call("create_special_activation_particles", gameboard, world_pos)
 		return
@@ -22,7 +21,7 @@ static func create_special_activation_particles(gameboard: Node, world_pos: Vect
 		tree.create_timer(1.5).timeout.connect(Callable(particles, "queue_free"))
 
 static func create_impact_particles(gameboard: Node, pos: Vector2, color: Color = Color(1,1,1,1)) -> void:
-	var ve_local = load("res://scripts/game/VisualEffects.gd")
+	var ve_local = load("res://games/match3/board/services/VisualEffects.gd")
 	if ve_local != null and ve_local.has_method("create_impact_particles"):
 		ve_local.call("create_impact_particles", gameboard, pos, color)
 		return
@@ -36,7 +35,7 @@ static func create_impact_particles(gameboard: Node, pos: Vector2, color: Color 
 		tree.create_timer(0.6).timeout.connect(Callable(particles, "queue_free"))
 
 static func create_lightning_beam(border_parent: Node, start_pos: Vector2, end_pos: Vector2, tile_size: float, color: Color, vertical: bool=false, width: float = 12.0) -> Tween:
-	var ve_local = load("res://scripts/game/VisualEffects.gd")
+	var ve_local = load("res://games/match3/board/services/VisualEffects.gd")
 	if ve_local != null and ve_local.has_method("create_lightning_beam"):
 		return ve_local.call("create_lightning_beam", border_parent, start_pos, end_pos, tile_size, color, vertical, width)
 	var beam = Line2D.new()
@@ -66,7 +65,7 @@ static func create_lightning_beam(border_parent: Node, start_pos: Vector2, end_p
 	return null
 
 static func show_combo_text(gameboard: Node, match_count: int, positions: Array, combo_multiplier: int = 1) -> void:
-	var ve_local = load("res://scripts/game/VisualEffects.gd")
+	var ve_local = load("res://games/match3/board/services/VisualEffects.gd")
 	if ve_local != null and ve_local.has_method("show_combo_text"):
 		ve_local.call("show_combo_text", gameboard, match_count, positions, combo_multiplier)
 		return
@@ -109,12 +108,10 @@ static func apply_screen_shake(gameboard: Node, duration: float, intensity: floa
 	tw.tween_property(gameboard, "position", original_pos + Vector2(intensity, 0), step).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(gameboard, "position", original_pos + Vector2(-intensity, 0), step).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(gameboard, "position", original_pos, step).set_trans(Tween.TRANS_SINE)
-	# cleanup after finished
 	tw.finished.connect(Callable(tw, "queue_free"))
-	# Also ensure gameboard position reset after the full duration
 	var tree = gameboard.get_tree()
 	if tree:
-		var cb = Callable(BoardEffects, "_restore_position").bind(gameboard, original_pos)
+		var cb = func(): _restore_position(gameboard, original_pos)
 		tree.create_timer(max(duration, step * 3)).timeout.connect(cb)
 	return
 

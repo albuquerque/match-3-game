@@ -28,6 +28,8 @@ var SpecialFactory = null
 var MatchProcessor = null
 var GravityService = null
 var GQS = null  # GridQueryService
+var _MatchFinder = null  # MatchFinder — loaded via load() to avoid class_name dependency
+var _Scoring = null     # Scoring — loaded via load() to avoid class_name dependency
 
 # ObjectiveManager integration
 var ObjectiveManagerScript = null
@@ -46,32 +48,36 @@ func _init_resolvers():
 	if NodeResolverAPI == null:
 		NodeResolverAPI = load("res://scripts/helpers/node_resolvers_api.gd")
 	if SpecialFactory == null:
-		SpecialFactory = load("res://scripts/game/SpecialFactory.gd")
+		SpecialFactory = load("res://games/match3/board/services/SpecialFactory.gd")
 	if MatchProcessor == null:
-		MatchProcessor = load("res://scripts/game/MatchProcessor.gd")
+		MatchProcessor = load("res://games/match3/board/services/MatchProcessor.gd")
 	if typeof(GravityService) == TYPE_NIL:
-		GravityService = load("res://scripts/game/GravityService.gd")
+		GravityService = load("res://games/match3/board/services/GravityService.gd")
 	if GQS == null:
-		GQS = load("res://scripts/game/GridQueryService.gd")
+		GQS = load("res://games/match3/board/services/GridQueryService.gd")
+	if _MatchFinder == null:
+		_MatchFinder = load("res://scripts/services/MatchFinder.gd")
+	if _Scoring == null:
+		_Scoring = load("res://scripts/services/Scoring.gd")
 	if ObjectiveManagerScript == null:
-		ObjectiveManagerScript = load("res://scripts/game/ObjectiveManager.gd")
+		ObjectiveManagerScript = load("res://games/match3/board/services/ObjectiveManager.gd")
 	# C1: Instantiate GameFlowController
 	if _flow_ctrl == null:
-		var gfc_script = load("res://scripts/game/GameFlowController.gd")
+		var gfc_script = load("res://games/match3/board/services/GameFlowController.gd")
 		if gfc_script and gfc_script is Script:
 			_flow_ctrl = gfc_script.new()
 			_flow_ctrl.setup(self)
 			add_child(_flow_ctrl)
 	# D1: Instantiate LevelLoader
 	if _level_loader == null:
-		var ll_script = load("res://scripts/game/LevelLoader.gd")
+		var ll_script = load("res://games/match3/board/services/LevelLoader.gd")
 		if ll_script and ll_script is Script:
 			_level_loader = ll_script.new()
 			_level_loader.setup(self)
 			add_child(_level_loader)
 	# D2: Load BoosterSelector (static methods only, no Node needed)
 	if _booster_selector == null:
-		_booster_selector = load("res://scripts/game/BoosterSelector.gd")
+		_booster_selector = load("res://games/match3/board/services/BoosterSelector.gd")
 
 var GRID_WIDTH = 8
 var GRID_HEIGHT = 8
@@ -517,6 +523,8 @@ func _apply_game_state(gs: Object) -> void:
 	unmovable_map = gs.get("unmovable_map") if gs.get("unmovable_map") != null else {}
 	spreader_positions = gs.get("spreader_positions") if gs.get("spreader_positions") != null else []
 	spreader_count = gs.get("spreader_count") if gs.get("spreader_count") != null else 0
+	# Keep GameRunState.grid in sync — single source of truth
+	var _grs_ref = _grs(); if _grs_ref: _grs_ref.grid = grid
 
 func create_empty_grid():
 	# B3: Delegated to GameState model
@@ -537,6 +545,8 @@ func create_empty_grid_fallback(w: int, h: int):
 	unmovable_map = {}
 	spreader_positions = []
 	spreader_count = 0
+	# Keep GameRunState.grid in sync — single source of truth
+	var grs = _grs(); if grs: grs.grid = grid
 
 func fill_grid_from_layout(layout: Array):
 	# B3: Delegated to GameState model
@@ -561,10 +571,23 @@ func _apply_layout_result(gs: Object, layout: Array) -> void:
 
 func fill_initial_grid():
 	# Legacy fallback — fill grid with random non-matching tiles
+	# Prevent 3-in-a-row horizontally or vertically during placement
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
 			if grid[x][y] != -1:
-				grid[x][y] = randi() % TILE_TYPES + 1
+				var forbidden: Array = []
+				# Check left two neighbours
+				if x >= 2 and grid[x-1][y] == grid[x-2][y] and grid[x-1][y] >= 1:
+					forbidden.append(grid[x-1][y])
+				# Check top two neighbours
+				if y >= 2 and grid[x][y-1] == grid[x][y-2] and grid[x][y-1] >= 1:
+					forbidden.append(grid[x][y-1])
+				var t = randi() % TILE_TYPES + 1
+				var tries = 0
+				while t in forbidden and tries < TILE_TYPES:
+					t = randi() % TILE_TYPES + 1
+					tries += 1
+				grid[x][y] = t
 
 func is_cell_blocked(x: int, y: int) -> bool:
 	if GQS != null: return GQS.is_cell_blocked(self, x, y)
@@ -622,18 +645,21 @@ func swap_tiles(pos1: Vector2, pos2: Vector2) -> bool:
 	return true
 
 func find_matches() -> Array:
-	# Exclude special tiles and unmovable sentinel so they never match as normal tiles.
-	# UNMOVABLE (11) is excluded rather than used as blocked_value so that runs of regular
-	# tiles on either side of an unmovable are detected independently and correctly.
 	var exclude = [HORIZTONAL_ARROW, VERTICAL_ARROW, FOUR_WAY_ARROW, COLLECTIBLE, SPREADER, UNMOVABLE]
-	return MatchFinder.find_matches(grid, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1)
+	if _MatchFinder == null:
+		_MatchFinder = load("res://scripts/services/MatchFinder.gd")
+	if _MatchFinder == null:
+		return []
+	return _MatchFinder.find_matches(grid, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1)
 
 func calculate_points(tiles_removed: int) -> int:
 	if tiles_removed <= 0:
 		return 0
-	if typeof(Scoring) == TYPE_NIL:
+	if _Scoring == null:
+		_Scoring = load("res://scripts/services/Scoring.gd")
+	if _Scoring == null:
 		return int(tiles_removed * POINTS_PER_TILE * (1.0 + (0.1 * float(combo_count))))
-	return Scoring.points_for(tiles_removed, combo_count)
+	return _Scoring.points_for(tiles_removed, combo_count)
 
 func add_score(points: int) -> void:
 	if points == null or points <= 0:
@@ -719,7 +745,7 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 
 	# Lazy-reload MatchProcessor in case _init_resolvers ran before the script was ready
 	if MatchProcessor == null:
-		MatchProcessor = load("res://scripts/game/MatchProcessor.gd")
+		MatchProcessor = load("res://games/match3/board/services/MatchProcessor.gd")
 
 	# Delegate clearing to MatchProcessor
 	var tiles_removed = 0
@@ -776,7 +802,7 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 func apply_gravity() -> bool:
 	## Step 1: Delegated to GravityService (barrier-aware version).
 	if GravityService == null:
-		GravityService = load("res://scripts/game/GravityService.gd")
+		GravityService = load("res://games/match3/board/services/GravityService.gd")
 	if GravityService != null:
 		return GravityService.apply_gravity(grid, self)
 	# Emergency fallback — should never be reached at runtime
@@ -786,7 +812,7 @@ func apply_gravity() -> bool:
 func fill_empty_spaces() -> Array:
 	## Step 1: Delegated to GravityService (barrier-aware version).
 	if GravityService == null:
-		GravityService = load("res://scripts/game/GravityService.gd")
+		GravityService = load("res://games/match3/board/services/GravityService.gd")
 	if GravityService != null:
 		return GravityService.fill_empty_spaces(grid, self)
 	return []
@@ -880,7 +906,7 @@ func has_possible_moves() -> bool:
 				if v != v2:
 					var tg = _copy_grid()
 					var t = tg[x][y]; tg[x][y] = tg[x+1][y]; tg[x+1][y] = t
-					if MatchFinder.find_matches(tg, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
+					if _MatchFinder.find_matches(tg, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
 						return true
 			if y + 1 < GRID_HEIGHT and is_cell_movable(x, y + 1):
 				var v3 = int(grid[x][y + 1])
@@ -888,7 +914,7 @@ func has_possible_moves() -> bool:
 				if v != v3:
 					var tg2 = _copy_grid()
 					var t2 = tg2[x][y]; tg2[x][y] = tg2[x][y+1]; tg2[x][y+1] = t2
-					if MatchFinder.find_matches(tg2, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
+					if _MatchFinder.find_matches(tg2, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1).size() > 0:
 						return true
 	return false
 
@@ -902,19 +928,16 @@ func _copy_grid() -> Array:
 	return copy
 
 func shuffle_until_moves_available(max_attempts: int = 100) -> bool:
-	# C3: Shuffle grid values until has_possible_moves() returns true.
+	# C3: Shuffle grid values until has_possible_moves() returns true
+	# AND no existing matches remain on the board.
 	# Only regular tile types (1-TILE_TYPES) are shuffled — collectibles, special tiles,
 	# and spreaders stay in place so they are never corrupted.
-	var rng = RandomNumberGenerator.new()
-	rng.randomize()
 	var cells: Array = []
 	var values: Array = []
 	for x in range(GRID_WIDTH):
 		for y in range(GRID_HEIGHT):
 			if grid.size() > x and grid[x].size() > y:
 				var v = int(grid[x][y])
-				# Only include regular movable tiles — skip blocked(-1), empty(0),
-				# special tiles (7-9), collectibles (10), spreaders (12)
 				if v >= 1 and v <= TILE_TYPES:
 					cells.append(Vector2(x, y))
 					values.append(v)
@@ -925,7 +948,8 @@ func shuffle_until_moves_available(max_attempts: int = 100) -> bool:
 		for i in range(cells.size()):
 			var p = cells[i]
 			grid[int(p.x)][int(p.y)] = values[i]
-		if has_possible_moves():
+		# Reject if existing matches present OR no valid swaps available
+		if find_matches().size() == 0 and has_possible_moves():
 			return true
 	return false
 
@@ -933,7 +957,7 @@ var SpreaderService = null
 
 func _init_spreader_service():
 	if SpreaderService == null:
-		SpreaderService = load("res://scripts/game/SpreaderService.gd")
+		SpreaderService = load("res://games/match3/board/services/SpreaderService.gd")
 
 func check_and_spread_tiles() -> Array:
 	## B5: Delegated to SpreaderService. Returns newly infected positions.
@@ -955,6 +979,7 @@ func check_and_spread_tiles() -> Array:
 				spreader_positions.append(np)
 		spreader_count = spreader_positions.size()
 		grid = res.get("grid", grid)
+		# Always re-sync GRS after a potential grid replacement
 		call_deferred("emit_signal", "spreaders_changed", spreader_count)
 		var grs = _grs(); if grs: grs.spreader_positions = spreader_positions; grs.spreader_count = spreader_count; grs.grid = grid
 		return new_list
