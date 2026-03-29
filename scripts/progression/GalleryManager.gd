@@ -8,6 +8,9 @@ signal item_unlocked(item_id: String)
 signal shard_added(item_id: String, current: int, required: int)
 # Legacy signal kept for backward compat
 signal gallery_item_unlocked(category: String, item_id: String)
+# PR 5c: direct signals replacing EventBus traffic
+signal shard_discovered(item_id: String, context: Dictionary)
+signal gallery_unlocked(item_id: String)
 
 const DATA_PATH := "res://data/gallery_items.json"
 
@@ -101,8 +104,9 @@ func add_shard(item_id: String) -> bool:
 	var required: int = int(_definitions[item_id].get("shards_required", 9))
 	print("[GalleryManager] shard_added %s → %d/%d" % [item_id, st["shards"], required])
 	shard_added.emit(item_id, st["shards"], required)
-	# Notify the EventBus so ShardToastNotifier and other listeners can react
-	if EventBus:
+	# PR 5c: emit directly — EventBus no longer carries shard_discovered traffic
+	shard_discovered.emit(item_id, {"shards": st["shards"], "required": required})
+	if EventBus:  # passthrough until PR 5d
 		EventBus.emit_shard_discovered(item_id, {"shards": st["shards"], "required": required})
 	if st["shards"] >= required:
 		st["unlocked"] = true
@@ -111,7 +115,9 @@ func add_shard(item_id: String) -> bool:
 		item_unlocked.emit(item_id)
 		var cat: String = str(_definitions[item_id].get("category", "artifacts"))
 		gallery_item_unlocked.emit(cat, item_id)  # legacy
-		if EventBus:
+		# PR 5c: emit directly — EventBus no longer carries gallery_item_unlocked traffic
+		gallery_unlocked.emit(item_id)
+		if EventBus:  # passthrough until PR 5d
 			EventBus.emit_gallery_item_unlocked(item_id)
 		_persist_state()
 		return true

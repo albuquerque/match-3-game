@@ -51,8 +51,11 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 			var item_id: String = ""
 			if tile and tile.has_meta("shard_item_id"):
 				item_id = str(tile.get_meta("shard_item_id"))
-			if EventBus and not item_id.is_empty():
-				EventBus.emit_shard_tile_collected(item_id)
+			if not item_id.is_empty():
+				# PR 5c: emit directly on GameManager — EventBus no longer carries shard_tile_collected
+				GameManager.emit_signal("shard_tile_collected", item_id)
+				if EventBus:  # passthrough until PR 5d
+					EventBus.emit_shard_tile_collected(item_id)
 		elif GameManager.has_method("collectible_landed_at"):
 			GameManager.collectible_landed_at(pos, coll_type)
 

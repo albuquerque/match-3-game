@@ -300,14 +300,25 @@ func _on_worldmap_level_selected(level_num: int) -> void:
 	print("[GameUI] WorldMap level_selected received: %d — routing through ExperienceDirector" % level_num)
 	var am = _get_am()
 	if am: am.play_sfx("ui_click")
-	var pm = _get_pm()
-	if pm: pm.close("WorldMap")
 	var ed = _get_ed()
 	if ed and ed.has_method("load_flow") and ed.has_method("start_flow_at_level"):
 		if ed.load_flow("main_story"):
+			var pm = _get_pm()
+			# Hide StartPage before closing WorldMap so it doesn't flash through.
+			# It remains on the PageManager stack but invisible while the flow runs.
+			if pm and pm.has_method("get_open_page"):
+				var sp_node = pm.get_open_page("StartPage")
+				if sp_node and is_instance_valid(sp_node):
+					sp_node.visible = false
+					print("[GameUI] Hid StartPage before WorldMap flow start")
+			# Close WorldMap with flow_starting=true — suppresses PageManager
+			# from revealing the StartPage underneath.
+			if pm: pm.close("WorldMap", {"flow_starting": true})
 			ed.start_flow_at_level(level_num)
 			return
-	# Fallback
+	# Fallback — close normally then load directly
+	var pm2 = _get_pm()
+	if pm2: pm2.close("WorldMap")
 	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
 	if lm and lm.has_method("get_level_index"):
 		var idx = lm.get_level_index(level_num)

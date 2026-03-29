@@ -19,6 +19,7 @@ func execute(context: PipelineContext) -> bool:
 		return false
 
 	print("[LoadLevelStep] Loading level %d (%s)" % [level_number, level_id])
+	print("[LoadLevelStep] game_ui=%s game_board=%s" % [str(context.game_ui), str(context.game_board)])
 
 	# Store pipeline context reference
 	pipeline_context = context
@@ -28,8 +29,15 @@ func execute(context: PipelineContext) -> bool:
 	context.completion_type = "level"
 
 	# Connect to level completion events
-	print("[LoadLevelStep] Connecting to EventBus for level_complete/level_failed (EventBus available: %s)" % (EventBus != null))
-	if EventBus:
+	# PR 5c: connect directly to GameManager autoload — EventBus no longer routes these
+	# NOTE: LoadLevelStep is a RefCounted — cannot use get_node_or_null; use autoload directly
+	if GameManager:
+		if GameManager.has_signal("level_complete") and not GameManager.level_complete.is_connected(_on_level_complete_direct):
+			GameManager.level_complete.connect(_on_level_complete_direct)
+		if GameManager.has_signal("level_failed") and not GameManager.level_failed.is_connected(_on_level_failed):
+			GameManager.level_failed.connect(_on_level_failed)
+		print("[LoadLevelStep] Connected to GameManager signals (PR 5c)")
+	elif EventBus:  # fallback until PR 5d
 		if not EventBus.level_complete.is_connected(_on_level_complete):
 			EventBus.level_complete.connect(_on_level_complete)
 		if not EventBus.level_failed.is_connected(_on_level_failed):
@@ -54,68 +62,68 @@ func execute(context: PipelineContext) -> bool:
 			print("[LoadLevelStep] GameUI loader completed for level %d" % level_number)
 		return true
 	elif GameManager:
-		print("[LoadLevelStep] Setting NodeResolvers._get_gm().level = %d" % level_number)
-		var gm_fb = NodeResolvers._get_gm()
-		if gm_fb:
-			gm_fb.level = level_number
-		else:
-			# Fallback to autoload object if available
-			if typeof(GameManager) != TYPE_NIL:
-				NodeResolvers._get_gm().level = level_number
+		print("[LoadLevelStep] Setting GameManager.level = %d" % level_number)
+		GameManager.level = level_number
 		return true
 	else:
 		push_error("[LoadLevelStep] Cannot load level - no GameUI or GameManager")
 		return false
 
 func _clear_narrative_stage() -> void:
-	var nsm = Engine.get_main_loop().root.get_node_or_null("NarrativeStageManager")
+	# Engine.get_main_loop().root works from RefCounted; get_node_or_null("/root/...") does not
+	var root = (Engine.get_main_loop() as SceneTree).root
+	var nsm = root.get_node_or_null("NarrativeStageManager") if root else null
 	if nsm and nsm.has_method("clear_stage"):
-		nsm.clear_stage(true)  # force=true so lock doesn't block it
+		nsm.clear_stage(true)
 		print("[LoadLevelStep] NarrativeStageManager cleared")
 
+## PR 5c: shim for GameManager.level_complete (no-arg signal)
+func _on_level_complete_direct():
+	print("[LoadLevelStep] _on_level_complete_direct fired for level %d (pipeline_context=%s)" % [level_number, str(pipeline_context)])
+	_on_level_complete("level_%d" % level_number, {
+		"score": GameRunState.score,
+		"stars": 0,  # stars computed by GameFlowController; pipeline reads from context
+		"coins_earned": 0,
+		"gems_earned": 0
+	})
+
 func _on_level_complete(lvl_id: String, context: Dictionary = {}):
-	print("[LoadLevelStep] Level completed: %s, context: %s" % [lvl_id, context])
-
-	# Clear any in-level narrative stage BEFORE the rewards screen appears
+	print("[LoadLevelStep] Level completed: %s" % lvl_id)
 	_clear_narrative_stage()
-
-	# Store completion data in pipeline context for ShowRewardsStep
 	if pipeline_context:
 		pipeline_context.set_result("current_level", level_number)
 		pipeline_context.set_result("level_completed", true)
-		pipeline_context.set_result("score", context.get("score", 0))
+		pipeline_context.set_result("score", context.get("score", GameRunState.score))
 		pipeline_context.set_result("stars", context.get("stars", 0))
 		pipeline_context.set_result("coins_earned", context.get("coins_earned", 0))
 		pipeline_context.set_result("gems_earned", context.get("gems_earned", 0))
 		print("[LoadLevelStep] Stored completion data in pipeline context")
-
 	step_completed.emit(true)
 
-func _on_level_failed(lvl_id: String, context: Dictionary = {}):
-	print("[LoadLevelStep] Level failed: %s, context: %s" % [lvl_id, context])
-
-	# Clear any in-level narrative stage BEFORE the failure screen appears
+func _on_level_failed(lvl_id: String = "", context: Dictionary = {}):
+	print("[LoadLevelStep] Level failed: %s" % lvl_id)
 	_clear_narrative_stage()
-
-	# Store failure data in pipeline context
 	if pipeline_context:
 		pipeline_context.set_result("current_level", level_number)
 		pipeline_context.set_result("level_completed", false)
-		pipeline_context.set_result("level_failed", true)  # Flag for failure
-		pipeline_context.set_result("score", context.get("score", 0))
-		pipeline_context.set_result("target_score", context.get("target", 0))
+		pipeline_context.set_result("level_failed", true)
+		pipeline_context.set_result("score", context.get("score", GameRunState.score))
+		pipeline_context.set_result("target_score", context.get("target", GameRunState.target_score))
 		pipeline_context.set_result("moves_used", context.get("moves_used", 0))
-		pipeline_context.set_result("stars", 0)  # No stars on failure
-		pipeline_context.set_result("coins_earned", 0)  # No rewards on failure
+		pipeline_context.set_result("stars", 0)
+		pipeline_context.set_result("coins_earned", 0)
 		pipeline_context.set_result("gems_earned", 0)
 		print("[LoadLevelStep] Stored failure data in pipeline context")
-
-	# Emit success so pipeline continues to handle failure properly
-	# (The next step should check level_failed flag and show appropriate screen)
 	step_completed.emit(true)
 
 func cleanup():
-	if EventBus:
+	# NOTE: LoadLevelStep is a RefCounted — use autoload directly, not get_node_or_null
+	if GameManager:
+		if GameManager.has_signal("level_complete") and GameManager.level_complete.is_connected(_on_level_complete_direct):
+			GameManager.level_complete.disconnect(_on_level_complete_direct)
+		if GameManager.has_signal("level_failed") and GameManager.level_failed.is_connected(_on_level_failed):
+			GameManager.level_failed.disconnect(_on_level_failed)
+	if EventBus:  # passthrough cleanup until PR 5d
 		if EventBus.level_complete.is_connected(_on_level_complete):
 			EventBus.level_complete.disconnect(_on_level_complete)
 		if EventBus.level_failed.is_connected(_on_level_failed):
