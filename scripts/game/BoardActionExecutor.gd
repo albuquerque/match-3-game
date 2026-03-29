@@ -274,8 +274,6 @@ static func activate_special_tile(board: Node, pos: Vector2) -> void:
 	# PR 5c: emit directly on GameManager — EventBus no longer carries special_tile_activated traffic
 	var _ctx := {"position": pos, "tile_type": tile_type, "level": GameRunState.level}
 	GameManager.emit_signal("special_tile_activated", "tile_%d_%d" % [int(pos.x), int(pos.y)], _ctx)
-	if EventBus:  # passthrough until PR 5d
-		EventBus.emit_special_tile_activated("tile_%d_%d" % [int(pos.x), int(pos.y)], _ctx)
 
 	var sas = load("res://scripts/game/SpecialActivationService.gd")
 	var activation_result = {}

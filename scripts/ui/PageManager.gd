@@ -55,51 +55,8 @@ func _ready() -> void:
 		# fallback to tree root
 		_pages_parent = get_tree().root
 
-	# subscribe to EventBus open/close (wait briefly if EventBus not ready)
-	var eb = null
-	# Try scene root first (safe)
-	if has_method("get_tree"):
-		var rt_ev = get_tree().root
-		if rt_ev:
-			eb = rt_ev.get_node_or_null("EventBus")
-	# Fallback to NodeResolvers helper if available
-	if eb == null:
-		# Try runtime load of resolver shim to avoid parse-time preloads
-		var resolver_script = load("res://scripts/helpers/node_resolvers_api.gd")
-		if resolver_script != null and typeof(resolver_script) != TYPE_NIL and resolver_script.has_method("_get_evbus"):
-			eb = resolver_script._get_evbus()
-		else:
-			# Fallback to shim
-			var shim = load("res://scripts/helpers/node_resolvers_shim.gd")
-			if shim != null and shim is Script and shim.has_source_code():
-				var shim_inst = shim.new()
-				if shim_inst and shim_inst.has_method("_get_evbus"):
-					eb = shim_inst._get_evbus()
-	# Wait a few frames for EventBus if still missing
-	if eb == null:
-		print("[PageManager] EventBus not ready - waiting up to 10 frames to connect")
-		for i in range(10):
-			await get_tree().process_frame
-			if typeof(NodeRes) != TYPE_NIL:
-				eb = NodeRes._get_evbus()
-			if eb == null and has_method("get_tree"):
-				var rt3 = get_tree().root
-				if rt3:
-					eb = rt3.get_node_or_null("EventBus")
-			if eb:
-				break
-
-	if eb:
-		if eb.has_signal("open_page"):
-			eb.connect("open_page", Callable(self, "_on_open_page"))
-		if eb.has_signal("close_page"):
-			eb.connect("close_page", Callable(self, "_on_close_page"))
-		# Ensure StartPage is removed when a level loads (covers direct StartPage children not managed by PageManager)
-		if eb.has_signal("level_loaded"):
-			eb.connect("level_loaded", Callable(self, "_on_global_level_loaded"))
-		print("[PageManager] Connected to EventBus signals")
-	else:
-		print("[PageManager] WARNING: EventBus not found; PageManager will not respond to EventBus.open_page until restarted")
+	# PR 5d: EventBus removed. Navigation uses PageManager.open/close directly.
+	# open_page and close_page signals are no longer emitted via EventBus.
 	print("[PageManager] Ready - parent=%s" % str(_pages_parent))
 
 func _z_for_index(idx: int) -> int:
@@ -288,18 +245,10 @@ func close(page_name: String, options: Dictionary = {}) -> bool:
 					print("[PageManager] %s closed with flow_starting=true — suppressing StartPage auto-reopen" % name)
 				elif not is_open("StartPage"):
 					# Only auto-open StartPage if the game is not currently running.
-					# If a level is active (GameManager.initialized == true), don't reopen StartPage now.
+					# If a level is active (GameRunState.initialized == true), don't reopen StartPage now.
 					# Also suppress if ExperienceDirector has an active flow running.
-					var gm = null
-					if typeof(NodeRes) != TYPE_NIL and NodeRes.has_method("_get_gm"):
-						gm = NodeRes._get_gm()
-					else:
-						if has_method("get_tree"):
-							var rt = get_tree().root
-							if rt:
-								gm = rt.get_node_or_null("GameManager")
 					var should_open_start = true
-					if gm != null and ("initialized" in gm) and gm.initialized:
+					if GameRunState and GameRunState.initialized:
 						should_open_start = false
 					if should_open_start and has_method("get_tree"):
 						var ed = get_tree().root.get_node_or_null("ExperienceDirector")

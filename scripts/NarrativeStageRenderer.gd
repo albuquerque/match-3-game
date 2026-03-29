@@ -17,7 +17,7 @@ var fade_in_duration: float = 0.3
 var fade_out_duration: float = 0.3
 
 var override_parent: Node = null
-var NodeResolvers = null
+# Note: NodeResolvers autoload is available globally; no local var needed
 
 func _ready():
 	print("[NarrativeStageRenderer] === RENDERER READY ===")
@@ -46,20 +46,8 @@ func _ready():
 	print("[NarrativeStageRenderer] ✓ Configured as fullscreen (anchors set to 0,0,1,1)")
 	print("[NarrativeStageRenderer] === RENDERER READY COMPLETE ===")
 
-	# Connect to language change events so we can re-translate visible text
-	var eb = null
-	# Runtime-load resolver to avoid parse-time preload issues
-	var resolver_script = load("res://scripts/helpers/node_resolvers_api.gd")
-	if resolver_script != null and typeof(resolver_script) != TYPE_NIL and resolver_script.has_method("_get_evbus"):
-		eb = resolver_script._get_evbus()
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null('EventBus')
-	if eb and eb.has_signal('language_changed'):
-		if not eb.language_changed.is_connected(Callable(self, '_on_language_changed')):
-			eb.language_changed.connect(Callable(self, '_on_language_changed'))
-			print('[NarrativeStageRenderer] Connected to EventBus.language_changed')
+	# TODO PR 6: connect to TranslationBootstrap.locale_changed once that signal exists
+	# so narrative text re-renders when the player changes language mid-session.
 
 func render_state(state_data: Dictionary):
 	"""Render a narrative stage state"""

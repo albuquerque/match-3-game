@@ -28,8 +28,6 @@ static func _get_gm():
 static func _get_rm():
 	return _fallback_autoload("RewardManager")
 
-static func _get_evbus():
-	return _fallback_autoload("EventBus")
 
 # AudioManager resolver (missing previously)
 static func _get_am():
@@ -79,11 +77,7 @@ static func _get_dlc():
 	return _fallback_autoload("DLCManager")
 
 static func _get_board():
-	# Prefer GameManager-provided board first
-	var gm = _fallback_autoload("GameManager")
-	if gm and gm.has_method("get_board"):
-		return gm.get_board()
-	# Fallback to direct node on root
+	# PR 5d: resolve GameBoard directly — GameManager no longer provides get_board()
 	var root = _get_tree_root()
 	if root:
 		return root.get_node_or_null("GameBoard")

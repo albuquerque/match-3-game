@@ -32,11 +32,7 @@ static func _get_pm() -> Node:
 	return _get_autoload("PageManager", "PageManager")
 
 static func _get_board() -> Node:
-	# Prefer GameManager-provided board if autoload present
-	var gm = _get_autoload("GameManager", "GameManager")
-	if gm and gm.has_method("get_board"):
-		return gm.get_board()
-	# fallback to direct autoload name 'GameBoard'
+	# PR 5d: resolve GameBoard directly from the scene tree
 	var direct = _get_autoload("GameBoard", "GameBoard")
 	if direct:
 		return direct
@@ -100,8 +96,6 @@ static func _get_rm() -> Node:
 static func _get_xd() -> Node:
 	return _get_autoload("ExperienceDirector", "ExperienceDirector")
 
-static func _get_evbus() -> Node:
-	return _get_autoload("EventBus", "EventBus")
 
 static func _get_am() -> Node:
 	return _get_autoload("AudioManager", "AudioManager")

@@ -16,9 +16,6 @@ func execute(context: PipelineContext) -> bool:
 		step_completed.emit(true)
 		return true
 	print("[UnlockStep] Unlocking: %s" % unlock_id)
-	# Best-effort: record unlock via EventBus custom_event if available
-	if EventBus and EventBus.has_method("emit_custom"):
-		EventBus.emit_custom("feature_unlocked", unlock_id, {})
 	step_completed.emit(true)
 	return true
 

@@ -8,7 +8,6 @@ var _cached_am: Node = null
 var _cached_rm: Node = null
 var _cached_tm: Node = null
 var _cached_vm: Node = null
-var _cached_evbus: Node = null
 
 func _am():
 	if is_instance_valid(_cached_am): return _cached_am
@@ -30,10 +29,6 @@ func _vm():
 	_cached_vm = VibrationManager if VibrationManager else get_node_or_null("/root/VibrationManager")
 	return _cached_vm
 
-func _evbus():
-	if is_instance_valid(_cached_evbus): return _cached_evbus
-	_cached_evbus = EventBus if EventBus else get_node_or_null("/root/EventBus")
-	return _cached_evbus
 
 # Local runtime resolver helper
 func _resolve(name: String) -> Node:
@@ -471,9 +466,8 @@ func _on_language_changed(index: int):
 	var _am_local = _resolve("AudioManager")
 	if _am_local:
 		_am_local.play_sfx("ui_click")
-	var _ev = _evbus()
-	if _ev and _ev.has_method("emit_language_changed"):
-		_ev.emit_language_changed(lang_code)
+	# PR 5d: EventBus.emit_language_changed removed — TranslationServer.set_locale already
+	# notifies all nodes via the built-in translation_changed notification.
 	_update_ui_after_language_change()
 
 func _update_ui_after_language_change():

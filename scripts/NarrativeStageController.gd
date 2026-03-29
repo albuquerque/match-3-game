@@ -52,20 +52,9 @@ func _ready():
 			gm.level_complete.connect(Callable(self, "_on_level_complete_direct"))
 		if gm.has_signal("match_cleared"):
 			gm.match_cleared.connect(Callable(self, "_on_match_cleared"))
-		print("[NarrativeStageController] Connected to GameManager signals (PR 5c)")
+		print("[NarrativeStageController] Connected to GameManager signals")
 	else:
-		# Fallback to EventBus while GameManager resolves (passthrough until PR 5d)
-		var eb = get_node_or_null("/root/EventBus")
-		if eb:
-			if eb.has_signal("level_loaded"):
-				eb.level_loaded.connect(Callable(self, "_on_level_loaded"))
-			if eb.has_signal("level_complete"):
-				eb.connect("level_complete", Callable(self, "_on_level_complete"))
-			if eb.has_signal("match_cleared"):
-				eb.connect("match_cleared", Callable(self, "_on_match_cleared"))
-			print("[NarrativeStageController] Connected to EventBus (fallback)")
-		else:
-			print("[NarrativeStageController] WARNING: No signal source found")
+		push_error("[NarrativeStageController] GameManager not found — narrative triggers disabled")
 
 func load_stage(stage_data: Dictionary) -> bool:
 	"""Load a narrative stage from JSON data"""
@@ -278,10 +267,8 @@ func _set_state(state_name: String):
 				print("[NarrativeStageController][ts] completion scheduled ms=", Time.get_ticks_msec(), " duration=", duration)
 				_completion_timer.timeout.connect(Callable(self, "_on_completion_timeout"))
 			return
-		# PR 5c: emit directly on self — EventBus no longer carries narrative_stage_complete
+		# No duration — emit immediately
 		narrative_stage_complete.emit(current_stage_data.get("id", ""))
-		if EventBus and EventBus.has_signal("narrative_stage_complete"):  # passthrough until PR 5d
-			EventBus.emit_signal("narrative_stage_complete", current_stage_data.get("id", ""))
 
 func _check_transitions(event_name: String, context: Dictionary = {}):
 	"""Check if any transitions match the event and trigger state change"""
@@ -420,10 +407,7 @@ func _on_completion_timeout():
 		return
 
 	_completion_timer = null
-	# PR 5c: emit directly on self — EventBus no longer carries narrative_stage_complete
 	narrative_stage_complete.emit(current_stage_data.get("id", ""))
-	if EventBus and EventBus.has_signal("narrative_stage_complete"):  # passthrough until PR 5d
-		EventBus.emit_signal("narrative_stage_complete", current_stage_data.get("id", ""))
 
 func stop_all_timers():
 	"""Stop all active timers (auto-advance and completion)"""

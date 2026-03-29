@@ -145,35 +145,15 @@ func _ready():
 	visible = false
 	modulate = Color(1,1,1,0)
 
-	# Listen for language changes
-	var eb = null
-	if typeof(NodeRes) != TYPE_NIL:
-		eb = NodeRes._get_evbus()
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null("EventBus")
-	if eb and eb.has_signal("language_changed"):
-		eb.language_changed.connect(self._on_language_changed)
+	# Listen for language changes via NarrativeStageRenderer (or TranslationBootstrap signal)
+	# PR 5d: EventBus.language_changed removed — TranslationBootstrap emits locale_changed directly
+	# TODO PR 6: wire locale_changed from TranslationBootstrap when needed
 
-	# Also hide StartPage when a level is loaded so it doesn't show behind gameplay
-	if eb and eb.has_signal("level_loaded"):
-		eb.level_loaded.connect(self._on_level_loaded)
-
-	# If a level is already loaded when StartPage starts, hide immediately to avoid flash-through
-	var gm_check = null
-	if typeof(NodeRes) != TYPE_NIL and NodeRes != null and NodeRes.has_method("_get_gm"):
-		gm_check = NodeRes._get_gm()
-	if gm_check == null and has_method("get_tree"):
-		var rt2 = get_tree().root
-		if rt2:
-			gm_check = rt2.get_node_or_null("GameManager")
-	if gm_check != null:
-		# Safe property check - many GameManager instances expose 'initialized' flag
-		if ("initialized" in gm_check and gm_check.initialized):
-			print("[StartPage] GameManager already initialized at _ready() - hiding StartPage")
-			visible = false
-			modulate = Color(1,1,1,0)
+	# If a level is already active when StartPage starts, hide immediately
+	if GameRunState and GameRunState.initialized:
+		print("[StartPage] Level already active at _ready() — hiding StartPage")
+		visible = false
+		modulate = Color(1,1,1,0)
 
 func set_level_info(level_number: int, description: String):
 	var btn = get_node_or_null("VBox/LevelButton")
