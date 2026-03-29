@@ -382,21 +382,12 @@ func _on_back_pressed():
 	return
 
 func _deferred_close_request() -> void:
-	print("[AchievementsPage] deferred close request: emitting EventBus/page manager close")
-	var eb = Resolver._get_evbus() if typeof(Resolver) != TYPE_NIL else null
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null("EventBus")
-	# Prefer EventBus; otherwise call PageManager directly
-	if eb and eb.has_method("emit_close_page"):
-		eb.emit_close_page("AchievementsPage")
-		return
+	print("[AchievementsPage] deferred close request: calling PageManager directly (PR 5c)")
 	var pm = Resolver._get_pm() if typeof(Resolver) != TYPE_NIL else null
 	if pm == null and has_method("get_tree"):
-		var rt2 = get_tree().root
-		if rt2:
-			pm = rt2.get_node_or_null("PageManager")
+		var rt = get_tree().root
+		if rt:
+			pm = rt.get_node_or_null("PageManager")
 	if pm and pm.has_method("close"):
 		pm.close("AchievementsPage")
 		return

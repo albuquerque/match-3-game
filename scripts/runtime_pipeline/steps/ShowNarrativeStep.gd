@@ -324,17 +324,23 @@ func execute(context: PipelineContext) -> bool:
 		# Continue - let the pipeline wait for completion; step will finish when timer or skip triggers
 		return true
 
-	var event_bus = null
-	if typeof(NodeResolvers) != TYPE_NIL:
-		event_bus = NodeResolvers._get_evbus()
-	# Fallback to scene root
-	if event_bus == null and root:
-		event_bus = root.get_node_or_null("EventBus")
-		print("[ShowNarrativeStep] EventBus available: %s" % (event_bus != null))
-	if event_bus and event_bus.has_signal("narrative_stage_complete"):
-		print("[ShowNarrativeStep] Connecting to EventBus.narrative_stage_complete")
-		if not event_bus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
-			event_bus.narrative_stage_complete.connect(Callable(self, "_on_narrative_complete"))
+	# PR 5c: connect directly to NarrativeStageController — EventBus no longer routes narrative_stage_complete
+	var controller = narrative_manager.get("controller") if narrative_manager else null
+	if controller and controller.has_signal("narrative_stage_complete"):
+		if not controller.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
+			controller.narrative_stage_complete.connect(Callable(self, "_on_narrative_complete"))
+			print("[ShowNarrativeStep] Connected to NarrativeStageController.narrative_stage_complete (PR 5c)")
+	else:
+		# Fallback to EventBus until PR 5d
+		var event_bus = null
+		if typeof(NodeResolvers) != TYPE_NIL:
+			event_bus = NodeResolvers._get_evbus()
+		if event_bus == null and root:
+			event_bus = root.get_node_or_null("EventBus")
+		if event_bus and event_bus.has_signal("narrative_stage_complete"):
+			if not event_bus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
+				event_bus.narrative_stage_complete.connect(Callable(self, "_on_narrative_complete"))
+				print("[ShowNarrativeStep] Connected to EventBus.narrative_stage_complete (fallback)")
 
 	if narrative_manager.has_method("load_stage_by_id"):
 		# Lock NarrativeStageManager to prevent level-based auto-loads from replacing this pipeline-driven stage
@@ -498,12 +504,7 @@ func _finish_narrative_stage():
 		_auto_timer = null
 		print("[ShowNarrativeStep] Stopped auto-advance timer")
 
-	var root = get_tree().root
-	var narrative_manager = null
-	if typeof(NodeResolvers) != TYPE_NIL:
-		narrative_manager = NodeResolvers._fallback_autoload("NarrativeStageManager")
-	if narrative_manager == null and root:
-		narrative_manager = root.get_node_or_null("NarrativeStageManager")
+	var narrative_manager = get_node_or_null("/root/NarrativeStageManager")
 	if narrative_manager and narrative_manager.has_method("unlock_stage"):
 		narrative_manager.unlock_stage()
 		print("[ShowNarrativeStep] Unlocked NarrativeStageManager")
@@ -540,19 +541,19 @@ func _finish_narrative_stage():
 	else:
 		print("[ShowNarrativeStep] Narrative overlay not found or already removed")
 
-	# Disconnect from event bus if connected
-	var event_bus = null
-	var tree = get_tree()
-	if tree:
-		var root2 = tree.root
-		if typeof(NodeResolvers) != TYPE_NIL:
-			event_bus = NodeResolvers._get_evbus()
-		if event_bus == null and root2:
-			event_bus = root2.get_node_or_null("EventBus")
-		if event_bus and event_bus.has_signal("narrative_stage_complete"):
-			if event_bus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
-				event_bus.narrative_stage_complete.disconnect(Callable(self, "_on_narrative_complete"))
-				print("[ShowNarrativeStep] Disconnected from EventBus.narrative_stage_complete")
+	# PR 5c: disconnect from NarrativeStageController directly
+	# NOTE: ShowNarrativeStep is a RefCounted — use Engine.get_main_loop(), not get_tree()
+	var root2 = (Engine.get_main_loop() as SceneTree).root
+	var nm2 = root2.get_node_or_null("NarrativeStageManager") if root2 else null
+	var ctrl2 = nm2.get("controller") if nm2 else null
+	if ctrl2 and ctrl2.has_signal("narrative_stage_complete"):
+		if ctrl2.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
+			ctrl2.narrative_stage_complete.disconnect(Callable(self, "_on_narrative_complete"))
+			print("[ShowNarrativeStep] Disconnected from NarrativeStageController.narrative_stage_complete")
+	# Passthrough cleanup until PR 5d
+	if EventBus and EventBus.has_signal("narrative_stage_complete"):
+		if EventBus.narrative_stage_complete.is_connected(Callable(self, "_on_narrative_complete")):
+			EventBus.narrative_stage_complete.disconnect(Callable(self, "_on_narrative_complete"))
 
 	print("[ShowNarrativeStep] Finished")
 
@@ -565,7 +566,7 @@ func _on_skip_pressed() -> void:
 	print("[ShowNarrativeStep] Forcibly finishing narrative stage due to skip")
 
 	# CRITICAL: Stop the controller's timers before finishing to prevent ghost state transitions
-	var root = get_tree().root
+	var root = (Engine.get_main_loop() as SceneTree).root
 	var narrative_manager = null
 	if typeof(NodeResolvers) != TYPE_NIL:
 		narrative_manager = NodeResolvers._fallback_autoload("NarrativeStageManager")

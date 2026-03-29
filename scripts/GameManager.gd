@@ -8,11 +8,19 @@ signal level_changed(new_level)
 signal moves_changed(moves_left)
 signal game_over
 signal level_complete
+signal level_failed(level_id: String, context: Dictionary)
 signal level_loaded
+signal level_loaded_ctx(level_id: String, context: Dictionary)  # PR 5c: carries context
 signal collectibles_changed(collected, target)
 signal remove_matches_done(tiles_removed)
 signal gravity_applied(moved)
 signal fill_complete(created_positions)
+# PR 5c: direct signals replacing EventBus traffic
+signal match_cleared(match_size: int, context: Dictionary)
+signal special_tile_activated(entity_id: String, context: Dictionary)
+signal pre_refill()
+signal post_refill()
+signal shard_tile_collected(item_id: String)
 
 # Game configuration
 var NodeResolverAPI = null
@@ -370,10 +378,8 @@ func load_current_level():
 	# PR 5a: push all level data to GameRunState so sub-services can migrate to it in PR 5b
 	_push_to_grs()
 
-	# Notify EventBus for narrative pipeline
-	var _eb = NodeResolverAPI._get_evbus() if typeof(NodeResolverAPI) != TYPE_NIL else null
-	if _eb:
-		_eb.emit_level_loaded("level_%d" % level, {"level": level, "target": target_score})
+	# PR 5c: emit direct signal with context — EventBus no longer carries level_loaded traffic
+	emit_signal("level_loaded_ctx", "level_%d" % GameRunState.level, {"level": GameRunState.level, "target": GameRunState.target_score})
 
 	# Deferred HUD signals — UI may not be ready at load_level call time
 	if unmovable_target > 0:
@@ -424,7 +430,8 @@ func _load_level_narrative() -> void:
 			# ShowNarrativeStep owns the manager right now.
 			# Defer load_stage_for_level until stage_cleared fires (after unlock).
 			_pending_in_level_stage = level
-			nsm.stage_cleared.connect(_on_narrative_cleared_load_level_stage, CONNECT_ONE_SHOT)
+			if not nsm.stage_cleared.is_connected(_on_narrative_cleared_load_level_stage):
+				nsm.stage_cleared.connect(_on_narrative_cleared_load_level_stage, CONNECT_ONE_SHOT)
 
 
 
@@ -757,10 +764,9 @@ func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> i
 			pending_level_complete = true
 			call_deferred("_perform_level_completion_check")
 
-	# Notify EventBus for narrative effects and shard drop system
+	# PR 5c: emit direct signal — EventBus no longer carries match_cleared traffic
 	if tiles_removed > 0:
-		if EventBus:
-			EventBus.emit_match_cleared(tiles_removed, {"level": level, "score": score, "target": target_score})
+		emit_signal("match_cleared", tiles_removed, {"level": GameRunState.level, "score": GameRunState.score, "target": GameRunState.target_score})
 
 	var grs = _grs(); if grs: grs.grid = grid; grs.combo_count = combo_count
 

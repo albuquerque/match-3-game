@@ -187,103 +187,43 @@ func close():
 	hide_screen()
 	# queue_free delegated to caller when desired
 
-func _on_start_pressed():
-	# Backwards-compatible local signal
-	emit_signal("start_pressed")
-	# Request navigation to Game page via EventBus
-	var eb = null
-	if typeof(NodeRes) != TYPE_NIL:
-		eb = NodeRes._get_evbus()
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null("EventBus")
-	if eb and eb.has_method("emit_open_page"):
-		eb.emit_open_page("Game", {})
+func _get_pm() -> Node:
+	# PR 5c: resolve PageManager directly — no EventBus needed for navigation
+	if has_method("get_tree") and get_tree():
+		return get_tree().root.get_node_or_null("PageManager")
+	return null
+
+func _open_page(page_name: String) -> void:
+	var pm := _get_pm()
+	if pm and pm.has_method("open"):
+		pm.open(page_name, {})
 	else:
-		print("[StartPage] EventBus not available - fallback to local start handling")
+		push_warning("[StartPage] PageManager not found; cannot open %s" % page_name)
+
+func _on_start_pressed():
+	emit_signal("start_pressed")
 
 func _on_booster_button_pressed(bid: String):
 	emit_signal("booster_selected", bid)
 
 func _on_exchange_pressed():
-	# Exchange opens Shop or Exchange page
 	emit_signal("exchange_pressed")
-	var eb = null
-	if typeof(NodeRes) != TYPE_NIL:
-		eb = NodeRes._get_evbus()
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null("EventBus")
-	if eb and eb.has_method("emit_open_page"):
-		eb.emit_open_page("ShopUI", {})
-	else:
-		print("[StartPage] EventBus not available - fallback to local exchange handling")
+	_open_page("ShopUI")
 
 func _on_settings_pressed():
 	emit_signal("settings_pressed")
-	var eb = null
-	if typeof(NodeRes) != TYPE_NIL:
-		eb = NodeRes._get_evbus()
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null("EventBus")
-	if eb and eb.has_method("emit_open_page"):
-		eb.emit_open_page("SettingsDialog", {})
-	else:
-		print("[StartPage] EventBus not available - fallback to local settings handling")
+	_open_page("SettingsDialog")
 
 func _on_map_pressed():
 	emit_signal("map_pressed")
-	var eb = null
-	if typeof(NodeRes) != TYPE_NIL:
-		eb = NodeRes._get_evbus()
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null("EventBus")
-	if eb and eb.has_method("emit_open_page"):
-		eb.emit_open_page("WorldMap", {})
-	else:
-		print("[StartPage] EventBus not available - fallback to local map handling")
+	_open_page("WorldMap")
 
 func _on_achievements_pressed():
 	emit_signal("achievements_pressed")
-	var eb = null
-	if typeof(NodeRes) != TYPE_NIL:
-		eb = NodeRes._get_evbus()
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null("EventBus")
-	if eb and eb.has_method("emit_open_page"):
-		eb.emit_open_page("AchievementsPage", {})
-	else:
-		print("[StartPage] EventBus not available - fallback to local achievements handling")
+	_open_page("AchievementsPage")
 
 func _on_gallery_pressed():
-	# Open the Gallery page via EventBus when available, otherwise fallback to PageManager.open
-	var eb = null
-	if typeof(NodeRes) != TYPE_NIL:
-		eb = NodeRes._get_evbus()
-	if eb == null and has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			eb = rt.get_node_or_null("EventBus")
-	if eb and eb.has_method("emit_open_page"):
-		eb.emit_open_page("GalleryPage", {})
-	else:
-		print("[StartPage] EventBus not available - fallback to PageManager.open('GalleryPage')")
-		if has_method("get_tree"):
-			var pm = get_tree().root.get_node_or_null("PageManager")
-			if pm and pm.has_method("open"):
-				pm.call_deferred("open", "GalleryPage", {})
-			elif pm and pm.has_method("go_to_page"):
-				pm.call_deferred("go_to_page", "GalleryPage", {})
-			else:
-				print("[StartPage] PageManager not found; cannot open GalleryPage")
+	_open_page("GalleryPage")
 
 func _on_language_changed(locale: String):
 	"""Refresh UI text when language changes"""

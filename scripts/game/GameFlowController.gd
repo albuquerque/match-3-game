@@ -106,6 +106,7 @@ func on_level_complete() -> void:
 	if rm and rm.has_method("grant_level_completion_reward"):
 		rm.grant_level_completion_reward(GameRunState.level, stars)
 
+	print("[GFC] Emitting level_complete on GameManager (level=%d score=%d)" % [GameRunState.level, GameRunState.score])
 	gm.emit_signal("level_complete")
 
 	var coins_earned = 100 + (50 * GameRunState.level)
@@ -125,6 +126,8 @@ func _calculate_stars(original_moves_left: int) -> int:
 
 func _emit_eventbus_level_complete(stars: int, coins: int, gems: int) -> void:
 	var level_id = "level_%d" % GameRunState.level
+	# PR 5c: GameManager.level_complete already emitted in on_level_complete() — do NOT re-emit here.
+	# Keep EventBus passthrough only until PR 5d removes EventBus.
 	if EventBus:
 		EventBus.emit_level_complete(level_id, {
 			"level": GameRunState.level, "score": GameRunState.score,
@@ -149,11 +152,12 @@ func perform_level_failed_check() -> void:
 
 func _emit_eventbus_level_failed() -> void:
 	var level_id = "level_%d" % GameRunState.level
-	if EventBus:
-		EventBus.emit_level_failed(level_id, {
-			"level": GameRunState.level, "score": GameRunState.score,
-			"target": GameRunState.target_score, "moves_used": GameRunState.moves_left
-		})
+	var ctx := {"level": GameRunState.level, "score": GameRunState.score,
+		"target": GameRunState.target_score, "moves_used": GameRunState.moves_left}
+	# PR 5c: emit directly on GameManager — EventBus no longer carries level_failed traffic
+	gm.emit_signal("level_failed", level_id, ctx)
+	if EventBus:  # passthrough kept until PR 5d
+		EventBus.emit_level_failed(level_id, ctx)
 
 # ─── Bonus cascade ───────────────────────────────────────────────────────────
 

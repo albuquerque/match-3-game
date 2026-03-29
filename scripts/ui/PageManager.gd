@@ -232,7 +232,8 @@ func open(page_name: String, params: Dictionary = {}) -> bool:
 	print("[PageManager] Opened page: %s (z=%d)" % [page_name, z])
 	return true
 
-func close(page_name: String) -> bool:
+func close(page_name: String, options: Dictionary = {}) -> bool:
+	var _flow_starting: bool = options.get("flow_starting", false)
 	# find top-most matching page and remove
 	for i in range(_stack.size() - 1, -1, -1):
 		var entry = _stack[i]
@@ -252,7 +253,11 @@ func close(page_name: String) -> bool:
 			if _stack.size() > 0:
 				var new_top = _stack[_stack.size() - 1]
 				var new_node = new_top.get("node", null)
-				if new_node and is_instance_valid(new_node) and new_node is CanvasItem:
+				# If a flow is starting, do NOT reveal the page underneath (e.g. StartPage) —
+				# the pipeline will show the board instead.
+				if _flow_starting:
+					print("[PageManager] %s closed with flow_starting=true — suppressing reveal of underlying %s" % [name, new_top.get("name", "?")])
+				elif new_node and is_instance_valid(new_node) and new_node is CanvasItem:
 					# Prefer animated show if the page supports ScreenBase.show_screen
 					if new_node.has_method("show_screen"):
 						new_node.call_deferred("show_screen")
@@ -279,6 +284,8 @@ func close(page_name: String) -> bool:
 				# EXCEPTION: if StartPage itself was just closed, the pipeline/flow is starting — don't re-open it.
 				if name == "StartPage":
 					print("[PageManager] StartPage was closed and stack is empty — suppressing auto-reopen (flow starting)")
+				elif _flow_starting:
+					print("[PageManager] %s closed with flow_starting=true — suppressing StartPage auto-reopen" % name)
 				elif not is_open("StartPage"):
 					# Only auto-open StartPage if the game is not currently running.
 					# If a level is active (GameManager.initialized == true), don't reopen StartPage now.
@@ -338,6 +345,13 @@ func top_page():
 	if _stack.size() == 0:
 		return null
 	return _stack[_stack.size() - 1]
+
+# Return the scene node for an open page by name, or null
+func get_open_page(page_name: String) -> Node:
+	for entry in _stack:
+		if entry.get("name", "") == page_name:
+			return entry.get("node", null)
+	return null
 
 # Check if a page is open
 func is_open(page_name: String) -> bool:

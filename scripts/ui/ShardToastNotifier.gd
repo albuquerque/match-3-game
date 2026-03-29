@@ -18,7 +18,12 @@ static func _ignore_input_recursive(node: Node) -> void:
 		_ignore_input_recursive(child)
 func _ready() -> void:
 	layer = 95
-	if EventBus:
+	# PR 5c: connect directly to GalleryManager signals — EventBus no longer routes these
+	if GalleryManager:
+		GalleryManager.shard_discovered.connect(_on_shard_discovered)
+		GalleryManager.gallery_unlocked.connect(_on_gallery_item_unlocked)
+		print("[ShardToastNotifier] Connected to GalleryManager signals (PR 5c)")
+	elif EventBus:  # fallback until PR 5d
 		EventBus.shard_discovered.connect(_on_shard_discovered)
 		EventBus.gallery_item_unlocked.connect(_on_gallery_item_unlocked)
 	print("[ShardToastNotifier] ready")

@@ -89,13 +89,14 @@ static func process_cascade(board: Node, gm: Node, initial_swap_pos: Vector2 = V
 		# --- Gravity and refill ---
 		print("[MatchOrchestrator] Applying gravity...")
 		await board.animate_gravity()
-		# Signal listeners (e.g. ShardDropSystem) can now inject COLLECTIBLE cells
-		# into empty grid slots before fill_empty_spaces assigns random tile types.
-		EventBus.emit_pre_refill()
+		# PR 5c: emit directly on GameManager — EventBus no longer carries pre_refill traffic
+		gm.emit_signal("pre_refill")
+		if EventBus: EventBus.emit_pre_refill()  # passthrough until PR 5d
 		print("[MatchOrchestrator] Refilling empty spaces...")
 		await board.animate_refill()
-		# Allow systems to tag freshly spawned tiles (e.g. shard_item_id meta).
-		EventBus.post_refill.emit()
+		# PR 5c: emit directly on GameManager — EventBus no longer carries post_refill traffic
+		gm.emit_signal("post_refill")
+		if EventBus: EventBus.post_refill.emit()  # passthrough until PR 5d
 
 		# --- Collect any collectibles that have settled at the bottom row ---
 		if board.has_method("_check_collectibles_at_bottom"):
