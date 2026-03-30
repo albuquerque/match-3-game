@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
 # Pure helper functions to compute positions affected by boosters.
 # These work on grid coordinates and do not touch nodes or visuals.
@@ -96,7 +97,7 @@ static func activate_row_clear(row: int) -> void:
 	# Logic: clear all tiles in row via GameManager
 	var to_clear = []
 	for x in range(GameRunState.GRID_WIDTH):
-		if not GameManager.is_cell_blocked(x, row):
+		if not _GQS.is_cell_blocked(null, x, row):
 			to_clear.append(Vector2(x, row))
 	GameManager.remove_matches(to_clear)
 
@@ -107,7 +108,7 @@ static func activate_column_clear(col: int) -> void:
 		board._create_column_clear_effect(col)
 	var to_clear = []
 	for y in range(GameRunState.GRID_HEIGHT):
-		if not GameManager.is_cell_blocked(col, y):
+		if not _GQS.is_cell_blocked(null, col, y):
 			to_clear.append(Vector2(col, y))
 	GameManager.remove_matches(to_clear)
 
@@ -125,7 +126,7 @@ static func activate_bomb_3x3(x: int, y: int) -> void:
 		for dy in range(-1,2):
 			var nx = x + dx
 			var ny = y + dy
-			if nx >= 0 and nx < GameRunState.GRID_WIDTH and ny >=0 and ny < GameRunState.GRID_HEIGHT and not GameManager.is_cell_blocked(nx, ny):
+			if nx >= 0 and nx < GameRunState.GRID_WIDTH and ny >=0 and ny < GameRunState.GRID_HEIGHT and not _GQS.is_cell_blocked(null, nx, ny):
 				positions.append(Vector2(nx, ny))
 	var board = _get_board()
 	if board and board.has_method("_create_impact_particles"):
@@ -138,11 +139,11 @@ static func activate_line_blast(direction: String, x: int, y: int) -> void:
 	var positions = []
 	if direction == "horizontal":
 		for cx in range(GameRunState.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(cx, y):
+			if not _GQS.is_cell_blocked(null, cx, y):
 				positions.append(Vector2(cx, y))
 	else:
 		for cy in range(GameRunState.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(x, cy):
+			if not _GQS.is_cell_blocked(null, x, cy):
 				positions.append(Vector2(x, cy))
 	var board = _get_board()
 	if board:
@@ -154,7 +155,7 @@ static func activate_line_blast(direction: String, x: int, y: int) -> void:
 
 static func activate_swap(x1: int, y1: int, x2: int, y2: int) -> void:
 	print("[BoosterService] activate_swap:", x1, y1, x2, y2)
-	GameManager.swap_tiles(Vector2(x1,y1), Vector2(x2,y2))
+	_GQS.swap_tiles(Vector2(x1,y1), Vector2(x2,y2))
 
 static func activate_shuffle() -> void:
 	print("[BoosterService] activate_shuffle")

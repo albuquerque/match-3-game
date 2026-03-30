@@ -155,8 +155,11 @@ func _ready():
 	else:
 		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
 
-	# Register this board with GameManager so it can connect to request signals
-	if typeof(GameManager) != TYPE_NIL and GameManager != null and GameManager.has_method("register_board"):
+	# Expose this board via GameRunState so services can reach tiles without GameManager
+	GameRunState.board_ref = self
+
+	# Register with GameManager (backward compat — removed when GameManager is deleted)
+	if GameManager.has_method("register_board"):
 		GameManager.register_board(self)
 
 

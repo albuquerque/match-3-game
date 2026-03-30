@@ -52,7 +52,7 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 			var key = str(nx) + "," + str(ny)
 			if already_hit.has(key):
 				continue
-			if not GameManager.unmovable_map.has(key):
+			if not GameRunState.unmovable_map.has(key):
 				continue
 			already_hit[key] = true
 
@@ -71,13 +71,13 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 				var revealed_type = tile.tile_type if "tile_type" in tile else 0
 				if is_coll:
 					GameRunState.grid[nx][ny] = GameRunState.COLLECTIBLE
-					GameManager.grid[nx][ny] = GameRunState.COLLECTIBLE
+					GameRunState.grid[nx][ny] = GameRunState.COLLECTIBLE
 				elif revealed_type > 0:
 					GameRunState.grid[nx][ny] = revealed_type
-					GameManager.grid[nx][ny] = revealed_type
+					GameRunState.grid[nx][ny] = revealed_type
 				else:
 					GameRunState.grid[nx][ny] = 0
-					GameManager.grid[nx][ny] = 0
+					GameRunState.grid[nx][ny] = 0
 					tiles_ref[nx][ny] = null
 					if not tile.is_queued_for_deletion():
 						tile.queue_free()

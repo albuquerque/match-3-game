@@ -9,7 +9,7 @@ extends Node
 
 static func create_lightning_beam_horizontal(board_node: Node, row: int, color: Color, tile_size: float) -> Tween:
 	var start_pos = board_node.grid_to_world_position(Vector2(0, row))
-	var end_pos = board_node.grid_to_world_position(Vector2(GameManager.GRID_WIDTH - 1, row))
+	var end_pos = board_node.grid_to_world_position(Vector2(GameRunState.GRID_WIDTH - 1, row))
 
 	var beam = Line2D.new()
 	beam.name = "LightningBeamH"
@@ -51,7 +51,7 @@ static func create_lightning_beam_horizontal(board_node: Node, row: int, color: 
 
 static func create_lightning_beam_vertical(board_node: Node, col: int, color: Color, tile_size: float) -> Tween:
 	var start_pos = board_node.grid_to_world_position(Vector2(col, 0))
-	var end_pos = board_node.grid_to_world_position(Vector2(col, GameManager.GRID_HEIGHT - 1))
+	var end_pos = board_node.grid_to_world_position(Vector2(col, GameRunState.GRID_HEIGHT - 1))
 
 	var beam = Line2D.new()
 	beam.name = "LightningBeamV"

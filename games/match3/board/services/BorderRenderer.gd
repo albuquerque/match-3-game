@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
 # Pure rendering helpers for drawing board borders as Line2D children under a container.
 # PR 6: game_manager parameter removed — GameRunState and GameManager autoloads used directly.
@@ -37,17 +38,17 @@ static func draw_simple_borders(border_container: Node2D, grid_offset: Vector2, 
 	var arc_count = 0
 	for x in range(GameRunState.GRID_WIDTH):
 		for y in range(GameRunState.GRID_HEIGHT):
-			if GameManager.is_cell_blocked(x, y):
+			if _GQS.is_cell_blocked(null, x, y):
 				continue
 			var left = grid_offset.x + x * tile_size
 			var right = grid_offset.x + (x + 1) * tile_size
 			var top = grid_offset.y + y * tile_size
 			var bottom = grid_offset.y + (y + 1) * tile_size
 
-			var has_top = (y == 0 or GameManager.is_cell_blocked(x, y - 1))
-			var has_bottom = (y == GameRunState.GRID_HEIGHT - 1 or GameManager.is_cell_blocked(x, y + 1))
-			var has_left = (x == 0 or GameManager.is_cell_blocked(x - 1, y))
-			var has_right = (x == GameRunState.GRID_WIDTH - 1 or GameManager.is_cell_blocked(x + 1, y))
+			var has_top = (y == 0 or _GQS.is_cell_blocked(null, x, y - 1))
+			var has_bottom = (y == GameRunState.GRID_HEIGHT - 1 or _GQS.is_cell_blocked(null, x, y + 1))
+			var has_left = (x == 0 or _GQS.is_cell_blocked(null, x - 1, y))
+			var has_right = (x == GameRunState.GRID_WIDTH - 1 or _GQS.is_cell_blocked(null, x + 1, y))
 
 			# Top border
 			if has_top:

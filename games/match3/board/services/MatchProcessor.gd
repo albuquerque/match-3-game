@@ -1,15 +1,14 @@
 extends Node
 # MatchProcessor — pure data-model helper: clear matched tiles from grid, handle
 # special tile detection, collectibles and unmovables.
-# Loaded as a script resource (no class_name — avoids global name conflict with
-# the GameManager instance variable of the same name).
+# PR 6.5a: gm parameter replaced with GameRunState/GameManager autoloads.
+# gm kept as param for backward compat — ignored.
 
-static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, grid_w: int, grid_h: int, gm: Node) -> Dictionary:
+static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, grid_w: int, grid_h: int, gm: Node = null) -> Dictionary:
 	var out: Dictionary = {"tiles_removed": 0, "special_placed": null}
 	if matches == null or matches.size() == 0:
 		return out
 
-	# Normalise input into Vector2 list and deduplicate
 	var unique: Array = []
 	for m in matches:
 		var p = m
@@ -40,41 +39,41 @@ static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, g
 		var val: int = int(grid[gx][gy])
 
 		# Collectible tile (coin / shard)
-		if val == gm.COLLECTIBLE:
-			gm.collectibles_collected += 1
-			if gm.collectible_positions.has(p):
-				gm.collectible_positions.erase(p)
+		if val == GameRunState.COLLECTIBLE:
+			GameRunState.collectibles_collected += 1
+			if GameRunState.collectible_positions.has(p):
+				GameRunState.collectible_positions.erase(p)
 			grid[gx][gy] = 0
 			continue
 
 		# Spreader tile
-		if val == gm.SPREADER:
-			gm.report_spreader_destroyed(p)
+		if val == GameRunState.SPREADER:
+			GameManager.report_spreader_destroyed(p)
 			grid[gx][gy] = 0
 			tiles_removed += 1
 			continue
 
-		# Hard unmovable — report but let SpreaderService manage the visual
+		# Hard unmovable — report but let BoardActionExecutor manage the visual
 		var key: String = str(gx) + "," + str(gy)
-		if gm.unmovable_map.has(key):
-			gm.report_unmovable_destroyed(key, true)
+		if GameRunState.unmovable_map.has(key):
+			GameManager.report_unmovable_destroyed(key, true)
 			if int(grid[gx][gy]) == 0:
 				continue
 
-		# Preserve the swapped / special-spawn cell so caller can write the special type
+		# Preserve swapped / special-spawn cell so caller can write the special type
 		if swapped_pos.x >= 0 and swapped_pos.y >= 0 and int(swapped_pos.x) == gx and int(swapped_pos.y) == gy:
-			if val > 0 and val != gm.COLLECTIBLE:
+			if val > 0 and val != GameRunState.COLLECTIBLE:
 				tiles_removed += 1
 			continue
 
 		# Regular tile — clear and count
-		if val > 0 and val != gm.COLLECTIBLE:
+		if val > 0 and val != GameRunState.COLLECTIBLE:
 			tiles_removed += 1
 		grid[gx][gy] = 0
 
 	out["tiles_removed"] = tiles_removed
 
-	# Detect if the match qualifies for a special tile and register the best position
+	# Detect special tile qualification
 	if unique.size() >= 4 or _is_L_or_T(unique, grid_w, grid_h):
 		var best_pos: Vector2 = Vector2(-1, -1)
 		var best_score: int = -1
@@ -88,34 +87,29 @@ static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, g
 				best_score = score
 				best_pos = p
 		if best_pos.x >= 0:
-			gm.request_special_tile_creation(best_pos, "auto")
+			GameManager.request_special_tile_creation(best_pos, "auto")
 
 	return out
 
 # ---------------------------------------------------------------------------
 
-static func resolve_special_tile(req: Dictionary, unique: Array, grid: Array, gm: Node) -> int:
+static func resolve_special_tile(req: Dictionary, unique: Array, grid: Array, gm: Node = null) -> int:
 	if not (req is Dictionary) or not req.has("pos"):
 		return -1
 	var rpos = req["pos"]
 	if rpos == null or rpos.x < 0 or rpos.y < 0:
 		return -1
 
-	var sf = gm.SpecialFactory
-	if sf == null:
-		sf = load("res://games/match3/board/services/SpecialFactory.gd")
-		if sf:
-			gm.SpecialFactory = sf
+	var sf = load("res://games/match3/board/services/SpecialFactory.gd")
 	if sf == null:
 		return -1
 
-	# Call determine_special_type directly — no has_method guard (static method)
 	var special_type: int = sf.determine_special_type(
 		unique, Vector2(int(rpos.x), int(rpos.y)),
-		grid, gm.GRID_WIDTH, gm.GRID_HEIGHT, gm.MIN_MATCH_SIZE
+		grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.MIN_MATCH_SIZE
 	)
 	if special_type != -1:
-		if rpos.x >= 0 and rpos.x < gm.GRID_WIDTH and rpos.y >= 0 and rpos.y < gm.GRID_HEIGHT:
+		if rpos.x >= 0 and rpos.x < GameRunState.GRID_WIDTH and rpos.y >= 0 and rpos.y < GameRunState.GRID_HEIGHT:
 			grid[int(rpos.x)][int(rpos.y)] = special_type
 			return special_type
 	return -1

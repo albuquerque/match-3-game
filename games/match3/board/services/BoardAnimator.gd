@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 # BoardAnimator — loaded as a script resource (via BA var in GameBoard), not instanced directly
 
 ## BoardAnimator — all tile destruction, highlight, shuffle and clear animations.
@@ -128,8 +129,8 @@ static func animate_shuffle(board: Node, tiles_ref: Array) -> void:
 	for x in range(GameRunState.GRID_WIDTH):
 		for y in range(GameRunState.GRID_HEIGHT):
 			var tile = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
-			if tile and not GameManager.is_cell_blocked(x, y):
-				var new_type = GameManager.get_tile_at(Vector2(x, y))
+			if tile and not _GQS.is_cell_blocked(null, x, y):
+				var new_type = _GQS.get_tile_at(null, Vector2(x, y))
 				tile.update_type(new_type)
 				var original_pos = tile.position
 				var tween = board.create_tween()

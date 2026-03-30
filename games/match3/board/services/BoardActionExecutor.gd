@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 # BoardActionExecutor — loaded as a script resource (via BAX var in GameBoard), not instanced directly
 
 ## BoardActionExecutor — all booster execution, special tile activation,
@@ -75,7 +76,7 @@ static func activate_swap_booster(board: Node, tiles_ref: Array, x1: int, y1: in
 		return
 	GameRunState.processing_moves = true
 	AudioManager.play_sfx("booster_swap")
-	if GameManager.is_cell_blocked(x1, y1) or GameManager.is_cell_blocked(x2, y2):
+	if _GQS.is_cell_blocked(null, x1, y1) or _GQS.is_cell_blocked(null, x2, y2):
 		GameRunState.processing_moves = false
 		return
 	var tile1 = tiles_ref[x1][y1]
@@ -104,7 +105,7 @@ static func activate_chain_reaction_booster(board: Node, BS, x: int, y: int) -> 
 		return
 	GameRunState.processing_moves = true
 	AudioManager.play_sfx("booster_chain")
-	if GameManager.is_cell_blocked(x, y) or GameManager.get_tile_at(Vector2(x, y)) == GameRunState.COLLECTIBLE:
+	if _GQS.is_cell_blocked(null, x, y) or _GQS.get_tile_at(null, Vector2(x, y)) == GameRunState.COLLECTIBLE:
 		GameRunState.processing_moves = false
 		return
 	# Compute 3-wave expanding ring inline
@@ -132,7 +133,7 @@ static func activate_chain_reaction_booster(board: Node, BS, x: int, y: int) -> 
 	for wave in waves:
 		if wave.size() == 0:
 			continue
-		var valid = wave.filter(func(p): return not GameManager.is_cell_blocked(int(p.x), int(p.y)) and GameManager.get_tile_at(p) > 0 and GameManager.get_tile_at(p) != GameRunState.COLLECTIBLE)
+		var valid = wave.filter(func(p): return not _GQS.is_cell_blocked(null, int(p.x), int(p.y)) and _GQS.get_tile_at(null, p) > 0 and _GQS.get_tile_at(null, p) != GameRunState.COLLECTIBLE)
 		if valid.size() == 0:
 			continue
 		await board.highlight_special_activation(valid)
@@ -155,7 +156,7 @@ static func activate_bomb_3x3_booster(board: Node, BS, x: int, y: int) -> void:
 		return
 	GameRunState.processing_moves = true
 	AudioManager.play_sfx("booster_bomb_3x3")
-	if GameManager.is_cell_blocked(x, y):
+	if _GQS.is_cell_blocked(null, x, y):
 		GameRunState.processing_moves = false
 		return
 	var positions = []
@@ -164,7 +165,7 @@ static func activate_bomb_3x3_booster(board: Node, BS, x: int, y: int) -> void:
 			var nx = x + dx
 			var ny = y + dy
 			if nx >= 0 and nx < GameRunState.GRID_WIDTH and ny >= 0 and ny < GameRunState.GRID_HEIGHT:
-				if not GameManager.is_cell_blocked(nx, ny) and GameManager.get_tile_at(Vector2(nx, ny)) != GameRunState.COLLECTIBLE:
+				if not _GQS.is_cell_blocked(null, nx, ny) and _GQS.get_tile_at(null, Vector2(nx, ny)) != GameRunState.COLLECTIBLE:
 					positions.append(Vector2(nx, ny))
 	if positions.size() > 0:
 		await execute_board_action(board, positions)
@@ -181,7 +182,7 @@ static func activate_line_blast_booster(board: Node, BS, direction: String, cent
 			var ty = center_y + offset
 			if ty >= 0 and ty < GameRunState.GRID_HEIGHT:
 				for cx in range(GameRunState.GRID_WIDTH):
-					if not GameManager.is_cell_blocked(cx, ty) and GameManager.get_tile_at(Vector2(cx, ty)) != GameRunState.COLLECTIBLE:
+					if not _GQS.is_cell_blocked(null, cx, ty) and _GQS.get_tile_at(null, Vector2(cx, ty)) != GameRunState.COLLECTIBLE:
 						positions.append(Vector2(cx, ty))
 				board._create_lightning_beam_horizontal(ty, Color(1.0, 0.9, 0.2))
 				await board.get_tree().create_timer(0.05).timeout
@@ -189,7 +190,7 @@ static func activate_line_blast_booster(board: Node, BS, direction: String, cent
 			var tx = center_x + offset
 			if tx >= 0 and tx < GameRunState.GRID_WIDTH:
 				for cy in range(GameRunState.GRID_HEIGHT):
-					if not GameManager.is_cell_blocked(tx, cy) and GameManager.get_tile_at(Vector2(tx, cy)) != GameRunState.COLLECTIBLE:
+					if not _GQS.is_cell_blocked(null, tx, cy) and _GQS.get_tile_at(null, Vector2(tx, cy)) != GameRunState.COLLECTIBLE:
 						positions.append(Vector2(tx, cy))
 				board._create_lightning_beam_vertical(tx, Color(0.4, 0.9, 1.0))
 				await board.get_tree().create_timer(0.05).timeout
@@ -202,7 +203,7 @@ static func activate_hammer_booster(board: Node, x: int, y: int) -> void:
 		return
 	GameRunState.processing_moves = true
 	AudioManager.play_sfx("booster_hammer")
-	if GameManager.is_cell_blocked(x, y) or GameManager.get_tile_at(Vector2(x, y)) == GameRunState.COLLECTIBLE:
+	if _GQS.is_cell_blocked(null, x, y) or _GQS.get_tile_at(null, Vector2(x, y)) == GameRunState.COLLECTIBLE:
 		GameRunState.processing_moves = false
 		return
 	await execute_board_action(board, [Vector2(x, y)])
@@ -213,14 +214,14 @@ static func activate_tile_squasher_booster(board: Node, BS, x: int, y: int) -> v
 		return
 	GameRunState.processing_moves = true
 	AudioManager.play_sfx("booster_tile_squasher")
-	var target_type = GameManager.get_tile_at(Vector2(x, y))
-	if GameManager.is_cell_blocked(x, y) or target_type == GameRunState.COLLECTIBLE or target_type >= 7:
+	var target_type = _GQS.get_tile_at(null, Vector2(x, y))
+	if _GQS.is_cell_blocked(null, x, y) or target_type == GameRunState.COLLECTIBLE or target_type >= 7:
 		GameRunState.processing_moves = false
 		return
 	var positions = []
 	for gx in range(GameRunState.GRID_WIDTH):
 		for gy in range(GameRunState.GRID_HEIGHT):
-			if GameManager.get_tile_at(Vector2(gx, gy)) == target_type and not GameManager.is_cell_blocked(gx, gy):
+			if _GQS.get_tile_at(null, Vector2(gx, gy)) == target_type and not _GQS.is_cell_blocked(null, gx, gy):
 				positions.append(Vector2(gx, gy))
 	if positions.size() > 0:
 		await execute_board_action(board, positions)
@@ -233,14 +234,14 @@ static func activate_row_clear_booster(board: Node, BS, tiles_ref: Array, row: i
 	AudioManager.play_sfx("booster_row_clear")
 	var positions = []
 	for cx in range(GameRunState.GRID_WIDTH):
-		if not GameManager.is_cell_blocked(cx, row) and GameManager.get_tile_at(Vector2(cx, row)) != GameRunState.COLLECTIBLE:
+		if not _GQS.is_cell_blocked(null, cx, row) and _GQS.get_tile_at(null, Vector2(cx, row)) != GameRunState.COLLECTIBLE:
 			positions.append(Vector2(cx, row))
 	if positions.size() > 0:
 		board._create_lightning_beam_horizontal(row, Color(1.0, 1.0, 0.3))
 		await board.get_tree().create_timer(0.02).timeout
 		board._create_lightning_beam_horizontal(row, Color(1.0, 0.8, 0.0))
 		for cx in range(GameRunState.GRID_WIDTH):
-			if not GameManager.is_cell_blocked(cx, row):
+			if not _GQS.is_cell_blocked(null, cx, row):
 				board._create_impact_particles(board.grid_to_world_position(Vector2(cx, row)), Color.YELLOW)
 		await execute_line_clear(board, positions, tiles_ref)
 	GameRunState.processing_moves = false
@@ -252,14 +253,14 @@ static func activate_column_clear_booster(board: Node, BS, tiles_ref: Array, col
 	AudioManager.play_sfx("booster_column_clear")
 	var positions = []
 	for cy in range(GameRunState.GRID_HEIGHT):
-		if not GameManager.is_cell_blocked(column, cy) and GameManager.get_tile_at(Vector2(column, cy)) != GameRunState.COLLECTIBLE:
+		if not _GQS.is_cell_blocked(null, column, cy) and _GQS.get_tile_at(null, Vector2(column, cy)) != GameRunState.COLLECTIBLE:
 			positions.append(Vector2(column, cy))
 	if positions.size() > 0:
 		board._create_lightning_beam_vertical(column, Color(0.3, 0.8, 1.0))
 		await board.get_tree().create_timer(0.02).timeout
 		board._create_lightning_beam_vertical(column, Color(0.5, 1.0, 1.0))
 		for cy in range(GameRunState.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(column, cy):
+			if not _GQS.is_cell_blocked(null, column, cy):
 				board._create_impact_particles(board.grid_to_world_position(Vector2(column, cy)), Color.CYAN)
 		await execute_line_clear(board, positions, tiles_ref)
 	GameRunState.processing_moves = false
@@ -268,7 +269,7 @@ static func activate_column_clear_booster(board: Node, BS, tiles_ref: Array, col
 
 static func activate_special_tile(board: Node, pos: Vector2) -> void:
 	print("[BoardActionExecutor] activate_special_tile at ", pos)
-	var tile_type = GameManager.get_tile_at(pos)
+	var tile_type = _GQS.get_tile_at(null, pos)
 	GameRunState.processing_moves = true
 	AudioManager.play_sfx("special_activate")
 	# PR 5c: emit directly on GameManager — EventBus no longer carries special_tile_activated traffic
@@ -349,7 +350,7 @@ static func activate_special_tile_chain(board: Node, pos: Vector2, tile_type: in
 	var scoring_count = 0
 	var tiles_ref = board.tiles
 	for clear_pos in positions_to_clear:
-		var t  = GameManager.get_tile_at(clear_pos)
+		var t  = _GQS.get_tile_at(null, clear_pos)
 		var gx = int(clear_pos.x)
 		var gy = int(clear_pos.y)
 		if not tiles_ref or gx >= tiles_ref.size() or not tiles_ref[gx] or gy >= tiles_ref[gx].size():
@@ -393,7 +394,7 @@ static func destroy_tiles_immediately(board: Node, positions: Array) -> void:
 
 	var scoring_count = 0
 	for clear_pos in positions:
-		var t = GameManager.get_tile_at(clear_pos)
+		var t = _GQS.get_tile_at(null, clear_pos)
 		if t > 0 and t != GameRunState.COLLECTIBLE:
 			scoring_count += 1
 
@@ -401,7 +402,7 @@ static func destroy_tiles_immediately(board: Node, positions: Array) -> void:
 
 	var tiles_ref = board.tiles
 	for clear_pos in positions:
-		var t  = GameManager.get_tile_at(clear_pos)
+		var t  = _GQS.get_tile_at(null, clear_pos)
 		var gx = int(clear_pos.x)
 		var gy = int(clear_pos.y)
 

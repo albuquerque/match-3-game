@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 # BoardInputHandler — loaded and instantiated via script resource in GameBoard._ready()
 
 ## BoardInputHandler — handles all tile click/swipe input, selection state,
@@ -39,15 +40,15 @@ func handle_tile_clicked(tile) -> void:
 
 	# Special tile tap — read tile_type from the Tile node itself (authoritative),
 	# not from the grid which may lag behind after an unmovable reveal transform.
-	var tile_type = tile.tile_type if "tile_type" in tile else GameManager.get_tile_at(tile.grid_position)
+	var tile_type = tile.tile_type if "tile_type" in tile else _GQS.get_tile_at(null, tile.grid_position)
 	# Also sync the grid in case it's stale (unmovable reveal writes tile_type but grid may still say 11)
 	if tile_type >= 7 and tile_type <= 9:
 		var gx = int(tile.grid_position.x)
 		var gy = int(tile.grid_position.y)
-		var grid_val = GameManager.get_tile_at(tile.grid_position)
+		var grid_val = _GQS.get_tile_at(null, tile.grid_position)
 		if grid_val != tile_type:
 			# Grid is stale — update it so activate_special_tile works correctly
-			GameManager.grid[gx][gy] = tile_type
+			GameRunState.grid[gx][gy] = tile_type
 			GameRunState.grid[gx][gy] = tile_type
 	if tile_type >= 7 and tile_type <= 9:
 		print("[BoardInputHandler] Special tile tapped at ", tile.grid_position)
@@ -65,7 +66,7 @@ func handle_tile_clicked(tile) -> void:
 		tile.set_selected(false)
 		board.selected_tile = null
 	else:
-		if GameManager.can_swap(board.selected_tile.grid_position, tile.grid_position):
+		if _GQS.can_swap(null, board.selected_tile.grid_position, tile.grid_position):
 			await perform_swap(board.selected_tile, tile)
 		else:
 			board.selected_tile.set_selected(false)
@@ -135,7 +136,7 @@ func handle_tile_swiped(tile, direction: Vector2) -> void:
 		board.selected_tile = null
 
 	var target_pos = tile.grid_position + direction
-	if not GameManager.is_valid_position(target_pos):
+	if not _GQS.is_valid_position(null, target_pos):
 		return
 
 	var target_tile = board.tiles[int(target_pos.x)][int(target_pos.y)]
@@ -159,7 +160,7 @@ func perform_swap(tile1, tile2) -> void:
 	var pos1 = tile1.grid_position
 	var pos2 = tile2.grid_position
 
-	var swapped = GameManager.swap_tiles(pos1, pos2)
+	var swapped = _GQS.swap_tiles(pos1, pos2)
 	if not swapped:
 		AudioManager.play_sfx("invalid_move")
 		var tw = board.create_tween()
@@ -208,7 +209,7 @@ func perform_swap(tile1, tile2) -> void:
 		print("[BoardInputHandler] perform_swap: matched, cascade done")
 	else:
 		# Revert
-		GameManager.swap_tiles(pos1, pos2)
+		_GQS.swap_tiles(pos1, pos2)
 
 		var rt1 = tile1.animate_swap_to(target_pos2)
 		var rt2 = tile2.animate_swap_to(target_pos1)

@@ -1,18 +1,13 @@
 extends Node
 # GravityService — pure grid gravity and refill.
-# Barrier-aware versions migrated from GameManager inline (Round 4 refactor).
-# API (all static):
-#   apply_gravity(grid, gm) -> bool            -- uses gm for SPREADER/unmovable_map
-#   fill_empty_spaces(grid, gm) -> Array       -- uses gm for dimensions, SPREADER/unmovable
-#   apply_gravity_simple(grid, w, h) -> bool   -- legacy simple version (no barriers)
-#   fill_empty_spaces_simple(grid, w, h, tile_types) -> Array  -- legacy simple version
+# PR 6.5a: gm parameter replaced with GameRunState autoload references.
 
-## Barrier-aware gravity (canonical — matches GameManager inline logic exactly).
-## Segments are bounded by: blocked(-1), hard-unmovable, and SPREADER cells.
-static func apply_gravity(grid: Array, gm: Node) -> bool:
+## Barrier-aware gravity.
+static func apply_gravity(grid: Array, gm: Node = null) -> bool:
+	# gm kept as optional param for backward compat — ignored, uses GameRunState
 	var moved = false
-	var grid_w = gm.GRID_WIDTH
-	var grid_h = gm.GRID_HEIGHT
+	var grid_w = GameRunState.GRID_WIDTH
+	var grid_h = GameRunState.GRID_HEIGHT
 	for x in range(grid_w):
 		var segment_start = -1
 		var y = 0
@@ -20,7 +15,9 @@ static func apply_gravity(grid: Array, gm: Node) -> bool:
 			var end_of_segment = (y == grid_h)
 			var is_barrier = false
 			if not end_of_segment:
-				if grid[x][y] == -1 or grid[x][y] == gm.UNMOVABLE or gm._is_unmovable_cell(x, y) or grid[x][y] == gm.SPREADER:
+				if grid[x][y] == -1 or grid[x][y] == GameRunState.UNMOVABLE \
+						or GameRunState.is_unmovable_cell(x, y) \
+						or grid[x][y] == GameRunState.SPREADER:
 					is_barrier = true
 			if is_barrier or end_of_segment:
 				if segment_start >= 0:
@@ -46,13 +43,14 @@ static func apply_gravity(grid: Array, gm: Node) -> bool:
 			y += 1
 	return moved
 
-## Barrier-aware fill (canonical — matches GameManager inline logic exactly).
-static func fill_empty_spaces(grid: Array, gm: Node) -> Array:
+## Barrier-aware fill.
+static func fill_empty_spaces(grid: Array, gm: Node = null) -> Array:
+	# gm kept as optional param for backward compat — ignored, uses GameRunState
 	var rng = RandomNumberGenerator.new()
 	rng.randomize()
 	var created_positions: Array = []
-	var grid_w = gm.GRID_WIDTH
-	var grid_h = gm.GRID_HEIGHT
+	var grid_w = GameRunState.GRID_WIDTH
+	var grid_h = GameRunState.GRID_HEIGHT
 	for x in range(grid_w):
 		var segment_accessible := true
 		var in_barrier_run := true
@@ -60,12 +58,12 @@ static func fill_empty_spaces(grid: Array, gm: Node) -> Array:
 			if grid.size() <= x or grid[x].size() <= y:
 				continue
 			var cell = grid[x][y]
-			var is_unmov = gm._is_unmovable_cell(x, y)
-			var is_barrier_cell = is_unmov or (cell == -1) or (cell == gm.UNMOVABLE) or (cell == gm.SPREADER)
+			var is_unmov = GameRunState.is_unmovable_cell(x, y)
+			var is_barrier_cell = is_unmov or (cell == -1) or (cell == GameRunState.UNMOVABLE) or (cell == GameRunState.SPREADER)
 			if is_barrier_cell:
 				if not in_barrier_run:
 					in_barrier_run = true
-				segment_accessible = not (is_unmov or cell == gm.SPREADER)
+				segment_accessible = not (is_unmov or cell == GameRunState.SPREADER)
 			else:
 				in_barrier_run = false
 				if cell == 0 and segment_accessible:
@@ -77,10 +75,10 @@ static func fill_empty_spaces(grid: Array, gm: Node) -> Array:
 					# Check above two neighbours vertically
 					if y >= 2 and grid[x][y-1] == grid[x][y-2] and int(grid[x][y-1]) >= 1:
 						forbidden.append(int(grid[x][y-1]))
-					var tile_type = rng.randi_range(1, max(1, gm.TILE_TYPES))
+					var tile_type = rng.randi_range(1, max(1, GameRunState.TILE_TYPES))
 					var safety = 0
-					while tile_type in forbidden and safety < gm.TILE_TYPES:
-						tile_type = rng.randi_range(1, max(1, gm.TILE_TYPES))
+					while tile_type in forbidden and safety < GameRunState.TILE_TYPES:
+						tile_type = rng.randi_range(1, max(1, GameRunState.TILE_TYPES))
 						safety += 1
 					grid[x][y] = tile_type
 					created_positions.append(Vector2(x, y))

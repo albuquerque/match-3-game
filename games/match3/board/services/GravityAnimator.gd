@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
 # GravityAnimator — barrier/segment-aware gravity and refill animations.
 # A2: Full logic ported from GameBoard.animate_gravity / GameBoard.animate_refill (2026-03-05).
@@ -16,10 +17,10 @@ static func animate_gravity(gameboard: Node, tiles_ref: Array) -> void:
 		var is_barrier: Array = []
 		for y in range(GameRunState.GRID_HEIGHT):
 			var tile = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
-			var blocked = GameManager.is_cell_blocked(x, y)
+			var blocked = _GQS.is_cell_blocked(null, x, y)
 			var unmovable = tile != null and not tile.is_queued_for_deletion() and \
 				"is_unmovable_hard" in tile and tile.is_unmovable_hard
-			var is_spreader_cell = GameManager.get_tile_at(Vector2(x, y)) == GameRunState.SPREADER
+			var is_spreader_cell = _GQS.get_tile_at(null, Vector2(x, y)) == GameRunState.SPREADER
 			is_barrier.append(blocked or unmovable or is_spreader_cell)
 
 		# Collect visual tiles per segment bottom-to-top so index 0 = bottommost tile.
@@ -75,7 +76,7 @@ static func animate_gravity(gameboard: Node, tiles_ref: Array) -> void:
 				continue
 			prev_was_barrier = false
 
-			var tile_type = GameManager.get_tile_at(Vector2(x, y))
+			var tile_type = _GQS.get_tile_at(null, Vector2(x, y))
 			if tile_type > 0:
 				if tile_index < current_seg.size():
 					var tile = current_seg[tile_index]
@@ -118,13 +119,13 @@ static func animate_refill(gameboard: Node, tiles_ref: Array) -> Array:
 	var positions_needing_tiles = []
 	for x in range(GameRunState.GRID_WIDTH):
 		for y in range(GameRunState.GRID_HEIGHT):
-			if GameManager.is_cell_blocked(x, y):
+			if _GQS.is_cell_blocked(null, x, y):
 				continue
 			var existing = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
 			if existing != null and not existing.is_queued_for_deletion() and \
 					"is_unmovable_hard" in existing and existing.is_unmovable_hard:
 				continue
-			var grid_value = GameManager.get_tile_at(Vector2(x, y))
+			var grid_value = _GQS.get_tile_at(null, Vector2(x, y))
 			if grid_value > 0:
 				var has_visual = existing != null and is_instance_valid(existing)
 				if not has_visual:
@@ -139,7 +140,7 @@ static func animate_refill(gameboard: Node, tiles_ref: Array) -> Array:
 	for pos in new_tile_positions:
 		var x = int(pos.x)
 		var y = int(pos.y)
-		if GameManager.is_cell_blocked(x, y):
+		if _GQS.is_cell_blocked(null, x, y):
 			continue
 		var cur = tiles_ref[x][y] if x < tiles_ref.size() and y < tiles_ref[x].size() else null
 		if cur != null and not cur.is_queued_for_deletion() and \
@@ -147,7 +148,7 @@ static func animate_refill(gameboard: Node, tiles_ref: Array) -> Array:
 			print("[REFILL] Skipping unmovable at (", x, ",", y, ")")
 			continue
 
-		var tile_type = GameManager.get_tile_at(pos)
+		var tile_type = _GQS.get_tile_at(null, pos)
 
 		# If a collectible tile already has a valid visual at this position, leave it alone.
 		# Spawning a replacement would create a ghost tile on top of the existing shard/coin.
@@ -179,7 +180,7 @@ static func animate_refill(gameboard: Node, tiles_ref: Array) -> Array:
 		# Spawn from just above the top of this tile's segment (barrier-aware).
 		var segment_top_row: int = y
 		for sy in range(y - 1, -1, -1):
-			if GameManager.is_cell_blocked(x, sy):
+			if _GQS.is_cell_blocked(null, x, sy):
 				break
 			var st: Node = tiles_ref[x][sy] if x < tiles_ref.size() and sy < tiles_ref[x].size() else null
 			if st != null and not st.is_queued_for_deletion():

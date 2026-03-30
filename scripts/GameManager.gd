@@ -594,11 +594,10 @@ func is_cell_blocked(x: int, y: int) -> bool:
 	# inline fallback
 	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT: return true
 	if grid.size() <= x or grid[x].size() <= y: return true
-	return grid[x][y] == -1
+	return grid[x][y] == -1 or unmovable_map.has(str(x) + "," + str(y))
 
 func is_valid_position(pos: Vector2) -> bool:
 	if GQS != null: return GQS.is_valid_position(self, pos)
-	if pos.x < 0 or pos.x >= GRID_WIDTH or pos.y < 0 or pos.y >= GRID_HEIGHT: return false
 	return not is_cell_blocked(int(pos.x), int(pos.y))
 
 func are_adjacent(pos1: Vector2, pos2: Vector2) -> bool:
@@ -608,22 +607,11 @@ func are_adjacent(pos1: Vector2, pos2: Vector2) -> bool:
 
 func is_cell_movable(x: int, y: int) -> bool:
 	if GQS != null: return GQS.is_cell_movable(self, x, y)
-	if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT: return false
-	if grid.size() <= x or grid[x].size() <= y: return false
-	var v = grid[x][y]
-	# Blocked, empty, collectibles (coins/shards), and spreaders cannot be moved by the player
-	if v == -1 or v == 0 or v == COLLECTIBLE or v == SPREADER or v == UNMOVABLE: return false
-	var b = get_board()
-	if b and b.tiles and x < b.tiles.size() and y < b.tiles[x].size():
-		var tile = b.tiles[x][y]
-		if tile and "is_unmovable_hard" in tile and tile.is_unmovable_hard: return false
-	return true
+	return false
 
 func can_swap(pos1: Vector2, pos2: Vector2) -> bool:
 	if GQS != null: return GQS.can_swap(self, pos1, pos2)
-	if not is_valid_position(pos1) or not is_valid_position(pos2): return false
-	if not is_cell_movable(int(pos1.x), int(pos1.y)) or not is_cell_movable(int(pos2.x), int(pos2.y)): return false
-	return are_adjacent(pos1, pos2)
+	return false
 
 func get_tile_at(pos: Vector2) -> int:
 	if GQS != null: return GQS.get_tile_at(self, pos)
@@ -637,20 +625,24 @@ func _is_unmovable_cell(x: int, y: int) -> bool:
 	return unmovable_map.has(str(x) + "," + str(y))
 
 func swap_tiles(pos1: Vector2, pos2: Vector2) -> bool:
-	if not can_swap(pos1, pos2):
-		return false
-	var temp = grid[pos1.x][pos1.y]
-	grid[pos1.x][pos1.y] = grid[pos2.x][pos2.y]
-	grid[pos2.x][pos2.y] = temp
+	if not can_swap(pos1, pos2): return false
+	if GQS != null: GQS.swap_tiles(pos1, pos2)
+	else:
+		var temp = grid[int(pos1.x)][int(pos1.y)]
+		grid[int(pos1.x)][int(pos1.y)] = grid[int(pos2.x)][int(pos2.y)]
+		grid[int(pos2.x)][int(pos2.y)] = temp
 	return true
 
 func find_matches() -> Array:
 	var exclude = [HORIZTONAL_ARROW, VERTICAL_ARROW, FOUR_WAY_ARROW, COLLECTIBLE, SPREADER, UNMOVABLE]
 	if _MatchFinder == null:
 		_MatchFinder = load("res://scripts/services/MatchFinder.gd")
-	if _MatchFinder == null:
-		return []
+	if _MatchFinder == null: return []
 	return _MatchFinder.find_matches(grid, GRID_WIDTH, GRID_HEIGHT, MIN_MATCH_SIZE, exclude, -1)
+
+func reset_combo() -> void:
+	combo_count = 0
+	var grs = _grs(); if grs: grs.combo_count = 0
 
 func calculate_points(tiles_removed: int) -> int:
 	if tiles_removed <= 0:
@@ -875,8 +867,6 @@ func _emit_eventbus_level_complete() -> void:
 func _emit_eventbus_level_failed() -> void:
 	if _flow_ctrl: _flow_ctrl._emit_eventbus_level_failed()
 
-func reset_combo() -> void:
-	combo_count = 0
 
 func use_move() -> void:
 	if moves_left > 0:

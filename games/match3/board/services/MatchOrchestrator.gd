@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
 ## Full cascade orchestrator. Replaces the inline process_cascade in GameBoard.
 ## PR 6: gm parameter removed — GameManager and GameRunState autoloads referenced directly.
@@ -71,7 +72,7 @@ static func process_cascade(board: Node, gm: Node = null, initial_swap_pos: Vect
 		if will_create_special and special_tile_pos.x >= 0 and special_tile_pos.y >= 0:
 			await board.animate_destroy_matches_except(matches, special_tile_pos)
 			GameManager.remove_matches(matches, special_tile_pos)
-			var new_special_type: int = GameManager.get_tile_at(special_tile_pos)
+			var new_special_type: int = _GQS.get_tile_at(null, special_tile_pos)
 			if new_special_type >= 7:
 				board.update_tile_visual(special_tile_pos, new_special_type)
 		else:
@@ -99,7 +100,7 @@ static func process_cascade(board: Node, gm: Node = null, initial_swap_pos: Vect
 	var has_empties := false
 	for x in range(GameRunState.GRID_WIDTH):
 		for y in range(GameRunState.GRID_HEIGHT):
-			if not GameManager.is_cell_blocked(x, y) and GameRunState.grid[x][y] == 0:
+			if not _GQS.is_cell_blocked(null, x, y) and GameRunState.grid[x][y] == 0:
 				has_empties = true
 				break
 		if has_empties:

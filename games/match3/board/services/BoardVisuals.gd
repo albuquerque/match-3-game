@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
 # BoardVisuals: tile creation / clearing / visual grid helpers
 # API:
@@ -91,7 +92,7 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 	for x in range(GameRunState.GRID_WIDTH):
 		tiles_ref.append([])
 		for y in range(GameRunState.GRID_HEIGHT):
-			var tile_type = GameManager.get_tile_at(Vector2(x,y))
+			var tile_type = _GQS.get_tile_at(null, Vector2(x,y))
 			var key = str(x) + "," + str(y)
 			# If an unmovable_map entry exists, create the unmovable regardless of the grid sentinel
 			var tile = null

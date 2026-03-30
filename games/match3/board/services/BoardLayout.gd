@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
 # BoardLayout: visual layout and border helpers extracted from GameBoard
 # Public API (static functions) so callers can delegate to these utilities.
@@ -101,7 +102,7 @@ static func setup_tile_area_overlay(gameboard: Node) -> void:
 
     for x in range(GameRunState.GRID_WIDTH):
         for y in range(GameRunState.GRID_HEIGHT):
-            if not GameManager.is_cell_blocked(x, y):
+            if not _GQS.is_cell_blocked(null, x, y):
                 var tile_overlay = ColorRect.new()
                 tile_overlay.color = Color(0.1, 0.15, 0.25, 0.5)
                 tile_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE

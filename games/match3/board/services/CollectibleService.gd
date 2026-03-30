@@ -1,4 +1,5 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 # CollectibleService — loaded as a script resource (via CS var in GameBoard), not instanced directly
 
 ## CollectibleService — collectible detection, fly-to-HUD animation, and scoring.
@@ -14,7 +15,7 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 	for x in range(GameRunState.GRID_WIDTH):
 		var last_active_row = -1
 		for y in range(GameRunState.GRID_HEIGHT - 1, -1, -1):
-			if not GameManager.is_cell_blocked(x, y):
+			if not _GQS.is_cell_blocked(null, x, y):
 				last_active_row = y
 				break
 

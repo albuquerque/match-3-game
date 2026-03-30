@@ -84,3 +84,8 @@ var requested_special_tile: Dictionary = {}
 
 # ── Debug ─────────────────────────────────────────────────────────────────────
 var DEBUG_LOGGING: bool = true
+
+# ── Board reference (set by GameBoard._ready) ─────────────────────────────────
+# Allows board services to reach tiles without going through GameManager.
+var board_ref: Node = null
+
