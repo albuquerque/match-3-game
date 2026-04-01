@@ -1,6 +1,24 @@
 extends Node2D
 
-signal board_idle   ## Emitted when the board has settled: no matches, gravity done
+signal level_loaded_ctx(level_id: String, context: Dictionary)
+signal level_loaded()
+signal level_complete()
+signal level_failed()
+signal game_over()
+signal board_idle()
+signal match_cleared(match_size: int, context: Dictionary)
+signal pre_refill()
+signal post_refill()
+signal shard_tile_collected(item_id: String)
+signal score_changed(new_score: int)
+signal moves_changed(moves_left: int)
+signal collectibles_changed(collected: int, target: int)
+signal unmovables_changed(cleared: int, target: int)
+signal spreaders_changed(current_count: int)
+signal collectible_landed(pos: Vector2, coll_type: String)
+signal unmovable_destroyed(pos: Vector2)
+signal special_tile_activated(entity_id: String, context: Dictionary)
+signal bonus_skipped()
 
 
 # Safe script resource handles - avoid using load() at parse time which GDScript flags as non-constant
@@ -21,11 +39,15 @@ var SS = null  # SpreaderService
 var BV = null  # BoardVisuals
 var BE = null  # BoardEffects
 
+var _MatchFinder = null
+var MatchOrchestrator = null
 
+# GameStateBridge is loaded at runtime in _ready() to avoid parse-time preload failures
+var GameStateBridge = null
 
 var tiles = []
 var selected_tile = null
-var tile_scene = preload("res://scenes/Tile.tscn")
+var tile_scene = null
 
 # Dynamic sizing variables
 var tile_size: float
@@ -58,8 +80,18 @@ var border_container: Node2D  # Container for all border lines
 var tile_area_overlay: Control = null  # Container for semi-transparent overlay pieces over tiles
 var board_container: Node2D = null  # Master container for ALL board visual elements (tiles, borders, overlays)
 
+const COLLECTIBLE_SVC = preload("res://games/match3/board/services/CollectibleService.gd")
+
 func _ready():
+	print("[GameBoard] _ready: entry")
 	# Lazy-load helper modules to avoid parse-time non-constant assignment errors
+	# Load lightweight script references at runtime to avoid parse-time preload cycles
+	if _MatchFinder == null:
+		_MatchFinder = load("res://scripts/services/MatchFinder.gd")
+	# Load tile scene resource at runtime
+	if tile_scene == null:
+		tile_scene = load("res://scenes/Tile.tscn")
+
 	if VF == null:
 		VF = load("res://games/match3/board/services/VisualFactory.gd")
 	if VE == null:
@@ -74,6 +106,9 @@ func _ready():
 		BS = load("res://games/match3/board/services/BoosterService.gd")
 	if MO == null:
 		MO = load("res://games/match3/board/services/MatchOrchestrator.gd")
+		# Keep both references in sync to avoid accidental use of the wrong identifier
+		MatchOrchestrator = MO
+		print("[GameBoard] MatchOrchestrator loaded: MO=", MO)
 	if GA == null:
 		GA = load("res://games/match3/board/services/GravityAnimator.gd")
 	if BLS == null:
@@ -82,32 +117,46 @@ func _ready():
 		BA = load("res://games/match3/board/services/BoardAnimator.gd")
 	if BAX == null:
 		BAX = load("res://games/match3/board/services/BoardActionExecutor.gd")
+		print("[GameBoard] BoardActionExecutor loaded: BAX=", BAX)
 	if CS == null:
-		CS = load("res://games/match3/board/services/CollectibleService.gd")
+			# Use preloaded script resource; CollectibleService exposes static API
+			CS = COLLECTIBLE_SVC
+			if CS != null:
+				print("[GameBoard] CollectibleService script loaded: CS=", CS)
+			else:
+				push_error("[GameBoard] Failed to preload CollectibleService script")
 	if SS == null:
 		SS = load("res://games/match3/board/services/SpreaderService.gd")
 	if BV == null:
 		BV = load("res://games/match3/board/services/BoardVisuals.gd")
 	if BE == null:
 		BE = load("res://games/match3/board/services/BoardEffects.gd")
+	# Load GameStateBridge runtime shim used to forward lifecycle emits to GameManager during migration
+	if GameStateBridge == null:
+		GameStateBridge = load("res://games/match3/services/GameStateBridge.gd")
 
-	# Step 5: Instantiate BoardInputHandler as a child Node via loaded script
+	# Step 5: Instantiate BoardInputHandler as a child Node via loaded script var
 	if BIH == null:
 		var bih_script = load("res://games/match3/board/services/BoardInputHandler.gd")
-		BIH = bih_script.new()
-		BIH.name = "BoardInputHandler"
-		add_child(BIH)
-		BIH.setup(self)
+		# Avoid calling `.new()` directly on loaded script resource; instead create a Node and attach the script
+		var bih_node = Node.new()
+		bih_node.name = "BoardInputHandler"
+		bih_node.set_script(bih_script)
+		add_child(bih_node)
+		BIH = bih_node
+		if BIH and BIH.has_method("setup"):
+			BIH.setup(self)
 
 
-	# Safely connect to GameManager signals if GameManager autoload is present
-	var gm = get_node_or_null("/root/GameManager")
-	if gm:
-		gm.connect("game_over", Callable(self, "_on_game_over"))
-		gm.connect("level_complete", Callable(self, "_on_level_complete"))
-		gm.connect("level_loaded", Callable(self, "_on_level_loaded"))
+	# Prefer GameRunState.initialized to decide whether to create visuals now.
+	# This avoids relying on the legacy GameManager autoload during migration.
+	if GameRunState != null and GameRunState.initialized:
+		create_visual_grid()
+		# Borders will be drawn when level_loaded triggers _on_level_loaded
 	else:
-		print("[GameBoard] WARNING: GameManager autoload not available at _ready(); will wait for level_loaded signal")
+		print("[GameBoard] Waiting for GameRunState.initialized before creating visual grid")
+		# Defer a small waiter which checks GameRunState.initialized and then calls _on_level_loaded when appropriate
+		call_deferred("_deferred_wait_for_gamemanager")
 
 	# GameManager.level_loaded (no-arg signal) is the canonical trigger for _on_level_loaded.
 	# Do NOT also connect EventBus.level_loaded — it fires in the same frame and would
@@ -148,40 +197,95 @@ func _ready():
 	setup_background_image()
 
 	# Only create visual grid if GameManager has initialized a level; otherwise wait for level_loaded
-	var gm2 = get_node_or_null("/root/GameManager")
+	var gm2 = null
+	var nr2 = load("res://scripts/helpers/node_resolvers.gd")
+	if nr2 != null:
+		gm2 = nr2._get_gm()
+	# Do not fallback to /root lookup; prefer resolver only
 	if gm2 and gm2.initialized:
 		create_visual_grid()
 		# Borders will be drawn when level_loaded triggers _on_level_loaded
 	else:
 		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
 
-	# Expose this board via GameRunState so services can reach tiles without GameManager
+	# Expose this board via GameRunState so services can reach tiles without going through GameManager
 	GameRunState.board_ref = self
+	print("[GameBoard] _ready: GameRunState.board_ref set to", GameRunState.board_ref)
 
 	# Register with GameManager (backward compat — removed when GameManager is deleted)
-	if GameManager.has_method("register_board"):
-		GameManager.register_board(self)
+	#	if GameManager.has_method("register_board"):
+	#		GameManager.register_board(self)
+	# Legacy registration: GameStateBridge / GameRunState used instead of GameManager.register_board
+	# (GameManager.register_board is intentionally not called during migration)
 
 
 func calculate_responsive_layout():
-	# Step 3: Delegated to BoardSetup
-	if BLS == null: return
-	BLS.calculate_responsive_layout(self)
+	# Step 3: Delegated to BoardSetup (robustly handle Script resource vs instance)
+	if BLS == null:
+		BLS = load("res://games/match3/board/services/BoardSetup.gd")
+		if BLS == null:
+			push_error("[GameBoard] calculate_responsive_layout: failed to load BoardSetup")
+			return
+	var target = BLS
+	# If load returned a Script resource, instantiate a temporary helper to access methods
+	if BLS is Script:
+		target = BLS.new()
+	if target and target.has_method("calculate_responsive_layout"):
+		target.calculate_responsive_layout(self)
+	else:
+		push_error("[GameBoard] calculate_responsive_layout: BoardSetup missing calculate_responsive_layout")
+
 
 func setup_background():
-	# Step 3: Delegated to BoardSetup
-	if BLS == null: return
-	BLS.setup_background(self)
+	# Step 3: Delegated to BoardSetup (robust call)
+	if BLS == null:
+		BLS = load("res://games/match3/board/services/BoardSetup.gd")
+		if BLS == null:
+			push_error("[GameBoard] setup_background: failed to load BoardSetup")
+			return
+	var target = BLS
+	# If load returned a Script resource, instantiate a temporary helper to access methods
+	if BLS is Script:
+		target = BLS.new()
+	if target and target.has_method("setup_background"):
+		target.setup_background(self)
+	else:
+		push_error("[GameBoard] setup_background: BoardSetup missing setup_background")
+
 
 func setup_tile_area_overlay():
-	# Step 3: Delegated to BoardSetup
-	if BLS == null: return
-	BLS.setup_tile_area_overlay(self)
+	# Step 3: Delegated to BoardSetup (robust call)
+	if BLS == null:
+		BLS = load("res://games/match3/board/services/BoardSetup.gd")
+		if BLS == null:
+			push_error("[GameBoard] setup_tile_area_overlay: failed to load BoardSetup")
+			return
+	var target = BLS
+	# If load returned a Script resource, instantiate a temporary helper to access methods
+	if BLS is Script:
+		target = BLS.new()
+	if target and target.has_method("setup_tile_area_overlay"):
+		target.setup_tile_area_overlay(self)
+	else:
+		push_error("[GameBoard] setup_tile_area_overlay: BoardSetup missing setup_tile_area_overlay")
+
 
 func setup_background_image():
-	# Step 3: Delegated to BoardSetup
-	if BLS == null: return
-	BLS.setup_background_image(self)
+	# Step 3: Delegated to BoardSetup (robust call)
+	if BLS == null:
+		BLS = load("res://games/match3/board/services/BoardSetup.gd")
+		if BLS == null:
+			push_error("[GameBoard] setup_background_image: failed to load BoardSetup")
+			return
+	var target = BLS
+	# If load returned a Script resource, instantiate a temporary helper to access methods
+	if BLS is Script:
+		target = BLS.new()
+	if target and target.has_method("setup_background_image"):
+		target.setup_background_image(self)
+	else:
+		push_error("[GameBoard] setup_background_image: BoardSetup missing setup_background_image")
+
 
 func _deferred_attach_background(background_rect: Node, parent: Node) -> void:
 	if not parent or not background_rect:
@@ -261,9 +365,94 @@ func instantiate_tile_visual(tile_type: int, grid_pos: Vector2, scale_factor: fl
 
 
 func create_visual_grid():
-	# A8: Delegated to BV.create_visual_grid
-	await BV.create_visual_grid(self, tiles)
+	print("[GameBoard] create_visual_grid: entry - BV=", BV)
+	# Ensure BoardVisuals is loaded as a script resource exposing static API
+	if BV == null:
+		BV = load("res://games/match3/board/services/BoardVisuals.gd")
+		print("[GameBoard] create_visual_grid: loaded BV=", BV)
+	if BV == null:
+		push_error("[GameBoard] create_visual_grid: BoardVisuals could not be loaded; aborting visual grid creation")
+		return
+	if not BV.has_method("create_visual_grid"):
+		push_error("[GameBoard] create_visual_grid: BoardVisuals missing create_visual_grid method")
+		return
+	# Ensure tiles array exists
+	if tiles == null:
+		tiles = []
+	print("[GameBoard] create_visual_grid: calling BV.create_visual_grid now")
+	# Use the script resource's static function; fallback to explicit loader if needed
+	var bv_local = BV
+	if bv_local == null or not bv_local.has_method("create_visual_grid"):
+		bv_local = load("res://games/match3/board/services/BoardVisuals.gd")
+		print("[GameBoard] create_visual_grid: fallback load BV=", bv_local)
+	if bv_local and bv_local.has_method("create_visual_grid"):
+		await bv_local.create_visual_grid(self, tiles)
+	else:
+		push_error("[GameBoard] create_visual_grid: Unable to find create_visual_grid implementation on BoardVisuals")
+	print("[GameBoard] create_visual_grid: returned from BV.create_visual_grid; tiles_len=", tiles.size())
+	# Diagnostic: print tiles_ref dimensions and sample node names
+	var cols = tiles.size()
+	var rows = 0
+	if cols > 0 and tiles[0] and typeof(tiles[0]) == TYPE_ARRAY:
+		rows = tiles[0].size()
+	print("[GameBoard] Diagnostic: tiles array dims: ", cols, "x", rows)
+	if board_container:
+		print("[GameBoard] board_container child_count=", board_container.get_child_count())
+		var names = []
+		for i in range(min(10, board_container.get_child_count())):
+			names.append(board_container.get_child(i).name)
+		print("[GameBoard] board_container sample children: ", names)
+		# Detailed child diagnostics (print up to 50 children) to inspect tile internals
+		for i in range(min(50, board_container.get_child_count())):
+			var c = board_container.get_child(i)
+			if c == null:
+				continue
+			# Determine visibility robustly: CanvasItem subclasses (Node2D/Control) expose 'visible'
+			var vis = null
+			if c is CanvasItem:
+				vis = c.visible
+			elif c.has_method("is_visible_in_tree"):
+				vis = c.is_visible_in_tree()
+			# Build base info
+			var c_info = {"name": c.name, "class": c.get_class(), "visible": vis}
+			# Attempt to read Sprite2D child and its texture info (Tile scene uses Sprite2D)
+			var sprite_node = null
+			if c.has_node("Sprite2D"):
+				sprite_node = c.get_node_or_null("Sprite2D")
+			if sprite_node and sprite_node is Sprite2D:
+				var tex = sprite_node.texture if sprite_node.has_method("get") or sprite_node.has("texture") else sprite_node.texture
+				c_info["sprite_texture"] = str(tex)
+				c_info["sprite_scale"] = sprite_node.scale
+				c_info["sprite_modulate"] = sprite_node.modulate
+			else:
+				c_info["sprite_texture"] = null
+			# Position if available
+			if c is Node2D:
+				c_info["pos"] = c.global_position
+			elif c.has_method("get") and c.has("position"):
+				c_info["pos"] = c.position
+			print("[GameBoard] child diag: ", c_info)
 	return
+
+
+func ensure_visuals() -> void:
+	"""Compatibility helper: ensure the board visuals are present by directly invoking BoardVisuals.create_visual_grid.
+	This is called deferred from GameStateBridge when there is a race between level load and board readiness."""
+	print("[GameBoard] ensure_visuals: entry; tiles_len=", tiles.size())
+	# Reset creating flag to allow re-creation if left stuck
+	creating_visual_grid = false
+	var bv = load("res://games/match3/board/services/BoardVisuals.gd")
+	if bv == null:
+		push_error("[GameBoard] ensure_visuals: failed to load BoardVisuals script resource")
+		return
+	if not bv.has_method("create_visual_grid"):
+		push_error("[GameBoard] ensure_visuals: BoardVisuals missing create_visual_grid")
+		return
+	# Ensure tiles array
+	if tiles == null:
+		tiles = []
+	await bv.create_visual_grid(self, tiles)
+	print("[GameBoard] ensure_visuals: completed; tiles_len=", tiles.size())
 
 # Collectible spawning and handling
 func spawn_collectible_visual(x: int, y: int, coll_type: String = "coin"):
@@ -335,13 +524,25 @@ func _apply_screen_shake(duration: float, intensity: float):
 
 
 func _on_game_over():
-	print("[GameBoard] Game Over")
-	# Cleanup or final actions on game over
+	print("[GameBoard] Game Over — disabling tile input")
 	for x in range(GameRunState.GRID_WIDTH):
 		for y in range(GameRunState.GRID_HEIGHT):
 			var tile = tiles[x][y]
 			if tile:
-				tile.set_process_input(false)  # Disable input processing for tiles
+				tile.set_process_input(false)
+
+func _attempt_level_complete() -> void:
+	# Called by GameStateBridge — delegate to GameFlowController
+	var gfc = get_node_or_null("GameFlowController")
+	if gfc == null:
+		var gfc_script = load("res://games/match3/board/services/GameFlowController.gd")
+		if gfc_script:
+			gfc = gfc_script.new()
+			gfc.name = "GameFlowController"
+			gfc.setup()
+			add_child(gfc)
+	if gfc:
+		gfc.attempt_level_complete()
 
 func _on_level_complete():
 	print("[GameBoard] Level Complete")
@@ -363,13 +564,49 @@ func _on_level_complete():
 func _on_level_loaded():
 	# Step 3: Layout/setup delegated to BoardSetup
 	if BLS == null:
-		push_error("[GameBoard] _on_level_loaded: BLS (BoardSetup) not loaded yet — skipping setup")
-		return
+		print("[GameBoard] _on_level_loaded: BLS not loaded at runtime; attempting to load now")
+		BLS = load("res://games/match3/board/services/BoardSetup.gd")
+		if BLS == null:
+			push_error("[GameBoard] _on_level_loaded: Failed to load BoardSetup; cannot set up visuals")
+			return
+		else:
+			print("[GameBoard] _on_level_loaded: BoardSetup loaded at runtime: BLS=", BLS)
+	# Wait briefly for GameRunState to be populated by GameManager to avoid visual/model race
+	var wait_attempts = 0
+	while (not GameRunState.initialized) and wait_attempts < 20:
+		# wait up to ~1 second (20 * 0.05)
+		await get_tree().create_timer(0.05).timeout
+		wait_attempts += 1
+		print("[GameBoard] _on_level_loaded: waiting for GameRunState.initialized, attempt=", wait_attempts)
+	if not GameRunState.initialized:
+		print("[GameBoard] _on_level_loaded: WARNING - GameRunState not initialized after wait; proceeding anyway")
 	if creating_visual_grid:
 		print("[GameBoard] _on_level_loaded: skipping — visual grid creation already in progress")
 		return
 	BLS.on_level_loaded_setup(self)
 
+
+func _on_external_remove_matches(matches: Array) -> void:
+	# Called by GameStateBridge fallback path when GameManager.remove_matches is not available.
+	# This ensures visuals are destroyed to match GameRunState.grid being cleared.
+	print("[GameBoard] _on_external_remove_matches called - matches=", matches.size())
+	if BA == null:
+		push_error("[GameBoard] _on_external_remove_matches: BoardAnimator (BA) not loaded")
+		return
+	# Animate destruction of matched visuals using BoardAnimator
+	await BA.animate_destroy_matches(self, tiles, matches)
+	# Ensure tiles array entries corresponding to matches are nulled
+	for m in matches:
+		var pos = m
+		if typeof(m) == TYPE_DICTIONARY and m.has("x") and m.has("y"):
+			pos = Vector2(float(m["x"]), float(m["y"]))
+		if typeof(pos) != TYPE_VECTOR2:
+			continue
+		var gx = int(pos.x)
+		var gy = int(pos.y)
+		if gx >= 0 and gx < tiles.size() and gy >= 0 and gy < tiles[gx].size():
+			tiles[gx][gy] = null
+	print("[GameBoard] _on_external_remove_matches: visuals updated for matches")
 
 
 func grid_to_world_position(grid_pos: Vector2) -> Vector2:
@@ -423,8 +660,9 @@ func _input(event):
 	if skip_bonus_active and (event is InputEventScreenTouch or event is InputEventMouseButton):
 		if event.pressed:
 			print("[GameBoard] Screen tapped during bonus - requesting skip")
-			if GameManager.has_method("skip_bonus_animation"):
-				GameManager.skip_bonus_animation()
+			# Use GameStateBridge shim to avoid direct GameManager dependency during migration
+			if GameStateBridge != null:
+				GameStateBridge.skip_bonus_animation()
 			hide_skip_bonus_hint()
 			# Consume the event to prevent it from propagating to other input handlers
 			get_viewport().set_input_as_handled()
@@ -483,8 +721,20 @@ func animate_refill() -> Array:
 	return []
 
 func _check_collectibles_at_bottom():
-	# Step 7: Delegated to CollectibleService
-	await CS.check_collectibles_at_bottom(self, tiles)
+	# Diagnostic: log that we're checking collectibles, plus basic grid/tiles info
+	var cols := tiles.size() if typeof(tiles) == TYPE_ARRAY else 0
+	var rows := 0
+	if cols > 0 and tiles[0] and typeof(tiles[0]) == TYPE_ARRAY:
+		rows = tiles[0].size()
+	print("[GameBoard] _check_collectibles_at_bottom: cols=%d rows=%d GameRunState.GRID=(%d,%d)" % [cols, rows, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT])
+	# Step 7: Delegated to CollectibleService - guard the call to avoid invalid-call errors
+	var svc = CS
+	if svc == null:
+		svc = COLLECTIBLE_SVC
+	if svc != null and svc.has_method("check_collectibles_at_bottom"):
+		await svc.check_collectibles_at_bottom(self, tiles)
+	else:
+		push_error("[GameBoard] CollectibleService.check_collectibles_at_bottom not available (svc=%s)" % str(svc))
 
 func _spawn_level_collectibles():
 	# Step 7: Delegated to CollectibleService
@@ -495,16 +745,19 @@ func _spawn_level_collectibles():
 # ============================================
 
 func process_cascade(initial_swap_pos: Vector2 = Vector2(-1, -1)):
-	# A1: Delegated to MatchOrchestrator
+	# A1: Delegated to MatchOrchestrator (loaded at runtime to avoid parse-time cycles)
+	if MO == null:
+		MO = load("res://games/match3/board/services/MatchOrchestrator.gd")
+		MatchOrchestrator = MO
 	if MO != null:
 		await MO.process_cascade(self, null, initial_swap_pos)
 	else:
-		print("[GameBoard] ERROR: MatchOrchestrator not loaded")
+		print("[GameBoard] ERROR: MatchOrchestrator script not available")
 
 func perform_auto_shuffle():
 	"""Perform an automatic board shuffle with visual feedback"""
 	print("Performing auto-shuffle animation...")
-	if GameManager.shuffle_until_moves_available():
+	if GameStateBridge.shuffle_until_moves_available():
 		await animate_shuffle()
 		print("Board shuffled successfully with valid moves")
 	else:
@@ -537,9 +790,45 @@ func _task_deferred_gravity_then_refill() -> void:
 
 	await animate_gravity()
 	await animate_refill()
+	# --- Safety tagging: some shard drops are queued into pending_shard_cells
+	# Tag spawned tiles with their item_id so CollectibleService reliably detects them.
+	var pending_map: Dictionary = GameRunState.pending_shard_cells if GameRunState.pending_shard_cells else {}
+	if pending_map.size() > 0:
+		var to_erase: Array = []
+		for key in pending_map.keys():
+			var parts = key.split(",")
+			if parts.size() != 2:
+				continue
+			var px := int(parts[0])
+			var py := int(parts[1])
+			var iid := str(pending_map[key])
+			if px >= 0 and px < tiles.size() and py >= 0 and py < tiles[px].size():
+				var tnode = tiles[px][py]
+				if tnode and is_instance_valid(tnode):
+					tnode.set_meta("shard_item_id", iid)
+					print("[GameBoard] Tagged tile at (%d,%d) with shard_item_id=%s from pending_shard_cells" % [px, py, iid])
+					to_erase.append(key)
+			elif px >= 0 and px < GameRunState.grid.size() and py >= 0 and py < GameRunState.grid[px].size() and GameRunState.grid[px][py] == GameRunState.COLLECTIBLE:
+				# If this collectible sits at the bottom-most active row of its column, award immediately
+				var last_row = -1
+				for ry in range(GameRunState.GRID_HEIGHT - 1, -1, -1):
+					if not (BR == null) and BR.has_method("is_cell_blocked") and not BR.is_cell_blocked(self, px, ry):
+						last_row = ry
+						break
+				if last_row == py:
+					print("[GameBoard] Direct-award pending shard %s at (%d,%d) because visual missing" % [iid, px, py])
+					if GalleryManager:
+						GalleryManager.add_shard(iid)
+					to_erase.append(key)
+		# clean up handled keys
+		for k in to_erase:
+			pending_map.erase(k)
+		GameRunState.pending_shard_cells = pending_map
+
 	await _check_collectibles_at_bottom()
 
-	var new_matches = GameManager.find_matches()
+	var exclude = [GameRunState.HORIZTONAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
+	var new_matches = _MatchFinder.find_matches(GameRunState.grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.MIN_MATCH_SIZE, exclude, -1)
 	if new_matches and new_matches.size() > 0:
 		print("[GameBoard] deferred_gravity_then_refill: new matches found, processing cascade")
 		await process_cascade()
@@ -588,6 +877,7 @@ func activate_column_clear_booster(column: int):
 
 func activate_special_tile(pos: Vector2):
 	# Step 6: Delegated to BoardActionExecutor
+	print("[GameBoard] activate_special_tile called: pos=", pos, " BAX=", BAX)
 	await BAX.activate_special_tile(self, pos)
 
 func activate_special_tile_chain(pos: Vector2, tile_type: int):
@@ -641,5 +931,57 @@ func draw_board_borders():
 		border_container = BR.draw_board_borders(self, border_container, null, grid_offset, tile_size, border_color, BORDER_WIDTH)
 	else:
 		print("[GameBoard] BorderRenderer not loaded, skipping border draw")
+	# If borders drawn but tiles not created yet, schedule visual grid creation as a safety net
+	if tiles == null or tiles.size() == 0:
+		print("[GameBoard] draw_board_borders: tiles empty after border draw — scheduling create_visual_grid")
+		# Use a deferred call to allow current frame to finish
+		call_deferred("create_visual_grid")
 
 
+func dev_force_shard_drop(px: int, py: int, item_id: String = "dev_shard_test") -> void:
+	# Developer helper: force a collectible (shard) to appear at model pos (px,py) and process it.
+	# Usage (remote console): get_node("/root/MainGame/GameBoard").call_deferred("dev_force_shard_drop", 3, 7, "my_test_shard")
+	print("[GameBoard][dev] Forcing shard drop at (%d,%d) id=%s" % [px, py, item_id])
+	# Guard: only run in debug builds or when explicit call is made
+	# Set model value
+	if GameRunState.grid.size() <= px:
+		# extend columns
+		while GameRunState.grid.size() <= px:
+			GameRunState.grid.append([])
+	if GameRunState.grid[px].size() <= py:
+		while GameRunState.grid[px].size() <= py:
+			GameRunState.grid[px].append(0)
+	GameRunState.grid[px][py] = GameRunState.COLLECTIBLE
+
+	# Register pending shard in GameRunState so CollectibleService can resolve item id
+	var pend: Dictionary = {}
+	if GameRunState.pending_shard_cells:
+		pend = GameRunState.pending_shard_cells
+	var key = str(px) + "," + str(py)
+	pend[key] = item_id
+	GameRunState.pending_shard_cells = pend
+	print("[GameBoard][dev] Set GameRunState.pending_shard_cells[%s]=%s" % [key, item_id])
+
+	# Kick the board processing so the collectible detection runs
+	if has_method("deferred_gravity_then_refill"):
+		call_deferred("deferred_gravity_then_refill")
+	else:
+		print("[GameBoard][dev] deferred_gravity_then_refill not available; call MatchOrchestrator.process_cascade or similar")
+
+func _deferred_wait_for_gamemanager() -> void:
+	# PR 6.5b: GameBoard now owns all signals directly — no need to wait for GameManager.
+	# If GameRunState is already initialized, trigger level loaded handling now.
+	if GameRunState.initialized:
+		print("[GameBoard] _deferred_wait_for_gamemanager: GameRunState already initialized; calling _on_level_loaded")
+		call_deferred("_on_level_loaded")
+		return
+	# Wait briefly for GameRunState to be initialized by LevelLoader
+	var attempts = 0
+	while attempts < 60:
+		if GameRunState.initialized:
+			print("[GameBoard] _deferred_wait_for_gamemanager: GameRunState initialized; calling _on_level_loaded")
+			call_deferred("_on_level_loaded")
+			return
+		await get_tree().create_timer(0.05).timeout
+		attempts += 1
+	print("[GameBoard] _deferred_wait_for_gamemanager: GameManager not found after wait")

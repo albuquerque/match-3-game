@@ -29,13 +29,10 @@ func _ready():
 	print("LevelProgress scene is ready.")
 	_ensure_resolvers()
 
-	# Check if we're showing results or route map
-	var game_manager = NodeResolvers._get_gm()
-	if game_manager and (game_manager.last_level_score > 0 or game_manager.last_level_number > 0):
-		# Show results
+	# Check if we're showing results or route map using GameRunState snapshot
+	if typeof(GameRunState) != TYPE_NIL and (GameRunState.last_level_score > 0 or GameRunState.last_level_number > 0):
 		show_level_results()
 	else:
-		# Show route map for level selection
 		setup_route_map()
 
 func show_level_results():
@@ -48,20 +45,20 @@ func show_level_results():
 	if result_panel:
 		result_panel.visible = true
 
-		# Set result title
-		if game_manager.last_level_won:
-			result_title.text = "Level %d Complete!" % game_manager.last_level_number
+		# Set result title from GameRunState
+		if GameRunState.last_level_won:
+			result_title.text = "Level %d Complete!" % GameRunState.last_level_number
 			result_title.modulate = Color.GREEN
 		else:
-			result_title.text = "Level %d Failed" % game_manager.last_level_number
+			result_title.text = "Level %d Failed" % GameRunState.last_level_number
 			result_title.modulate = Color.RED
 
 		# Set score info
-		score_label.text = "Score: %d" % game_manager.last_level_score
-		target_label.text = "Target: %d" % game_manager.last_level_target
+		score_label.text = "Score: %d" % GameRunState.last_level_score
+		target_label.text = "Target: %d" % GameRunState.last_level_target
 
-		if game_manager.last_level_won:
-			moves_label.text = "Moves Left: %d" % game_manager.last_level_moves_left
+		if GameRunState.last_level_won:
+			moves_label.text = "Moves Left: %d" % GameRunState.last_level_moves_left
 		else:
 			moves_label.text = "Out of Moves!"
 
@@ -114,23 +111,37 @@ func _on_level_button_pressed(level):
 		print("Error: LevelManager not found!")
 
 func _on_next_level_pressed():
-	print("Next level button pressed")
-	# Level already advanced in GameManager, just load the game
-	var game_manager = NodeResolvers._get_gm()
-	game_manager.level_transitioning = false
-	game_manager.load_current_level()
-	get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
+    print("Next level button pressed")
+    # Use GameStateBridge to attempt level load and reset flags
+    var bridge = load("res://games/match3/services/GameStateBridge.gd")
+    if bridge != null and bridge.has_method("initialize_game"):
+        GameRunState.level_transitioning = false
+        bridge.initialize_game()
+        get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
+    else:
+        var gm = NodeResolvers._get_gm()
+        if gm:
+            gm.level_transitioning = false
+            gm.load_current_level()
+            get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
 
 func _on_restart_level_pressed():
-	print("Restart level button pressed")
-	var game_manager = NodeResolvers._get_gm()
-	var level_manager = NodeResolvers._get_lm()
-
-	# Reset to the failed level
-	level_manager.set_current_level(game_manager.last_level_number - 1)
-	game_manager.level_transitioning = false
-	game_manager.load_current_level()
-	get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
+    print("Restart level button pressed")
+    var level_manager = NodeResolvers._get_lm()
+    if level_manager:
+        level_manager.set_current_level(GameRunState.last_level_number - 1)
+    # Use bridge to load
+    var bridge = load("res://games/match3/services/GameStateBridge.gd")
+    if bridge != null and bridge.has_method("initialize_game"):
+        GameRunState.level_transitioning = false
+        bridge.initialize_game()
+        get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
+    else:
+        var gm = NodeResolvers._get_gm()
+        if gm:
+            gm.level_transitioning = false
+            gm.load_current_level()
+            get_tree().change_scene_to_file("res://scenes/MainGame.tscn")
 
 func _on_menu_pressed():
 	print("Menu button pressed")

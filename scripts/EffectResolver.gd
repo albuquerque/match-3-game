@@ -67,7 +67,7 @@ func _ready():
 	# Register effect executors
 	_register_executors()
 
-	# Connect directly to GameManager signals (EventBus removed in PR 5d)
+	# Connect directly to GameBoard signals (preferred) and/or GameManager signals (fallback)
 	_connect_event_signals()
 
 	# Dev: force-load test chapter for level 4 if enabled
@@ -106,23 +106,86 @@ func _register_executors():
 
 	print("[EffectResolver] Registered %d executors" % executors.size())
 
-## Connect to gameplay signals directly on GameManager (EventBus removed PR 5d)
+## Connect to gameplay signals: prefer GameBoard signals, fallback to GameManager
 func _connect_event_signals():
-	var gm = get_node_or_null("/root/GameManager")
-	if not gm:
-		push_warning("[EffectResolver] GameManager not found — visual effects disabled")
-		return
+	# Prefer active registered board_ref (set by GameBoard._ready) to avoid scene traversal and races
+	var board_node: Node = null
+	if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+		board_node = GameRunState.board_ref
+	else:
+		# Fallback: try to find GameBoard in current scene tree (legacy)
+		if has_method("get_tree") and get_tree() != null:
+			var tree = get_tree()
+			var cs = tree.get_current_scene()
+			if cs != null and cs.has_method("find_node"):
+				board_node = cs.find_node("GameBoard", true, false)
+			if board_node == null:
+				# fallback search
+				var stack = [tree.get_root()]
+				while stack.size() > 0 and board_node == null:
+					var rn = stack.pop_back()
+					for i in range(rn.get_child_count()):
+						var c = rn.get_child(i)
+						if not c:
+							continue
+						if str(c.name) == "GameBoard":
+							board_node = c
+							break
+						stack.append(c)
 
-	gm.level_loaded_ctx.connect(_on_level_loaded_ctx)
-	gm.level_complete.connect(_on_level_complete_direct)
-	gm.match_cleared.connect(_on_match_cleared)
-	gm.special_tile_activated.connect(_on_event_with_entity.bind("special_tile_activated"))
-	# tile_destroyed still on EventBus until PR 6 migrates BoardActionExecutor emitter
+	if board_node != null:
+		print("[EffectResolver] Connecting to GameBoard signals (preferred owner)")
+		# Connect level events if available on board
+		if board_node.has_signal("level_loaded_ctx"):
+			board_node.connect("level_loaded_ctx", Callable(self, "_on_level_loaded_ctx"))
+		if board_node.has_signal("level_complete"):
+			board_node.connect("level_complete", Callable(self, "_on_level_complete_direct"))
+		# Connect match_cleared on board
+		if board_node.has_signal("match_cleared"):
+			board_node.connect("match_cleared", Callable(self, "_on_match_cleared"))
+
+	# Migration: prefer a centralized GameStateBridge autoload for migration-era emits
+	var bridge_script = load("res://games/match3/services/GameStateBridge.gd")
+	if bridge_script != null:
+		# Bridge emits are forwarded to board_ref by default, but connect directly in case bridge exposes signals
+		if bridge_script.has_signal("level_loaded_ctx"):
+			bridge_script.connect("level_loaded_ctx", Callable(self, "_on_level_loaded_ctx"))
+		if bridge_script.has_signal("level_complete"):
+			bridge_script.connect("level_complete", Callable(self, "_on_level_complete_direct"))
+		if bridge_script.has_signal("match_cleared"):
+			bridge_script.connect("match_cleared", Callable(self, "_on_match_cleared"))
+		if bridge_script.has_signal("special_tile_activated"):
+			var cb = Callable(self, "_on_event_with_entity")
+			if cb.is_valid():
+				var b = cb.bind("special_tile_activated")
+				bridge_script.connect("special_tile_activated", b)
+	else:
+		# As a last resort, connect to legacy GameManager via node_resolvers (no /root fallback)
+		var nr = load("res://scripts/helpers/node_resolvers.gd")
+		var gm = null
+		if nr != null:
+			gm = nr._get_gm()
+		if gm == null:
+			push_warning("[EffectResolver] GameManager not found via node_resolvers — visual effects will only listen to GameBoard")
+		else:
+			if gm.has_signal("level_loaded_ctx"):
+				gm.connect("level_loaded_ctx", Callable(self, "_on_level_loaded_ctx"))
+			if gm.has_signal("level_complete"):
+				gm.connect("level_complete", Callable(self, "_on_level_complete_direct"))
+			if gm.has_signal("match_cleared"):
+				gm.connect("match_cleared", Callable(self, "_on_match_cleared"))
+			if gm.has_signal("special_tile_activated"):
+				var cb2 = Callable(self, "_on_event_with_entity")
+				if cb2.is_valid():
+					var b2 = cb2.bind("special_tile_activated")
+					gm.connect("special_tile_activated", b2)
+
+	# EventBus fallback kept for tile_destroyed until EventBus is fully removed
 	var eb = get_node_or_null("/root/EventBus")
 	if eb and eb.has_signal("tile_destroyed"):
 		eb.tile_destroyed.connect(_on_event_with_entity.bind("tile_destroyed"))
 
-	print("[EffectResolver] Connected to GameManager signals")
+	print("[EffectResolver] Connected to GameBoard or legacy GameManager if available")
 
 ## Load effect definitions from chapter JSON
 func load_effects(chapter_data: Dictionary) -> bool:
@@ -369,7 +432,7 @@ func _execute_effect(binding: Dictionary, entity_id: String, context: Dictionary
 		var tree = get_tree()
 		# Prefer the current scene (more likely to be a Node that supports find_node)
 		var cs = tree.get_current_scene()
-		if cs != null:
+		if cs != null and cs.has_method("find_node"):
 			resolved_viewport = cs
 		# Fallback to the SceneTree root (Window) which contains the scene
 		if resolved_viewport == null and tree.get_root() != null:

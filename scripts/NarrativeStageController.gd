@@ -39,22 +39,62 @@ var _progress_milestones_reached: Dictionary = {
 var _auto_timer: SceneTreeTimer = null
 var _completion_timer: SceneTreeTimer = null
 
+func _find_node_by_name(root: Node, name: String) -> Node:
+	if root == null:
+		return null
+	if str(root.name) == name:
+		return root
+	for i in range(root.get_child_count()):
+		var c = root.get_child(i)
+		if c == null:
+			continue
+		var res = _find_node_by_name(c, name)
+		if res != null:
+			return res
+	return null
+
 func _ready():
 	print("[NarrativeStageController] Ready")
 	_ensure_resolvers()
 
-	# PR 5c: connect directly to GameManager signals — EventBus no longer routes these
-	var gm: Node = get_node_or_null("/root/GameManager")
-	if gm:
-		if gm.has_signal("level_loaded_ctx"):
-			gm.level_loaded_ctx.connect(Callable(self, "_on_level_loaded"))
-		if gm.has_signal("level_complete"):
-			gm.level_complete.connect(Callable(self, "_on_level_complete_direct"))
-		if gm.has_signal("match_cleared"):
-			gm.match_cleared.connect(Callable(self, "_on_match_cleared"))
-		print("[NarrativeStageController] Connected to GameManager signals")
+	# Prefer active registered board_ref (set by GameBoard._ready)
+	var board_node: Node = null
+	if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+		board_node = GameRunState.board_ref
 	else:
-		push_error("[NarrativeStageController] GameManager not found — narrative triggers disabled")
+		# Fallback: try to find GameBoard in current scene
+		if has_method("get_tree") and get_tree() != null:
+			var tree = get_tree()
+			var cs = tree.get_current_scene()
+			if cs != null:
+				board_node = _find_node_by_name(cs, "GameBoard")
+			if board_node == null:
+				# fallback search
+				var stack = [tree.get_root()]
+				while stack.size() > 0 and board_node == null:
+					var rn = stack.pop_back()
+					for i in range(rn.get_child_count()):
+						var c = rn.get_child(i)
+						if not c:
+							continue
+						if str(c.name) == "GameBoard":
+							board_node = c
+							break
+						stack.append(c)
+
+	if board_node != null:
+		if board_node.has_signal("level_loaded_ctx"):
+			board_node.connect("level_loaded_ctx", Callable(self, "_on_level_loaded"))
+		if board_node.has_signal("level_complete"):
+			board_node.connect("level_complete", Callable(self, "_on_level_complete_direct"))
+		if board_node.has_signal("match_cleared"):
+			board_node.connect("match_cleared", Callable(self, "_on_match_cleared"))
+		print("[NarrativeStageController] Connected to GameBoard signals")
+	else:
+		# No legacy fallback: we must not attempt to resolve GameManager directly here.
+		# Narrative triggers rely on GameBoard signals (preferred) or on GameRunState
+		# being populated by the runtime host. If neither is available, disable triggers.
+		push_warning("[NarrativeStageController] GameBoard not found and GameManager resolution skipped — narrative triggers disabled")
 
 func load_stage(stage_data: Dictionary) -> bool:
 	"""Load a narrative stage from JSON data"""
@@ -297,11 +337,8 @@ func _check_condition(condition: Dictionary, context: Dictionary) -> bool:
 	if condition.has("min_score"):
 		var score = context.get("score", 0)
 		if score == 0:
-			var _gm = _NodeResolvers._get_gm()
-			if _gm == null:
-				_gm = _NodeResolvers._get_gm()
-			if _gm and "score" in _gm:
-				score = _gm.score
+			if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.initialized:
+				score = int(GameRunState.score)
 		if score < condition["min_score"]:
 			return false
 
@@ -342,47 +379,47 @@ func _on_level_complete(level_id: String, context: Dictionary):
 		_check_transitions("goal_complete", context)
 
 func _on_match_cleared(match_size: int, context: Dictionary):
-	"""Handle match cleared event"""
-	# Check for progress-based transitions
-	var game_manager = _NodeResolvers._get_gm()
-	if game_manager == null:
-		game_manager = _NodeResolvers._get_gm()
-	if game_manager:
-		var progress = 0
+	"""Handle match cleared event; compute progress using GameRunState only"""
+	if typeof(GameRunState) == TYPE_NIL or GameRunState == null or not GameRunState.initialized:
+		print("[NarrativeStageController] GameRunState not initialized; skipping progress checks")
+		return
 
-		# Calculate progress based on level type
-		if game_manager.collectible_target > 0:
-			# Collectible level
-			progress = float(game_manager.collectibles_collected) / float(game_manager.collectible_target)
-		elif game_manager.unmovable_target > 0:
-			# Unmovable level
-			progress = float(game_manager.unmovables_cleared) / float(game_manager.unmovable_target)
+	var progress := 0.0
+	# Calculate progress based on level type using GameRunState
+	if typeof(GameRunState) != TYPE_NIL and GameRunState != null:
+		if (GameRunState.collectible_target and GameRunState.collectible_target > 0):
+			progress = float(GameRunState.collectibles_collected) / float(max(GameRunState.collectible_target, 1))
+		elif (GameRunState.unmovable_target and GameRunState.unmovable_target > 0):
+			progress = float(GameRunState.unmovables_cleared) / float(max(GameRunState.unmovable_target, 1))
 		else:
-			# Score level
-			progress = float(game_manager.score) / float(game_manager.target_score)
+			var target = 1
+			if typeof(GameRunState.target_score) != TYPE_NIL:
+				target = GameRunState.target_score
+			progress = float(GameRunState.score) / float(max(target, 1))
+	else:
+		print("[NarrativeStageController] GameRunState missing; skipping progress check")
+		return
 
-		# Check for progress milestones
-		var progress_percent = int(progress * 100)
+	var progress_percent = int(progress * 100)
+	print("[NarrativeStageController] Progress: ", progress_percent, "% (", GameRunState.score, "/", GameRunState.target_score, ")")
 
-		print("[NarrativeStageController] Progress: ", progress_percent, "% (", game_manager.score, "/", game_manager.target_score, ")")
-
-		# Check for specific progress events (only trigger each once)
-		if progress_percent >= 25 and not _progress_milestones_reached["progress_25"]:
-			print("[NarrativeStageController] Triggering progress_25 milestone")
-			_progress_milestones_reached["progress_25"] = true
-			_check_transitions("progress_25", context)
-		elif progress_percent >= 50 and not _progress_milestones_reached["progress_50"]:
-			print("[NarrativeStageController] Triggering progress_50 milestone")
-			_progress_milestones_reached["progress_50"] = true
-			_check_transitions("progress_50", context)
-		elif progress_percent >= 75 and not _progress_milestones_reached["progress_75"]:
-			print("[NarrativeStageController] Triggering progress_75 milestone")
-			_progress_milestones_reached["progress_75"] = true
-			_check_transitions("progress_75", context)
-		elif progress_percent >= 100 and not _progress_milestones_reached["goal_complete"]:
-			print("[NarrativeStageController] Triggering goal_complete milestone (100% progress)")
-			_progress_milestones_reached["goal_complete"] = true
-			_check_transitions("goal_complete", context)
+	# Check for specific progress events (only trigger each once)
+	if progress_percent >= 25 and not _progress_milestones_reached["progress_25"]:
+		print("[NarrativeStageController] Triggering progress_25 milestone")
+		_progress_milestones_reached["progress_25"] = true
+		_check_transitions("progress_25", context)
+	elif progress_percent >= 50 and not _progress_milestones_reached["progress_50"]:
+		print("[NarrativeStageController] Triggering progress_50 milestone")
+		_progress_milestones_reached["progress_50"] = true
+		_check_transitions("progress_50", context)
+	elif progress_percent >= 75 and not _progress_milestones_reached["progress_75"]:
+		print("[NarrativeStageController] Triggering progress_75 milestone")
+		_progress_milestones_reached["progress_75"] = true
+		_check_transitions("progress_75", context)
+	elif progress_percent >= 100 and not _progress_milestones_reached["goal_complete"]:
+		print("[NarrativeStageController] Triggering goal_complete milestone (100% progress)")
+		_progress_milestones_reached["goal_complete"] = true
+		_check_transitions("goal_complete", context)
 
 func _on_auto_advance_timeout():
 	print("[NarrativeStageController] Auto-advance timer fired for state: ", current_state)

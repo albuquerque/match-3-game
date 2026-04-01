@@ -1,34 +1,44 @@
 extends Node
 ## GameFlowController — owns all level-completion, level-failure, and bonus-cascade logic.
-## GameManager holds an instance of this and forwards public calls to it.
-## All signals that external nodes listen to are re-emitted on GameManager for back-compat.
+## PR 6.5b: gm dependency removed — uses GameRunState.board_ref and GameStateBridge directly.
 
 signal level_complete_ready(stars: int, coins: int, gems: int)
 signal level_failed_ready
 signal bonus_cascade_started(remaining_moves: int)
 signal bonus_cascade_complete
 
-# Injected by GameManager on instantiation
-var gm: Node = null  # GameManager reference
+# gm kept as optional for backward compat — ignored; use GameRunState/board_ref
+var gm: Node = null
+var GameStateBridge = null
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
-func setup(game_manager: Node) -> void:
-	gm = game_manager
+func setup(game_manager: Node = null) -> void:
+	gm = game_manager  # kept for compat, not used
+	if GameStateBridge == null:
+		GameStateBridge = load("res://games/match3/services/GameStateBridge.gd")
+
+func _get_board() -> Node:
+	return GameRunState.board_ref
+
+func _get_tree_ref():
+	var b = _get_board()
+	if b and b.get_tree():
+		return b.get_tree()
+	return null
 
 # ─── Level completion ───────────────────────────────────────────────────────
 
 func attempt_level_complete() -> void:
-	# Do not trigger level-complete checks while the bonus cascade is already running
 	if GameRunState.in_bonus_conversion:
 		return
 	if GameRunState.pending_level_complete:
 		return
 	GameRunState.pending_level_complete = true
-	gm.call_deferred("_perform_level_completion_check")
+	call_deferred("perform_level_completion_check")
 
 func perform_level_completion_check() -> void:
 	if not GameRunState.pending_level_complete:
 		return
-	# Do not re-trigger if we are already in the bonus conversion or transitioning
 	if GameRunState.in_bonus_conversion or GameRunState.level_transitioning:
 		GameRunState.pending_level_complete = false
 		return
@@ -47,7 +57,7 @@ func perform_level_completion_check() -> void:
 	if has_any_primary:
 		if collectible_met and unmovable_met and spreader_met:
 			print("[GFC] Level complete — all primary objectives met")
-			gm.call_deferred("on_level_complete")
+			call_deferred("on_level_complete")
 		else:
 			if not collectible_met:
 				print("[GFC] Waiting on collectibles: %d/%d" % [GameRunState.collectibles_collected, GameRunState.collectible_target])
@@ -58,24 +68,26 @@ func perform_level_completion_check() -> void:
 	else:
 		if GameRunState.score >= GameRunState.target_score:
 			print("[GFC] Level complete by score")
-			gm.call_deferred("on_level_complete")
+			call_deferred("on_level_complete")
 
 func on_level_complete() -> void:
 	print("[GFC] on_level_complete()")
 	if GameRunState.level_transitioning or GameRunState.in_bonus_conversion:
 		return
 	GameRunState.level_transitioning = true
+	if GameStateBridge == null:
+		GameStateBridge = load("res://games/match3/services/GameStateBridge.gd")
 
-	# Wait for any ongoing board activity
+	var tree = _get_tree_ref()
 	var wait_time = 0.0
 	while GameRunState.processing_moves and wait_time < 10.0:
-		if gm.get_tree() == null: break
-		await gm.get_tree().create_timer(0.1).timeout
+		if tree == null: break
+		await tree.create_timer(0.1).timeout
 		wait_time += 0.1
 	if GameRunState.processing_moves:
 		GameRunState.processing_moves = false
-	if gm.get_tree() != null:
-		await gm.get_tree().create_timer(0.2).timeout
+	if tree:
+		await tree.create_timer(0.2).timeout
 
 	var original_moves_left = GameRunState.moves_left
 
@@ -83,71 +95,80 @@ func on_level_complete() -> void:
 		await convert_remaining_moves_to_bonus(GameRunState.moves_left)
 		if GameRunState.moves_left != 0:
 			GameRunState.moves_left = 0
-			gm.emit_signal("moves_changed", GameRunState.moves_left)
+			GameStateBridge.emit_moves_changed(GameRunState.moves_left)
 	else:
 		print("[GFC] No bonus moves remaining")
 
-	# Store final snapshot
 	GameRunState.last_level_won = true
 	GameRunState.last_level_score = GameRunState.score
 	GameRunState.last_level_target = GameRunState.target_score
 	GameRunState.last_level_number = GameRunState.level
 	GameRunState.last_level_moves_left = original_moves_left
 
-	# Calculate stars
 	var stars = _calculate_stars(original_moves_left)
 	print("[GFC] Level completed with %d stars" % stars)
 
-	var star_manager = gm.get_node_or_null("/root/StarRatingManager")
+	var star_manager = Engine.get_singleton("StarRatingManager") if Engine.has_singleton("StarRatingManager") else \
+		(GameRunState.board_ref.get_node_or_null("/root/StarRatingManager") if GameRunState.board_ref else null)
 	if star_manager:
 		star_manager.save_level_stars(GameRunState.level, stars)
 
-	var rm = gm.get_node_or_null("/root/RewardManager")
+	var rm = GameRunState.board_ref.get_node_or_null("/root/RewardManager") if GameRunState.board_ref else null
 	if rm and rm.has_method("grant_level_completion_reward"):
 		rm.grant_level_completion_reward(GameRunState.level, stars)
 
-	print("[GFC] Emitting level_complete on GameManager (level=%d score=%d)" % [GameRunState.level, GameRunState.score])
-	gm.emit_signal("level_complete")
+	print("[GFC] Emitting level_complete via bridge (level=%d score=%d)" % [GameRunState.level, GameRunState.score])
+	GameStateBridge.emit_level_complete()
 
 	var coins_earned = 100 + (50 * GameRunState.level)
 	var gems_earned  = 5 if stars == 3 else 0
-	_emit_eventbus_level_complete(stars, coins_earned, gems_earned)
+	emit_signal("level_complete_ready", stars, coins_earned, gems_earned)
 
 func _calculate_stars(original_moves_left: int) -> int:
-	var star_manager = gm.get_node_or_null("/root/StarRatingManager")
-	if star_manager and gm.level_manager:
-		var level_data = gm.level_manager.get_level(gm.level_manager.current_level_index)
-		var total_moves = level_data.moves if level_data else 20
-		var moves_used  = total_moves - original_moves_left
-		return star_manager.calculate_stars(GameRunState.score, GameRunState.target_score, moves_used, total_moves)
+	var star_manager = GameRunState.board_ref.get_node_or_null("/root/StarRatingManager") if GameRunState.board_ref else null
+	if star_manager:
+		var lm = GameRunState.board_ref.get_node_or_null("/root/LevelManager") if GameRunState.board_ref else null
+		if lm:
+			var level_data = lm.get_level(lm.current_level_index) if lm.has_method("get_level") else null
+			var total_moves = level_data.moves if level_data and level_data.has("moves") else 20
+			var moves_used  = total_moves - original_moves_left
+			return star_manager.calculate_stars(GameRunState.score, GameRunState.target_score, moves_used, total_moves)
 	if GameRunState.score >= int(GameRunState.target_score * 1.5): return 3
 	if GameRunState.score >= int(GameRunState.target_score * 1.2): return 2
 	return 1
-
-func _emit_eventbus_level_complete(_stars: int, _coins: int, _gems: int) -> void:
-	pass  # PR 5d: EventBus removed — level_complete already emitted on GameManager
 
 # ─── Level failure ───────────────────────────────────────────────────────────
 
 func perform_level_failed_check() -> void:
 	if not GameRunState.pending_level_failed:
 		return
-	if GameRunState.pending_level_complete:
+	if GameRunState.pending_level_complete or GameRunState.level_transitioning:
 		return
-	if GameRunState.score >= GameRunState.target_score:
+	# Don't check while cascade is still running — board_idle will re-trigger
+	if GameRunState.processing_moves:
 		return
-	if GameRunState.collectible_target > 0 and GameRunState.collectibles_collected >= GameRunState.collectible_target:
+	# Don't fail if objectives are actually met
+	var has_collectible_goal = GameRunState.collectible_target > 0
+	var has_unmovable_goal   = GameRunState.unmovable_target > 0
+	var has_spreader_goal    = GameRunState.use_spreader_objective
+	var collectible_met = not has_collectible_goal or (GameRunState.collectibles_collected >= GameRunState.collectible_target)
+	var unmovable_met   = not has_unmovable_goal  or (GameRunState.unmovables_cleared >= GameRunState.unmovable_target)
+	var spreader_met    = not has_spreader_goal   or (GameRunState.spreader_count <= 0)
+	var score_met       = GameRunState.score >= GameRunState.target_score
+	var has_any_primary = has_collectible_goal or has_unmovable_goal or has_spreader_goal
+	if (has_any_primary and collectible_met and unmovable_met and spreader_met) or (not has_any_primary and score_met):
+		# Actually complete — don't fail
+		GameRunState.pending_level_failed = false
+		call_deferred("attempt_level_complete")
 		return
 	print("[GFC] Level failed: out of moves")
 	GameRunState.pending_level_failed = false
-	gm.emit_signal("game_over")
-	_emit_eventbus_level_failed()
-
-func _emit_eventbus_level_failed() -> void:
+	GameRunState.level_transitioning = true
+	GameStateBridge.emit_game_over()
 	var level_id = "level_%d" % GameRunState.level
-	var ctx := {"level": GameRunState.level, "score": GameRunState.score,
-		"target": GameRunState.target_score, "moves_used": GameRunState.moves_left}
-	gm.emit_signal("level_failed", level_id, ctx)
+	var ctx := {"level": GameRunState.level, "score": GameRunState.score, "target": GameRunState.target_score, "moves_used": GameRunState.moves_left}
+	GameStateBridge.emit_level_failed(level_id, ctx)
+	emit_signal("level_failed_ready")
 
 # ─── Bonus cascade ───────────────────────────────────────────────────────────
 
@@ -157,12 +178,14 @@ func convert_remaining_moves_to_bonus(remaining_moves: int) -> void:
 	GameRunState.bonus_skipped = false
 	GameRunState.in_bonus_conversion = true
 
-	var board = gm.get_board()
+	var board = _get_board()
 	if not board:
 		print("[GFC] GameBoard not found — skipping bonus")
 		GameRunState.processing_moves = false
 		GameRunState.in_bonus_conversion = false
 		return
+
+	var tree = _get_tree_ref()
 
 	if board.has_method("show_skip_bonus_hint"):
 		board.show_skip_bonus_hint()
@@ -170,9 +193,9 @@ func convert_remaining_moves_to_bonus(remaining_moves: int) -> void:
 	for i in range(remaining_moves):
 		if GameRunState.bonus_skipped:
 			for j in range(i, remaining_moves):
-				gm.add_score(100 * (j + 1))
+				GameStateBridge.add_score(100 * (j + 1))
 			GameRunState.moves_left = 0
-			gm.emit_signal("moves_changed", GameRunState.moves_left)
+			GameStateBridge.emit_moves_changed(GameRunState.moves_left)
 			break
 
 		var random_pos = _get_random_active_tile_position()
@@ -182,20 +205,21 @@ func convert_remaining_moves_to_bonus(remaining_moves: int) -> void:
 		GameRunState.grid[int(random_pos.x)][int(random_pos.y)] = GameRunState.FOUR_WAY_ARROW
 		if board.has_method("update_tile_visual"):
 			board.update_tile_visual(random_pos, GameRunState.FOUR_WAY_ARROW)
-		await gm.get_tree().create_timer(0.1).timeout
+		if tree:
+			await tree.create_timer(0.1).timeout
 		if board.has_method("activate_special_tile"):
 			await board.activate_special_tile(random_pos)
 
 		GameRunState.moves_left -= 1
-		gm.emit_signal("moves_changed", GameRunState.moves_left)
-		gm.add_score(100 * (i + 1))
+		GameStateBridge.emit_moves_changed(GameRunState.moves_left)
+		GameStateBridge.add_score(100 * (i + 1))
 
 	if board.has_method("hide_skip_bonus_hint"):
 		board.hide_skip_bonus_hint()
 	if GameRunState.bonus_skipped:
-		await gm.get_tree().create_timer(0.5).timeout
-		if board:
-			board.visible = false
+		if tree:
+			await tree.create_timer(0.5).timeout
+		board.visible = false
 
 	GameRunState.in_bonus_conversion = false
 	GameRunState.processing_moves = false
@@ -206,7 +230,7 @@ func _get_random_active_tile_position() -> Vector2:
 	for x in range(GameRunState.GRID_WIDTH):
 		for y in range(GameRunState.GRID_HEIGHT):
 			var t = GameRunState.grid[x][y]
-			if not gm.is_cell_blocked(x, y) and t >= 1 and t <= GameRunState.TILE_TYPES:
+			if not _GQS.is_cell_blocked(null, x, y) and t >= 1 and t <= GameRunState.TILE_TYPES:
 				positions.append(Vector2(x, y))
 	if positions.size() == 0:
 		return Vector2(-1, -1)
@@ -215,3 +239,5 @@ func _get_random_active_tile_position() -> Vector2:
 func skip_bonus_animation() -> void:
 	if not GameRunState.bonus_skipped:
 		GameRunState.bonus_skipped = true
+
+

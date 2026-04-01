@@ -1,5 +1,6 @@
 extends Node
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
+const NodeResolversApi = preload("res://scripts/helpers/node_resolvers_api.gd")
 
 # Pure helper functions to compute positions affected by boosters.
 # These work on grid coordinates and do not touch nodes or visuals.
@@ -77,17 +78,37 @@ static func column_clear_positions(col: int, grid_w: int, grid_h: int) -> Array:
 	return out
 
 static func _get_board() -> Node:
-	if typeof(GameManager) != TYPE_NIL and GameManager != null:
-		var b = GameManager.get_board()
-		if b:
+	# Prefer NodeResolvers API (runtime-loaded) which encapsulates legacy fallbacks
+	var nr = null
+	# Try using the preloaded API if available
+	if NodeResolversApi != null:
+		nr = NodeResolversApi
+	else:
+		# Runtime load as fallback to avoid parse-time coupling
+		nr = load("res://scripts/helpers/node_resolvers.gd")
+	if nr != null:
+		var b = null
+		# prefer board resolver when present
+		if nr.has_method("_get_board"):
+			b = nr._get_board()
+		if b != null:
 			return b
-	# fallback to root lookup
+	# Next prefer explicit GameRunState board_ref (owner set by GameBoard._ready)
+	if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+		return GameRunState.board_ref
+	# fallback: try scene tree search
 	var ml = Engine.get_main_loop()
 	if ml != null and ml is SceneTree:
 		var rt = ml.root
 		if rt:
 			return rt.get_node_or_null("GameBoard")
 	return null
+
+static var _Bridge = null
+static func _get_bridge():
+	if _Bridge == null:
+		_Bridge = load("res://games/match3/services/GameStateBridge.gd")
+	return _Bridge
 
 static func activate_row_clear(row: int) -> void:
 	print("[BoosterService] activate_row_clear:", row)
@@ -99,7 +120,9 @@ static func activate_row_clear(row: int) -> void:
 	for x in range(GameRunState.GRID_WIDTH):
 		if not _GQS.is_cell_blocked(null, x, row):
 			to_clear.append(Vector2(x, row))
-	GameManager.remove_matches(to_clear)
+	var br = _get_bridge()
+	if br != null:
+		br.remove_matches(to_clear)
 
 static func activate_column_clear(col: int) -> void:
 	print("[BoosterService] activate_column_clear:", col)
@@ -110,14 +133,18 @@ static func activate_column_clear(col: int) -> void:
 	for y in range(GameRunState.GRID_HEIGHT):
 		if not _GQS.is_cell_blocked(null, col, y):
 			to_clear.append(Vector2(col, y))
-	GameManager.remove_matches(to_clear)
+	var br = _get_bridge()
+	if br != null:
+		br.remove_matches(to_clear)
 
 static func activate_hammer(x: int, y: int) -> void:
 	print("[BoosterService] activate_hammer at", x, y)
 	var board = _get_board()
 	if board and board.has_method("_create_impact_particles"):
 		board._create_impact_particles(board.grid_to_world_position(Vector2(x,y)), Color(1,0.8,0.6))
-	GameManager.remove_matches([Vector2(x,y)])
+	var br = _get_bridge()
+	if br != null:
+		br.remove_matches([Vector2(x,y)])
 
 static func activate_bomb_3x3(x: int, y: int) -> void:
 	print("[BoosterService] activate_bomb_3x3 at", x, y)
@@ -132,7 +159,9 @@ static func activate_bomb_3x3(x: int, y: int) -> void:
 	if board and board.has_method("_create_impact_particles"):
 		for p in positions:
 			board._create_impact_particles(board.grid_to_world_position(p), Color(1,0.6,0.2))
-	GameManager.remove_matches(positions)
+	var br = _get_bridge()
+	if br != null:
+		br.remove_matches(positions)
 
 static func activate_line_blast(direction: String, x: int, y: int) -> void:
 	print("[BoosterService] activate_line_blast:", direction, x, y)
@@ -151,7 +180,9 @@ static func activate_line_blast(direction: String, x: int, y: int) -> void:
 			board._create_row_clear_effect(y)
 		else:
 			board._create_column_clear_effect(x)
-	GameManager.remove_matches(positions)
+	var br = _get_bridge()
+	if br != null:
+		br.remove_matches(positions)
 
 static func activate_swap(x1: int, y1: int, x2: int, y2: int) -> void:
 	print("[BoosterService] activate_swap:", x1, y1, x2, y2)
@@ -159,7 +190,18 @@ static func activate_swap(x1: int, y1: int, x2: int, y2: int) -> void:
 
 static func activate_shuffle() -> void:
 	print("[BoosterService] activate_shuffle")
-	if typeof(GameManager) != TYPE_NIL and GameManager != null and GameManager.has_method("shuffle_board"):
-		GameManager.call("shuffle_board")
-	else:
-		print("[BoosterService] GameManager.shuffle_board not available")
+	var board = _get_board()
+	# Prefer bridge shuffle logic for migration safety
+	var br = _get_bridge()
+	if br != null and br.shuffle_until_moves_available():
+		if board != null and board.has_method("perform_auto_shuffle"):
+			# ask board to animate the shuffle
+			board.call_deferred("perform_auto_shuffle")
+		return
+	# Fallback: use GameStateBridge shuffle or board_ref perform_auto_shuffle
+	var br2 = _get_bridge()
+	if br2 != null and br2.shuffle_until_moves_available():
+		if board != null and board.has_method("perform_auto_shuffle"):
+			board.call_deferred("perform_auto_shuffle")
+		return
+	print("[BoosterService] No shuffle implementation available via bridge or board")

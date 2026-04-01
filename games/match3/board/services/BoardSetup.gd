@@ -1,5 +1,6 @@
 extends Node
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
+var GameStateBridge = null
 # BoardSetup — loaded as a script resource (via BLS var in GameBoard), not instanced directly
 
 ## BoardSetup — all layout calculation, background/overlay setup, board-group
@@ -224,15 +225,16 @@ static func on_level_loaded_setup(board: Node) -> void:
 	hide_board_group(board)
 	print("[BoardSetup] Board group hidden — will show after grid created")
 
-	# Reset game-state flags
-	if typeof(GameManager) != TYPE_NIL:
-		GameRunState.processing_moves       = false
-		GameRunState.level_transitioning    = false
-		GameRunState.pending_level_complete = false
-		GameRunState.pending_level_failed   = false
-		GameRunState.in_bonus_conversion    = false
-		GameManager.reset_combo()
-		print("[BoardSetup] Safety flags cleared")
+	# Reset game-state flags (migration: prefer GameStateBridge for helpers)
+	GameRunState.processing_moves       = false
+	GameRunState.level_transitioning    = false
+	GameRunState.pending_level_complete = false
+	GameRunState.pending_level_failed   = false
+	GameRunState.in_bonus_conversion    = false
+	var bridge = load("res://games/match3/services/GameStateBridge.gd")
+	if bridge != null and bridge.has_method("reset_combo"):
+		bridge.reset_combo()
+	print("[BoardSetup] Safety flags cleared")
 
 	# Clean up old tile area overlay
 	if board.tile_area_overlay and is_instance_valid(board.tile_area_overlay):

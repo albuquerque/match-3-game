@@ -26,10 +26,10 @@ func _ready() -> void:
 		for id in BOOSTER_KEYS:
 			var btn: Button = hbox.get_node_or_null(BUTTON_NAMES.get(id, ""))
 			if btn:
-				# Ensure the visual children don't intercept input (but keep the button interactive)
-				_ignore_children_recursive(btn)
+				self._ignore_children_recursive(btn)
 				btn.pressed.connect(_on_button_pressed.bind(id))
-	_connect_signals()
+	# Defer so GameBoard._ready() has time to set GameRunState.board_ref first
+	call_deferred("_connect_signals")
 
 # Recursively set mouse_filter IGNORE on all children of node (but not node itself)
 static func _ignore_children_recursive(node: Node) -> void:
@@ -46,12 +46,30 @@ func _connect_signals() -> void:
 	var rm = _rm()
 	if rm and rm.has_signal("booster_changed") and not rm.is_connected("booster_changed", _on_booster_changed):
 		rm.connect("booster_changed", _on_booster_changed)
-	var gm = _gm()
-	if gm and gm.has_signal("level_loaded") and not gm.is_connected("level_loaded", _on_level_loaded):
-		gm.connect("level_loaded", _on_level_loaded)
 
-func _gm():
-	return Engine.get_singleton("GameManager") if Engine.has_singleton("GameManager") else get_node_or_null("/root/GameManager")
+	# Connect to level_loaded_ctx on board_ref — this is the signal GameStateBridge emits
+	var board = GameRunState.board_ref if typeof(GameRunState) != TYPE_NIL else null
+	if board and board.has_signal("level_loaded_ctx"):
+		if not board.is_connected("level_loaded_ctx", _on_level_loaded_ctx):
+			board.connect("level_loaded_ctx", _on_level_loaded_ctx)
+	else:
+		# Fallback: connect to legacy GameManager level_loaded if available
+		var gm = _resolve_gm()
+		if gm and gm.has_signal("level_loaded") and not gm.is_connected("level_loaded", _on_level_loaded):
+			gm.connect("level_loaded", _on_level_loaded)
+
+	# Catch-up: if level is already loaded, populate immediately
+	if typeof(GameRunState) != TYPE_NIL and GameRunState.initialized:
+		_on_level_loaded()
+
+
+func _resolve_gm():
+	var nr = load("res://scripts/helpers/node_resolvers.gd")
+	if nr != null:
+		var g = nr._get_gm()
+		if g != null:
+			return g
+	return get_node_or_null("/root/GameManager")
 
 func _rm():
 	return get_node_or_null("/root/RewardManager")
@@ -61,10 +79,18 @@ func _tm():
 
 # ── Self-wired handlers ───────────────────────────────────────────────────────
 
+func _on_level_loaded_ctx(_level_id: String, _ctx: Dictionary) -> void:
+	_on_level_loaded()
+
 func _on_level_loaded() -> void:
-	var gm = _gm()
-	if gm and "available_boosters" in gm and gm.available_boosters.size() > 0:
-		set_available_boosters(gm.available_boosters)
+	# Prefer GameRunState for available boosters (migration path)
+	if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.available_boosters and GameRunState.available_boosters.size() > 0:
+		set_available_boosters(GameRunState.available_boosters)
+	else:
+		# Resolve legacy GameManager via node_resolvers only (no removed helper)
+		var gm = _resolve_gm()
+		if gm and "available_boosters" in gm and gm.available_boosters.size() > 0:
+			set_available_boosters(gm.available_boosters)
 	_refresh_counts()
 	var tm = _tm()
 	if tm and tm.has_method("get_theme_name"):

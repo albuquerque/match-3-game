@@ -45,6 +45,7 @@ var pending_level_complete: bool = false
 var pending_level_failed:  bool = false
 var in_bonus_conversion:   bool = false
 var bonus_skipped:         bool = false
+var pending_collectible_refill: bool = false
 
 # ── Last-level snapshot (used by rewards / transition screens) ────────────────
 var last_level_won:        bool = false
@@ -76,6 +77,9 @@ var spreader_spread_limit:       int        = 0
 var spreader_textures_map:       Dictionary = {}
 var spreader_type:               String     = "virus"
 
+# ── Objective state ───────────────────────────────────────────────────────
+var objective_manager_ref: Node = null
+
 # ── Booster state ─────────────────────────────────────────────────────────────
 var available_boosters: Array = []
 
@@ -84,8 +88,12 @@ var requested_special_tile: Dictionary = {}
 
 # ── Debug ─────────────────────────────────────────────────────────────────────
 var DEBUG_LOGGING: bool = true
+var VERBOSE_GRAVITY: bool = true
 
 # ── Board reference (set by GameBoard._ready) ─────────────────────────────────
 # Allows board services to reach tiles without going through GameManager.
 var board_ref: Node = null
 
+# Pending shard cells mapping: keys are "x,y" -> item_id
+# Previously stored in GameManager meta; now kept in GameRunState for migration.
+var pending_shard_cells: Dictionary = {}

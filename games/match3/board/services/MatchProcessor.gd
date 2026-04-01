@@ -4,10 +4,23 @@ extends Node
 # PR 6.5a: gm parameter replaced with GameRunState/GameManager autoloads.
 # gm kept as param for backward compat — ignored.
 
+const GAME_STATE_BRIDGE_PATH := "res://games/match3/services/GameStateBridge.gd"
+
 static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, grid_w: int, grid_h: int, gm: Node = null) -> Dictionary:
 	var out: Dictionary = {"tiles_removed": 0, "special_placed": null}
 	if matches == null or matches.size() == 0:
 		return out
+
+	# Debug: snapshot small view
+	if GameRunState.VERBOSE_GRAVITY:
+		print("[MatchProcessor] process_matches START matches_count=", matches.size())
+		var preview = []
+		for cx in range(min(grid_w, 6)):
+			var col = []
+			for cy in range(min(grid_h, 6)):
+				col.append(str(grid[cx][cy]) if grid.size() > cx and grid[cx].size() > cy else "?")
+			preview.append("(" + ",".join(col) + ")")
+		print("[MatchProcessor] Grid preview (first 6x6): ", preview)
 
 	var unique: Array = []
 	for m in matches:
@@ -38,17 +51,31 @@ static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, g
 		var gy: int = int(p.y)
 		var val: int = int(grid[gx][gy])
 
+		# Debug: log what we're about to handle
+		if GameRunState.VERBOSE_GRAVITY:
+			print("[MatchProcessor] Handling pos=", gx, gy, " val=", val)
+
 		# Collectible tile (coin / shard)
 		if val == GameRunState.COLLECTIBLE:
 			GameRunState.collectibles_collected += 1
 			if GameRunState.collectible_positions.has(p):
 				GameRunState.collectible_positions.erase(p)
+			if GameRunState.VERBOSE_GRAVITY:
+				print("[MatchProcessor] Clearing COLLECTIBLE at", gx, gy)
 			grid[gx][gy] = 0
 			continue
 
 		# Spreader tile
 		if val == GameRunState.SPREADER:
-			GameManager.report_spreader_destroyed(p)
+			# Prefer bridge to report spreader destruction
+			var br = load(GAME_STATE_BRIDGE_PATH)
+			if typeof(br) != TYPE_NIL and br != null and br.has_method("report_spreader_destroyed"):
+				br.report_spreader_destroyed(p)
+			else:
+				# Fallback: update GameRunState directly
+				GameRunState.spreader_count = max(0, GameRunState.spreader_count - 1)
+			if GameRunState.VERBOSE_GRAVITY:
+				print("[MatchProcessor] Clearing SPREADER at", gx, gy)
 			grid[gx][gy] = 0
 			tiles_removed += 1
 			continue
@@ -56,7 +83,17 @@ static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, g
 		# Hard unmovable — report but let BoardActionExecutor manage the visual
 		var key: String = str(gx) + "," + str(gy)
 		if GameRunState.unmovable_map.has(key):
-			GameManager.report_unmovable_destroyed(key, true)
+			# Use bridge shim (load locally)
+			var br2 = load(GAME_STATE_BRIDGE_PATH)
+			if typeof(br2) != TYPE_NIL and br2 != null and br2.has_method("report_unmovable_destroyed"):
+				br2.report_unmovable_destroyed(Vector2(gx, gy), true)
+			else:
+				# Fallback: emit on board_ref if present
+				if GameRunState.board_ref != null and GameRunState.board_ref.has_signal and GameRunState.board_ref.has_signal("unmovable_destroyed"):
+					GameRunState.board_ref.emit_signal("unmovable_destroyed", Vector2(gx, gy))
+			if GameRunState.VERBOSE_GRAVITY:
+				print("[MatchProcessor] Unmovable reported at", gx, gy, "grid val before=", grid[gx][gy])
+			# If grid is zero already, skip clearing; otherwise continue to allow other handling
 			if int(grid[gx][gy]) == 0:
 				continue
 
@@ -69,25 +106,20 @@ static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, g
 		# Regular tile — clear and count
 		if val > 0 and val != GameRunState.COLLECTIBLE:
 			tiles_removed += 1
-		grid[gx][gy] = 0
+		if val > 0:
+			if GameRunState.VERBOSE_GRAVITY:
+				print("[MatchProcessor] Clearing regular tile at", gx, gy, "oldval=", val)
+			grid[gx][gy] = 0
 
 	out["tiles_removed"] = tiles_removed
 
-	# Detect special tile qualification
-	if unique.size() >= 4 or _is_L_or_T(unique, grid_w, grid_h):
-		var best_pos: Vector2 = Vector2(-1, -1)
-		var best_score: int = -1
-		for p in unique:
-			var h: int = _run(unique, p, true, grid_w)
-			var v: int = _run(unique, p, false, grid_h)
-			var score: int = h + v
-			if swapped_pos.x >= 0 and int(p.x) == int(swapped_pos.x) and int(p.y) == int(swapped_pos.y):
-				score += 10
-			if score > best_score:
-				best_score = score
-				best_pos = p
-		if best_pos.x >= 0:
-			GameManager.request_special_tile_creation(best_pos, "auto")
+	# Debug: final tiles_removed
+	if GameRunState.VERBOSE_GRAVITY:
+		print("[MatchProcessor] process_matches END tiles_removed=", tiles_removed)
+
+	# NOTE: Special tile detection and creation is handled entirely by MatchOrchestrator
+	# BEFORE process_matches is called. Do NOT run independent detection here — it
+	# creates conflicting grid writes and phantom tile visuals.
 
 	return out
 

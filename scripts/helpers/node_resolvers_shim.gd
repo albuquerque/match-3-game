@@ -30,10 +30,10 @@ static func _get_board():
     var inst = _get_root_instance("NodeResolvers")
     if inst and inst.has_method("_get_board"):
         return inst.call("_get_board")
-    # prefer GameManager.get_board if available
-    var gm = _get_root_instance("GameManager")
-    if gm and gm.has_method("get_board"):
-        return gm.call("get_board")
+    # Prefer GameRunState.board_ref when available instead of calling legacy GameManager.get_board
+    if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+        return GameRunState.board_ref
+    # fallback: try scene tree search
     return _get_root_instance("GameBoard")
 
 static func _get_rm():

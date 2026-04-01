@@ -1,5 +1,7 @@
 extends Node
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
+const _MatchFinder = preload("res://scripts/services/MatchFinder.gd")
+const GameStateBridge = preload("res://games/match3/services/GameStateBridge.gd")
 # BoardInputHandler — loaded and instantiated via script resource in GameBoard._ready()
 
 ## BoardInputHandler — handles all tile click/swipe input, selection state,
@@ -190,9 +192,25 @@ func perform_swap(tile1, tile2) -> void:
 	if tween1: await tween1.finished
 	if tween2: await tween2.finished
 
-	var matches = GameManager.find_matches()
-	if matches.size() > 0:
-		GameManager.use_move()
+	# Use MatchFinder directly (migrated from GameManager.find_matches)
+	var exclude = [GameRunState.HORIZTONAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
+	var matches = []
+	if _MatchFinder != null:
+		# Preloaded script resource exposes find_matches as a callable
+		matches = _MatchFinder.find_matches(GameRunState.grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.MIN_MATCH_SIZE, exclude, -1)
+	else:
+		print("[BoardInputHandler] WARNING: MatchFinder not available; falling back to empty matches")
+
+	if matches and matches.size() > 0:
+		# Use GameStateBridge to consume a move (migrated from GameManager.use_move)
+		if GameStateBridge != null:
+			# GameStateBridge is a script resource exposing use_move()
+			GameStateBridge.use_move()
+		else:
+			# Fallback: decrement moves and emit via GameStateBridge if possible
+			print("[BoardInputHandler] WARNING: GameStateBridge.use_move not available; decrementing GameRunState.moves_left as fallback")
+			if GameRunState.moves_left > 0:
+				GameRunState.moves_left -= 1
 
 		var swap_pos_in_match = Vector2(-1, -1)
 		if pos1 in matches:

@@ -2,22 +2,39 @@ extends Node
 # GravityService — pure grid gravity and refill.
 # PR 6.5a: gm parameter replaced with GameRunState autoload references.
 
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
+
 ## Barrier-aware gravity.
 static func apply_gravity(grid: Array, gm: Node = null) -> bool:
 	# gm kept as optional param for backward compat — ignored, uses GameRunState
 	var moved = false
 	var grid_w = GameRunState.GRID_WIDTH
 	var grid_h = GameRunState.GRID_HEIGHT
+	if GameRunState.VERBOSE_GRAVITY:
+		print("[GravityService] apply_gravity START grid snapshot cols=%d rows=%d" % [grid_w, grid_h])
 	for x in range(grid_w):
+		# Optional per-column snapshot before
+		if GameRunState.VERBOSE_GRAVITY:
+			var col_before = []
+			if grid.size() > x:
+				for yy in range(grid_h):
+					col_before.append(str(grid[x][yy]) if grid[x].size() > yy else "?")
+			print("[GravityService] Column %d BEFORE: %s" % [x, ",".join(col_before)])
 		var segment_start = -1
 		var y = 0
 		while y <= grid_h:
 			var end_of_segment = (y == grid_h)
 			var is_barrier = false
 			if not end_of_segment:
-				if grid[x][y] == -1 or grid[x][y] == GameRunState.UNMOVABLE \
-						or GameRunState.is_unmovable_cell(x, y) \
-						or grid[x][y] == GameRunState.SPREADER:
+				# Barriers for gravity: disabled cells (-1), hard unmovables, and SPREADER sentinels.
+				# UNMOVABLE sentinel (11) and unmovable_map entries are gravity barriers while the
+				# hard tile is still present. Once destroyed (grid==0, removed from unmovable_map),
+				# the cell becomes a normal empty slot that gets refilled.
+				var cell_val = GameRunState.grid[x][y] if (GameRunState.grid.size() > x and GameRunState.grid[x].size() > y) else 0
+				if _GQS.is_cell_blocked(null, x, y) \
+					or cell_val == GameRunState.UNMOVABLE \
+					or cell_val == GameRunState.SPREADER \
+					or GameRunState.unmovable_map.has(str(x) + "," + str(y)):
 					is_barrier = true
 			if is_barrier or end_of_segment:
 				if segment_start >= 0:
@@ -41,6 +58,15 @@ static func apply_gravity(grid: Array, gm: Node = null) -> bool:
 				if segment_start == -1:
 					segment_start = y
 			y += 1
+		# Optional per-column snapshot after
+		if GameRunState.VERBOSE_GRAVITY:
+			var col_after = []
+			if grid.size() > x:
+				for yy in range(grid_h):
+					col_after.append(str(grid[x][yy]) if grid[x].size() > yy else "?")
+			print("[GravityService] Column %d AFTER:  %s" % [x, ",".join(col_after)])
+	if GameRunState.VERBOSE_GRAVITY:
+		print("[GravityService] apply_gravity END moved=%s" % [str(moved)])
 	return moved
 
 ## Barrier-aware fill.
@@ -51,6 +77,8 @@ static func fill_empty_spaces(grid: Array, gm: Node = null) -> Array:
 	var created_positions: Array = []
 	var grid_w = GameRunState.GRID_WIDTH
 	var grid_h = GameRunState.GRID_HEIGHT
+	if GameRunState.VERBOSE_GRAVITY:
+		print("[GravityService] fill_empty_spaces START")
 	for x in range(grid_w):
 		var segment_accessible := true
 		var in_barrier_run := true
@@ -58,7 +86,7 @@ static func fill_empty_spaces(grid: Array, gm: Node = null) -> Array:
 			if grid.size() <= x or grid[x].size() <= y:
 				continue
 			var cell = grid[x][y]
-			var is_unmov = GameRunState.is_unmovable_cell(x, y)
+			var is_unmov = _GQS.is_unmovable_cell(null, x, y)
 			var is_barrier_cell = is_unmov or (cell == -1) or (cell == GameRunState.UNMOVABLE) or (cell == GameRunState.SPREADER)
 			if is_barrier_cell:
 				if not in_barrier_run:
@@ -82,6 +110,10 @@ static func fill_empty_spaces(grid: Array, gm: Node = null) -> Array:
 						safety += 1
 					grid[x][y] = tile_type
 					created_positions.append(Vector2(x, y))
+					if GameRunState.VERBOSE_GRAVITY:
+						print("[GravityService] fill_empty_spaces: placed %d at (%d,%d) forbidden=%s" % [tile_type, x, y, str(forbidden)])
+	if GameRunState.VERBOSE_GRAVITY:
+		print("[GravityService] fill_empty_spaces END created=%d" % [created_positions.size()])
 	return created_positions
 
 ## Legacy simple apply_gravity (no unmovable/spreader barriers). Kept for backward compat.

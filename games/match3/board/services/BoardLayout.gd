@@ -44,7 +44,7 @@ static func setup_background(gameboard: Node) -> void:
             bg.visible = false
 
     # compute board rect if tile_size / grid_offset exist
-    if not (GameManager and typeof(gameboard.tile_size) != TYPE_NIL and typeof(gameboard.grid_offset) != TYPE_NIL):
+    if not (typeof(gameboard.tile_size) != TYPE_NIL and typeof(gameboard.grid_offset) != TYPE_NIL):
         return
 
     var board_size = Vector2(
@@ -168,7 +168,7 @@ static func draw_borders(gameboard: Node, border_container: Node, color: Color, 
         br = br_local
     # If br is still null, we intentionally do not reference module-level BorderRenderer here
     if br != null and br.has_method("draw_board_borders"):
-        br.draw_board_borders(gameboard, border_container, GameManager, gameboard.grid_offset, gameboard.tile_size, color, width)
+        br.draw_board_borders(gameboard, border_container, null, gameboard.grid_offset, gameboard.tile_size, color, width)
         return
     # Fallback: do nothing
     return

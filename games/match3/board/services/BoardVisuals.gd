@@ -74,19 +74,95 @@ static func instantiate_tile_visual(gameboard: Node, tile_scene: PackedScene, ti
 			gameboard.board_container.add_child(tile)
 		else:
 			gameboard.add_child(tile)
+		# Ensure tile is visible and on correct z_index
+		if tile is CanvasItem:
+			# CanvasItem and subclasses (Node2D, Control) have visible property
+			tile.visible = true
+		# If tile is a Node2D, set its z_index above the board_container
+		if tile is Node2D:
+			var parent_z = 0
+			if gameboard.board_container and (gameboard.board_container is Node2D):
+				parent_z = int(gameboard.board_container.z_index)
+			tile.z_index = parent_z + 1
+		# If tile contains a Sprite2D child, ensure its modulate is not transparent
+		var s = tile.get_node_or_null("Sprite2D") if tile.has_method("get_node_or_null") else null
+		if s and s is Sprite2D:
+			s.modulate = Color(1,1,1,1)
 	return tile
 
 static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 	# guard
+	print("[BoardVisuals] create_visual_grid: entry - GameRunState.grid_size=", GameRunState.grid.size() if typeof(GameRunState) != TYPE_NIL and GameRunState.grid != null else -1)
+	# Diagnostic: print a small sample of the model grid (first 4 columns)
+	var sample = []
+	if typeof(GameRunState) != TYPE_NIL and GameRunState.grid != null:
+		for x in range(min(4, GameRunState.GRID_WIDTH)):
+			var col_sample = []
+			for y in range(min(6, GameRunState.GRID_HEIGHT)):
+				if GameRunState.grid.size() > x and GameRunState.grid[x].size() > y:
+					col_sample.append(GameRunState.grid[x][y])
+				else:
+					col_sample.append(null)
+			sample.append(col_sample)
+	print("[BoardVisuals] grid sample (first 4 cols x 6 rows): ", sample)
+	# Diagnostic: list non-empty positions in model
+	var non_empty = []
+	if typeof(GameRunState) != TYPE_NIL and GameRunState.grid != null:
+		for xx in range(GameRunState.GRID_WIDTH):
+			for yy in range(GameRunState.GRID_HEIGHT):
+				if GameRunState.grid[xx][yy] != 0 and GameRunState.grid[xx][yy] != -1:
+					non_empty.append(str(xx) + "," + str(yy) + ":" + str(GameRunState.grid[xx][yy]))
+	print("[BoardVisuals] model non-empty positions count=", non_empty.size(), " sample=", non_empty.slice(0,20))
 	if gameboard.creating_visual_grid:
 		return
 	gameboard.creating_visual_grid = true
 	clear_tiles(gameboard, tiles_ref)
 	await gameboard.get_tree().process_frame
 	tiles_ref.clear()
-	if GameRunState.grid.size() == 0:
-		gameboard.creating_visual_grid = false
-		return
+	# If grid size is zero but dimensions are present, wait a short while for the model to populate
+	if GameRunState.grid == null or GameRunState.grid.size() == 0:
+		if GameRunState.GRID_WIDTH > 0 and GameRunState.GRID_HEIGHT > 0:
+			print("[BoardVisuals] create_visual_grid: GameRunState.grid empty — waiting for model to populate")
+			var attempts = 0
+			var populated = false
+			var _st = Engine.get_main_loop() as SceneTree
+			while attempts < 40:
+				# Check for any non-zero, non--1 cell in the model grid
+				if GameRunState.grid != null and GameRunState.grid.size() > 0:
+					for cx in range(GameRunState.GRID_WIDTH):
+						for cy in range(GameRunState.GRID_HEIGHT):
+							if GameRunState.grid.size() > cx and GameRunState.grid[cx].size() > cy:
+								var val = GameRunState.grid[cx][cy]
+								if val != 0 and val != -1:
+									populated = true
+									break
+							# end inner
+						if populated:
+							break
+				# if populated break outer
+				if populated:
+					break
+				# await a short timeout
+				if _st:
+					await _st.create_timer(0.05).timeout
+				else:
+					# Engine main loop not available (static context edge-case) — log and break the wait
+					print("[BoardVisuals] WARNING: Engine main loop not available; aborting wait for model population")
+					break
+				attempts += 1
+			# If model still empty after waiting, create a visible fallback grid (tile_type=1)
+			if not populated:
+				print("[BoardVisuals] WARNING: Model grid still empty after wait; creating visible fallback grid to avoid empty board")
+				GameRunState.grid = []
+				for xx in range(GameRunState.GRID_WIDTH):
+					var col = []
+					for yy in range(GameRunState.GRID_HEIGHT):
+						col.append(1) # default visible tile type
+					GameRunState.grid.append(col)
+				print("[BoardVisuals] create_visual_grid: fallback grid created with dimensions", GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT)
+		else:
+			gameboard.creating_visual_grid = false
+			return
 	var scale_factor = gameboard.tile_size / 64.0
 	var tiles_created = 0
 	for x in range(GameRunState.GRID_WIDTH):
@@ -96,28 +172,27 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 			var key = str(x) + "," + str(y)
 			# If an unmovable_map entry exists, create the unmovable regardless of the grid sentinel
 			var tile = null
-			if GameRunState.unmovable_map.has(key) and typeof(GameRunState.unmovable_map[key]) == TYPE_DICTIONARY:
-				# hard unmovable
-				tile = gameboard.tile_scene.instantiate()
-				if tile and tile.has_method("setup"):
-					tile.setup(0, Vector2(x,y), scale_factor, true)
-			else:
-				# Not an unmovable — respect the grid sentinel
-				if tile_type == -1:
-					tiles_ref[x].append(null)
-					continue
-				var vf_local = load("res://games/match3/board/services/VisualFactory.gd")
-				if vf_local != null and vf_local.has_method("create_tile_instance"):
-					tile = vf_local.call("create_tile_instance", gameboard.tile_scene, tile_type, Vector2(x,y), scale_factor)
-				else:
-					tile = gameboard.tile_scene.instantiate()
-					if tile and tile.has_method("setup"):
-						tile.setup(tile_type, Vector2(x,y), scale_factor)
+			if tile_type == -1 and not GameRunState.unmovable_map.has(key):
+				tiles_ref[x].append(null)
+				continue
+
+			# Instantiate tile bare (no setup yet — must add to scene first so _ready() wires @onready vars)
+			tile = gameboard.tile_scene.instantiate()
 			if not tile:
 				tiles_ref[x].append(null)
 				continue
-			# configure unmovable or normal wiring
+
+			# ── Add to scene FIRST so _ready() fires and sprite/@onready nodes are wired ──
+			if gameboard.board_container:
+				gameboard.board_container.add_child(tile)
+			else:
+				gameboard.add_child(tile)
+
+			# ── Now call setup() — sprite is guaranteed available ──
 			if GameRunState.unmovable_map.has(key) and typeof(GameRunState.unmovable_map[key]) == TYPE_DICTIONARY:
+				# hard unmovable: setup with skip_visual=true, then configure_unmovable_hard
+				if tile.has_method("setup"):
+					tile.setup(0, Vector2(x,y), scale_factor, true)
 				var meta = GameRunState.unmovable_map[key]
 				if tile.has_method("configure_unmovable_hard"):
 					var textures_arr = []
@@ -136,6 +211,9 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 				else:
 					print("[BoardVisuals] WARNING: Tile missing configure_unmovable_hard at (", x, ",", y, ")")
 			else:
+				# Normal tile: setup with actual tile_type
+				if tile.has_method("setup"):
+					tile.setup(tile_type, Vector2(x,y), scale_factor)
 				if tile_type == GameRunState.COLLECTIBLE and tile.has_method("configure_collectible"):
 					tile.configure_collectible(GameRunState.collectible_type)
 					print("[BoardVisuals] Configured collectible at (", x, ",", y, "): ", GameRunState.collectible_type)
@@ -145,11 +223,6 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 						textures = GameRunState.spreader_textures_map[GameRunState.spreader_type]
 					tile.configure_spreader(GameRunState.spreader_grace_default, GameRunState.spreader_type, textures)
 					print("[BoardVisuals] Configured spreader at (", x, ",", y, ") type='", GameRunState.spreader_type, "'")
-			# parent to board_container
-			if gameboard.board_container:
-				gameboard.board_container.add_child(tile)
-			else:
-				gameboard.add_child(tile)
 			# Always connect input signals — including unmovables (adjacency detection needs them)
 			if not tile.is_connected("tile_clicked", Callable(gameboard, "_on_tile_clicked")):
 				tile.connect("tile_clicked", Callable(gameboard, "_on_tile_clicked"))

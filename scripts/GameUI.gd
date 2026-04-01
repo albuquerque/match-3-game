@@ -124,9 +124,33 @@ func _load_level_by_number(level_num: int) -> void:
 			lm.set_current_level(idx)
 			print("[GameUI] LevelManager set to index %d (level %d)" % [idx, level_num])
 	var gm = _get_gm()
-	if gm and gm.has_method("initialize_game"):
-		print("[GameUI] Calling GameManager.initialize_game() for level %d" % level_num)
+	# Prefer GameStateBridge.initialize_game if available
+	var bridge = load("res://games/match3/services/GameStateBridge.gd")
+	if bridge != null and bridge.has_method("initialize_game"):
+		print("[GameUI] Calling GameStateBridge.initialize_game() for level %d" % level_num)
+		bridge.initialize_game()
+		# Ensure GameBoard creates visuals even if it missed the level_loaded callback (race guard)
+		var nrb = load("res://scripts/helpers/node_resolvers.gd")
+		if nrb != null:
+			var b = nrb._get_board()
+			if b != null:
+				print("[GameUI] Scheduling create_visual_grid on board: ", b)
+				if b.has_method("create_visual_grid"):
+					b.call_deferred("create_visual_grid")
+				if b.has_method("_on_level_loaded"):
+					b.call_deferred("_on_level_loaded")
+	elif gm and gm.has_method("initialize_game"):
+		print("[GameUI] Calling GameManager.initialize_game() for level %d (fallback)" % level_num)
 		gm.initialize_game()
+		# Also schedule visual grid creation for legacy path
+		var nr2 = load("res://scripts/helpers/node_resolvers.gd")
+		if nr2 != null:
+			var b2 = nr2._get_board()
+			if b2 != null:
+				if b2.has_method("create_visual_grid"):
+					b2.call_deferred("create_visual_grid")
+				if b2.has_method("_on_level_loaded"):
+					b2.call_deferred("_on_level_loaded")
 
 # ── Gameplay UI visibility ────────────────────────────────────────────────────
 func show_gameplay_ui() -> void:
@@ -204,9 +228,16 @@ func _on_startpage_start_pressed():
 		if ed.load_flow("main_story"):
 			ed.start_flow()
 			return
-	var gm = _get_gm()
-	if gm and gm.has_method("initialize_game"):
-		gm.initialize_game()
+	# If ExperienceDirector path wasn't used, fall back to initializing via GameStateBridge or legacy GameManager
+	var bridge = load("res://games/match3/services/GameStateBridge.gd")
+	if bridge != null and bridge.has_method("initialize_game"):
+		print("[GameUI] Calling GameStateBridge.initialize_game() (fallback)")
+		bridge.initialize_game()
+	else:
+		var gm = _get_gm()
+		if gm and gm.has_method("initialize_game"):
+			print("[GameUI] Calling GameManager.initialize_game() (fallback)")
+			gm.initialize_game()
 
 func _on_startpage_settings_pressed():
 	var pm = _get_pm()
@@ -253,9 +284,14 @@ func _on_booster_button_pressed(booster_id: String) -> void:
 			board.activate_shuffle_booster()
 	elif booster_id == "extra_moves":
 		if rm.has_method("use_booster") and rm.use_booster("extra_moves"):
-			var gm = _get_gm()
-			if gm and gm.has_method("add_moves"):
-				gm.add_moves(10)
+			# Prefer bridge add_moves
+			var bridge2 = load("res://games/match3/services/GameStateBridge.gd")
+			if bridge2 != null and bridge2.has_method("add_moves"):
+				bridge2.add_moves(10)
+			else:
+				var gm2 = _get_gm()
+				if gm2 and gm2.has_method("add_moves"):
+					gm2.add_moves(10)
 	else:
 		activate_booster(booster_id)
 		if booster_id == "line_blast":

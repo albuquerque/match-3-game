@@ -490,27 +490,21 @@ func _transform_on_hard_destroy(reveal: Dictionary) -> void:
         return
 
     var rtype = reveal["type"]
-    var gm = NodeResolvers._get_gm()
-    # Resolve board (prefer NodeResolvers._get_board())
     var gx = int(grid_position.x)
     var gy = int(grid_position.y)
-
-    var board = NodeResolvers._get_board()
-    if board == null and gm and gm.has_method("get_board"):
-        board = gm.get_board()
+    var board = GameRunState.board_ref
 
     if rtype == "collectible":
         var collectible_value = reveal.get("value", "coin")
         configure_collectible(collectible_value)
 
-        # Update model so gravity/refill won't overwrite the revealed collectible
-        if gm and gm.grid.size() > gx and gm.grid[gx].size() > gy:
-            gm.grid[gx][gy] = gm.COLLECTIBLE
+        # Update GameRunState grid
+        if GameRunState.grid.size() > gx and GameRunState.grid[gx].size() > gy:
+            GameRunState.grid[gx][gy] = GameRunState.COLLECTIBLE
 
-        # Play reveal animation
         _create_collection_particles()
 
-        # Ensure the GameBoard tiles array contains this tile instance
+        # Keep this tile in board.tiles at its position
         if board and board.tiles and gx < board.tiles.size():
             while board.tiles[gx].size() <= gy:
                 board.tiles[gx].append(null)
@@ -523,11 +517,11 @@ func _transform_on_hard_destroy(reveal: Dictionary) -> void:
         var new_type = reveal.get("value", 1)
         update_type(int(new_type))
 
-        # Update model
-        if gm and gm.grid.size() > gx and gm.grid[gx].size() > gy:
-            gm.grid[gx][gy] = int(new_type)
+        # Update GameRunState grid
+        if GameRunState.grid.size() > gx and GameRunState.grid[gx].size() > gy:
+            GameRunState.grid[gx][gy] = int(new_type)
 
-        # Ensure the GameBoard tiles array contains this tile instance
+        # Keep this tile in board.tiles at its position
         if board and board.tiles and gx < board.tiles.size():
             while board.tiles[gx].size() <= gy:
                 board.tiles[gx].append(null)
@@ -537,8 +531,7 @@ func _transform_on_hard_destroy(reveal: Dictionary) -> void:
             position = board.grid_to_world_position(Vector2(gx, gy))
 
     elif rtype == "none":
-        # just mark visual but do not call report_unmovable_destroyed here
-        print("[Tile] transform type 'none' encountered - emitting unmovable_destroyed signal")
+        print("[Tile] transform type 'none' — emitting unmovable_destroyed signal")
         emit_signal("unmovable_destroyed", self)
 
     # end _transform_on_hard_destroy

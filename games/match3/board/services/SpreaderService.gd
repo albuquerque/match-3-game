@@ -1,4 +1,14 @@
 extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
+
+static var _Bridge = null
+static func _get_bridge():
+	if _Bridge == null:
+		_Bridge = load("res://games/match3/services/GameStateBridge.gd")
+		if _Bridge != null:
+			print("[SpreaderService] GameStateBridge loaded")
+	return _Bridge
+
 # SpreaderService — loaded as a script resource (via SS var in GameBoard), not instanced directly
 
 # Handles spreader mechanics purely at data level
@@ -39,7 +49,6 @@ static func spread(spreader_positions: Array, grid: Array, grid_w: int, grid_h: 
 
 static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_positions: Array) -> void:
 	## Hit hard-unmovable tiles orthogonally adjacent to any matched position.
-	## Updates the grid and tile visual state; syncs both GameRunState and GameManager grids.
 	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
 	var already_hit: Dictionary = {}
 
@@ -64,25 +73,51 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 			if not ("is_unmovable_hard" in tile) or not tile.is_unmovable_hard:
 				continue
 
+			# Capture reveal config BEFORE take_hit() consumes it
+			var reveal = tile.hard_reveals_on_destroy if "hard_reveals_on_destroy" in tile else {}
+			var has_reveal = reveal != null and reveal != {} and \
+				reveal.has("type") and reveal.get("type") != "none"
+
 			var destroyed = tile.take_hit(1)
-			if destroyed:
-				# tile.tile_type is now the revealed type (set by _transform_on_hard_destroy)
-				var is_coll = tile.is_collectible if "is_collectible" in tile else false
-				var revealed_type = tile.tile_type if "tile_type" in tile else 0
-				if is_coll:
-					GameRunState.grid[nx][ny] = GameRunState.COLLECTIBLE
-					GameRunState.grid[nx][ny] = GameRunState.COLLECTIBLE
-				elif revealed_type > 0:
-					GameRunState.grid[nx][ny] = revealed_type
-					GameRunState.grid[nx][ny] = revealed_type
+			if not destroyed:
+				continue
+
+			# take_hit() called _transform_on_hard_destroy which already:
+			#   - updated the tile visual
+			#   - wrote the correct value into GameRunState.grid (via our Tile.gd fix)
+			# We just need to clean up unmovable_map and handle the tile reference.
+
+			var br = _get_bridge()
+			if has_reveal:
+				# Tile transformed in place — GameRunState.grid already has the revealed value.
+				# Keep the tile node in board.tiles so it stays visible.
+				if board and board.tiles and nx < board.tiles.size() and ny < board.tiles[nx].size():
+					board.tiles[nx][ny] = tile
+				# Erase unmovable_map but do NOT zero the grid (skip_clear=true)
+				if br != null:
+					br.report_unmovable_destroyed(Vector2(nx, ny), true)
 				else:
-					GameRunState.grid[nx][ny] = 0
-					GameRunState.grid[nx][ny] = 0
-					tiles_ref[nx][ny] = null
-					if not tile.is_queued_for_deletion():
-						tile.queue_free()
-				if GameManager.has_method("report_unmovable_destroyed"):
-					GameManager.report_unmovable_destroyed(key, true)  # skip_clear=true, grid already set
+					GameRunState.unmovable_map.erase(key)
+					GameRunState.unmovables_cleared += 1
+					if GameRunState.board_ref != null:
+						GameRunState.board_ref.emit_signal("unmovables_changed", GameRunState.unmovables_cleared, GameRunState.unmovable_target)
+			else:
+				# No reveal — tile is fully gone. Zero grid, free tile.
+				GameRunState.grid[nx][ny] = 0
+				tiles_ref[nx][ny] = null
+				if not tile.is_queued_for_deletion():
+					tile.queue_free()
+				# Erase unmovable_map AND zero grid (skip_clear=false)
+				if br != null:
+					br.report_unmovable_destroyed(Vector2(nx, ny), false)
+				else:
+					GameRunState.unmovable_map.erase(key)
+					GameRunState.unmovables_cleared += 1
+					if GameRunState.board_ref != null:
+						GameRunState.board_ref.emit_signal("unmovables_changed", GameRunState.unmovables_cleared, GameRunState.unmovable_target)
+					GameRunState.unmovables_cleared += 1
+					if GameRunState.board_ref != null:
+						GameRunState.board_ref.emit_signal("unmovables_changed", GameRunState.unmovables_cleared, GameRunState.unmovable_target)
 
 static func damage_adjacent_spreaders(board: Node, tiles_ref: Array, matched_positions: Array) -> void:
 	## Destroy any spreader tile orthogonally adjacent to a matched position.
@@ -104,8 +139,15 @@ static func damage_adjacent_spreaders(board: Node, tiles_ref: Array, matched_pos
 
 			GameRunState.grid[nx][ny] = 0
 			# PR 5d: call via GameManager for now; moves to Match3Game in PR 6
-			if GameManager and GameManager.has_method("report_spreader_destroyed"):
-				GameManager.report_spreader_destroyed(Vector2(nx, ny))
+			var br2 = _get_bridge()
+			if br2 != null and br2.has_method("report_spreader_destroyed"):
+				br2.report_spreader_destroyed(Vector2(nx, ny))
+			else:
+				# Fallback: update GameRunState and emit via bridge
+				GameRunState.spreader_count = max(0, GameRunState.spreader_count - 1)
+				if GameRunState.board_ref != null and GameRunState.board_ref.has_signal and GameRunState.board_ref.has_signal("spreaders_changed"):
+					GameRunState.board_ref.emit_signal("spreaders_changed", GameRunState.spreader_count)
+
 			if nx < tiles_ref.size() and ny < tiles_ref[nx].size():
 				var tile = tiles_ref[nx][ny]
 				if tile and is_instance_valid(tile) and not tile.is_queued_for_deletion():
