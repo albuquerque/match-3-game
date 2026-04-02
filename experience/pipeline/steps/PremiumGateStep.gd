@@ -1,5 +1,4 @@
 extends "res://experience/pipeline/PipelineStep.gd"
-class_name PremiumGateStep
 
 # PremiumGateStep
 # Shows a premium gate and waits for user decision; default behavior is to skip.

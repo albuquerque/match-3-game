@@ -143,7 +143,7 @@ Detect architectural drift early and prevent any class from becoming a monolithi
   - state
 
   - execution
-    
+	
   - UI
 
   - rewards
@@ -188,7 +188,7 @@ Detect architectural drift early and prevent any class from becoming a monolithi
 
 4. Split domains into:
 
-    - Flow
+	- Flow
 
    - Execution
 

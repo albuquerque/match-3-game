@@ -1,5 +1,4 @@
 extends "res://experience/pipeline/PipelineStep.gd"
-class_name LoadLevelStep
 
 ## LoadLevelStep
 ## Loads a level and waits for level_complete or level_failed event

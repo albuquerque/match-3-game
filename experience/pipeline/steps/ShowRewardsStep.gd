@@ -1,5 +1,4 @@
 extends "res://experience/pipeline/PipelineStep.gd"
-class_name ShowRewardsStep
 
 ## ShowRewardsStep
 ## Shows the level transition/rewards screen after level completion

@@ -1,5 +1,4 @@
 extends RefCounted
-class_name PipelineContext
 
 ## PipelineContext
 ## Holds shared execution state and runtime references for pipeline steps

@@ -1,5 +1,4 @@
 extends "res://experience/pipeline/PipelineStep.gd"
-class_name ConditionalStep
 
 # ConditionalStep
 # Evaluates a condition expression in the node and either executes a child flow or skips.

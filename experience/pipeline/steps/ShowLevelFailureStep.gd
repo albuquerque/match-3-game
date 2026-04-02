@@ -1,5 +1,4 @@
 extends "res://experience/pipeline/PipelineStep.gd"
-class_name ShowLevelFailureStep
 
 ## ShowLevelFailureStep
 ## Shows level failure screen with retry/quit options

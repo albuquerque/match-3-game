@@ -1,5 +1,4 @@
 extends Node
-class_name FlowCoordinator
 
 ## FlowCoordinator
 ## Thin orchestrator that delegates to pipeline

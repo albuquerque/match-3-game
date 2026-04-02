@@ -1,5 +1,4 @@
 extends Node
-class_name ExperiencePipeline
 
 ## ExperiencePipeline
 ## Central runtime flow execution coordinator

@@ -1,5 +1,4 @@
 extends "res://experience/pipeline/PipelineStep.gd"
-class_name GrantRewardsStep
 
 ## GrantRewardsStep
 ## Grants rewards directly without showing popups

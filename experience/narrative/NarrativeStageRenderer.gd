@@ -1,5 +1,4 @@
 extends Control
-class_name NarrativeStageRenderer
 
 ## NarrativeStageRenderer
 ## Handles visual rendering of narrative stage states
