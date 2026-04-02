@@ -255,14 +255,8 @@ func execute(context) -> bool:
 	var tween = get_tree().create_tween()
 	tween.tween_property(narrative_container, "modulate:a", 1.0, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
-	var narrative_manager = null
-	# Resolver-first fallback using inline preload to avoid static symbol issues
-	var _res = load("res://scripts/helpers/node_resolvers_api.gd")
-	if _res != null and typeof(_res) != TYPE_NIL:
-		narrative_manager = _res._fallback_autoload("NarrativeStageManager")
-	else:
-		narrative_manager = load("res://scripts/helpers/node_resolvers_shim.gd")._fallback_autoload("NarrativeStageManager")
-	# Fallback to scene root lookup without hardcoded '/root/'
+	var narrative_manager = NodeResolvers._get_autoload("NarrativeStageManager")
+	# Fallback to scene root lookup
 	if narrative_manager == null and root:
 		narrative_manager = root.get_node_or_null("NarrativeStageManager")
 	if not narrative_manager:

@@ -23,7 +23,6 @@ signal post_refill()
 signal shard_tile_collected(item_id: String)
 
 # Game configuration
-var NodeResolverAPI = null
 var SpecialFactory = null
 var MatchProcessor = null
 var GravityService = null
@@ -45,8 +44,6 @@ var _level_loader: Node = null
 var _booster_selector = null
 
 func _init_resolvers():
-	if NodeResolverAPI == null:
-		NodeResolverAPI = load("res://scripts/helpers/node_resolvers_api.gd")
 	if SpecialFactory == null:
 		SpecialFactory = load("res://games/match3/board/services/SpecialFactory.gd")
 	if MatchProcessor == null:
@@ -301,10 +298,8 @@ func _ready():
 	# Initialize resolver helper at runtime (avoid parse-time preload)
 	_init_resolvers()
 	# Get the autoloaded LevelManager via resolver
-	if typeof(NodeResolverAPI) != TYPE_NIL:
-		level_manager = NodeResolverAPI._get_lm()
-	else:
-		# fallback to root lookup
+	level_manager = NodeResolvers._get_lm()
+	if not level_manager:
 		if has_method("get_tree"):
 			var rt = get_tree().root
 			if rt:
@@ -313,9 +308,8 @@ func _ready():
 		print("[GameManager] WARNING: LevelManager autoload not found via NodeResolvers!")
 
 	# Get the autoloaded ThemeManager via resolver
-	if typeof(NodeResolverAPI) != TYPE_NIL:
-		theme_manager = NodeResolverAPI._get_tm()
-	else:
+	theme_manager = NodeResolvers._get_tm()
+	if not theme_manager:
 		if has_method("get_tree"):
 			var rt2 = get_tree().root
 			if rt2:
@@ -457,7 +451,7 @@ func _load_current_level_inline():
 	if not level_manager or level_manager.levels.size() == 0:
 		var attempts = 0
 		while (not level_manager or level_manager.levels.size() == 0) and attempts < 40:
-			level_manager = NodeResolverAPI._get_lm()
+			level_manager = NodeResolvers._get_lm()
 			await get_tree().create_timer(0.05).timeout
 			attempts += 1
 	var ld = level_manager.get_current_level() if level_manager else null

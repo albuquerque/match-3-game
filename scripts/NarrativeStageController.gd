@@ -1,14 +1,5 @@
 extends Node
 
-var _NodeResolvers = null
-
-func _ensure_resolvers():
-	if _NodeResolvers == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL:
-			_NodeResolvers = s
-		else:
-			_NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 ## NarrativeStageController
 ## Manages the narrative stage state machine and coordinates with renderer
@@ -55,7 +46,6 @@ func _find_node_by_name(root: Node, name: String) -> Node:
 
 func _ready():
 	print("[NarrativeStageController] Ready")
-	_ensure_resolvers()
 
 	# Prefer active registered board_ref (set by GameBoard._ready)
 	var board_node: Node = null
@@ -196,9 +186,7 @@ func load_stage_from_file(path: String) -> bool:
 func load_stage_from_dlc(chapter_id: String, stage_name: String) -> bool:
 	"""Load stage from DLC chapter"""
 	# Try to load from DLC via AssetRegistry or DLCManager
-	var dlc_manager = null
-	if typeof(_NodeResolvers) != TYPE_NIL:
-		dlc_manager = _NodeResolvers._get_dlc()
+	var dlc_manager = NodeResolvers._get_dlc()
 	if dlc_manager == null and has_method("get_node_or_null"):
 		var rt = get_tree().root
 		if rt:

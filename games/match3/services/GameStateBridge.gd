@@ -1,19 +1,15 @@
 extends Node
-# GameStateBridge — thin bridge to mutate GameRunState and emit legacy GameManager signals
-# Purpose: incremental migration (PR 6.5b). Keep behavior while callers switch from GameManager.
+# GameStateBridge — thin bridge to mutate GameRunState and emit signals to board_ref.
+# PR 6.5c: GameManager references removed — all reads/writes go through GameRunState.
 
 const _MatchFinder = preload("res://scripts/services/MatchFinder.gd")
 const _Spreader = preload("res://games/match3/board/services/SpreaderService.gd")
 const _Scoring = preload("res://scripts/services/Scoring.gd")
 
-# Runtime resolver for legacy autoloads. Load node_resolvers at runtime to avoid parse-time global symbols.
-static func _resolve_gm():
-	var nr = load("res://scripts/helpers/node_resolvers.gd")
-	if nr != null:
-		return nr._get_gm()
-	return null
 
 static func use_move() -> void:
+	# Clear the per-turn spreader immunity list at the start of each new move
+	GameRunState.spreaders_destroyed_this_turn.clear()
 	if GameRunState.moves_left > 0:
 		GameRunState.moves_left -= 1
 	emit_moves_changed(GameRunState.moves_left)
@@ -126,7 +122,17 @@ static func check_and_spread_tiles() -> Array:
 	# Delegate to SpreaderService (preloaded script resource). Avoid has_method() calls on script resources.
 	if _Spreader == null:
 		return []
-	var res = _Spreader.spread(GameRunState.spreader_positions, GameRunState.grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.spreader_spread_limit, GameRunState.spreader_type)
+	# If any spreader was destroyed this turn, block spreading entirely for this move.
+	# Pass the destroyed positions as the immune list so SpreaderService skips those cells.
+	var immune: Array = GameRunState.spreaders_destroyed_this_turn.duplicate()
+	if immune.size() > 0:
+		print("[GameStateBridge] Spreading blocked — %d spreader(s) destroyed this turn" % immune.size())
+		# Clear the destroyed-this-turn list now that the move is complete
+		GameRunState.spreaders_destroyed_this_turn.clear()
+		return []
+	var res = _Spreader.spread(GameRunState.spreader_positions, GameRunState.grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.spreader_spread_limit, GameRunState.spreader_type, immune)
+	# Clear the destroyed-this-turn list after spreading
+	GameRunState.spreaders_destroyed_this_turn.clear()
 	if typeof(res) == TYPE_DICTIONARY and res.has("new_spreaders"):
 		var new_list: Array = res["new_spreaders"]
 		for np in new_list:
@@ -197,6 +203,9 @@ static func report_spreader_destroyed(pos: Vector2) -> void:
 	# Update GameRunState and notify via centralized emitter
 	GameRunState.spreader_count = max(0, GameRunState.spreader_count - 1)
 	GameRunState.spreader_positions.erase(pos)
+	# Track destroyed position so spread is blocked this turn (immune list)
+	if not GameRunState.spreaders_destroyed_this_turn.has(pos):
+		GameRunState.spreaders_destroyed_this_turn.append(pos)
 	# Notify interested parties
 	emit_spreaders_changed(GameRunState.spreader_count)
 

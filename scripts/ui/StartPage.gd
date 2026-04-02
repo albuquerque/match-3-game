@@ -7,20 +7,9 @@ signal settings_pressed
 signal achievements_pressed
 signal map_pressed
 
-var NodeRes = null
-
-func _ensure_resolvers():
-	if NodeRes == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL:
-			NodeRes = s
-		else:
-			NodeRes = load("res://scripts/helpers/node_resolvers_shim.gd")
-
 func _ready():
 	# Call ScreenBase ready setup
 	ensure_fullscreen()
-	_ensure_resolvers()
 	# Create a simple layout programmatically so the scene file isn't required here
 	var vbox = VBoxContainer.new()
 	vbox.name = "VBox"
@@ -32,7 +21,7 @@ func _ready():
 	add_child(vbox)
 
 	# Create a theme_manager resolver for font helpers
-	var theme_manager = NodeRes._get_tm() if typeof(NodeRes) != TYPE_NIL else null
+	var theme_manager = NodeResolvers._get_tm()
 	var level_label = Button.new()
 	level_label.name = "LevelButton"
 	level_label.text = "Level: --"

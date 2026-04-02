@@ -11,10 +11,9 @@ signal back_pressed
 
 # Preload gold star texture for consistent display
 var gold_star_texture = preload("res://textures/gold_star.svg")
-var Resolver = null
+var Resolver = null  # unused — kept for safety, use NodeResolvers autoload directly
 
 func _ready():
-	_ensure_resolver()
 	# Create UI programmatically for flexibility
 	_setup_ui()
 	_update_display()
@@ -24,13 +23,6 @@ func _ready():
 		self.mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 
-func _ensure_resolver():
-	if Resolver == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL:
-			Resolver = s
-		else:
-			Resolver = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 func _setup_ui():
 	# Try to add background image first, fallback to solid color
@@ -174,13 +166,12 @@ func _setup_background():
 		add_child(bg)
 
 func _apply_bangers_font(node: Node, size: int) -> void:
-	# Lightweight font application - use ThemeManager if available
-	var tm = Resolver._get_tm() if typeof(Resolver) != TYPE_NIL else null
+	var tm = NodeResolvers._get_tm()
 	if tm and tm.has_method("apply_bangers_font"):
 		tm.apply_bangers_font(node, size)
 
 func _update_display():
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -214,7 +205,7 @@ func _update_display():
 	_update_badges(streak)
 
 func _can_claim_daily_reward() -> bool:
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -235,7 +226,7 @@ func _update_badges(streak: int):
 	for child in badges_container.get_children():
 		child.queue_free()
 
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -355,7 +346,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 
 func _on_claim_reward_pressed():
 	print("[AchievementsPage] Claim reward pressed")
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm and rm.has_method("claim_daily_reward"):
 		rm.claim_daily_reward()
 		_update_display()
@@ -383,7 +374,7 @@ func _on_back_pressed():
 
 func _deferred_close_request() -> void:
 	print("[AchievementsPage] deferred close request: calling PageManager directly (PR 5c)")
-	var pm = Resolver._get_pm() if typeof(Resolver) != TYPE_NIL else null
+	var pm = NodeResolvers._get_pm()
 	if pm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:

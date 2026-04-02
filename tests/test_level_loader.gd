@@ -47,7 +47,6 @@ class MockGM extends Node:
 	var theme_manager = null
 	var ObjectiveManagerScript = null
 	var objective_manager_ref = null
-	var NodeResolverAPI = null
 	var level_manager = null
 	var _grid_called := false
 	var _layout_called := false

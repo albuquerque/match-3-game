@@ -122,14 +122,7 @@ var audio_muted: bool = false
 # Language settings (persisted in player progress)
 var language: String = "en"  # Current language locale (en, es, pt, fr, etc.)
 
-var _node_resolvers_api = null
-
-func _deferred_init_resolvers():
-	if _node_resolvers_api == null:
-		_node_resolvers_api = load("res://scripts/helpers/node_resolvers_api.gd")
-
 func _ready():
-	_deferred_init_resolvers()
 	print("[RewardManager] Initializing...")
 	load_progress()
 
@@ -611,16 +604,9 @@ func load_progress():
 				var _root_try = get_tree().root
 				if _root_try:
 					experience_director = _root_try.get_node_or_null("ExperienceDirector")
-			# Fallback: try resolver script's fallback autoload helper if present
+			# Fallback: try NodeResolvers autoload helper
 			if experience_director == null:
-				var resolver_script = null
-				if _node_resolvers_api != null:
-					resolver_script = _node_resolvers_api
-				else:
-					resolver_script = load("res://scripts/helpers/node_resolvers_api.gd")
-				if resolver_script != null and typeof(resolver_script) != TYPE_NIL:
-					if resolver_script.has_method("_fallback_autoload"):
-						experience_director = resolver_script._fallback_autoload("ExperienceDirector")
+				experience_director = NodeResolvers._get_xd()
 
 			if experience_director and experience_director.has_method("load_state_data"):
 				var experience_state_data = data.get("experience_state", null)

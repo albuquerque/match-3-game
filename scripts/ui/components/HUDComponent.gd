@@ -2,7 +2,7 @@ extends VBoxContainer
 class_name HUDComponent
 
 ## HUDComponent: owns and updates all in-game HUD elements.
-## E1: Self-wiring — connects directly to GameManager + RewardManager signals.
+## E1: Self-wiring — connects directly to GameBoard (via GameRunState.board_ref) + RewardManager signals.
 ## GameUI no longer needs HUD signal handlers.
 ## Registered with VisualAnchorManager as "hud" so narrative effects can
 ## show/hide it independently without touching GameUI.
@@ -54,15 +54,6 @@ func _connect_signals() -> void:
 	if rm and rm.has_signal("coins_changed") and not rm.is_connected("coins_changed", _on_currency_changed):
 		rm.connect("coins_changed", _on_currency_changed)
 
-func _resolve_gm():
-	# Runtime resolve via node_resolvers helper to avoid parse-time global symbol
-	var nr = load("res://scripts/helpers/node_resolvers.gd")
-	if nr != null:
-		var g = nr._get_gm()
-		if g != null:
-			return g
-	# Last-resort fallback to /root lookup (should be removed in final PR)
-	return get_node_or_null("/root/GameManager")
 
 func _rm():
 	return get_node_or_null("/root/RewardManager")
@@ -76,7 +67,6 @@ func _on_level_loaded_ctx(_level_id: String = "", _ctx: Dictionary = {}) -> void
 	_refresh_from_gm()
 
 func _on_score_changed(new_score: int) -> void:
-	# Prefer GameRunState for authoritative values
 	var unmov = 0
 	var coll = 0
 	var target = 1
@@ -84,14 +74,6 @@ func _on_score_changed(new_score: int) -> void:
 		unmov = GameRunState.unmovable_target
 		coll = GameRunState.collectible_target
 		target = GameRunState.target_score
-	else:
-		var gm = _resolve_gm()
-		if gm:
-			# Legacy GameManager fields (read directly)
-			unmov = gm.unmovable_target if gm and gm.unmovable_target != null else 0
-			coll = gm.collectible_target if gm and gm.collectible_target != null else 0
-			if gm and gm.target_score != null:
-				target = gm.target_score
 	set_score(new_score)
 	if unmov == 0 and coll == 0:
 		set_target_score(new_score, target)
@@ -113,7 +95,7 @@ func _on_currency_changed(_amount: int) -> void:
 	_refresh_currency()
 
 func _refresh_from_gm() -> void:
-	# Prefer reading from GameRunState (migration target). Fallback to GameManager for legacy runs.
+	# Read exclusively from GameRunState — GameManager fallback removed (PR 6.5c).
 	if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.initialized:
 		set_score(GameRunState.score)
 		set_level(GameRunState.level)
@@ -124,19 +106,6 @@ func _refresh_from_gm() -> void:
 			set_objective_collectibles(GameRunState.collectibles_collected, GameRunState.collectible_target)
 		else:
 			set_target_score(GameRunState.score, GameRunState.target_score)
-	else:
-		var gm = _resolve_gm()
-		if not gm:
-			return
-		set_score(gm.score)
-		set_level(gm.level)
-		set_moves(gm.moves_left)
-		if gm.unmovable_target > 0:
-			set_objective_unmovables(gm.unmovables_cleared, gm.unmovable_target)
-		elif gm.collectible_target > 0:
-			set_objective_collectibles(gm.collectibles_collected, gm.collectible_target)
-		else:
-			set_target_score(gm.score, gm.target_score)
 	_refresh_currency()
 
 func _refresh_currency() -> void:

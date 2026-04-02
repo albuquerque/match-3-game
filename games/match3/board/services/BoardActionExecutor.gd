@@ -510,7 +510,12 @@ static func destroy_tiles_immediately(board: Node, positions: Array) -> void:
 	if GameRunState.use_spreader_objective:
 		# Prefer bridge emits; GameStateBridge will forward to GameManager if still present
 		GameStateBridge.emit_spreaders_changed(GameRunState.spreader_count)
-		if GameRunState.spreader_count == 0:
+		# Guard: only trigger completion when the board is initialized AND both the counter
+		# AND the positions array confirm zero spreaders remain.  This prevents a premature
+		# cascade when spreader_count is transiently 0 (e.g. before the layout places
+		# spreaders, or mid-cascade between a destroy and the next spread step).
+		if GameRunState.spreader_count == 0 and GameRunState.spreader_positions.size() == 0 \
+				and GameRunState.initialized:
 			if not GameRunState.pending_level_complete and not GameRunState.level_transitioning:
 				GameStateBridge.attempt_level_complete()
 

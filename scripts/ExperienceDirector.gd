@@ -26,7 +26,6 @@ var waiting_for_level_complete: bool = false
 var waiting_for_narrative_complete: bool = false
 var waiting_for_ad_complete: bool = false
 
-var _nr = null
 
 # ── PR 4: Match3Game is now the live win/loss signal source ──────────────────
 ## ExperienceDirector listens to game_won / game_lost from Match3Game and
@@ -938,26 +937,8 @@ func _on_flow_coordinator_flow_failed(flow_id: String, reason: String):
 
 # Helper: resolve RewardManager safely
 func _get_rm():
-	var rm = null
-	if _nr == null:
-		_nr = load("res://scripts/helpers/node_resolvers_api.gd")
-	if _nr:
-		rm = _nr._get_rm()
-	if rm == null and has_method("get_tree"):
-		var rr = get_tree().root
-		if rr:
-			rm = rr.get_node_or_null("RewardManager")
-	return rm
+	return NodeResolvers._get_rm()
 
 # Helper: resolve CollectionManager safely
 func _get_cm():
-	var cm = null
-	if _nr == null:
-		_nr = load("res://scripts/helpers/node_resolvers_api.gd")
-	if _nr:
-		cm = _nr._get_cm()
-	if cm == null and has_method("get_tree"):
-		var rc = get_tree().root
-		if rc:
-			cm = rc.get_node_or_null("CollectionManager")
-	return cm
+	return NodeResolvers._get_cm()

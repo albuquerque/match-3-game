@@ -82,6 +82,10 @@ func _apply_level_data(ld) -> void:
 			GameRunState.grid = gs.grid
 			# Merge unmovable_map: take entries from GameState fill, then overlay hard textures
 			GameRunState.unmovable_map = gs.unmovable_map
+			# Copy spreader tracking arrays — without this spreader_count stays 0 and
+			# the first destroy immediately (incorrectly) triggers level completion.
+			GameRunState.spreader_positions = gs.spreader_positions.duplicate()
+			GameRunState.spreader_count    = gs.spreader_count
 		else:
 			# No layout — generate a fully random grid
 			gs.create_empty_grid()

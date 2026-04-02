@@ -1,29 +1,13 @@
 extends Node
 
-var NodeResolvers = null
-
-func _ensure_resolvers():
-	if NodeResolvers == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL:
-			NodeResolvers = s
-		else:
-			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
-
 func _ready():
-	_ensure_resolvers()
 	print("[TEST] test_board_registration starting")
 	# Create a fake GameBoard stub
 	var board_stub = Node.new()
 	board_stub.name = "BoardStub"
 
-	# Get GameManager autoload via NodeResolvers shim; if not available, attempt to load the GameManager script locally
-	var gm = NodeResolvers._get_gm()
-	if gm == null:
-		var gm_script = load("res://scripts/GameManager.gd")
-		if gm_script:
-			gm = gm_script.new()
-			add_child(gm)
+	# PR 6.5c: GameManager no longer used — tests verify via GameRunState
+	var gm = null
 
 	var result = {"passed": false, "reason": "unknown"}
 	if gm == null:

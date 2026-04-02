@@ -11,19 +11,9 @@ signal back_pressed
 
 # Preload gold star texture for consistent display
 var gold_star_texture = load("res://textures/gold_star.svg") as Texture2D
-var Resolver = null
-
-func _ensure_resolvers():
-    if Resolver == null:
-        var s = load("res://scripts/helpers/node_resolvers_api.gd")
-        if s != null and typeof(s) != TYPE_NIL:
-            Resolver = s
-        else:
-            Resolver = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 func _ready():
 	# Create UI programmatically for flexibility
-	_ensure_resolvers()
 	_setup_ui()
 	_update_display()
 
@@ -134,7 +124,7 @@ func _setup_ui():
 	vbox.add_child(back_button)
 
 func _update_display():
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -168,7 +158,7 @@ func _update_display():
 	_update_badges(streak)
 
 func _can_claim_daily_reward() -> bool:
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -190,7 +180,7 @@ func _update_badges(streak: int):
 	for child in badges_container.get_children():
 		child.queue_free()
 
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -420,7 +410,7 @@ func _create_achievement_panel(achievement_id: String, title: String, desc: Stri
 	main_hbox.add_child(right_vbox)
 
 	# Status/reward section
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -535,7 +525,7 @@ func _on_claim_achievement(achievement_id: String, button: Button):
 	"""Handle claiming achievement reward"""
 	AudioManager.play_sfx("ui_click")
 
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -558,7 +548,7 @@ func _on_claim_achievement(achievement_id: String, button: Button):
 		print("[AchievementsPage] Failed to claim %s: %s" % [achievement_id, result["reason"]])
 
 func _on_claim_reward_pressed():
-	var rm = Resolver._get_rm() if typeof(Resolver) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	if rm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:

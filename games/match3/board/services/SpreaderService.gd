@@ -115,9 +115,6 @@ static func damage_adjacent_unmovables(board: Node, tiles_ref: Array, matched_po
 					GameRunState.unmovables_cleared += 1
 					if GameRunState.board_ref != null:
 						GameRunState.board_ref.emit_signal("unmovables_changed", GameRunState.unmovables_cleared, GameRunState.unmovable_target)
-					GameRunState.unmovables_cleared += 1
-					if GameRunState.board_ref != null:
-						GameRunState.board_ref.emit_signal("unmovables_changed", GameRunState.unmovables_cleared, GameRunState.unmovable_target)
 
 static func damage_adjacent_spreaders(board: Node, tiles_ref: Array, matched_positions: Array) -> void:
 	## Destroy any spreader tile orthogonally adjacent to a matched position.

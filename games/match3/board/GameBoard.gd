@@ -196,27 +196,15 @@ func _ready():
 	# Setup background image AFTER layout is calculated
 	setup_background_image()
 
-	# Only create visual grid if GameManager has initialized a level; otherwise wait for level_loaded
-	var gm2 = null
-	var nr2 = load("res://scripts/helpers/node_resolvers.gd")
-	if nr2 != null:
-		gm2 = nr2._get_gm()
-	# Do not fallback to /root lookup; prefer resolver only
-	if gm2 and gm2.initialized:
-		create_visual_grid()
-		# Borders will be drawn when level_loaded triggers _on_level_loaded
-	else:
-		print("[GameBoard] Waiting for GameManager.level_loaded before creating visual grid")
-
 	# Expose this board via GameRunState so services can reach tiles without going through GameManager
 	GameRunState.board_ref = self
 	print("[GameBoard] _ready: GameRunState.board_ref set to", GameRunState.board_ref)
 
-	# Register with GameManager (backward compat — removed when GameManager is deleted)
-	#	if GameManager.has_method("register_board"):
-	#		GameManager.register_board(self)
-	# Legacy registration: GameStateBridge / GameRunState used instead of GameManager.register_board
-	# (GameManager.register_board is intentionally not called during migration)
+	# PR 6.5c: use GameRunState.initialized directly — GameManager check removed.
+	if typeof(GameRunState) != TYPE_NIL and GameRunState.initialized:
+		create_visual_grid()
+	else:
+		print("[GameBoard] Waiting for level_loaded before creating visual grid")
 
 
 func calculate_responsive_layout():

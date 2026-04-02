@@ -14,16 +14,6 @@ var _is_processing: bool = false
 # Reference to RewardNotification (will be set by GameUI or created)
 var reward_notification: Node = null
 
-# Preload NodeResolvers for use in this script
-var NodeResolvers = null
-
-func _ensure_resolvers():
-    if NodeResolvers == null:
-        var s = load("res://scripts/helpers/node_resolvers_api.gd")
-        if s != null and typeof(s) != TYPE_NIL:
-            NodeResolvers = s
-        else:
-            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 # Cached RewardManager resolver for this instance
 var _cached_rm: Node = null
@@ -124,19 +114,12 @@ func _grant_reward(reward: Dictionary):
 func _get_rm():
 	if is_instance_valid(_cached_rm):
 		return _cached_rm
-	var r = NodeResolvers._fallback_autoload("RewardManager")
-	if r == null and has_method("get_tree"):
-		var _root = get_tree().root
-		if _root:
-			r = _root.get_node_or_null("RewardManager")
+	var r = NodeResolvers._get_rm()
 	_cached_rm = r
 	return r
 
 func _get_xd():
-	_ensure_resolvers()
-	if typeof(NodeResolvers) != TYPE_NIL:
-		return NodeResolvers._get_xd()
-	return null
+	return NodeResolvers._get_xd()
 
 ## Grant coins reward
 func _grant_coins(reward: Dictionary):
@@ -293,7 +276,7 @@ func _find_reward_notification() -> Node:
 
 	# Try resolver-based lookups first
 	# 1) Common autoload-provided GameUI
-	var ui = NodeResolvers._fallback_autoload("GameUI")
+	var ui = NodeResolvers._get_autoload("GameUI")
 	if ui and ui.has_node("RewardNotification"):
 		return ui.get_node("RewardNotification")
 

@@ -369,15 +369,6 @@ func _record_level_collected(level_key: String) -> void:
 
 # ── Node helpers ──────────────────────────────────────────────────────────────
 
-func _get_gm() -> Node:
-	# Resolve legacy GameManager via node_resolvers helper only. Do NOT fallback to /root.
-	var nr = load("res://scripts/helpers/node_resolvers.gd")
-	if nr != null:
-		var gm2 = nr._get_gm()
-		if gm2 != null:
-			return gm2
-	# If unresolved, return null — migration code should rely on GameRunState instead
-	return null
 
 func _get_board() -> Node:
 	if GameRunState.board_ref != null:

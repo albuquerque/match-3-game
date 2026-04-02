@@ -12,40 +12,16 @@ var _pages_parent: Node = null
 # z-index base for pages so they stack above gameplay UI
 const BASE_Z_INDEX := 1000
 
-var NodeRes = null
-
-func _init_resolvers():
-	if NodeRes == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL and s.has_method("_get_gm"):
-			NodeRes = s
-		else:
-			NodeRes = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 func _ready() -> void:
-	_init_resolvers()
 	# Prefer VisualAnchorManager anchor if present
-	var vam = null
-	# Try scene root first (safe) to avoid calling unknown static APIs on script resources
-	if has_method("get_tree"):
-		var rt0 = get_tree().root
-		if rt0:
-			vam = rt0.get_node_or_null("VisualAnchorManager")
-	# Fallback to NodeResolvers helper
-	if vam == null and typeof(NodeRes) != TYPE_NIL:
-		vam = NodeRes._get_vam()
-
+	var vam = NodeResolvers._get_vam()
 	# If still not available, wait a few frames for initialization
 	if vam == null:
 		print("[PageManager] VisualAnchorManager not ready - waiting up to 10 frames for registration")
 		for i in range(10):
 			await get_tree().process_frame
-			if typeof(NodeRes) != TYPE_NIL:
-				vam = NodeRes._get_vam()
-			if vam == null and has_method("get_tree"):
-				var rt2 = get_tree().root
-				if rt2:
-					vam = rt2.get_node_or_null("VisualAnchorManager")
+			vam = NodeResolvers._get_vam()
 			if vam:
 				break
 
@@ -272,15 +248,8 @@ func close_all() -> void:
 	# BUT do not auto-open StartPage if a game level is currently initialized,
 	# or if ExperienceDirector has an active flow running.
 	var should_open_start = true
-	var gm = null
-	if typeof(NodeRes) != TYPE_NIL and NodeRes.has_method("_get_gm"):
-		gm = NodeRes._get_gm()
-	else:
-		if has_method("get_tree"):
-			var rt = get_tree().root
-			if rt:
-				gm = rt.get_node_or_null("GameManager")
-	if gm != null and ("initialized" in gm) and gm.initialized:
+	# PR 6.5c: use GameRunState.initialized directly — no longer reads from GameManager.
+	if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.initialized:
 		should_open_start = false
 	if should_open_start and has_method("get_tree"):
 		var ed = get_tree().root.get_node_or_null("ExperienceDirector")

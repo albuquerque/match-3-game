@@ -3,7 +3,7 @@ class_name BoosterPanelComponent
 
 ## BoosterPanelComponent: owns the booster bar shown during gameplay.
 ## E2: Self-wiring — connects to RewardManager.booster_changed and
-## GameManager.level_loaded directly. GameUI no longer mediates booster updates.
+## GameBoard.level_loaded_ctx via GameRunState.board_ref. GameUI no longer mediates booster updates.
 
 signal booster_pressed(booster_id: String)
 
@@ -52,24 +52,12 @@ func _connect_signals() -> void:
 	if board and board.has_signal("level_loaded_ctx"):
 		if not board.is_connected("level_loaded_ctx", _on_level_loaded_ctx):
 			board.connect("level_loaded_ctx", _on_level_loaded_ctx)
-	else:
-		# Fallback: connect to legacy GameManager level_loaded if available
-		var gm = _resolve_gm()
-		if gm and gm.has_signal("level_loaded") and not gm.is_connected("level_loaded", _on_level_loaded):
-			gm.connect("level_loaded", _on_level_loaded)
 
 	# Catch-up: if level is already loaded, populate immediately
 	if typeof(GameRunState) != TYPE_NIL and GameRunState.initialized:
 		_on_level_loaded()
 
 
-func _resolve_gm():
-	var nr = load("res://scripts/helpers/node_resolvers.gd")
-	if nr != null:
-		var g = nr._get_gm()
-		if g != null:
-			return g
-	return get_node_or_null("/root/GameManager")
 
 func _rm():
 	return get_node_or_null("/root/RewardManager")
@@ -83,14 +71,9 @@ func _on_level_loaded_ctx(_level_id: String, _ctx: Dictionary) -> void:
 	_on_level_loaded()
 
 func _on_level_loaded() -> void:
-	# Prefer GameRunState for available boosters (migration path)
+	# Read available boosters from GameRunState exclusively (PR 6.5c — GameManager fallback removed).
 	if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.available_boosters and GameRunState.available_boosters.size() > 0:
 		set_available_boosters(GameRunState.available_boosters)
-	else:
-		# Resolve legacy GameManager via node_resolvers only (no removed helper)
-		var gm = _resolve_gm()
-		if gm and "available_boosters" in gm and gm.available_boosters.size() > 0:
-			set_available_boosters(gm.available_boosters)
 	_refresh_counts()
 	var tm = _tm()
 	if tm and tm.has_method("get_theme_name"):

@@ -1,6 +1,5 @@
 extends Control
 
-var NodeResolvers = null
 
 # Out of Lives dialog - shown when player has no lives
 
@@ -15,16 +14,7 @@ signal dialog_closed
 
 const GEM_REFILL_COST = 50
 
-func _init_resolvers():
-    if NodeResolvers == null:
-        var s = load("res://scripts/helpers/node_resolvers_api.gd")
-        if s != null and typeof(s) != TYPE_NIL and s.has_method("_get_rm"):
-            NodeResolvers = s
-        else:
-            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
-
 func _ready():
-    _init_resolvers()
     visible = false
 
     if gem_refill_button:

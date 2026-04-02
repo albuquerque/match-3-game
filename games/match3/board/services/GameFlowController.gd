@@ -49,7 +49,7 @@ func perform_level_completion_check() -> void:
 
 	var collectible_met = not has_collectible_goal or (GameRunState.collectibles_collected >= GameRunState.collectible_target)
 	var unmovable_met   = not has_unmovable_goal  or (GameRunState.unmovables_cleared >= GameRunState.unmovable_target)
-	var spreader_met    = not has_spreader_goal   or (GameRunState.spreader_count <= 0)
+	var spreader_met    = not has_spreader_goal   or (GameRunState.spreader_count <= 0 and GameRunState.spreader_positions.size() == 0)
 	var has_any_primary = has_collectible_goal or has_unmovable_goal or has_spreader_goal
 
 	GameRunState.pending_level_complete = false
@@ -153,7 +153,7 @@ func perform_level_failed_check() -> void:
 	var has_spreader_goal    = GameRunState.use_spreader_objective
 	var collectible_met = not has_collectible_goal or (GameRunState.collectibles_collected >= GameRunState.collectible_target)
 	var unmovable_met   = not has_unmovable_goal  or (GameRunState.unmovables_cleared >= GameRunState.unmovable_target)
-	var spreader_met    = not has_spreader_goal   or (GameRunState.spreader_count <= 0)
+	var spreader_met    = not has_spreader_goal   or (GameRunState.spreader_count <= 0 and GameRunState.spreader_positions.size() == 0)
 	var score_met       = GameRunState.score >= GameRunState.target_score
 	var has_any_primary = has_collectible_goal or has_unmovable_goal or has_spreader_goal
 	if (has_any_primary and collectible_met and unmovable_met and spreader_met) or (not has_any_primary and score_met):

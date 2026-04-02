@@ -77,17 +77,7 @@ func ensure_fullscreen():
 # Provide a default close hook that subclasses can call
 func close_screen():
 	# Prefer PageManager close so navigation stack is updated and previous page is restored
-	var pm = null
-	# Try scene root first
-	if has_method("get_tree"):
-		var rt = get_tree().root
-		if rt:
-			pm = rt.get_node_or_null("PageManager")
-	# Fallback: attempt to resolve PageManager via runtime resolver script or root lookup
-	if pm == null:
-		var resolver_script = load("res://scripts/helpers/node_resolvers_api.gd")
-		if resolver_script != null and typeof(resolver_script) != TYPE_NIL and resolver_script.has_method("_get_pm"):
-			pm = resolver_script._get_pm()
+	var pm = NodeResolvers._get_pm()
 	if pm and pm.has_method("close"):
 		pm.close(self.name)
 		return

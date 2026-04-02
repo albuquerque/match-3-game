@@ -1,6 +1,5 @@
 extends Node
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
-const NodeResolversApi = preload("res://scripts/helpers/node_resolvers_api.gd")
 
 # Pure helper functions to compute positions affected by boosters.
 # These work on grid coordinates and do not touch nodes or visuals.

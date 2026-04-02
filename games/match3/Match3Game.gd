@@ -52,46 +52,32 @@ func _exit_tree() -> void:
 func _connect_game_manager() -> void:
 	if _game_manager != null:
 		return  # Already connected.
-	# Prefer board_ref signals (true owner) exposed via GameRunState
+	# PR 6.5c: connect to board_ref signals exclusively — GameManager fallback removed.
 	var board = GameRunState.board_ref if typeof(GameRunState) != TYPE_NIL else null
 	if board != null:
 		if board.has_signal("level_complete") and not board.is_connected("level_complete", _on_level_complete):
 			board.connect("level_complete", _on_level_complete)
 		if board.has_signal("game_over") and not board.is_connected("game_over", _on_game_over):
 			board.connect("game_over", _on_game_over)
-		print("[Match3Game] Connected to board_ref signals (preferred)")
-		return
-
-	# Resolve legacy GameManager via node_resolvers helper only (no direct /root lookup)
-	var nr = load("res://scripts/helpers/node_resolvers.gd")
-	if nr != null:
-		_game_manager = nr._get_gm()
-	if _game_manager == null:
-		push_warning("[Match3Game] GameManager autoload not found via node_resolvers — signals not wired.")
-		return
-
-	if not _game_manager.is_connected("level_complete", _on_level_complete):
-		_game_manager.connect("level_complete", _on_level_complete)
-
-	if not _game_manager.is_connected("game_over", _on_game_over):
-		_game_manager.connect("game_over", _on_game_over)
-
-	print("[Match3Game] Connected to GameManager signals (fallback).")
+		print("[Match3Game] Connected to board_ref signals")
+	else:
+		push_warning("[Match3Game] board_ref not yet set — signals not wired. Will retry when board becomes available.")
 
 func _disconnect_game_manager() -> void:
-	if _game_manager == null:
-		return
-	if _game_manager.is_connected("level_complete", _on_level_complete):
-		_game_manager.disconnect("level_complete", _on_level_complete)
-	if _game_manager.is_connected("game_over", _on_game_over):
-		_game_manager.disconnect("game_over", _on_game_over)
+	# PR 6.5c: disconnect from board_ref signals if board is still valid.
+	var board = GameRunState.board_ref if typeof(GameRunState) != TYPE_NIL else null
+	if board and is_instance_valid(board):
+		if board.is_connected("level_complete", _on_level_complete):
+			board.disconnect("level_complete", _on_level_complete)
+		if board.is_connected("game_over", _on_game_over):
+			board.disconnect("game_over", _on_game_over)
 	_game_manager = null
 
 # ── Signal handlers ───────────────────────────────────────────────────────────
 
 func _on_level_complete() -> void:
-	var lvl   = GameRunState.level if typeof(GameRunState) != TYPE_NIL else (_game_manager.level if _game_manager else 0)
-	var score = GameRunState.score if typeof(GameRunState) != TYPE_NIL else (_game_manager.score if _game_manager else 0)
+	var lvl   = GameRunState.level if typeof(GameRunState) != TYPE_NIL else 0
+	var score = GameRunState.score if typeof(GameRunState) != TYPE_NIL else 0
 	var stars = GameRunState.last_level_moves_left if typeof(GameRunState) != TYPE_NIL else 0
 	print("[Match3Game] → game_won (level=%d score=%d)" % [lvl, score])
 	match3_level_won.emit(lvl, score, stars)

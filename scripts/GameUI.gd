@@ -1,15 +1,6 @@
 extends Control
 class_name GameUI
 
-var NodeResolverAPI = null
-
-func _init_resolvers():
-	if NodeResolverAPI == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL and s.has_method("_get_gm"):
-			NodeResolverAPI = s
-		else:
-			NodeResolverAPI = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 # ── Component references ──────────────────────────────────────────────────────
 @onready var hud                = get_node_or_null("HUDComponent")
@@ -38,20 +29,18 @@ func _fmc():
 	return floating_menu_comp if (floating_menu_comp and floating_menu_comp.has_method("collapse")) else null
 
 # ── Resolver helpers ──────────────────────────────────────────────────────────
-func _get_gm():
-	return NodeResolverAPI._get_gm()
 
 func _get_rm():
-	return NodeResolverAPI._get_rm()
+	return NodeResolvers._get_rm()
 
 func _get_tm():
-	return NodeResolverAPI._get_tm()
+	return NodeResolvers._get_tm()
 
 func _get_pm():
-	return NodeResolverAPI._get_pm()
+	return NodeResolvers._get_pm()
 
 func _get_am():
-	return NodeResolverAPI._get_am()
+	return NodeResolvers._get_am()
 
 func _get_ed():
 	var rt = get_tree().root if has_node("/root") else null
@@ -62,7 +51,6 @@ func _get_ed():
 	return null
 
 func _ready():
-	_init_resolvers()
 	self.z_index = 200
 
 	floating_menu       = get_node_or_null("FloatingMenu")
@@ -82,12 +70,12 @@ func _ready():
 		booster_bar.connect("booster_pressed", Callable(self, "_on_booster_button_pressed"))
 
 	# Register with VisualAnchorManager
-	var vam = NodeResolverAPI._get_vam() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	var vam = NodeResolvers._get_vam()
 	if vam and vam.has_method("register_anchor"):
 		vam.register_anchor("ui", self)
 
 	# Connect PageManager
-	var pm = NodeResolverAPI._get_pm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	var pm = NodeResolvers._get_pm()
 	if pm == null:
 		pm = get_tree().root.get_node_or_null("PageManager")
 	if pm and pm.has_signal("page_opened"):
@@ -115,7 +103,7 @@ func _ready():
 # ── Level loading (called by ExperiencePipeline) ──────────────────────────────
 func _load_level_by_number(level_num: int) -> void:
 	print("[GameUI] _load_level_by_number(%d) called by pipeline" % level_num)
-	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	var lm = NodeResolvers._get_lm()
 	if lm == null:
 		lm = get_tree().root.get_node_or_null("LevelManager")
 	if lm and lm.has_method("get_level_index"):
@@ -123,8 +111,7 @@ func _load_level_by_number(level_num: int) -> void:
 		if idx >= 0:
 			lm.set_current_level(idx)
 			print("[GameUI] LevelManager set to index %d (level %d)" % [idx, level_num])
-	var gm = _get_gm()
-	# Prefer GameStateBridge.initialize_game if available
+	# Prefer GameStateBridge.initialize_game — GameManager fallback removed (PR 6.5c).
 	var bridge = load("res://games/match3/services/GameStateBridge.gd")
 	if bridge != null and bridge.has_method("initialize_game"):
 		print("[GameUI] Calling GameStateBridge.initialize_game() for level %d" % level_num)
@@ -139,18 +126,6 @@ func _load_level_by_number(level_num: int) -> void:
 					b.call_deferred("create_visual_grid")
 				if b.has_method("_on_level_loaded"):
 					b.call_deferred("_on_level_loaded")
-	elif gm and gm.has_method("initialize_game"):
-		print("[GameUI] Calling GameManager.initialize_game() for level %d (fallback)" % level_num)
-		gm.initialize_game()
-		# Also schedule visual grid creation for legacy path
-		var nr2 = load("res://scripts/helpers/node_resolvers.gd")
-		if nr2 != null:
-			var b2 = nr2._get_board()
-			if b2 != null:
-				if b2.has_method("create_visual_grid"):
-					b2.call_deferred("create_visual_grid")
-				if b2.has_method("_on_level_loaded"):
-					b2.call_deferred("_on_level_loaded")
 
 # ── Gameplay UI visibility ────────────────────────────────────────────────────
 func show_gameplay_ui() -> void:
@@ -228,16 +203,11 @@ func _on_startpage_start_pressed():
 		if ed.load_flow("main_story"):
 			ed.start_flow()
 			return
-	# If ExperienceDirector path wasn't used, fall back to initializing via GameStateBridge or legacy GameManager
+	# If ExperienceDirector path wasn't used, fall back to initializing via GameStateBridge
 	var bridge = load("res://games/match3/services/GameStateBridge.gd")
 	if bridge != null and bridge.has_method("initialize_game"):
 		print("[GameUI] Calling GameStateBridge.initialize_game() (fallback)")
 		bridge.initialize_game()
-	else:
-		var gm = _get_gm()
-		if gm and gm.has_method("initialize_game"):
-			print("[GameUI] Calling GameManager.initialize_game() (fallback)")
-			gm.initialize_game()
 
 func _on_startpage_settings_pressed():
 	var pm = _get_pm()
@@ -284,14 +254,10 @@ func _on_booster_button_pressed(booster_id: String) -> void:
 			board.activate_shuffle_booster()
 	elif booster_id == "extra_moves":
 		if rm.has_method("use_booster") and rm.use_booster("extra_moves"):
-			# Prefer bridge add_moves
+			# PR 6.5c: use GameStateBridge exclusively — GameManager fallback removed.
 			var bridge2 = load("res://games/match3/services/GameStateBridge.gd")
 			if bridge2 != null and bridge2.has_method("add_moves"):
 				bridge2.add_moves(10)
-			else:
-				var gm2 = _get_gm()
-				if gm2 and gm2.has_method("add_moves"):
-					gm2.add_moves(10)
 	else:
 		activate_booster(booster_id)
 		if booster_id == "line_blast":
@@ -319,7 +285,7 @@ func _on_page_opened(page_name: String, node: Node) -> void:
 			var level_num = _get_next_level_number()
 			var desc = _get_level_description(level_num)
 			# Also tell LevelManager to point at this level so it's ready when play is pressed
-			var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+			var lm = NodeResolvers._get_lm()
 			if lm and lm.has_method("get_level_index"):
 				var idx = lm.get_level_index(level_num)
 				if idx >= 0:
@@ -352,16 +318,17 @@ func _on_worldmap_level_selected(level_num: int) -> void:
 			if pm: pm.close("WorldMap", {"flow_starting": true})
 			ed.start_flow_at_level(level_num)
 			return
-	# Fallback — close normally then load directly
+	# Fallback — close normally then load directly via GameStateBridge
 	var pm2 = _get_pm()
 	if pm2: pm2.close("WorldMap")
-	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	var lm = NodeResolvers._get_lm()
 	if lm and lm.has_method("get_level_index"):
 		var idx = lm.get_level_index(level_num)
 		if idx >= 0: lm.set_current_level(idx)
-	var gm = _get_gm()
-	if gm and gm.has_method("initialize_game"):
-		gm.initialize_game()
+	# PR 6.5c: use GameStateBridge — GameManager.initialize_game removed.
+	var bridge3 = load("res://games/match3/services/GameStateBridge.gd")
+	if bridge3 != null and bridge3.has_method("initialize_game"):
+		bridge3.initialize_game()
 
 # ── Progress helpers ──────────────────────────────────────────────────────────
 func _get_next_level_number() -> int:
@@ -371,7 +338,7 @@ func _get_next_level_number() -> int:
 	var completed = rm.levels_completed if (rm and "levels_completed" in rm) else 0
 	var next_level = completed + 1
 	# Clamp to available levels
-	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	var lm = NodeResolvers._get_lm()
 	if lm and "levels" in lm and lm.levels.size() > 0:
 		next_level = clamp(next_level, 1, lm.levels.size())
 	else:
@@ -380,7 +347,7 @@ func _get_next_level_number() -> int:
 
 func _get_level_description(level_num: int) -> String:
 	## Returns the description string for the given level number.
-	var lm = NodeResolverAPI._get_lm() if typeof(NodeResolverAPI) != TYPE_NIL else null
+	var lm = NodeResolvers._get_lm()
 	if lm and lm.has_method("get_level_index"):
 		var idx = lm.get_level_index(level_num)
 		if idx >= 0 and lm.has_method("get_level_by_index"):

@@ -72,8 +72,11 @@ static func process_matches(grid: Array, matches: Array, swapped_pos: Vector2, g
 			if typeof(br) != TYPE_NIL and br != null and br.has_method("report_spreader_destroyed"):
 				br.report_spreader_destroyed(p)
 			else:
-				# Fallback: update GameRunState directly
+				# Fallback: update GameRunState directly — keep count AND positions in sync
 				GameRunState.spreader_count = max(0, GameRunState.spreader_count - 1)
+				GameRunState.spreader_positions.erase(p)
+				if not GameRunState.spreaders_destroyed_this_turn.has(p):
+					GameRunState.spreaders_destroyed_this_turn.append(p)
 			if GameRunState.VERBOSE_GRAVITY:
 				print("[MatchProcessor] Clearing SPREADER at", gx, gy)
 			grid[gx][gy] = 0

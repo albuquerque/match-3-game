@@ -24,8 +24,9 @@ static func _get_autoload(name: String, strict_label: String = "") -> Node:
 	return res
 
 # Public static helpers - keep specific getters used throughout the codebase
+# PR 6.5c: _get_gm() now returns null — callers should use GameRunState or GameStateBridge.
 static func _get_gm() -> Node:
-	return _get_autoload("GameManager", "GameManager")
+	return null
 
 # PageManager resolver
 static func _get_pm() -> Node:
@@ -40,46 +41,21 @@ static func _get_board() -> Node:
 		push_error("[NodeResolvers] STRICT: GameBoard could not be resolved")
 	return null
 
-# Convenience helpers for common GameManager-derived properties
+# Convenience helpers for common GameRunState-derived properties — PR 6.5c: reads from GameRunState.
 static func _gm_grid_width() -> int:
-	var gm = _get_gm()
-	if gm == null:
-		return 0
-	# Try preferred getter methods first
-	if gm.has_method("get_grid_width"):
-		return int(gm.get_grid_width())
-	# Fall back to direct property access if available safely
-	if typeof(gm) == TYPE_OBJECT:
-		if "GRID_WIDTH" in gm:
-			return int(gm.GRID_WIDTH)
-		# Try property access via get if present
-		if gm.has_method("get"):
-			# Many autoload instances support get(varname)
-			var ok = gm.get("GRID_WIDTH") if gm.has_method("get") else null
-			if typeof(ok) == TYPE_INT or typeof(ok) == TYPE_FLOAT:
-				return int(ok)
+	if typeof(GameRunState) != TYPE_NIL and GameRunState != null:
+		return int(GameRunState.GRID_WIDTH)
 	return 0
 
 static func _gm_grid_height() -> int:
-	var gm = _get_gm()
-	if gm == null:
-		return 0
-	if gm.has_method("get_grid_height"):
-		return int(gm.get_grid_height())
-	if typeof(gm) == TYPE_OBJECT:
-		if "GRID_HEIGHT" in gm:
-			return int(gm.GRID_HEIGHT)
-		if gm.has_method("get"):
-			var ok2 = gm.get("GRID_HEIGHT") if gm.has_method("get") else null
-			if typeof(ok2) == TYPE_INT or typeof(ok2) == TYPE_FLOAT:
-				return int(ok2)
+	if typeof(GameRunState) != TYPE_NIL and GameRunState != null:
+		return int(GameRunState.GRID_HEIGHT)
 	return 0
 
 static func _is_cell_blocked(x: int, y: int) -> bool:
-	var gm = _get_gm()
-	if gm != null and gm.has_method("is_cell_blocked"):
-		return gm.is_cell_blocked(x, y)
-	# conservative default: not blocked
+	var gqs = load("res://games/match3/board/services/GridQueryService.gd")
+	if gqs != null:
+		return gqs.is_cell_blocked(null, x, y)
 	return false
 
 static func _play_sfx(name: String) -> void:
