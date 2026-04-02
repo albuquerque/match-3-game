@@ -12,7 +12,7 @@ func _to_set(arr: Array) -> Array:
 	return s
 
 func _ready():
-	GS = load("res://scripts/model/GameState.gd").new(3, 3, 6)
+	GS = load("res://meta/profile/GameState.gd").new(3, 3, 6)
 	print("[TEST] test_gamestate_unit starting")
 
 	# Case 1: create_empty_grid

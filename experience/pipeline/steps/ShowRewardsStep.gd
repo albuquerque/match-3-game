@@ -84,7 +84,7 @@ func _show_reward_screen(context) -> bool:
 	var theme_name: String = _theme_mgr.get_theme_name() if _theme_mgr and _theme_mgr.has_method("get_theme_name") else "modern"
 
 	# Load reward profile via explicit path to avoid class_name cache dependency
-	var _rpp = load("res://scripts/reward_system/RewardPresentationProfile.gd")
+	var _rpp = load("res://meta/rewards/system/RewardPresentationProfile.gd")
 	var profile_id: String = _rpp.get_profile_for_theme(theme_name) if _rpp else "default_chest"
 	var profile: Dictionary = _rpp.load_profile(profile_id) if _rpp else {}
 
@@ -115,7 +115,7 @@ func _show_reward_screen(context) -> bool:
 	}
 
 	# Create controller (dynamically to avoid parse-time class resolution)
-	var controller_script_path = "res://scripts/reward_system/RewardTransitionController.gd"
+	var controller_script_path = "res://meta/rewards/system/RewardTransitionController.gd"
 	if ResourceLoader.exists(controller_script_path):
 		var controller_scr = load(controller_script_path)
 		if controller_scr and controller_scr is Script and controller_scr.has_method("new"):

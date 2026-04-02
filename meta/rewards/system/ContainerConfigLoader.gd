@@ -1,5 +1,4 @@
 extends RefCounted
-class_name ContainerConfigLoader
 
 ## Container Configuration Loader
 ## Loads and caches reward container configurations from JSON files

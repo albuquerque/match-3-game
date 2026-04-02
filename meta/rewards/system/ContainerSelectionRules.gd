@@ -1,5 +1,4 @@
 extends RefCounted
-class_name ContainerSelectionRules
 
 ## Container Selection Rules Evaluator
 ## Data-driven rule evaluation for selecting reward containers

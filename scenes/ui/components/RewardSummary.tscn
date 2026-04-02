@@ -1,5 +1,5 @@
 [gd_scene load_steps=4 format=3 uid="uid://reward_summary_panel"]
-[ext_resource type="Script" path="res://scripts/reward_system/RewardSummaryPanel.gd" id="1_rsp"]
+[ext_resource type="Script" path="res://meta/rewards/system/RewardSummaryPanel.gd" id="1_rsp"]
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
 bg_color = Color(0.10, 0.08, 0.22, 1.0)
 border_width_left = 3

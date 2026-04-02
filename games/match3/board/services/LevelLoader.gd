@@ -65,7 +65,7 @@ func _apply_level_data(ld) -> void:
 
 	# Build grid using GameState.fill_from_layout() so 0-cells get randomised tile types
 	# and collectibles/unmovables/spreaders are populated correctly.
-	var gs_script = load("res://scripts/model/GameState.gd")
+	var gs_script = load("res://meta/profile/GameState.gd")
 	if gs_script != null:
 		var gs = gs_script.new(GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.TILE_TYPES)
 		if ld.grid_layout != null:

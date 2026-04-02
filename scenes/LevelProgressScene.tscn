@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://cty447cnji4fo"]
 
-[ext_resource type="Script" uid="uid://cgs4xyu6od57y" path="res://scripts/LevelProgress.gd" id="1"]
+[ext_resource type="Script" uid="uid://cgs4xyu6od57y" path="res://meta/profile/LevelProgress.gd" id="1"]
 
 [node name="LevelProgress" type="Control"]
 layout_mode = 3
