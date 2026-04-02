@@ -192,11 +192,11 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 				br2.collectible_landed_at(pos, coll_type)
 			elif GameRunState.board_ref != null and GameRunState.board_ref.has_signal and GameRunState.board_ref.has_signal("collectible_landed"):
 				GameRunState.board_ref.emit_signal("collectible_landed", pos, coll_type)
-			# Check for level completion after collecting
-			if not GameRunState.processing_moves:
-				var gsb = _get_bridge()
-				if gsb != null and gsb.has_method("attempt_level_complete"):
-					gsb.attempt_level_complete()
+			# Check for level completion after collecting — do this regardless of processing_moves
+			# so boosters that clear the flag before calling us still trigger the pipeline.
+			var gsb = _get_bridge()
+			if gsb != null and gsb.has_method("attempt_level_complete"):
+				gsb.attempt_level_complete()
 
 		print("[CollectibleService] Collected ", coll_type, " at ", pos)
 
