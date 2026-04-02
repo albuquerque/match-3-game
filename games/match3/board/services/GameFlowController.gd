@@ -104,31 +104,30 @@ func on_level_complete() -> void:
 	var stars = _calculate_stars(original_moves_left)
 	print("[GFC] Level completed with %d stars" % stars)
 
-	var star_manager = Engine.get_singleton("StarRatingManager") if Engine.has_singleton("StarRatingManager") else \
-		(GameRunState.board_ref.get_node_or_null("/root/StarRatingManager") if GameRunState.board_ref else null)
-	if star_manager:
-		star_manager.save_level_stars(GameRunState.level, stars)
+	# Persist star rating — StarRatingManager is an autoload, use it directly
+	if StarRatingManager:
+		StarRatingManager.save_level_stars(GameRunState.level, stars)
 
-	var rm = GameRunState.board_ref.get_node_or_null("/root/RewardManager") if GameRunState.board_ref else null
-	if rm and rm.has_method("grant_level_completion_reward"):
-		rm.grant_level_completion_reward(GameRunState.level, stars)
+	# NOTE: Reward granting (coins, gems, achievements) is the pipeline's responsibility.
+	# GrantRewardsStep handles it after show_rewards. Do NOT call RewardManager here.
 
+	# Fire the bridge event — LoadLevelStep listens to GameBoard.level_complete to advance the pipeline.
 	print("[GFC] Emitting level_complete via bridge (level=%d score=%d)" % [GameRunState.level, GameRunState.score])
 	GameStateBridge.emit_level_complete()
 
+	# Local signal for any in-game overlay subscribers
 	var coins_earned = 100 + (50 * GameRunState.level)
 	var gems_earned  = 5 if stars == 3 else 0
 	emit_signal("level_complete_ready", stars, coins_earned, gems_earned)
 
 func _calculate_stars(original_moves_left: int) -> int:
-	var star_manager = GameRunState.board_ref.get_node_or_null("/root/StarRatingManager") if GameRunState.board_ref else null
-	if star_manager:
-		var lm = GameRunState.board_ref.get_node_or_null("/root/LevelManager") if GameRunState.board_ref else null
-		if lm:
-			var level_data = lm.get_level(lm.current_level_index) if lm.has_method("get_level") else null
-			var total_moves = level_data.moves if level_data and level_data.has("moves") else 20
-			var moves_used  = total_moves - original_moves_left
-			return star_manager.calculate_stars(GameRunState.score, GameRunState.target_score, moves_used, total_moves)
+	# StarRatingManager and LevelManager are autoloads — use them directly
+	if StarRatingManager and LevelManager:
+		var level_data = LevelManager.get_level(LevelManager.current_level_index) if LevelManager.has_method("get_level") else null
+		# LevelData is a typed class (RefCounted) — access .moves directly, not via .has()
+		var total_moves = level_data.moves if level_data != null else 20
+		var moves_used  = total_moves - original_moves_left
+		return StarRatingManager.calculate_stars(GameRunState.score, GameRunState.target_score, moves_used, total_moves)
 	if GameRunState.score >= int(GameRunState.target_score * 1.5): return 3
 	if GameRunState.score >= int(GameRunState.target_score * 1.2): return 2
 	return 1
@@ -160,6 +159,7 @@ func perform_level_failed_check() -> void:
 	print("[GFC] Level failed: out of moves")
 	GameRunState.pending_level_failed = false
 	GameRunState.level_transitioning = true
+	# Emit bridge events so LoadLevelStep fires level_failed and the pipeline routes to ShowLevelFailureStep
 	GameStateBridge.emit_game_over()
 	var level_id = "level_%d" % GameRunState.level
 	var ctx := {"level": GameRunState.level, "score": GameRunState.score, "target": GameRunState.target_score, "moves_used": GameRunState.moves_left}
@@ -235,5 +235,3 @@ func _get_random_active_tile_position() -> Vector2:
 func skip_bonus_animation() -> void:
 	if not GameRunState.bonus_skipped:
 		GameRunState.bonus_skipped = true
-
-

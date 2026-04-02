@@ -102,11 +102,23 @@ static func activate_swap_booster(board: Node, tiles_ref: Array, x1: int, y1: in
 	tile2.grid_position = Vector2(x1, y1)
 	if t1: await t1.finished
 	if t2: await t2.finished
-	board._check_collectibles_at_bottom()
+	# Clear processing_moves BEFORE collectible check so CollectibleService can schedule
+	# gravity+refill and attempt_level_complete immediately when a coin lands at the bottom row.
+	GameRunState.processing_moves = false
+	await board._check_collectibles_at_bottom()
+	# Run gravity+refill to fill any cell left empty by a collected collectible.
+	# (CollectibleService skips its own deferred_gravity_then_refill when processing_moves was true,
+	# so we own the refill here for the booster path.)
+	if board.has_method("animate_gravity"):
+		await board.animate_gravity()
+	if board.has_method("animate_refill"):
+		await board.animate_refill()
 	var exclude = [GameRunState.HORIZONTAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
 	if _MatchFinder.find_matches(GameRunState.grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.MIN_MATCH_SIZE, exclude, -1).size() > 0:
 		await board.process_cascade()
-	GameRunState.processing_moves = false
+	else:
+		# No cascade — still check for level completion (objectives may have been met by the swap)
+		GameStateBridge.attempt_level_complete()
 
 static func activate_chain_reaction_booster(board: Node, BS, x: int, y: int) -> void:
 	if not RewardManager.use_booster("chain_reaction"):

@@ -77,19 +77,9 @@ static func column_clear_positions(col: int, grid_w: int, grid_h: int) -> Array:
 	return out
 
 static func _get_board() -> Node:
-	# Prefer NodeResolvers API (runtime-loaded) which encapsulates legacy fallbacks
-	var nr = null
-	# Try using the preloaded API if available
-	if NodeResolversApi != null:
-		nr = NodeResolversApi
-	else:
-		# Runtime load as fallback to avoid parse-time coupling
-		nr = load("res://scripts/helpers/node_resolvers.gd")
-	if nr != null:
-		var b = null
-		# prefer board resolver when present
-		if nr.has_method("_get_board"):
-			b = nr._get_board()
+	# NodeResolvers is registered as an autoload — use it directly
+	if NodeResolvers.has_method("_get_board"):
+		var b = NodeResolvers._get_board()
 		if b != null:
 			return b
 	# Next prefer explicit GameRunState board_ref (owner set by GameBoard._ready)
