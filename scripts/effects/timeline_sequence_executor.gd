@@ -8,12 +8,12 @@ class_name EffectExecutorTimelineSequence
 #     - binding (Dictionary): effect binding to execute via EffectResolver (preferred)
 #     - callable (Dictionary): { "node": "path_or_name", "method": "method_name", "args": [] }
 #  - id: optional id used for logging
-# NOTE: The legacy "event"/"event_args" step type (EventBus emit) was removed in PR 5d.
+# NOTE: The "event"/"event_args" step type is no longer supported.
 #       Convert any remaining event steps to "binding" steps using EffectResolver.
 func execute(context: Dictionary) -> void:
 	var params = context.get("params", {})
 	var viewport = context.get("viewport", null)
-	# Support both "steps" and "sequence" for backward compatibility
+	# Support both "steps" and "sequence" key names
 	var sequence = params.get("steps", params.get("sequence", []))
 	var seq_id = params.get("id", "")
 	var board_node = context.get("board", null)

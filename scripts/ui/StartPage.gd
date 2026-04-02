@@ -134,9 +134,7 @@ func _ready():
 	visible = false
 	modulate = Color(1,1,1,0)
 
-	# Listen for language changes via NarrativeStageRenderer (or TranslationBootstrap signal)
-	# PR 5d: EventBus.language_changed removed — TranslationBootstrap emits locale_changed directly
-	# TODO PR 6: wire locale_changed from TranslationBootstrap when needed
+	# TranslationBootstrap emits locale_changed directly when language changes.
 
 	# If a level is already active when StartPage starts, hide immediately
 	if GameRunState and GameRunState.initialized:
@@ -157,7 +155,6 @@ func close():
 	# queue_free delegated to caller when desired
 
 func _get_pm() -> Node:
-	# PR 5c: resolve PageManager directly — no EventBus needed for navigation
 	if has_method("get_tree") and get_tree():
 		return get_tree().root.get_node_or_null("PageManager")
 	return null

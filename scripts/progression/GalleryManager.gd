@@ -6,9 +6,9 @@ extends Node
 
 signal item_unlocked(item_id: String)
 signal shard_added(item_id: String, current: int, required: int)
-# Legacy signal kept for backward compat
+# Signal kept for compatibility with existing consumers
 signal gallery_item_unlocked(category: String, item_id: String)
-# PR 5c: direct signals replacing EventBus traffic
+# Emits directly to consumers via signals.
 signal shard_discovered(item_id: String, context: Dictionary)
 signal gallery_unlocked(item_id: String)
 
@@ -113,7 +113,7 @@ func add_shard(item_id: String) -> bool:
 	print("[GalleryManager] add_shard invoked for %s (current=%d required=%d)" % [item_id, st["shards"], required])
 	# Always emit deferred so UI listeners created later in the same frame can receive events
 	call_deferred("_deferred_emit_shard_added", item_id, st["shards"], required)
-	# PR 5c: emit via deferred helper — EventBus no longer carries shard_discovered traffic
+	# Emit via deferred helper.
 	call_deferred("_deferred_emit_shard_discovered", item_id, {"shards": st["shards"], "required": required})
 	if st["shards"] >= required:
 		st["unlocked"] = true
@@ -183,7 +183,7 @@ func get_categories() -> Array:
 		cats[cat] = true
 	return cats.keys()
 
-# ── Legacy unlock API (category-based, kept for backward compat) ──────────────
+# ── Category-based unlock API ──────────────────────────────────────────────────
 
 func unlock_item(category: String, item_id: String) -> void:
 	if not _state.has(item_id):

@@ -6,7 +6,8 @@ func _ready():
 	var board_stub = Node.new()
 	board_stub.name = "BoardStub"
 
-	# PR 6.5c: GameManager no longer used — tests verify via GameRunState
+	# Test note: legacy GameManager autoload may be absent in the refactor —
+	# this test attempts to instantiate it if present, otherwise fails gracefully.
 	var gm = null
 
 	var result = {"passed": false, "reason": "unknown"}

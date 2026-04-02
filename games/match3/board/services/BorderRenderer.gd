@@ -2,7 +2,7 @@ extends Node
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
 # Pure rendering helpers for drawing board borders as Line2D children under a container.
-# PR 6: game_manager parameter removed — GameRunState and GameManager autoloads used directly.
+# All state read from GameRunState.
 # API: BorderRenderer.draw_board_borders(board_node, border_container, grid_offset, tile_size, border_color, border_width)
 
 static func _ensure_container(board_node: Node, border_container: Node) -> Node2D:
@@ -14,7 +14,7 @@ static func _ensure_container(board_node: Node, border_container: Node) -> Node2
 	return bc
 
 static func draw_board_borders(board_node: Node, border_container: Node, game_manager = null, grid_offset: Vector2 = Vector2.ZERO, tile_size: float = 64.0, border_color: Color = Color.WHITE, border_width: float = 3.0) -> Node2D:
-	# game_manager kept as optional param for backward compat — ignored, uses autoloads
+	# game_manager param accepted but ignored — all state read from GameRunState.
 	print("[BorderRenderer] draw_board_borders called: grid=", GameRunState.GRID_WIDTH, "x", GameRunState.GRID_HEIGHT, " tile_size=", tile_size)
 	if not GameRunState.initialized or GameRunState.grid == null or GameRunState.grid.size() == 0:
 		print("[BorderRenderer] WARNING: GameRunState not initialized or grid empty")

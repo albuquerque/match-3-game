@@ -24,12 +24,10 @@ func _ready() -> void:
 	emit_signal("hud_ready")
 
 func _connect_signals() -> void:
-	# Connect to GameBoard (true signal owner) via GameRunState.board_ref
-	var board = GameRunState.board_ref if typeof(GameRunState) != TYPE_NIL else null
+	var board = GameRunState.board_ref
 	if board == null:
-		# board_ref not set yet — retry after one frame
 		await get_tree().create_timer(0.1).timeout
-		board = GameRunState.board_ref if typeof(GameRunState) != TYPE_NIL else null
+		board = GameRunState.board_ref
 	if board:
 		if board.has_signal("score_changed") and not board.is_connected("score_changed", _on_score_changed):
 			board.connect("score_changed", _on_score_changed)
@@ -48,7 +46,7 @@ func _connect_signals() -> void:
 			board.connect("level_loaded_ctx", _on_level_loaded_ctx)
 		# Catch-up: if level already loaded, refresh now
 		if GameRunState.initialized:
-			_refresh_from_gm()
+			_refresh_from_state()
 	# Connect to RewardManager for currency display
 	var rm = _rm()
 	if rm and rm.has_signal("coins_changed") and not rm.is_connected("coins_changed", _on_currency_changed):
@@ -61,29 +59,22 @@ func _rm():
 # ── Self-wired signal handlers ───────────────────────────────────────────────
 
 func _on_level_loaded() -> void:
-	_refresh_from_gm()
+	_refresh_from_state()
 
 func _on_level_loaded_ctx(_level_id: String = "", _ctx: Dictionary = {}) -> void:
-	_refresh_from_gm()
+	_refresh_from_state()
 
 func _on_score_changed(new_score: int) -> void:
-	var unmov = 0
-	var coll = 0
-	var target = 1
-	if typeof(GameRunState) != TYPE_NIL and GameRunState != null:
-		unmov = GameRunState.unmovable_target
-		coll = GameRunState.collectible_target
-		target = GameRunState.target_score
 	set_score(new_score)
-	if unmov == 0 and coll == 0:
-		set_target_score(new_score, target)
+	if GameRunState.unmovable_target == 0 and GameRunState.collectible_target == 0:
+		set_target_score(new_score, GameRunState.target_score)
 
 func _on_moves_changed(moves: int) -> void:
 	set_moves(moves)
 
 func _on_level_changed(new_level: int) -> void:
 	set_level(new_level)
-	_refresh_from_gm()
+	_refresh_from_state()
 
 func _on_collectibles_changed(collected: int, target: int) -> void:
 	set_objective_collectibles(collected, target)
@@ -94,9 +85,8 @@ func _on_unmovables_changed(cleared: int, target: int) -> void:
 func _on_currency_changed(_amount: int) -> void:
 	_refresh_currency()
 
-func _refresh_from_gm() -> void:
-	# Read exclusively from GameRunState — GameManager fallback removed (PR 6.5c).
-	if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.initialized:
+func _refresh_from_state() -> void:
+	if GameRunState.initialized:
 		set_score(GameRunState.score)
 		set_level(GameRunState.level)
 		set_moves(GameRunState.moves_left)

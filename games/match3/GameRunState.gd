@@ -1,14 +1,8 @@
 extends Node
 ## GameRunState — live runtime data singleton for Match-3 gameplay.
-##
-## PR 5a: This is the single source of truth for all mutable game state
-## that was previously scattered across GameManager's vars.
-## GameManager reads AND writes through this node during PR 5a so that
-## call sites (GameBoard, BoardActionExecutor, etc.) can be migrated
-## one file at a time in PR 5b without breaking anything.
+## Single source of truth for all mutable game state.
 ##
 ## ❌ NO logic here — only data.
-## ❌ NO signals here — signals stay on GameManager during 5a/5b.
 ## ❌ NO references to other nodes — pure data store.
 
 # ── Grid dimensions (mutable — set from level data) ──────────────────────────
@@ -18,7 +12,7 @@ var GRID_HEIGHT: int = 8
 # ── Tile-type constants ───────────────────────────────────────────────────────
 const TILE_TYPES:      int = 6
 const MIN_MATCH_SIZE:  int = 3
-const HORIZTONAL_ARROW: int = 7   # note: intentional typo preserved from GameManager
+const HORIZONTAL_ARROW: int = 7
 const VERTICAL_ARROW:  int = 8
 const FOUR_WAY_ARROW:  int = 9
 const COLLECTIBLE:     int = 10
@@ -91,9 +85,7 @@ var DEBUG_LOGGING: bool = true
 var VERBOSE_GRAVITY: bool = true
 
 # ── Board reference (set by GameBoard._ready) ─────────────────────────────────
-# Allows board services to reach tiles without going through GameManager.
 var board_ref: Node = null
 
 # Pending shard cells mapping: keys are "x,y" -> item_id
-# Previously stored in GameManager meta; now kept in GameRunState for migration.
 var pending_shard_cells: Dictionary = {}

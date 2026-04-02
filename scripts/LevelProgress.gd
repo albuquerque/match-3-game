@@ -19,7 +19,7 @@ func _ready():
 	print("LevelProgress scene is ready.")
 
 	# Check if we're showing results or route map using GameRunState snapshot
-	if typeof(GameRunState) != TYPE_NIL and (GameRunState.last_level_score > 0 or GameRunState.last_level_number > 0):
+	if GameRunState.last_level_score > 0 or GameRunState.last_level_number > 0:
 		show_level_results()
 	else:
 		setup_route_map()
@@ -50,7 +50,7 @@ func show_level_results():
 		else:
 			moves_label.text = "Out of Moves!"
 
-		# Show appropriate buttons based on GameRunState (PR 6.5c: GameManager removed)
+		# Show appropriate buttons based on GameRunState
 		if GameRunState.last_level_won:
 			next_level_button.visible = true
 			restart_button.visible = false
@@ -100,7 +100,7 @@ func _on_level_button_pressed(level):
 
 func _on_next_level_pressed():
 	print("Next level button pressed")
-	# PR 6.5c: use GameStateBridge exclusively — GameManager fallback removed.
+	# Use GameStateBridge exclusively.
 	var bridge = load("res://games/match3/services/GameStateBridge.gd")
 	if bridge != null and bridge.has_method("initialize_game"):
 		GameRunState.level_transitioning = false
@@ -112,7 +112,7 @@ func _on_restart_level_pressed():
 	var level_manager = NodeResolvers._get_lm()
 	if level_manager:
 		level_manager.set_current_level(GameRunState.last_level_number - 1)
-	# PR 6.5c: use GameStateBridge exclusively — GameManager fallback removed.
+	# Use GameStateBridge exclusively.
 	var bridge = load("res://games/match3/services/GameStateBridge.gd")
 	if bridge != null and bridge.has_method("initialize_game"):
 		GameRunState.level_transitioning = false

@@ -135,7 +135,7 @@ static func damage_adjacent_spreaders(board: Node, tiles_ref: Array, matched_pos
 			already_hit[key] = true
 
 			GameRunState.grid[nx][ny] = 0
-			# PR 5d: call via GameManager for now; moves to Match3Game in PR 6
+			# Bridge: call via GameStateBridge
 			var br2 = _get_bridge()
 			if br2 != null and br2.has_method("report_spreader_destroyed"):
 				br2.report_spreader_destroyed(Vector2(nx, ny))

@@ -1,6 +1,6 @@
 extends Node
 # GameStateBridge — thin bridge to mutate GameRunState and emit signals to board_ref.
-# PR 6.5c: GameManager references removed — all reads/writes go through GameRunState.
+# All state reads/writes go through GameRunState.
 
 const _MatchFinder = preload("res://scripts/services/MatchFinder.gd")
 const _Spreader = preload("res://games/match3/board/services/SpreaderService.gd")
@@ -153,7 +153,7 @@ static func skip_bonus_animation() -> void:
 
 static func remove_matches(matches: Array, swapped_pos: Vector2 = Vector2(-1, -1)) -> int:
 	# Migration: perform conservative grid clearing and attempt to free visuals via board_ref.
-	# Previous GameManager.remove_matches logic is removed — callers should rely on services + GameRunState.
+	# Callers should rely on MatchProcessor + GameRunState.
 	var removed = 0
 	for m in matches:
 		var x = int(m.x); var y = int(m.y)
@@ -223,15 +223,15 @@ static func spawn_level_collectibles() -> void:
 	elif GameRunState.board_ref != null and GameRunState.board_ref.has_method("spawn_level_collectibles"):
 		GameRunState.board_ref.call_deferred("spawn_level_collectibles")
 
-# New small shims to centralize legacy emits and lifecycle hooks so callers don't need GameManager.
+# Shims to centralize legacy emits and lifecycle hooks.
 static func emit_special_tile_activated(name: String, ctx: Dictionary) -> void:
 	# Prefer emitting on the board (true owner) if available
 	if GameRunState.board_ref != null and GameRunState.board_ref.has_signal and GameRunState.board_ref.has_signal("special_tile_activated"):
 		GameRunState.board_ref.emit_signal("special_tile_activated", name, ctx)
-	# Legacy GameManager emissions removed — migrate consumers to board_ref
+	# Emit directly on board_ref (true signal owner)
 
 static func emit_spreaders_changed(count: int) -> void:
-	# Emit to board (preferred). Do not rely on legacy GameManager.
+	# Emit to board (true signal owner).
 	if GameRunState.board_ref != null and GameRunState.board_ref.has_signal and GameRunState.board_ref.has_signal("spreaders_changed"):
 		GameRunState.board_ref.emit_signal("spreaders_changed", count)
 	# Additionally, write to GameRunState so consumers using the state can read it
@@ -336,7 +336,7 @@ static func emit_level_loaded_ctx(level_id: String, ctx: Dictionary) -> void:
 		print("[GameStateBridge] Polling for GameBoard timed out after attempts=", attempts)
 
 static func initialize_game():
-	# Minimal initializer shim to replace GameManager.initialize_game during migration.
+	# Initializer: resets state and loads level via LevelLoader.
 	# Resets transient flags, invokes LevelLoader to populate GameRunState, and emits level_loaded_ctx.
 	print("[GameStateBridge] initialize_game: start")
 	GameRunState.score = 0

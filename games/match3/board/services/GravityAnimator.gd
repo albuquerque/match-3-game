@@ -4,11 +4,11 @@ const GravityService = preload("res://games/match3/board/services/GravityService
 
 # GravityAnimator — barrier/segment-aware gravity and refill animations.
 # A2: Full logic ported from GameBoard.animate_gravity / GameBoard.animate_refill (2026-03-05).
-# PR 6: game_manager parameter removed — GameManager and GameRunState autoloads referenced directly.
+# All state read from GameRunState.
 
 static func animate_gravity(gameboard: Node, tiles_ref: Array) -> void:
 	var moved = false
-	# Use GravityService.apply_gravity on the GameRunState.grid instead of GameManager.apply_gravity()
+	# Use GravityService.apply_gravity on GameRunState.grid
 	moved = GravityService.apply_gravity(GameRunState.grid)
 	print("[GRAVITY] apply_gravity returned -> ", moved)
 

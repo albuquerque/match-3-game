@@ -111,7 +111,7 @@ func _load_level_by_number(level_num: int) -> void:
 		if idx >= 0:
 			lm.set_current_level(idx)
 			print("[GameUI] LevelManager set to index %d (level %d)" % [idx, level_num])
-	# Prefer GameStateBridge.initialize_game — GameManager fallback removed (PR 6.5c).
+	# Use GameStateBridge.initialize_game.
 	var bridge = load("res://games/match3/services/GameStateBridge.gd")
 	if bridge != null and bridge.has_method("initialize_game"):
 		print("[GameUI] Calling GameStateBridge.initialize_game() for level %d" % level_num)
@@ -254,7 +254,7 @@ func _on_booster_button_pressed(booster_id: String) -> void:
 			board.activate_shuffle_booster()
 	elif booster_id == "extra_moves":
 		if rm.has_method("use_booster") and rm.use_booster("extra_moves"):
-			# PR 6.5c: use GameStateBridge exclusively — GameManager fallback removed.
+			# Use GameStateBridge exclusively.
 			var bridge2 = load("res://games/match3/services/GameStateBridge.gd")
 			if bridge2 != null and bridge2.has_method("add_moves"):
 				bridge2.add_moves(10)
@@ -325,7 +325,7 @@ func _on_worldmap_level_selected(level_num: int) -> void:
 	if lm and lm.has_method("get_level_index"):
 		var idx = lm.get_level_index(level_num)
 		if idx >= 0: lm.set_current_level(idx)
-	# PR 6.5c: use GameStateBridge — GameManager.initialize_game removed.
+	# Use GameStateBridge.initialize_game.
 	var bridge3 = load("res://games/match3/services/GameStateBridge.gd")
 	if bridge3 != null and bridge3.has_method("initialize_game"):
 		bridge3.initialize_game()

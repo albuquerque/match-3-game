@@ -131,7 +131,7 @@ func _ready():
 		BV = load("res://games/match3/board/services/BoardVisuals.gd")
 	if BE == null:
 		BE = load("res://games/match3/board/services/BoardEffects.gd")
-	# Load GameStateBridge runtime shim used to forward lifecycle emits to GameManager during migration
+	# Load GameStateBridge runtime shim
 	if GameStateBridge == null:
 		GameStateBridge = load("res://games/match3/services/GameStateBridge.gd")
 
@@ -148,19 +148,11 @@ func _ready():
 			BIH.setup(self)
 
 
-	# Prefer GameRunState.initialized to decide whether to create visuals now.
-	# This avoids relying on the legacy GameManager autoload during migration.
 	if GameRunState != null and GameRunState.initialized:
 		create_visual_grid()
-		# Borders will be drawn when level_loaded triggers _on_level_loaded
 	else:
 		print("[GameBoard] Waiting for GameRunState.initialized before creating visual grid")
-		# Defer a small waiter which checks GameRunState.initialized and then calls _on_level_loaded when appropriate
-		call_deferred("_deferred_wait_for_gamemanager")
-
-	# GameManager.level_loaded (no-arg signal) is the canonical trigger for _on_level_loaded.
-	# Do NOT also connect EventBus.level_loaded — it fires in the same frame and would
-	# cause on_level_loaded_setup to run twice, corrupting tile state.
+		call_deferred("_wait_for_state_initialized")
 
 	# Create master board container to hold ALL visual elements
 	# This allows hiding/showing the entire board area with one call
@@ -196,12 +188,12 @@ func _ready():
 	# Setup background image AFTER layout is calculated
 	setup_background_image()
 
-	# Expose this board via GameRunState so services can reach tiles without going through GameManager
+	# Expose this board via GameRunState so services can reach tiles directly
 	GameRunState.board_ref = self
 	print("[GameBoard] _ready: GameRunState.board_ref set to", GameRunState.board_ref)
 
-	# PR 6.5c: use GameRunState.initialized directly — GameManager check removed.
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.initialized:
+	# Use GameRunState.initialized directly.
+	if GameRunState.initialized:
 		create_visual_grid()
 	else:
 		print("[GameBoard] Waiting for level_loaded before creating visual grid")
@@ -559,7 +551,7 @@ func _on_level_loaded():
 			return
 		else:
 			print("[GameBoard] _on_level_loaded: BoardSetup loaded at runtime: BLS=", BLS)
-	# Wait briefly for GameRunState to be populated by GameManager to avoid visual/model race
+	# Wait briefly for GameRunState to be populated to avoid visual/model race
 	var wait_attempts = 0
 	while (not GameRunState.initialized) and wait_attempts < 20:
 		# wait up to ~1 second (20 * 0.05)
@@ -575,7 +567,7 @@ func _on_level_loaded():
 
 
 func _on_external_remove_matches(matches: Array) -> void:
-	# Called by GameStateBridge fallback path when GameManager.remove_matches is not available.
+	# Called by GameStateBridge fallback path when remove_matches implementation is not available on the owner
 	# This ensures visuals are destroyed to match GameRunState.grid being cleared.
 	print("[GameBoard] _on_external_remove_matches called - matches=", matches.size())
 	if BA == null:
@@ -648,7 +640,7 @@ func _input(event):
 	if skip_bonus_active and (event is InputEventScreenTouch or event is InputEventMouseButton):
 		if event.pressed:
 			print("[GameBoard] Screen tapped during bonus - requesting skip")
-			# Use GameStateBridge shim to avoid direct GameManager dependency during migration
+			# Use GameStateBridge shim to avoid direct dependency on legacy manager during migration
 			if GameStateBridge != null:
 				GameStateBridge.skip_bonus_animation()
 			hide_skip_bonus_hint()
@@ -815,7 +807,7 @@ func _task_deferred_gravity_then_refill() -> void:
 
 	await _check_collectibles_at_bottom()
 
-	var exclude = [GameRunState.HORIZTONAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
+	var exclude = [GameRunState.HORIZONTAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
 	var new_matches = _MatchFinder.find_matches(GameRunState.grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.MIN_MATCH_SIZE, exclude, -1)
 	if new_matches and new_matches.size() > 0:
 		print("[GameBoard] deferred_gravity_then_refill: new matches found, processing cascade")
@@ -956,20 +948,20 @@ func dev_force_shard_drop(px: int, py: int, item_id: String = "dev_shard_test") 
 	else:
 		print("[GameBoard][dev] deferred_gravity_then_refill not available; call MatchOrchestrator.process_cascade or similar")
 
-func _deferred_wait_for_gamemanager() -> void:
-	# PR 6.5b: GameBoard now owns all signals directly — no need to wait for GameManager.
+func _wait_for_state_initialized() -> void:
+	# GameBoard owns all signals directly.
 	# If GameRunState is already initialized, trigger level loaded handling now.
 	if GameRunState.initialized:
-		print("[GameBoard] _deferred_wait_for_gamemanager: GameRunState already initialized; calling _on_level_loaded")
+		print("[GameBoard] _wait_for_state_initialized: GameRunState already initialized; calling _on_level_loaded")
 		call_deferred("_on_level_loaded")
 		return
 	# Wait briefly for GameRunState to be initialized by LevelLoader
 	var attempts = 0
 	while attempts < 60:
 		if GameRunState.initialized:
-			print("[GameBoard] _deferred_wait_for_gamemanager: GameRunState initialized; calling _on_level_loaded")
+			print("[GameBoard] _wait_for_state_initialized: GameRunState initialized; calling _on_level_loaded")
 			call_deferred("_on_level_loaded")
 			return
 		await get_tree().create_timer(0.05).timeout
 		attempts += 1
-	print("[GameBoard] _deferred_wait_for_gamemanager: GameManager not found after wait")
+	print("[GameBoard] _wait_for_state_initialized: GameRunState not initialized after wait")

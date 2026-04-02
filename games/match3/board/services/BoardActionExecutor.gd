@@ -103,7 +103,7 @@ static func activate_swap_booster(board: Node, tiles_ref: Array, x1: int, y1: in
 	if t1: await t1.finished
 	if t2: await t2.finished
 	board._check_collectibles_at_bottom()
-	var exclude = [GameRunState.HORIZTONAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
+	var exclude = [GameRunState.HORIZONTAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
 	if _MatchFinder.find_matches(GameRunState.grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.MIN_MATCH_SIZE, exclude, -1).size() > 0:
 		await board.process_cascade()
 	GameRunState.processing_moves = false
@@ -290,8 +290,7 @@ static func activate_special_tile(board: Node, pos: Vector2) -> void:
 				GameRunState.grid[int(pos.x)][int(pos.y)] = inst_type
 				tile_type = inst_type
 
-	# PR 5c: emit directly on GameManager — EventBus no longer carries special_tile_activated traffic
-	# Build context then emit via GameStateBridge so callers don't reference GameManager directly
+	# Emit via GameStateBridge
 	var _ctx = {"position": pos, "tile_type": tile_type, "level": GameRunState.level}
 	if GameStateBridge != null:
 		GameStateBridge.emit_special_tile_activated("tile_%d_%d" % [int(pos.x), int(pos.y)], _ctx)
@@ -309,7 +308,7 @@ static func activate_special_tile(board: Node, pos: Vector2) -> void:
 	if positions_to_clear.size() == 0:
 		print("[BoardActionExecutor] activation_result returned no positions — using fallback computation for tile_type=", tile_type, " pos=", pos)
 		positions_to_clear = []
-		if tile_type == GameRunState.HORIZTONAL_ARROW:
+		if tile_type == GameRunState.HORIZONTAL_ARROW:
 			for x in range(GameRunState.GRID_WIDTH):
 				var y = int(pos.y)
 				var val = _GQS.get_tile_at(null, Vector2(x, y))
@@ -337,7 +336,7 @@ static func activate_special_tile(board: Node, pos: Vector2) -> void:
 					if not positions_to_clear.has(p):
 						positions_to_clear.append(p)
 
-	if tile_type == GameRunState.HORIZTONAL_ARROW:
+	if tile_type == GameRunState.HORIZONTAL_ARROW:
 		AudioManager.play_sfx("special_horiz")
 		board._create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.9, 0.3))
 		print("[BoardActionExecutor] HORIZONTAL activate: pos=", pos, " grid_val=", _GQS.get_tile_at(null,pos))
@@ -385,7 +384,7 @@ static func activate_special_tile_chain(board: Node, pos: Vector2, tile_type: in
 	var positions_to_clear: Array = chain_result.get("positions", [])
 	var chained_specials: Array   = chain_result.get("specials", [])
 
-	if tile_type == GameRunState.HORIZTONAL_ARROW:
+	if tile_type == GameRunState.HORIZONTAL_ARROW:
 		AudioManager.play_sfx("special_horiz")
 		board._create_lightning_beam_horizontal(int(pos.y), Color(1.0, 0.9, 0.3))
 		await board.get_tree().create_timer(0.1).timeout
@@ -415,7 +414,7 @@ static func activate_special_tile_chain(board: Node, pos: Vector2, tile_type: in
 		if tile_instance and tile_instance.is_unmovable_hard:
 			var destroyed = tile_instance.take_hit(1)
 			if destroyed:
-				# Notify via bridge to keep backward compatibility
+				# Notify via bridge
 				GameStateBridge.report_unmovable_destroyed(clear_pos, true)
 				var is_coll       = tile_instance.is_collectible if "is_collectible" in tile_instance else false
 				var tile_type_chk = tile_instance.tile_type if "tile_type" in tile_instance else 0
@@ -479,7 +478,7 @@ static func destroy_tiles_immediately(board: Node, positions: Array) -> void:
 		if "is_unmovable_hard" in tile_instance and tile_instance.is_unmovable_hard:
 			var destroyed = tile_instance.take_hit(1)
 			if destroyed:
-				# Notify via bridge to keep backward compatibility
+				# Notify via bridge
 				GameStateBridge.report_unmovable_destroyed(clear_pos, true)
 				var is_coll       = tile_instance.is_collectible if "is_collectible" in tile_instance else false
 				var tile_type_chk = tile_instance.tile_type if "tile_type" in tile_instance else 0
@@ -508,7 +507,7 @@ static func destroy_tiles_immediately(board: Node, positions: Array) -> void:
 			tiles_ref[gx][gy] = null
 
 	if GameRunState.use_spreader_objective:
-		# Prefer bridge emits; GameStateBridge will forward to GameManager if still present
+		# Prefer bridge emits; GameStateBridge will forward to any legacy owners if present
 		GameStateBridge.emit_spreaders_changed(GameRunState.spreader_count)
 		# Guard: only trigger completion when the board is initialized AND both the counter
 		# AND the positions array confirm zero spreaders remain.  This prevents a premature

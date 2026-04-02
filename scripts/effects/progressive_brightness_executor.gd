@@ -19,14 +19,14 @@ func execute(context: Dictionary) -> void:
 		print("[ProgressiveBrightnessExecutor] No viewport!")
 		return
 
-	# PR 6.5c: GameManager fallback removed — use GameRunState directly.
+	# Read from GameRunState.
 
 	if event_name == "level_loaded":
 		match_count = 0
 		use_score_mode = params.get("score_based", false)
 		if use_score_mode:
 			target_score = context.get("event_context", {}).get("target", 0)
-			if target_score == 0 and typeof(GameRunState) != TYPE_NIL:
+			if target_score == 0:
 				target_score = GameRunState.target_score
 			print("[ProgressiveBrightnessExecutor] Using SCORE mode - target: %d" % target_score)
 		else:
@@ -65,7 +65,7 @@ func execute(context: Dictionary) -> void:
 		var progress = 0.0
 
 		if use_score_mode:
-			var current_score = GameRunState.score if typeof(GameRunState) != TYPE_NIL else 0
+			var current_score = GameRunState.score
 
 			if target_score > 0:
 				progress = min(float(current_score) / float(target_score), 1.0)

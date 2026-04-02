@@ -53,7 +53,7 @@ func _ready() -> void:
 	_load_config()
 	# Prefer active registered board_ref (set by GameBoard._ready) to avoid scene traversal and races
 	var board_node: Node = null
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+	if GameRunState.board_ref != null:
 		board_node = GameRunState.board_ref
 	else:
 		if has_method("get_tree") and get_tree() != null:
@@ -79,12 +79,11 @@ func _ready() -> void:
 			board_node.connect("level_loaded_ctx", Callable(self, "_on_level_loaded"))
 		print("[ShardDropSystem] Connected to GameBoard signals")
 	else:
-		# No board found — disable shard drops. Migration: do not fallback to legacy GameManager.
+		# No board found — shard drops disabled until board_ref is set.
 		push_error("[ShardDropSystem] GameBoard not found and GameRunState.board_ref is unset — shard drops disabled")
 		return
 
-	# TODO PR 6: tile_destroyed emitter (BoardActionExecutor) moves to direct GameBoard signal
-	# For now connect via EventBus which still carries tile_destroyed only
+	# Connect tile_destroyed via EventBus (still active for this signal only)
 	var eb = get_node_or_null("/root/EventBus")
 	if eb and eb.has_signal("tile_destroyed"):
 		eb.connect("tile_destroyed", Callable(self, "_on_tile_destroyed"))
@@ -128,8 +127,7 @@ func _on_level_loaded(_level_id: String, _context: Dictionary) -> void:
 
 ## Returns true when shards are allowed to drop in the current level context.
 func _can_drop() -> bool:
-	# Use GameRunState for level and grid state if GameManager not present
-	var current_level: int = int(GameRunState.level) if typeof(GameRunState) != TYPE_NIL else 0
+	var current_level: int = int(GameRunState.level)
 	if current_level < shard_unlock_from_level:
 		return false
 	if _session_drops >= max_shards_per_level:
@@ -150,8 +148,7 @@ func _on_shard_tile_collected(item_id: String) -> void:
 		return
 	GalleryManager.add_shard(item_id)
 	# Record the collection against this level so replay logic is correct
-	var lvl = int(GameRunState.level) if typeof(GameRunState) != TYPE_NIL else 0
-	# Use GameRunState.level exclusively (migration) — legacy GameManager-level preference removed
+	var lvl = int(GameRunState.level)
 	_record_level_collected("level_%d" % int(lvl))
 	print("[ShardDropSystem] shard collected for item: ", item_id)
 
@@ -208,7 +205,7 @@ func _inject_random_shard() -> void:
 	# normal fall-in animation, just like any other new tile.
 	GameRunState.grid[int(pos.x)][int(pos.y)] = GameRunState.COLLECTIBLE
 	# Store item_id so animate_refill can configure the tile as a shard.
-	# Previously stored on GameManager meta; now store on GameRunState.pending_shard_cells
+	# Stored on GameRunState.pending_shard_cells
 	if not GameRunState.pending_shard_cells:
 		GameRunState.pending_shard_cells = {}
 	GameRunState.pending_shard_cells[str(int(pos.x)) + "," + str(int(pos.y))] = item_id
@@ -271,18 +268,18 @@ func _on_tile_destroyed(entity_id: String, context: Dictionary) -> void:
 
 func _do_reveal_shard(pos: Vector2, item_id: String) -> void:
 	var board := _get_board()
-	# Use GameRunState.level when GameManager not available
+	# Use GameRunState.level
 	var lvl = GameRunState.level if GameRunState != null else 0
 	if board == null:
 		return
 	_session_drops += 1
 	_record_level_dropped("level_%d" % int(lvl))
-	_spawn_shard_tile(board, null, pos, item_id)
+	_spawn_shard_tile(board, pos, item_id)
 	print("[ShardDropSystem] revealed shard tile for '%s' under obstacle at %s" % [item_id, pos])
 
 # ── Shared spawn helper ───────────────────────────────────────────────────────
 
-func _spawn_shard_tile(board: Node, gm: Node, pos: Vector2, item_id: String) -> void:
+func _spawn_shard_tile(board: Node, pos: Vector2, item_id: String) -> void:
 	var x := int(pos.x)
 	var y := int(pos.y)
 	GameRunState.grid[x][y] = GameRunState.COLLECTIBLE

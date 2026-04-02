@@ -613,10 +613,10 @@ func _on_level_selected(level_num: int):
 		else:
 			print("[WorldMap] WARNING: LevelManager could not find level_number %d" % level_num)
 
-	# PR 5c: LevelManager index is set here; ExperienceDirector pipeline calls initialize_game()
-	# via LoadLevelStep → do NOT call initialize_game() directly from WorldMap.
+	# LevelManager index is set here; ExperienceDirector pipeline calls initialize_game()
+	# via LoadLevelStep — do NOT call initialize_game() directly from WorldMap.
 
-	# PR 5c: close WorldMap directly via PageManager — no EventBus needed
+	# Close WorldMap directly via PageManager.
 	var pm = NodeResolvers._get_pm()
 	if pm == null and has_method("get_tree"):
 		var rt3 = get_tree().root
@@ -633,7 +633,7 @@ func _on_back_pressed():
 	var am2 = NodeResolvers._get_am()
 	if am2 and am2.has_method("play_sfx"):
 		am2.play_sfx("ui_click")
-	# PR 5c: close directly via PageManager
+	# Close directly via PageManager.
 	var pm = NodeResolvers._get_pm()
 	if pm and pm.has_method("close"):
 		pm.close("WorldMap")

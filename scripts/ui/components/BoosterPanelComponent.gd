@@ -48,13 +48,12 @@ func _connect_signals() -> void:
 		rm.connect("booster_changed", _on_booster_changed)
 
 	# Connect to level_loaded_ctx on board_ref — this is the signal GameStateBridge emits
-	var board = GameRunState.board_ref if typeof(GameRunState) != TYPE_NIL else null
+	var board = GameRunState.board_ref
 	if board and board.has_signal("level_loaded_ctx"):
 		if not board.is_connected("level_loaded_ctx", _on_level_loaded_ctx):
 			board.connect("level_loaded_ctx", _on_level_loaded_ctx)
 
-	# Catch-up: if level is already loaded, populate immediately
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.initialized:
+	if GameRunState.initialized:
 		_on_level_loaded()
 
 
@@ -71,8 +70,7 @@ func _on_level_loaded_ctx(_level_id: String, _ctx: Dictionary) -> void:
 	_on_level_loaded()
 
 func _on_level_loaded() -> void:
-	# Read available boosters from GameRunState exclusively (PR 6.5c — GameManager fallback removed).
-	if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.available_boosters and GameRunState.available_boosters.size() > 0:
+	if GameRunState.available_boosters and GameRunState.available_boosters.size() > 0:
 		set_available_boosters(GameRunState.available_boosters)
 	_refresh_counts()
 	var tm = _tm()

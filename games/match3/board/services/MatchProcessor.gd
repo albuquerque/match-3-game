@@ -1,8 +1,7 @@
 extends Node
 # MatchProcessor — pure data-model helper: clear matched tiles from grid, handle
 # special tile detection, collectibles and unmovables.
-# PR 6.5a: gm parameter replaced with GameRunState/GameManager autoloads.
-# gm kept as param for backward compat — ignored.
+# All state read from GameRunState.
 
 const GAME_STATE_BRIDGE_PATH := "res://games/match3/services/GameStateBridge.gd"
 

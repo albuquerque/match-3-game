@@ -3,12 +3,6 @@ extends Node
 ## unmovable/spreader texture mapping, and ObjectiveManager wiring.
 ## Works with LevelManager.LevelData objects (typed inner class — NOT a Dictionary).
 
-# Optional legacy GameManager passed for compatibility
-var gm: Node = null
-
-func setup(game_manager: Node = null) -> void:
-	# Accept optional legacy GameManager, but prefer NodeResolvers/GameRunState
-	gm = game_manager
 
 # Public API
 func load_level() -> bool:
@@ -36,15 +30,12 @@ func _fetch_level_data():
 		await get_tree().create_timer(0.05).timeout
 		attempts += 1
 	if lm == null:
-		# As a last resort, try legacy GameManager if provided
-		if gm != null and gm.has_method("get_current_level"):
-			return gm.get_current_level()
 		return null
 	return lm.get_current_level()
 
 # Private: apply
 func _apply_level_data(ld) -> void:
-	# Populate GameRunState with LevelData fields instead of writing to legacy GameManager.
+	# Populate GameRunState with LevelData fields.
 	GameRunState.GRID_WIDTH = int(ld.width)
 	GameRunState.GRID_HEIGHT = int(ld.height)
 	GameRunState.target_score = int(ld.target_score)
@@ -154,14 +145,8 @@ func _apply_theme(theme_name: String) -> void:
 	return
 
 func _init_objective_manager(ld) -> void:
-	# ObjectiveManagerScript may be provided on legacy gm; try resolving via gm.get("ObjectiveManagerScript") defensively
-	var omscript = null
-	if gm != null and gm.has_method("get"):
-		var candidate = gm.get("ObjectiveManagerScript")
-		if candidate != null:
-			omscript = candidate
+	var omscript = load("res://games/match3/board/services/ObjectiveManager.gd")
 	if omscript == null:
-		# No global ObjectiveManagerScript configured — skip
 		return
 	var om = null
 	if omscript is PackedScene:

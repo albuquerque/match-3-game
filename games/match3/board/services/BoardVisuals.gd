@@ -91,11 +91,9 @@ static func instantiate_tile_visual(gameboard: Node, tile_scene: PackedScene, ti
 	return tile
 
 static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
-	# guard
-	print("[BoardVisuals] create_visual_grid: entry - GameRunState.grid_size=", GameRunState.grid.size() if typeof(GameRunState) != TYPE_NIL and GameRunState.grid != null else -1)
-	# Diagnostic: print a small sample of the model grid (first 4 columns)
+	print("[BoardVisuals] create_visual_grid: entry - GameRunState.grid_size=", GameRunState.grid.size() if GameRunState.grid != null else -1)
 	var sample = []
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.grid != null:
+	if GameRunState.grid != null:
 		for x in range(min(4, GameRunState.GRID_WIDTH)):
 			var col_sample = []
 			for y in range(min(6, GameRunState.GRID_HEIGHT)):
@@ -105,9 +103,8 @@ static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
 					col_sample.append(null)
 			sample.append(col_sample)
 	print("[BoardVisuals] grid sample (first 4 cols x 6 rows): ", sample)
-	# Diagnostic: list non-empty positions in model
 	var non_empty = []
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.grid != null:
+	if GameRunState.grid != null:
 		for xx in range(GameRunState.GRID_WIDTH):
 			for yy in range(GameRunState.GRID_HEIGHT):
 				if GameRunState.grid[xx][yy] != 0 and GameRunState.grid[xx][yy] != -1:

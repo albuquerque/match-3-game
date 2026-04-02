@@ -17,7 +17,7 @@ var flow_coordinator: Node = null  # FlowCoordinator (new)
 var state: Node = null  # ExperienceState
 var parser: Node = null  # ExperienceFlowParser
 
-# Legacy properties (maintained for backward compatibility)
+# Properties maintained for signal consumer compatibility
 var current_flow: Dictionary = {}
 var current_node: Dictionary = {}
 var processing_node: bool = false
@@ -27,11 +27,10 @@ var waiting_for_narrative_complete: bool = false
 var waiting_for_ad_complete: bool = false
 
 
-# ── PR 4: Match3Game is now the live win/loss signal source ──────────────────
 ## ExperienceDirector listens to game_won / game_lost from Match3Game and
-## advances the flow accordingly. GameManager still drives the board internals
-## (gravity, matching, scoring) — that is PR 5's concern.
-## ExperienceDirector no longer reaches into GameManager directly for level routing.
+## advances the flow accordingly.
+## (gravity, matching, scoring) — handled by board services.
+## ExperienceDirector reads state from GameRunState; routing via GameStateBridge.
 var _match3_game: Node = null
 
 func _ready():
@@ -70,11 +69,10 @@ func _create_components():
 	flow_coordinator.connect("flow_completed", Callable(self, "_on_flow_coordinator_flow_completed"))
 	flow_coordinator.connect("flow_failed", Callable(self, "_on_flow_coordinator_flow_failed"))
 
-	print("[ExperienceDirector] FlowCoordinator created (legacy components removed)")
+	print("[ExperienceDirector] FlowCoordinator created")
 
-	# ── PR 4: Instantiate Match3Game — now the live win/loss signal source ────
-	# Match3Game.tscn has no GameBoard child (fixed in PR 3 ghost-tile bugfix).
-	# It connects to GameManager signals internally and re-emits them as
+	# Instantiate Match3Game — the live win/loss signal source.
+	# It connects to board_ref signals and re-emits them as
 	# game_won / game_lost on the BaseGame interface.
 	var m3_scene = load("res://games/match3/Match3Game.tscn")
 	if m3_scene:
@@ -83,7 +81,7 @@ func _create_components():
 		add_child(_match3_game)
 		_match3_game.connect("game_won", _on_match3_game_won)
 		_match3_game.connect("game_lost", _on_match3_game_lost)
-		print("[ExperienceDirector] [PR4] Match3Game live — win/loss routed through BaseGame signals")
+		print("[ExperienceDirector] Match3Game live — win/loss routed through BaseGame signals")
 	else:
 		push_warning("[ExperienceDirector] [PR4] Could not load Match3Game.tscn")
 
@@ -334,11 +332,7 @@ func _process_current_node():
 
 # Node processors
 func _process_level_node(node: Dictionary):
-	"""Process a level node.
-	PR 4: ExperienceDirector only triggers the load via GameUI.
-	Completion is signalled by Match3Game.game_won → _on_match3_game_won.
-	ExperienceDirector no longer reads from or writes to GameManager directly.
-	"""
+	"""Trigger a level load via GameUI and wait for Match3Game.game_won to advance the flow."""
 	var level_id = node.get("id", "")
 	print("[ExperienceDirector] Triggering level: ", level_id)
 
@@ -891,38 +885,29 @@ func _process_dlc_flow_node(node: Dictionary):
 		# Continue
 		_complete_current_node()
 
-# ============================================
-# PR 4: Match3Game win/loss handlers — now drive the flow
-# ============================================
+# ── Match3Game win/loss handlers ─────────────────────────────────────────────
 
 func _on_match3_game_won() -> void:
-	print("[ExperienceDirector] [PR4] game_won — advancing flow")
+	print("[ExperienceDirector] game_won — advancing flow")
 	if not waiting_for_level_complete:
-		# Spurious signal (e.g. fired before a level node was active). Ignore.
-		print("[ExperienceDirector] [PR4] game_won ignored — not waiting for level completion")
+		print("[ExperienceDirector] game_won ignored — not waiting for level completion")
 		return
 	waiting_for_level_complete = false
-	# The pipeline's LoadLevelStep already received level_complete via EventBus
-	# and called step_completed. _complete_current_node() keeps ExperienceDirector's
-	# own legacy state in sync (marked-completed, auto-advance).
+	# _complete_current_node() keeps ExperienceDirector state in sync (marked-completed, auto-advance).
 	if processing_node:
 		_complete_current_node()
 
 func _on_match3_game_lost() -> void:
-	print("[ExperienceDirector] [PR4] game_lost — flow stays at current level node (player can retry)")
-	# On loss we do NOT advance the flow — the player retries the same level.
-	# waiting_for_level_complete stays true so the next game_won will advance normally.
-	# LoadLevelStep already handled the failure path via EventBus.level_failed.
+	print("[ExperienceDirector] game_lost — flow stays at current level node (player can retry)")
+	# On loss the flow does not advance — the player retries the same level.
 	waiting_for_level_complete = false
 
-# ============================================
-# FlowCoordinator Signal Forwarding
-# ============================================
+# ── FlowCoordinator signal forwarding ────────────────────────────────────────
 
 func _on_flow_coordinator_flow_started(flow_id: String):
 	"""Forward FlowCoordinator flow_started signal"""
 	print("[ExperienceDirector] FlowCoordinator started flow: %s" % flow_id)
-	# Legacy signal for backward compatibility
+	# Signal kept for consumer compatibility
 	# emit_signal("experience_flow_changed", flow_id) # Already emitted in load_flow
 
 func _on_flow_coordinator_flow_completed(flow_id: String):
@@ -933,7 +918,7 @@ func _on_flow_coordinator_flow_completed(flow_id: String):
 func _on_flow_coordinator_flow_failed(flow_id: String, reason: String):
 	"""Handle FlowCoordinator flow_failed signal"""
 	push_error("[ExperienceDirector] FlowCoordinator flow failed: %s - %s" % [flow_id, reason])
-	# Could emit a failure signal or fallback to legacy behavior
+	# Could emit a failure signal here
 
 # Helper: resolve RewardManager safely
 func _get_rm():

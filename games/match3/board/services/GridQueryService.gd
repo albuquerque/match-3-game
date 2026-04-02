@@ -1,8 +1,6 @@
 extends Node
 # GridQueryService — pure stateless grid queries.
-# PR 6.5a: gm parameter replaced with GameRunState autoload.
-# gm kept as first param on all methods for backward compat with GameManager callers
-# that pass `self` — the value is now ignored.
+# gm param accepted but ignored — all state read from GameRunState.
 
 static func is_cell_blocked(gm, x: int, y: int) -> bool:
 	if x < 0 or x >= GameRunState.GRID_WIDTH or y < 0 or y >= GameRunState.GRID_HEIGHT: return true

@@ -646,8 +646,8 @@ func _update_rewards_display(coins: int, gems: int):
 		rewards_container.remove_child(child)
 		child.free()
 
-	# PR 6.5c: use GameRunState for last-level snapshot — GameManager removed.
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.last_level_moves_left >= 0:
+	# Use GameRunState for last-level snapshot.
+	if GameRunState.last_level_moves_left >= 0:
 		var level_manager = NodeResolvers._get_lm()
 		if level_manager == null:
 			level_manager = get_node_or_null("/root/LevelManager")
@@ -1112,10 +1112,10 @@ func _on_replay_pressed():
 	# Hide this screen
 	visible = false
 
-	# PR 6.5c: replay via GameRunState + GameStateBridge — no longer calls GameManager.
-	var level_to_replay = GameRunState.last_level_number if typeof(GameRunState) != TYPE_NIL else 1
+	# Replay via GameRunState + GameStateBridge.
+	var level_to_replay = GameRunState.last_level_number
 	if level_to_replay <= 0:
-		level_to_replay = GameRunState.level if typeof(GameRunState) != TYPE_NIL else 1
+		level_to_replay = GameRunState.level
 	print("[LevelTransition] Replaying level %d" % level_to_replay)
 
 	# Reset transient GameRunState flags
@@ -1133,7 +1133,7 @@ func _on_replay_pressed():
 		lm.current_level_index = level_to_replay - 1
 
 	# Ensure board is visible
-	var game_board = GameRunState.board_ref if typeof(GameRunState) != TYPE_NIL else null
+	var game_board = GameRunState.board_ref
 	if game_board == null:
 		game_board = NodeResolvers._get_board()
 	if game_board:

@@ -373,7 +373,7 @@ func _on_back_pressed():
 	return
 
 func _deferred_close_request() -> void:
-	print("[AchievementsPage] deferred close request: calling PageManager directly (PR 5c)")
+	print("[AchievementsPage] deferred close request: calling PageManager directly")
 	var pm = NodeResolvers._get_pm()
 	if pm == null and has_method("get_tree"):
 		var rt = get_tree().root

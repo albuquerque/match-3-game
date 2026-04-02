@@ -37,7 +37,7 @@ func execute(context) -> bool:
 		var nr = load("res://scripts/helpers/node_resolvers.gd")
 		if nr != null and nr.has_method("_get_board"):
 			br = nr._get_board()
-		if br == null and typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+		if br == null and GameRunState.board_ref != null:
 			br = GameRunState.board_ref
 	# Connect if board provides signals
 	if br != null:
@@ -68,11 +68,11 @@ func execute(context) -> bool:
 				context.game_board.call_deferred("_on_level_loaded")
 		# Wait for GameRunState.initialized to avoid creating visuals against empty grid
 		var wait_attempts = 0
-		while not (typeof(GameRunState) != TYPE_NIL and GameRunState.initialized) and wait_attempts < 20:
+		while not GameRunState.initialized and wait_attempts < 20:
 			print("[LoadLevelStep] waiting for GameRunState.initialized (attempt=", wait_attempts, ")")
 			await get_tree().create_timer(0.05).timeout
 			wait_attempts += 1
-		if not (typeof(GameRunState) != TYPE_NIL and GameRunState.initialized):
+		if not GameRunState.initialized:
 			print("[LoadLevelStep] WARNING: GameRunState not initialized after wait; visuals may not create")
 		return true
 	elif context.game_ui and context.game_ui.has_method("_load_level_by_number"):

@@ -466,8 +466,7 @@ func _on_language_changed(index: int):
 	var _am_local = _resolve("AudioManager")
 	if _am_local:
 		_am_local.play_sfx("ui_click")
-	# PR 5d: EventBus.emit_language_changed removed — TranslationServer.set_locale already
-	# notifies all nodes via the built-in translation_changed notification.
+	# TranslationServer.set_locale already notifies all nodes via the built-in translation_changed notification.
 	_update_ui_after_language_change()
 
 func _update_ui_after_language_change():

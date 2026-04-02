@@ -2,7 +2,7 @@ extends Node
 ## EffectResolver - Central dispatcher that maps events to visual effects
 ## Loads effect definitions from JSON and instantiates executors
 ## This class must NOT contain story-specific logic
-## PR 5d: EventBus removed — all signals now connected directly to GameManager
+## Connects directly to GameBoard signals (true owner).
 
 # Active effect definitions loaded from chapter JSON
 var active_effects: Array = []
@@ -67,7 +67,7 @@ func _ready():
 	# Register effect executors
 	_register_executors()
 
-	# Connect directly to GameBoard signals (preferred) and/or GameManager signals (fallback)
+	# Connect directly to GameBoard signals (true owner)
 	_connect_event_signals()
 
 	# Dev: force-load test chapter for level 4 if enabled
@@ -106,11 +106,11 @@ func _register_executors():
 
 	print("[EffectResolver] Registered %d executors" % executors.size())
 
-## Connect to gameplay signals via GameBoard (true owner) — PR 6.5c: GameManager fallback removed.
+## Connect to gameplay signals via GameBoard (true signal owner).
 func _connect_event_signals():
 	# Prefer active registered board_ref (set by GameBoard._ready) to avoid scene traversal and races
 	var board_node: Node = null
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+	if GameRunState.board_ref != null:
 		board_node = GameRunState.board_ref
 	else:
 		# Fallback: try to find GameBoard in current scene tree
@@ -290,11 +290,11 @@ func _exit_tree():
 
 	print("[EffectResolver] Cleanup complete")
 
-## PR 5d: GameManager.level_loaded_ctx handler (level_id: String, context: Dictionary)
+## Handler for level_loaded_ctx signal (level_id: String, context: Dictionary)
 func _on_level_loaded_ctx(level_id: String, context: Dictionary):
 	_process_event("level_loaded", level_id, context)
 
-## PR 5d: GameManager.level_complete handler (no-arg signal)
+## Handler for level_complete signal
 func _on_level_complete_direct():
 	_process_event("level_complete", "level_%d" % GameRunState.level, {
 		"level": GameRunState.level, "score": GameRunState.score
@@ -338,9 +338,7 @@ func _process_event(event_name: String, entity_id: String, context: Dictionary):
 				var required_level = condition.get("level")
 				var current_level = context.get("level", 0)
 				if current_level == 0:
-					# PR 6.5c: read from GameRunState — GameManager removed.
-					if typeof(GameRunState) != TYPE_NIL:
-						current_level = GameRunState.level
+					current_level = GameRunState.level
 
 				print("[EffectResolver] Level condition check: current=%d, required=%d" % [current_level, required_level])
 				if current_level != required_level:
@@ -427,16 +425,8 @@ func _execute_effect(binding: Dictionary, entity_id: String, context: Dictionary
 						break
 					stack.append(c)
 
-	# Last resort: use GameRunState.board_ref — PR 6.5c: GameManager removed.
-	if not board_node:
-		if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
-			board_node = GameRunState.board_ref
-		else:
-			# Search scene root as final fallback
-			if has_method("get_tree") and get_tree() != null:
-				var nr_script = load("res://scripts/helpers/node_resolvers.gd")
-				if nr_script != null and nr_script.has_method("_get_board"):
-					board_node = nr_script._get_board()
+	if not board_node and GameRunState.board_ref != null:
+		board_node = GameRunState.board_ref
 
 	if board_node == null:
 		print("[EffectResolver] Warning: GameBoard not found")

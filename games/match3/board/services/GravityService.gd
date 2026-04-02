@@ -1,12 +1,10 @@
 extends Node
 # GravityService — pure grid gravity and refill.
-# PR 6.5a: gm parameter replaced with GameRunState autoload references.
 
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
 ## Barrier-aware gravity.
-static func apply_gravity(grid: Array, gm: Node = null) -> bool:
-	# gm kept as optional param for backward compat — ignored, uses GameRunState
+static func apply_gravity(grid: Array) -> bool:
 	var moved = false
 	var grid_w = GameRunState.GRID_WIDTH
 	var grid_h = GameRunState.GRID_HEIGHT
@@ -70,8 +68,7 @@ static func apply_gravity(grid: Array, gm: Node = null) -> bool:
 	return moved
 
 ## Barrier-aware fill.
-static func fill_empty_spaces(grid: Array, gm: Node = null) -> Array:
-	# gm kept as optional param for backward compat — ignored, uses GameRunState
+static func fill_empty_spaces(grid: Array) -> Array:
 	var rng = RandomNumberGenerator.new()
 	rng.randomize()
 	var created_positions: Array = []
@@ -116,7 +113,7 @@ static func fill_empty_spaces(grid: Array, gm: Node = null) -> Array:
 		print("[GravityService] fill_empty_spaces END created=%d" % [created_positions.size()])
 	return created_positions
 
-## Legacy simple apply_gravity (no unmovable/spreader barriers). Kept for backward compat.
+## Simple apply_gravity without barrier awareness.
 static func apply_gravity_simple(grid: Array, grid_w: int, grid_h: int) -> bool:
 	var moved = false
 	for x in range(grid_w):
@@ -145,7 +142,7 @@ static func apply_gravity_simple(grid: Array, grid_w: int, grid_h: int) -> bool:
 	return moved
 
 
-## Legacy simple fill (no barrier awareness). Kept for backward compat.
+## Simple fill without barrier awareness.
 static func fill_empty_spaces_simple(grid: Array, grid_w: int, grid_h: int, tile_types: int) -> Array:
 	var rng = RandomNumberGenerator.new()
 	rng.randomize()

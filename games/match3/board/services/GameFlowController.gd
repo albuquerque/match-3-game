@@ -1,19 +1,15 @@
 extends Node
 ## GameFlowController — owns all level-completion, level-failure, and bonus-cascade logic.
-## PR 6.5b: gm dependency removed — uses GameRunState.board_ref and GameStateBridge directly.
 
 signal level_complete_ready(stars: int, coins: int, gems: int)
 signal level_failed_ready
 signal bonus_cascade_started(remaining_moves: int)
 signal bonus_cascade_complete
 
-# gm kept as optional for backward compat — ignored; use GameRunState/board_ref
-var gm: Node = null
 var GameStateBridge = null
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
 
-func setup(game_manager: Node = null) -> void:
-	gm = game_manager  # kept for compat, not used
+func setup(_ignored: Node = null) -> void:
 	if GameStateBridge == null:
 		GameStateBridge = load("res://games/match3/services/GameStateBridge.gd")
 

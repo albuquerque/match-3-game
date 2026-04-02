@@ -31,8 +31,7 @@ func _ready() -> void:
 		# fallback to tree root
 		_pages_parent = get_tree().root
 
-	# PR 5d: EventBus removed. Navigation uses PageManager.open/close directly.
-	# open_page and close_page signals are no longer emitted via EventBus.
+	# Navigation uses PageManager.open/close directly.
 	print("[PageManager] Ready - parent=%s" % str(_pages_parent))
 
 func _z_for_index(idx: int) -> int:
@@ -248,8 +247,7 @@ func close_all() -> void:
 	# BUT do not auto-open StartPage if a game level is currently initialized,
 	# or if ExperienceDirector has an active flow running.
 	var should_open_start = true
-	# PR 6.5c: use GameRunState.initialized directly — no longer reads from GameManager.
-	if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.initialized:
+	if GameRunState.initialized:
 		should_open_start = false
 	if should_open_start and has_method("get_tree"):
 		var ed = get_tree().root.get_node_or_null("ExperienceDirector")

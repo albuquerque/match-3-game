@@ -5,7 +5,7 @@ const _MatchFinder = preload("res://scripts/services/MatchFinder.gd")
 static var GameStateBridge = null
 
 ## Full cascade orchestrator. Replaces the inline process_cascade in GameBoard.
-## PR 6: gm parameter removed — GameManager and GameRunState autoloads referenced directly.
+## All state read from GameRunState.
 ## Call: await MatchOrchestrator.process_cascade(board, initial_swap_pos)
 
 static func _grid_snapshot(grid: Array) -> String:
@@ -20,7 +20,7 @@ static func _grid_snapshot(grid: Array) -> String:
 	return "|".join(parts)
 
 static func process_cascade(board: Node, gm: Node = null, initial_swap_pos: Vector2 = Vector2(-1, -1)) -> void:
-	# gm kept as optional param for backward compatibility during migration — ignored, uses autoload
+	# gm param accepted but ignored — all state read from GameRunState.
 	if board == null:
 		print("[MatchOrchestrator] ERROR: board is null")
 		return
@@ -40,7 +40,7 @@ static func process_cascade(board: Node, gm: Node = null, initial_swap_pos: Vect
 		# Snapshot before finding matches
 		var before_snap = _grid_snapshot(GameRunState.grid)
 
-		var exclude = [GameRunState.HORIZTONAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
+		var exclude = [GameRunState.HORIZONTAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
 		var matches = _MatchFinder.find_matches(GameRunState.grid, GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT, GameRunState.MIN_MATCH_SIZE, exclude, -1)
 		print("[MatchOrchestrator] Found ", matches.size(), " matches at depth ", cascade_depth)
 		if matches.size() == 0:
@@ -131,7 +131,7 @@ static func process_cascade(board: Node, gm: Node = null, initial_swap_pos: Vect
 				print("[MatchOrchestrator] Score +%d (tiles=%d combo=%d) → total=%d" % [pts, tiles_cleared_for_score, cascade_depth, GameRunState.score])
 
 		# --- Emit match_cleared event (owner: board) ---
-		# Build context similar to GameManager.match_cleared usage
+		# Build context for match_cleared signal
 		var tiles_removed := matches.size()
 		var ctx: Dictionary = {
 			"level": GameRunState.level,

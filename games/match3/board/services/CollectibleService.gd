@@ -16,7 +16,7 @@ static func _get_bridge():
 
 static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 	## Scan all columns for collectibles at their bottom-most active row.
-	## Plays the fly-to-HUD animation, clears the tile, and notifies GameManager.
+	## Plays the fly-to-HUD animation, clears the tile, and updates GameRunState.
 	## After collecting, triggers gravity → refill → cascade on the board.
 	var collectibles_to_remove = []
 
@@ -268,7 +268,7 @@ static func check_collectibles_at_bottom(board: Node, tiles_ref: Array) -> void:
 		# If model says this bottom cell is a collectible, handle it
 		if GameRunState.grid.size() > col and GameRunState.grid[col].size() > bottom_row and GameRunState.grid[col][bottom_row] == GameRunState.COLLECTIBLE:
 			var pos := Vector2(col, bottom_row)
-			# Resolve item_id: prefer tile meta, then GameManager.pending_shard_cells
+			# Resolve item_id from tile meta or GameRunState.pending_shard_cells
 			var resolved_id := ""
 			if col < tiles_ref.size() and bottom_row < tiles_ref[col].size():
 				var tv = tiles_ref[col][bottom_row]

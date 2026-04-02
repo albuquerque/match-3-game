@@ -192,8 +192,8 @@ func perform_swap(tile1, tile2) -> void:
 	if tween1: await tween1.finished
 	if tween2: await tween2.finished
 
-	# Use MatchFinder directly (migrated from GameManager.find_matches)
-	var exclude = [GameRunState.HORIZTONAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
+	# Use MatchFinder directly
+	var exclude = [GameRunState.HORIZONTAL_ARROW, GameRunState.VERTICAL_ARROW, GameRunState.FOUR_WAY_ARROW, GameRunState.COLLECTIBLE, GameRunState.SPREADER, GameRunState.UNMOVABLE]
 	var matches = []
 	if _MatchFinder != null:
 		# Preloaded script resource exposes find_matches as a callable
@@ -202,7 +202,7 @@ func perform_swap(tile1, tile2) -> void:
 		print("[BoardInputHandler] WARNING: MatchFinder not available; falling back to empty matches")
 
 	if matches and matches.size() > 0:
-		# Use GameStateBridge to consume a move (migrated from GameManager.use_move)
+		# Use GameStateBridge to consume a move
 		if GameStateBridge != null:
 			# GameStateBridge is a script resource exposing use_move()
 			GameStateBridge.use_move()

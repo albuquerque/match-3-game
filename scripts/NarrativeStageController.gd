@@ -7,7 +7,6 @@ extends Node
 
 signal state_changed(new_state: String)
 signal stage_loaded(stage_id: String)
-# PR 5c: emitting directly — EventBus.narrative_stage_complete replaced
 signal narrative_stage_complete(stage_id: String)
 
 var current_stage_data: Dictionary = {}
@@ -49,7 +48,7 @@ func _ready():
 
 	# Prefer active registered board_ref (set by GameBoard._ready)
 	var board_node: Node = null
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+	if GameRunState.board_ref != null:
 		board_node = GameRunState.board_ref
 	else:
 		# Fallback: try to find GameBoard in current scene
@@ -81,10 +80,10 @@ func _ready():
 			board_node.connect("match_cleared", Callable(self, "_on_match_cleared"))
 		print("[NarrativeStageController] Connected to GameBoard signals")
 	else:
-		# No legacy fallback: we must not attempt to resolve GameManager directly here.
+		# board_ref must be set before narrative triggers are active.
 		# Narrative triggers rely on GameBoard signals (preferred) or on GameRunState
 		# being populated by the runtime host. If neither is available, disable triggers.
-		push_warning("[NarrativeStageController] GameBoard not found and GameManager resolution skipped — narrative triggers disabled")
+		push_warning("[NarrativeStageController] GameBoard not found — narrative triggers disabled")
 
 func load_stage(stage_data: Dictionary) -> bool:
 	"""Load a narrative stage from JSON data"""
@@ -324,8 +323,7 @@ func _check_condition(condition: Dictionary, context: Dictionary) -> bool:
 	# Check score threshold
 	if condition.has("min_score"):
 		var score = context.get("score", 0)
-		if score == 0:
-			if typeof(GameRunState) != TYPE_NIL and GameRunState != null and GameRunState.initialized:
+		if score == 0 and GameRunState.initialized:
 				score = int(GameRunState.score)
 		if score < condition["min_score"]:
 			return false
@@ -351,7 +349,7 @@ func _on_level_loaded(level_id: String, context: Dictionary):
 	print("[NarrativeStageController] Level loaded: ", level_id)
 	_check_transitions("level_start", context)
 
-## PR 5c: shim for GameManager.level_complete (no-arg signal)
+## Handler for board_ref.level_complete signal
 func _on_level_complete_direct():
 	_on_level_complete("level_%d" % GameRunState.level, {})
 
@@ -374,7 +372,7 @@ func _on_match_cleared(match_size: int, context: Dictionary):
 
 	var progress := 0.0
 	# Calculate progress based on level type using GameRunState
-	if typeof(GameRunState) != TYPE_NIL and GameRunState != null:
+	if GameRunState != null:
 		if (GameRunState.collectible_target and GameRunState.collectible_target > 0):
 			progress = float(GameRunState.collectibles_collected) / float(max(GameRunState.collectible_target, 1))
 		elif (GameRunState.unmovable_target and GameRunState.unmovable_target > 0):

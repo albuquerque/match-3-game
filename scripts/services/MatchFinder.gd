@@ -1,5 +1,4 @@
 extends RefCounted
-# class_name removed — loaded via load() in GameManager._MatchFinder
 
 # Pure match-finding utility. No node access, no side-effects.
 # API: find_matches(grid, width, height, min_match_size=3, exclude_values=[], blocked_value=-1) -> Array of Vector2 positions

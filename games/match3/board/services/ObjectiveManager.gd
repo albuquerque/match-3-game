@@ -51,7 +51,7 @@ func report_spreader_destroyed(count: int = 1) -> void:
 func is_complete() -> bool:
 	## Returns true only when ALL active primary objectives are met.
 	## If no primary objectives are set, returns false (score-only levels
-	## are handled by GameManager directly).
+	## are handled directly by GameFlowController.
 	var has_any = collectible_goal > 0 or unmovable_goal > 0 or spreader_goal > 0
 	if not has_any:
 		return false

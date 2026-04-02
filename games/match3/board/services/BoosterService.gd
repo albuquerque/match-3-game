@@ -93,7 +93,7 @@ static func _get_board() -> Node:
 		if b != null:
 			return b
 	# Next prefer explicit GameRunState board_ref (owner set by GameBoard._ready)
-	if typeof(GameRunState) != TYPE_NIL and GameRunState.board_ref != null:
+	if GameRunState.board_ref != null:
 		return GameRunState.board_ref
 	# fallback: try scene tree search
 	var ml = Engine.get_main_loop()
@@ -114,7 +114,7 @@ static func activate_row_clear(row: int) -> void:
 	var board = _get_board()
 	if board and board.has_method("_create_row_clear_effect"):
 		board._create_row_clear_effect(row)
-	# Logic: clear all tiles in row via GameManager
+	# Logic: clear all tiles in row
 	var to_clear = []
 	for x in range(GameRunState.GRID_WIDTH):
 		if not _GQS.is_cell_blocked(null, x, row):
