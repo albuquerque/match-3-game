@@ -30,7 +30,7 @@ func _initialize_components():
 	"""Initialize controller and renderer"""
 	# Attempt to load controller/renderer scripts at runtime to avoid preload-time failures
 	if controller_scene == null:
-		var cs = load("res://scripts/NarrativeStageController.gd")
+		var cs = load("res://experience/narrative/NarrativeStageController.gd")
 		if cs and cs is Script:
 			controller_scene = cs
 		else:
@@ -48,7 +48,7 @@ func _initialize_components():
 
 	# Attempt to load renderer script if not already loaded
 	if renderer_scene == null:
-		var rs = load("res://scripts/NarrativeStageRenderer.gd")
+		var rs = load("res://experience/narrative/NarrativeStageRenderer.gd")
 		if rs and rs is Script:
 			renderer_scene = rs
 		else:

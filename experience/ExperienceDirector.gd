@@ -55,13 +55,13 @@ func _create_components():
 	# Create ExperienceState (needed for save/load)
 	state = Node.new()
 	state.name = "ExperienceState"
-	state.set_script(preload("res://scripts/ExperienceState.gd"))
+	state.set_script(preload("res://experience/ExperienceState.gd"))
 	add_child(state)
 
 	# Create FlowCoordinator (new pipeline)
 	flow_coordinator = Node.new()
 	flow_coordinator.name = "FlowCoordinator"
-	flow_coordinator.set_script(preload("res://scripts/FlowCoordinator.gd"))
+	flow_coordinator.set_script(preload("res://experience/FlowCoordinator.gd"))
 	add_child(flow_coordinator)
 
 	# Connect FlowCoordinator signals

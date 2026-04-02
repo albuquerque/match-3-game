@@ -1,4 +1,4 @@
-extends "res://scripts/runtime_pipeline/PipelineStep.gd"
+extends "res://experience/pipeline/PipelineStep.gd"
 class_name LoadLevelStep
 
 ## LoadLevelStep

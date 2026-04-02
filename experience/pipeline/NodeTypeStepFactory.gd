@@ -1,19 +1,19 @@
 extends RefCounted
 # class_name NodeTypeStepFactory — removed, loaded via _step_factory() in FlowCoordinator
 
-const _DEF_LOADER = preload("res://scripts/runtime_pipeline/FlowStepDefinitionLoader.gd")
+const _DEF_LOADER = preload("res://experience/pipeline/FlowStepDefinitionLoader.gd")
 
-const _LoadLevelStep        = preload("res://scripts/runtime_pipeline/steps/LoadLevelStep.gd")
-const _ShowNarrativeStep    = preload("res://scripts/runtime_pipeline/steps/ShowNarrativeStep.gd")
-const _GrantRewardsStep     = preload("res://scripts/runtime_pipeline/steps/GrantRewardsStep.gd")
-const _ShowRewardsStep      = preload("res://scripts/runtime_pipeline/steps/ShowRewardsStep.gd")
-const _ShowLevelFailureStep = preload("res://scripts/runtime_pipeline/steps/ShowLevelFailureStep.gd")
-const _CutsceneStep         = preload("res://scripts/runtime_pipeline/steps/CutsceneStep.gd")
-const _UnlockStep           = preload("res://scripts/runtime_pipeline/steps/UnlockStep.gd")
-const _AdRewardStep         = preload("res://scripts/runtime_pipeline/steps/AdRewardStep.gd")
-const _PremiumGateStep      = preload("res://scripts/runtime_pipeline/steps/PremiumGateStep.gd")
-const _DLCFlowStep          = preload("res://scripts/runtime_pipeline/steps/DLCFlowStep.gd")
-const _ConditionalStep      = preload("res://scripts/runtime_pipeline/steps/ConditionalStep.gd")
+const _LoadLevelStep        = preload("res://experience/pipeline/steps/LoadLevelStep.gd")
+const _ShowNarrativeStep    = preload("res://experience/pipeline/steps/ShowNarrativeStep.gd")
+const _GrantRewardsStep     = preload("res://experience/pipeline/steps/GrantRewardsStep.gd")
+const _ShowRewardsStep      = preload("res://experience/pipeline/steps/ShowRewardsStep.gd")
+const _ShowLevelFailureStep = preload("res://experience/pipeline/steps/ShowLevelFailureStep.gd")
+const _CutsceneStep         = preload("res://experience/pipeline/steps/CutsceneStep.gd")
+const _UnlockStep           = preload("res://experience/pipeline/steps/UnlockStep.gd")
+const _AdRewardStep         = preload("res://experience/pipeline/steps/AdRewardStep.gd")
+const _PremiumGateStep      = preload("res://experience/pipeline/steps/PremiumGateStep.gd")
+const _DLCFlowStep          = preload("res://experience/pipeline/steps/DLCFlowStep.gd")
+const _ConditionalStep      = preload("res://experience/pipeline/steps/ConditionalStep.gd")
 
 static var _DEF_CACHE: Dictionary = {}
 

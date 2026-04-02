@@ -5,7 +5,7 @@
 *.uid
 export.cfg
 # export_presets.cfg - ALLOW this file to be committed for CI/CD
-
+tools/editor/
 # Android build artifacts (exclude generated files but keep template files)
 android/build/build/
 android/build/.gradle/

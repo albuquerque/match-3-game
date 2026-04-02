@@ -1,0 +1,447 @@
+Scenes Tree:
+scenes/
+├── AboutDialog.tscn
+├── AdMobTest.tscn
+├── LevelProgressScene.tscn
+├── MainGame.tscn
+├── MainMenu.tscn
+├── TestDefinitionRunner.tscn
+├── TestRewardContainer.gd
+├── TestRewardContainer.gd.uid
+├── TestRewardContainer.tscn
+├── Tile.tscn
+└── ui
+    ├── components
+    │   ├── BoosterPanel.tscn
+    │   ├── FloatingMenu.tscn
+    │   ├── HUDComponent.tscn
+    │   ├── RewardClaimButton.tscn
+    │   └── RewardSummary.tscn
+    ├── gallery
+    │   ├── gallery_item.tscn
+    │   ├── gallery_screen.tscn
+    │   ├── GalleryItemCard.tscn
+    │   └── GalleryScreen.tscn
+    ├── pages
+    │   ├── AboutPage.tscn
+    │   ├── AchievementsPage.tscn
+    │   ├── GalleryPage.tscn
+    │   ├── Game.tscn
+    │   ├── ProfilePage.tscn
+    │   ├── SettingsDialog.tscn
+    │   ├── ShopUI.tscn
+    │   ├── StartPage.tscn
+    │   └── WorldMap.tscn
+    └── ShardToastNotifier.tsc
+
+Scripts Tree:
+scripts/
+├── AboutDialog.gd
+├── AboutDialog.gd.uid
+├── AchievementsPage.gd
+├── AchievementsPage.gd.uid
+├── AdMobManager.gd
+├── AdMobManager.gd.uid
+├── AssetRegistry.gd
+├── AssetRegistry.gd.uid
+├── AudioManager.gd
+├── AudioManager.gd.uid
+├── CollectionManager.gd
+├── CollectionManager.gd.uid
+├── components
+│   ├── LevelNode.gd
+│   └── LevelNode.gd.uid
+├── core
+│   ├── EventBus.gd
+│   └── EventBus.gd.uid
+├── dev
+│   ├── page_open_test.gd
+│   └── page_open_test.gd.uid
+├── DLCConfig.gd
+├── DLCConfig.gd.uid
+├── DLCDownloadTest.gd
+├── DLCDownloadTest.gd.uid
+├── DLCManager.gd
+├── DLCManager.gd.uid
+├── DLCSystemTest.gd
+├── DLCSystemTest.gd.uid
+├── EffectResolver.gd
+├── EffectResolver.gd.uid
+├── effects
+│   ├── background_dim_executor.gd
+│   ├── background_dim_executor.gd.uid
+│   ├── background_tint_executor.gd
+│   ├── background_tint_executor.gd.uid
+│   ├── camera_impulse_executor.gd
+│   ├── camera_impulse_executor.gd.uid
+│   ├── camera_lerp_executor.gd
+│   ├── camera_lerp_executor.gd.uid
+│   ├── cutscene_executor.gd
+│   ├── cutscene_executor.gd.uid
+│   ├── effect_executor_base.gd
+│   ├── effect_executor_base.gd.uid
+│   ├── EffectExecutor.gd
+│   ├── EffectExecutor.gd.uid
+│   ├── foreground_dim_executor.gd
+│   ├── foreground_dim_executor.gd.uid
+│   ├── gameplay_pause_executor.gd
+│   ├── gameplay_pause_executor.gd.uid
+│   ├── narrative_dialogue_executor.gd
+│   ├── narrative_dialogue_executor.gd.uid
+│   ├── play_animation_executor.gd
+│   ├── play_animation_executor.gd.uid
+│   ├── progressive_brightness_executor.gd
+│   ├── progressive_brightness_executor.gd.uid
+│   ├── screen_flash_executor.gd
+│   ├── screen_flash_executor.gd.uid
+│   ├── screen_overlay_executor.gd
+│   ├── screen_overlay_executor.gd.uid
+│   ├── shader_param_lerp_executor.gd
+│   ├── shader_param_lerp_executor.gd.uid
+│   ├── spawn_particles_executor.gd
+│   ├── spawn_particles_executor.gd.uid
+│   ├── state_swap_executor.gd
+│   ├── state_swap_executor.gd.uid
+│   ├── symbolic_overlay_executor.gd
+│   ├── symbolic_overlay_executor.gd.uid
+│   ├── timeline_sequence_executor.gd
+│   ├── timeline_sequence_executor.gd.uid
+│   ├── vignette_executor.gd
+│   └── vignette_executor.gd.uid
+├── EventBus.gd
+├── EventBus.gd.uid
+├── ExperienceDirector.gd
+├── ExperienceDirector.gd.uid
+├── ExperienceFlowParser.gd
+├── ExperienceFlowParser.gd.uid
+├── ExperienceState.gd
+├── ExperienceState.gd.uid
+├── FlowCoordinator.gd
+├── FlowCoordinator.gd.uid
+├── GalleryUI.gd
+├── GalleryUI.gd.uid
+├── game
+│   ├── BoardActionExecutor.gd
+│   ├── BoardActionExecutor.gd.uid
+│   ├── BoardAnimator.gd
+│   ├── BoardAnimator.gd.uid
+│   ├── BoardEffects.gd
+│   ├── BoardEffects.gd.uid
+│   ├── BoardInputHandler.gd
+│   ├── BoardInputHandler.gd.uid
+│   ├── BoardLayout.gd
+│   ├── BoardLayout.gd.uid
+│   ├── BoardSetup.gd
+│   ├── BoardSetup.gd.uid
+│   ├── BoardVisuals.gd
+│   ├── BoardVisuals.gd.uid
+│   ├── BoosterSelector.gd
+│   ├── BoosterSelector.gd.uid
+│   ├── BoosterService.gd
+│   ├── BoosterService.gd.uid
+│   ├── BorderRenderer.gd
+│   ├── BorderRenderer.gd.uid
+│   ├── CollectibleService.gd
+│   ├── CollectibleService.gd.uid
+│   ├── EffectsRenderer.gd
+│   ├── EffectsRenderer.gd.uid
+│   ├── GameFlowController.gd
+│   ├── GameFlowController.gd.uid
+│   ├── GravityAnimator.gd
+│   ├── GravityAnimator.gd.uid
+│   ├── GravityService.gd
+│   ├── GravityService.gd.uid
+│   ├── GridQueryService.gd
+│   ├── GridQueryService.gd.uid
+│   ├── LevelLoader.gd
+│   ├── LevelLoader.gd.uid
+│   ├── MatchFinder.gd.uid
+│   ├── MatchOrchestrator.gd
+│   ├── MatchOrchestrator.gd.uid
+│   ├── MatchProcessor.gd
+│   ├── MatchProcessor.gd.uid
+│   ├── ObjectiveManager.gd
+│   ├── ObjectiveManager.gd.uid
+│   ├── Scoring.gd.uid
+│   ├── SpecialActivationService.gd
+│   ├── SpecialActivationService.gd.uid
+│   ├── SpecialDetector.gd
+│   ├── SpecialDetector.gd.uid
+│   ├── SpecialFactory.gd
+│   ├── SpecialFactory.gd.uid
+│   ├── SpreaderService.gd
+│   ├── SpreaderService.gd.uid
+│   ├── VisualEffects.gd
+│   ├── VisualEffects.gd.uid
+│   ├── VisualFactory.gd
+│   └── VisualFactory.gd.uid
+├── game_debug.log
+├── GameBoard.gd
+├── GameBoard.gd.uid
+├── GameManager.gd
+├── GameManager.gd.uid
+├── GameUI.gd
+├── GameUI.gd.uid
+├── helpers
+│   ├── autoload_types_stub.gd
+│   ├── autoload_types_stub.gd.uid
+│   ├── node_resolvers_api.gd
+│   ├── node_resolvers_api.gd.uid
+│   ├── node_resolvers_shim.gd
+│   ├── node_resolvers_shim.gd.uid
+│   ├── node_resolvers_stub.gd
+│   ├── node_resolvers_stub.gd.uid
+│   ├── node_resolvers.gd
+│   └── node_resolvers.gd.uid
+├── LevelManager.gd
+├── LevelManager.gd.uid
+├── LevelProgress.gd
+├── LevelProgress.gd.uid
+├── LevelTransition.gd
+├── LevelTransition.gd.uid
+├── MainMenu.gd
+├── MainMenu.gd.uid
+├── managers
+│   ├── GalleryManager.gd
+│   ├── GalleryManager.gd.uid
+│   ├── progress_manager.gd.uid
+│   ├── ProgressManager.gd
+│   └── ProgressManager.gd.uid
+├── model
+│   ├── GameState.gd
+│   └── GameState.gd.uid
+├── NarrativeStageController.gd
+├── NarrativeStageController.gd.uid
+├── NarrativeStageManager.gd
+├── NarrativeStageManager.gd.uid
+├── NarrativeStageRenderer.gd
+├── NarrativeStageRenderer.gd.uid
+├── NarrativeSystemDemo.gd
+├── NarrativeSystemDemo.gd.uid
+├── NarrativeSystemTest.gd
+├── NarrativeSystemTest.gd.uid
+├── OutOfLivesDialog.gd
+├── OutOfLivesDialog.gd.uid
+├── progression
+│   ├── AchievementManager.gd
+│   ├── AchievementManager.gd.uid
+│   ├── GalleryManager.gd
+│   ├── GalleryManager.gd.uid
+│   ├── ProfileManager.gd
+│   ├── ProfileManager.gd.uid
+│   ├── ProgressManager.gd
+│   └── ProgressManager.gd.uid
+├── reward_system
+│   ├── ContainerConfigLoader.gd
+│   ├── ContainerConfigLoader.gd.uid
+│   ├── ContainerParticleSpawner.gd
+│   ├── ContainerParticleSpawner.gd.uid
+│   ├── containers
+│   ├── ContainerSelectionRules.gd
+│   ├── ContainerSelectionRules.gd.uid
+│   ├── RewardContainer.gd
+│   ├── RewardContainer.gd.uid
+│   ├── RewardPresentationProfile.gd
+│   ├── RewardPresentationProfile.gd.uid
+│   ├── RewardRevealSystem.gd
+│   ├── RewardRevealSystem.gd.uid
+│   ├── RewardSummaryPanel.gd
+│   ├── RewardSummaryPanel.gd.uid
+│   ├── RewardTransitionController.gd
+│   ├── RewardTransitionController.gd.uid
+│   ├── SimpleRewardUI.gd
+│   └── SimpleRewardUI.gd.uid
+├── RewardManager.gd
+├── RewardManager.gd.uid
+├── RewardNotification.gd
+├── RewardNotification.gd.uid
+├── RewardOrchestrator.gd
+├── RewardOrchestrator.gd.uid
+├── runtime_pipeline
+│   ├── ContextBuilder.gd
+│   ├── ContextBuilder.gd.uid
+│   ├── ExperiencePipeline.gd
+│   ├── ExperiencePipeline.gd.uid
+│   ├── FlowStepDefinitionLoader.gd
+│   ├── FlowStepDefinitionLoader.gd.uid
+│   ├── NodeTypeStepFactory.gd
+│   ├── NodeTypeStepFactory.gd.uid
+│   ├── PipelineContext.gd
+│   ├── PipelineContext.gd.uid
+│   ├── PipelineStep.gd
+│   ├── PipelineStep.gd.uid
+│   └── steps
+│       ├── AdRewardStep.gd
+│       ├── AdRewardStep.gd.uid
+│       ├── ConditionalStep.gd
+│       ├── ConditionalStep.gd.uid
+│       ├── CutsceneStep.gd
+│       ├── CutsceneStep.gd.uid
+│       ├── DLCFlowStep.gd
+│       ├── DLCFlowStep.gd.uid
+│       ├── GrantRewardsStep.gd
+│       ├── GrantRewardsStep.gd.uid
+│       ├── LoadLevelStep.gd
+│       ├── LoadLevelStep.gd.uid
+│       ├── PremiumGateStep.gd
+│       ├── PremiumGateStep.gd.uid
+│       ├── ShowLevelFailureStep.gd
+│       ├── ShowLevelFailureStep.gd.uid
+│       ├── ShowNarrativeStep.gd
+│       ├── ShowNarrativeStep.gd.uid
+│       ├── ShowRewardsStep.gd
+│       ├── ShowRewardsStep.gd.uid
+│       ├── UnlockStep.gd
+│       └── UnlockStep.gd.uid
+├── services
+│   ├── MatchFinder.gd
+│   ├── MatchFinder.gd.uid
+│   ├── Scoring.gd
+│   └── Scoring.gd.uid
+├── SettingsDialog.gd.uid
+├── ShopUI.gd
+├── ShopUI.gd.uid
+├── StarRatingManager.gd
+├── StarRatingManager.gd.uid
+├── StartPage.gd
+├── StartPage.gd.uid
+├── systems
+│   ├── ContentPackTranslationLoader.gd
+│   ├── ContentPackTranslationLoader.gd.uid
+│   ├── GalleryImageLoader.gd
+│   ├── GalleryImageLoader.gd.uid
+│   ├── ShardDropSystem.gd
+│   ├── ShardDropSystem.gd.uid
+│   ├── StoryManager.gd
+│   └── StoryManager.gd.uid
+├── test_cutscene_conditional.gd
+├── test_cutscene_conditional.gd.uid
+├── test_definition_runner.gd
+├── test_definition_runner.gd.uid
+├── TextureCache.gd.uid
+├── ThemeManager.gd
+├── ThemeManager.gd.uid
+├── Tile.gd
+├── Tile.gd.uid
+├── TileTextureGenerator.gd
+├── TileTextureGenerator.gd.uid
+├── TranslationBootstrap.gd
+├── TranslationBootstrap.gd.uid
+├── ui
+│   ├── AboutPage.gd
+│   ├── AboutPage.gd.uid
+│   ├── AchievementsPage.gd
+│   ├── AchievementsPage.gd.uid
+│   ├── AchievementsPanel.gd.uid
+│   ├── BoosterPanel.gd.uid
+│   ├── components
+│   │   ├── BoosterPanelComponent.gd
+│   │   ├── BoosterPanelComponent.gd.uid
+│   │   ├── FloatingMenuComponent.gd
+│   │   ├── FloatingMenuComponent.gd.uid
+│   │   ├── HUDComponent.gd
+│   │   ├── HUDComponent.gd.uid
+│   │   ├── MultiplierMiniGame.gd
+│   │   └── MultiplierMiniGame.gd.uid
+│   ├── FloatingMenu.gd.uid
+│   ├── gallery
+│   │   ├── GalleryItemCard.gd
+│   │   ├── GalleryItemCard.gd.uid
+│   │   ├── GalleryPreview.gd
+│   │   ├── GalleryPreview.gd.uid
+│   │   ├── GalleryScreen.gd
+│   │   ├── GalleryScreen.gd.uid
+│   │   ├── StoryCard.gd
+│   │   ├── StoryCard.gd.uid
+│   │   ├── StoryPreview.gd
+│   │   └── StoryPreview.gd.uid
+│   ├── gallery_adapter.gd.uid
+│   ├── gallery_screen.gd
+│   ├── gallery_screen.gd.uid
+│   ├── GalleryPage_bridge.gd
+│   ├── GalleryPage_bridge.gd.uid
+│   ├── GalleryPage.gd
+│   ├── GalleryPage.gd.uid
+│   ├── GalleryUI.gd.uid
+│   ├── Game.gd
+│   ├── Game.gd.uid
+│   ├── PageManager.gd
+│   ├── PageManager.gd.uid
+│   ├── ProfilePage.gd
+│   ├── ProfilePage.gd.uid
+│   ├── ScreenBase.gd
+│   ├── ScreenBase.gd.uid
+│   ├── SettingsDialog.gd
+│   ├── SettingsDialog.gd.uid
+│   ├── ShardToastNotifier.gd
+│   ├── ShardToastNotifier.gd.uid
+│   ├── ShopUI.gd
+│   ├── ShopUI.gd.uid
+│   ├── StartPage.gd
+│   ├── StartPage.gd.uid
+│   ├── UIBootstrap.gd.uid
+│   ├── WorldMap.gd
+│   ├── WorldMap.gd.uid
+│   └── WorldMapAdapter.gd.uid
+├── utils
+│   ├── NodeResolver.gd
+│   ├── NodeResolver.gd.uid
+│   └── TweenFactory.gd.uid
+├── VibrationManager.gd
+├── VibrationManager.gd.uid
+├── VisualAnchorManager.gd
+├── VisualAnchorManager.gd.uid
+└── WorldMap.gd.uid
+
+20 directories, 337 files
+
+
+
+
+
+
+
+1. GameManager.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/GameManager.gd
+2. FlowCoordinator.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/FlowCoordinator.gd
+3. ExperienceDirector.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/ExperienceDirector.gd
+4. runtime_pipeline/ExperiencePipeline.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/runtime_pipeline/ExperiencePipeline.gd
+5. runtime_pipeline/PipelineStep.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/runtime_pipeline/PipelineStep.gd
+6. LoadLevelStep.gd or ShowRewardsStep.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/runtime_pipeline/steps/LoadLevelStep.gd, https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/runtime_pipeline/steps/ShowRewardsStep.gd
+7. game/GameFlowController.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/game/GameFlowController.gd
+8. GameBoard.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/GameBoard.gd
+9. game/MatchOrchestrator.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/game/MatchOrchestrator.gd
+10. core/EventBus.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/core/EventBus.gd
+11. EventBus.gd (the duplicate one): https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/EventBus.gd
+12. ui/PageManager.gd: https://raw.githubusercontent.com/albuquerque/match-3-game/refs/heads/main/scripts/ui/PageManager.gd
+
+[autoload]
+
+TranslationBootstrap="*res://scripts/TranslationBootstrap.gd"
+GameState="*res://scripts/model/GameState.gd"
+AdMobManager="*res://scripts/AdMobManager.gd"
+LevelManager="*res://scripts/LevelManager.gd"
+ThemeManager="*res://scripts/ThemeManager.gd"
+RewardManager="*res://scripts/RewardManager.gd"
+GameManager="*res://scripts/GameManager.gd"
+AudioManager="*res://scripts/AudioManager.gd"
+StarRatingManager="*res://scripts/StarRatingManager.gd"
+EventBus="*res://scripts/EventBus.gd"
+EffectResolver="*res://scripts/EffectResolver.gd"
+AssetRegistry="*res://scripts/AssetRegistry.gd"
+VisualAnchorManager="*res://scripts/VisualAnchorManager.gd"
+DLCConfig="*res://scripts/DLCConfig.gd"
+DLCManager="*res://scripts/DLCManager.gd"
+NarrativeStageManager="*res://scripts/NarrativeStageManager.gd"
+ExperienceDirector="*res://scripts/ExperienceDirector.gd"
+CollectionManager="*res://scripts/CollectionManager.gd"
+VibrationManager="*res://scripts/VibrationManager.gd"
+PageManager="*res://scripts/ui/PageManager.gd"
+NodeResolvers="*res://scripts/helpers/node_resolvers.gd"
+ProgressManager="*res://scripts/progression/ProgressManager.gd"
+GalleryManager="*res://scripts/progression/GalleryManager.gd"
+GalleryImageLoader="*res://scripts/systems/GalleryImageLoader.gd"
+StoryManager="*res://scripts/systems/StoryManager.gd"
+AchievementManager="*res://scripts/progression/AchievementManager.gd"
+ProfileManager="*res://scripts/progression/ProfileManager.gd"
+ShardDropSystem="*res://scripts/systems/ShardDropSystem.gd"
+ShardToastNotifier="*res://scripts/ui/ShardToastNotifier.gd"

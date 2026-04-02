@@ -1,4 +1,4 @@
-extends "res://scripts/runtime_pipeline/PipelineStep.gd"
+extends "res://experience/pipeline/PipelineStep.gd"
 class_name ShowRewardsStep
 
 ## ShowRewardsStep
@@ -27,7 +27,7 @@ func execute(context) -> bool:
 	if context.get_result("level_failed", false):
 		print("[ShowRewardsStep] Level failed - showing failure screen instead of rewards")
 		# Show failure screen instead
-		var failure_step = load("res://scripts/runtime_pipeline/steps/ShowLevelFailureStep.gd").new(context.get_result("current_level", level_number))
+		var failure_step = load("res://experience/pipeline/steps/ShowLevelFailureStep.gd").new(context.get_result("current_level", level_number))
 		# Note: Don't manually set pipeline_context - execute() receives context as parameter
 		var success = await failure_step.execute(context)
 

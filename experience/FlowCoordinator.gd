@@ -11,13 +11,13 @@ signal flow_failed(flow_id: String, reason: String)
 signal node_started(node: Dictionary)
 signal node_completed(node: Dictionary)
 
-const _ExperiencePipeline = preload("res://scripts/runtime_pipeline/ExperiencePipeline.gd")
+const _ExperiencePipeline = preload("res://experience/pipeline/ExperiencePipeline.gd")
 
 func _ctx_builder():
-	return load("res://scripts/runtime_pipeline/ContextBuilder.gd")
+	return load("res://experience/pipeline/ContextBuilder.gd")
 
 func _step_factory():
-	return load("res://scripts/runtime_pipeline/NodeTypeStepFactory.gd")
+	return load("res://experience/pipeline/NodeTypeStepFactory.gd")
 
 # Components
 var parser: Node = null  # ExperienceFlowParser
@@ -37,13 +37,13 @@ func _create_components():
 	# Create parser
 	parser = Node.new()
 	parser.name = "ExperienceFlowParser"
-	parser.set_script(preload("res://scripts/ExperienceFlowParser.gd"))
+	parser.set_script(preload("res://experience/ExperienceFlowParser.gd"))
 	add_child(parser)
 
 	# Create state
 	state = Node.new()
 	state.name = "ExperienceState"
-	state.set_script(preload("res://scripts/ExperienceState.gd"))
+	state.set_script(preload("res://experience/ExperienceState.gd"))
 	add_child(state)
 
 	# Create pipeline

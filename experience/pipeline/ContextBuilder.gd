@@ -1,6 +1,6 @@
 extends RefCounted
 # class_name removed — loaded via load() in FlowCoordinator
-const _PipelineContext = preload("res://scripts/runtime_pipeline/PipelineContext.gd")
+const _PipelineContext = preload("res://experience/pipeline/PipelineContext.gd")
 
 ## ExecutionContextBuilder
 ## Builds PipelineContext with runtime references

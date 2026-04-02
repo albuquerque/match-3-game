@@ -1,4 +1,4 @@
-extends "res://scripts/runtime_pipeline/PipelineStep.gd"
+extends "res://experience/pipeline/PipelineStep.gd"
 class_name ShowNarrativeStep
 
 ## ShowNarrativeStep
@@ -60,7 +60,7 @@ func execute(context) -> bool:
 	# IMMEDIATELY hide the GameBoard to prevent old level from showing
 	var board = _context.game_board if _context else null
 	if not board:
-		var _ecb = load("res://scripts/runtime_pipeline/ContextBuilder.gd")
+		var _ecb = load("res://experience/pipeline/ContextBuilder.gd")
 		board = _ecb._find_game_board() if _ecb else null
 
 	if board:
@@ -262,7 +262,7 @@ func execute(context) -> bool:
 	if not narrative_manager:
 		print("[ShowNarrativeStep] NarrativeStageManager not found - attempting local renderer fallback")
 		# Try to load the renderer script dynamically and render the stage ourselves as a fallback
-		var rs = load("res://scripts/NarrativeStageRenderer.gd")
+		var rs = load("res://experience/narrative/NarrativeStageRenderer.gd")
 		var local_renderer = null
 		if rs and rs is Script:
 			local_renderer = Control.new()
