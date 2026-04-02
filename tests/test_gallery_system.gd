@@ -21,7 +21,7 @@ func _run_all() -> void:
 	_test_duplicate_shard_ignored_after_unlock()
 	_test_weight_selection()
 func _make_gallery_manager() -> Node:
-	var s = load("res://scripts/progression/GalleryManager.gd")
+	var s = load("res://meta/progression/GalleryManager.gd")
 	var gm = Node.new()
 	gm.set_script(s)
 	add_child(gm)
@@ -62,7 +62,7 @@ func _test_duplicate_shard_ignored_after_unlock() -> void:
 	_assert(gm._state["item_a"]["shards"] == 3, "duplicate_shard: shard count unchanged")
 	gm.queue_free()
 func _test_weight_selection() -> void:
-	var s = load("res://scripts/systems/ShardDropSystem.gd")
+	var s = load("res://meta/systems/ShardDropSystem.gd")
 	var sds = Node.new()
 	sds.set_script(s)
 	add_child(sds)

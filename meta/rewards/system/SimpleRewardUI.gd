@@ -1,5 +1,4 @@
 extends Control
-class_name SimpleRewardUI
 
 ## Simple Reward UI for Phase 2
 ## Displays score, stars, rewards and a Continue button

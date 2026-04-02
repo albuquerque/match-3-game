@@ -1,5 +1,4 @@
 extends Node2D
-class_name RewardRevealSystem
 
 ## Reward Reveal System
 ## Spawns reward icons and animates them flying to HUD positions

@@ -1,5 +1,4 @@
 extends Node2D
-class_name ContainerParticleSpawner
 
 ## Generic Particle Spawner for Reward Containers
 ## Theme-aware particle effects with configurable patterns

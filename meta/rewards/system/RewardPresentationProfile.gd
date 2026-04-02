@@ -1,5 +1,4 @@
 extends Node
-class_name RewardPresentationProfile
 
 ## Loads and manages reward presentation configurations from JSON
 

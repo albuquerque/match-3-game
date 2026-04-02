@@ -1,8 +1,7 @@
 extends Node2D
-class_name RewardContainer
 
-const _RewardRevealSystem = preload("res://scripts/reward_system/RewardRevealSystem.gd")
-const _ContainerParticleSpawner = preload("res://scripts/reward_system/ContainerParticleSpawner.gd")
+const _RewardRevealSystem = preload("res://meta/rewards/system/RewardRevealSystem.gd")
+const _ContainerParticleSpawner = preload("res://meta/rewards/system/ContainerParticleSpawner.gd")
 
 ## Generalized Reward Container
 ## Theme-agnostic container that can represent any reward presentation style

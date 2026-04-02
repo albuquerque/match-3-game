@@ -1,5 +1,4 @@
 extends Control
-class_name RewardSummaryPanel
 
 signal continue_pressed
 

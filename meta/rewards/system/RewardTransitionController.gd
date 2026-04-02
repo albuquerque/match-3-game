@@ -1,14 +1,13 @@
 extends Node
-class_name RewardTransitionController
 
-const _RewardContainer    = preload("res://scripts/reward_system/RewardContainer.gd")
-const _RewardSummaryPanel = preload("res://scripts/reward_system/RewardSummaryPanel.gd")
+const _RewardContainer    = preload("res://meta/rewards/system/RewardContainer.gd")
+const _RewardSummaryPanel = preload("res://meta/rewards/system/RewardSummaryPanel.gd")
 
 func _config_loader():
-	return load("res://scripts/reward_system/ContainerConfigLoader.gd")
+	return load("res://meta/rewards/system/ContainerConfigLoader.gd")
 
 func _selection_rules():
-	return load("res://scripts/reward_system/ContainerSelectionRules.gd")
+	return load("res://meta/rewards/system/ContainerSelectionRules.gd")
 
 ## RewardTransitionController
 ## Manages the complete reward reveal experience with stages and animations
