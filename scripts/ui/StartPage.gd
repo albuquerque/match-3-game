@@ -7,20 +7,9 @@ signal settings_pressed
 signal achievements_pressed
 signal map_pressed
 
-var NodeRes = null
-
-func _ensure_resolvers():
-	if NodeRes == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL:
-			NodeRes = s
-		else:
-			NodeRes = load("res://scripts/helpers/node_resolvers_shim.gd")
-
 func _ready():
 	# Call ScreenBase ready setup
 	ensure_fullscreen()
-	_ensure_resolvers()
 	# Create a simple layout programmatically so the scene file isn't required here
 	var vbox = VBoxContainer.new()
 	vbox.name = "VBox"
@@ -32,7 +21,7 @@ func _ready():
 	add_child(vbox)
 
 	# Create a theme_manager resolver for font helpers
-	var theme_manager = NodeRes._get_tm() if typeof(NodeRes) != TYPE_NIL else null
+	var theme_manager = NodeResolvers._get_tm()
 	var level_label = Button.new()
 	level_label.name = "LevelButton"
 	level_label.text = "Level: --"
@@ -145,9 +134,7 @@ func _ready():
 	visible = false
 	modulate = Color(1,1,1,0)
 
-	# Listen for language changes via NarrativeStageRenderer (or TranslationBootstrap signal)
-	# PR 5d: EventBus.language_changed removed — TranslationBootstrap emits locale_changed directly
-	# TODO PR 6: wire locale_changed from TranslationBootstrap when needed
+	# TranslationBootstrap emits locale_changed directly when language changes.
 
 	# If a level is already active when StartPage starts, hide immediately
 	if GameRunState and GameRunState.initialized:
@@ -168,7 +155,6 @@ func close():
 	# queue_free delegated to caller when desired
 
 func _get_pm() -> Node:
-	# PR 5c: resolve PageManager directly — no EventBus needed for navigation
 	if has_method("get_tree") and get_tree():
 		return get_tree().root.get_node_or_null("PageManager")
 	return null

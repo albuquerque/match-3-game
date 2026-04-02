@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name ShowLevelFailureStep
 
 ## ShowLevelFailureStep
@@ -17,7 +17,7 @@ func _init(lvl_num: int = 0):
 	super("show_level_failure")
 	level_number = lvl_num
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	"""Show level failure screen and wait for user input"""
 	print("[ShowLevelFailureStep] Level %d failed" % level_number)
 
@@ -50,7 +50,7 @@ func execute(context: PipelineContext) -> bool:
 	step_completed.emit(true)
 	return true
 
-func _create_failure_screen(context: PipelineContext):
+func _create_failure_screen(context):
 	"""Create failure UI overlay"""
 	var game_ui = context.game_ui
 	if not game_ui:

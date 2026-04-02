@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name AdRewardStep
 
 # AdRewardStep
@@ -12,7 +12,7 @@ func _init(id: String = "", payload: Dictionary = {}):
 	reward_id = id
 	reward_payload = payload
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	print("[AdRewardStep] Processing ad reward: %s" % reward_id)
 	if RewardManager and RewardManager.has_method("grant_rewards") and reward_payload:
 		RewardManager.grant_rewards(reward_payload)

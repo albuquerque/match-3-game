@@ -1,13 +1,14 @@
 extends RefCounted
-class_name ExecutionContextBuilder
+# class_name removed — loaded via load() in FlowCoordinator
+const _PipelineContext = preload("res://scripts/runtime_pipeline/PipelineContext.gd")
 
 ## ExecutionContextBuilder
 ## Builds PipelineContext with runtime references
 
-static func build_from_scene_tree() -> PipelineContext:
-	var context = PipelineContext.new()
-	var loop = Engine.get_main_loop()
-	context.viewport = loop.root if loop else null
+static func build_from_scene_tree():
+	var context = _PipelineContext.new()
+	var scene_tree := Engine.get_main_loop() as SceneTree
+	context.viewport = scene_tree.root if scene_tree else null
 
 	var board = _find_game_board()
 	if board:
@@ -30,13 +31,14 @@ static func build_from_scene_tree() -> PipelineContext:
 
 	return context
 
-static func build_with_references(board: Node, ui: Node, overlay: CanvasLayer = null) -> PipelineContext:
-	var context = PipelineContext.new()
+static func build_with_references(board: Node, ui: Node, overlay: CanvasLayer = null):
+	var context = _PipelineContext.new()
 	context.set_runtime_references(board, ui, overlay)
 	return context
 
 static func _find_game_board() -> Node:
-	var root = Engine.get_main_loop().root if Engine.get_main_loop() else null
+	var tree = Engine.get_main_loop() as SceneTree
+	var root = tree.root if tree else null
 	if not root:
 		return null
 	# Common locations tried in order
@@ -54,7 +56,8 @@ static func _find_game_board() -> Node:
 	return null
 
 static func _find_game_ui() -> Node:
-	var root = Engine.get_main_loop().root if Engine.get_main_loop() else null
+	var tree = Engine.get_main_loop() as SceneTree
+	var root = tree.root if tree else null
 	if not root:
 		return null
 	var ui = root.get_node_or_null("MainGame/GameUI")
@@ -63,7 +66,8 @@ static func _find_game_ui() -> Node:
 	return ui
 
 static func _find_or_create_overlay() -> CanvasLayer:
-	var root = Engine.get_main_loop().root if Engine.get_main_loop() else null
+	var tree = Engine.get_main_loop() as SceneTree
+	var root = tree.root if tree else null
 	if not root:
 		return null
 	var overlay = root.get_node_or_null("EffectOverlay")

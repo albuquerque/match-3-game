@@ -13,7 +13,7 @@ signal pipeline_completed(flow_id: String)
 signal pipeline_failed(flow_id: String, reason: String)
 
 # Execution state
-var context: PipelineContext = null
+var context = null  # PipelineContext
 var current_steps: Array = []
 var current_step_index: int = 0
 var is_running: bool = false
@@ -22,7 +22,7 @@ func _init():
 	name = "ExperiencePipeline"
 
 ## Start pipeline execution with the given context and steps
-func start(ctx: PipelineContext, steps: Array) -> void:
+func start(ctx, steps: Array) -> void:
 	if is_running:
 		print("[ExperiencePipeline] Pipeline already running - stopping existing pipeline and restarting")
 		stop()
@@ -49,7 +49,7 @@ func _execute_next_step() -> void:
 		_complete_pipeline()
 		return
 
-	var step: PipelineStep = current_steps[current_step_index]
+	var step = current_steps[current_step_index]
 	if not step:
 		push_error("[ExperiencePipeline] Invalid step at index %d" % current_step_index)
 		_fail_pipeline("invalid_step")
@@ -82,7 +82,7 @@ func _on_step_completed(success: bool) -> void:
 		print("[ExperiencePipeline] _on_step_completed called but current_step_index out of range")
 		return
 
-	var step: PipelineStep = current_steps[current_step_index]
+	var step = current_steps[current_step_index]
 
 	print("[ExperiencePipeline] Step completed: %s (success: %s)" % [step.step_name, success])
 	emit_signal("pipeline_step_completed", step.step_name, success)

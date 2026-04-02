@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name ConditionalStep
 
 # ConditionalStep
@@ -14,7 +14,7 @@ func _init(cond: String = "", t_branch: Dictionary = {}, f_branch: Dictionary = 
 	true_branch = t_branch
 	false_branch = f_branch
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	print("[ConditionalStep] Evaluating condition: %s" % condition_expr)
 	# Very simple condition evaluator: check a flag in experience_state or context
 	var result = false

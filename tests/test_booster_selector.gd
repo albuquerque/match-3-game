@@ -5,7 +5,7 @@ extends Node
 var BS = null
 
 func _ready():
-	BS = load("res://scripts/game/BoosterSelector.gd")
+	BS = load("res://games/match3/board/services/BoosterSelector.gd")
 	assert(BS != null, "BoosterSelector script must load")
 	print("[TEST] test_booster_selector starting")
 

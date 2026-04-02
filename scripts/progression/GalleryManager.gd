@@ -6,9 +6,9 @@ extends Node
 
 signal item_unlocked(item_id: String)
 signal shard_added(item_id: String, current: int, required: int)
-# Legacy signal kept for backward compat
+# Signal kept for compatibility with existing consumers
 signal gallery_item_unlocked(category: String, item_id: String)
-# PR 5c: direct signals replacing EventBus traffic
+# Emits directly to consumers via signals.
 signal shard_discovered(item_id: String, context: Dictionary)
 signal gallery_unlocked(item_id: String)
 
@@ -34,6 +34,12 @@ func _ready() -> void:
 	print("[GalleryManager] ready")
 	_load_definitions()
 	_load_state_from_progress()
+
+	# Debug toggle: set project setting "gallery/debug_emit_immediately" = true to emit signals immediately (useful when debugging missing UI hooks)
+	var _debug_immediate := false
+	if ProjectSettings.has_setting("gallery/debug_emit_immediately"):
+		_debug_immediate = bool(ProjectSettings.get_setting("gallery/debug_emit_immediately"))
+	self.set_meta("_debug_emit_immediately", _debug_immediate)
 
 # ── Data loading ──────────────────────────────────────────────────────────────
 
@@ -103,21 +109,46 @@ func add_shard(item_id: String) -> bool:
 	session_shards_collected += 1
 	var required: int = int(_definitions[item_id].get("shards_required", 9))
 	print("[GalleryManager] shard_added %s → %d/%d" % [item_id, st["shards"], required])
-	shard_added.emit(item_id, st["shards"], required)
-	# PR 5c: emit directly — EventBus no longer carries shard_discovered traffic
-	shard_discovered.emit(item_id, {"shards": st["shards"], "required": required})
+	# Diagnostic: immediate log that add_shard was invoked (helps trace missing toasts)
+	print("[GalleryManager] add_shard invoked for %s (current=%d required=%d)" % [item_id, st["shards"], required])
+	# Always emit deferred so UI listeners created later in the same frame can receive events
+	call_deferred("_deferred_emit_shard_added", item_id, st["shards"], required)
+	# Emit via deferred helper.
+	call_deferred("_deferred_emit_shard_discovered", item_id, {"shards": st["shards"], "required": required})
 	if st["shards"] >= required:
 		st["unlocked"] = true
 		session_items_unlocked.append(item_id)
 		print("[GalleryManager] Unlocked gallery item: %s" % item_id)
-		item_unlocked.emit(item_id)
+		# Defer unlock-related emits to avoid interrupting gameplay logic
+		call_deferred("_deferred_emit_item_unlocked", item_id)
 		var cat: String = str(_definitions[item_id].get("category", "artifacts"))
-		gallery_item_unlocked.emit(cat, item_id)  # legacy
-		gallery_unlocked.emit(item_id)
+		call_deferred("_deferred_emit_gallery_item_unlocked", cat, item_id)  # legacy
+		call_deferred("_deferred_emit_gallery_unlocked", item_id)
 		_persist_state()
 		return true
 	_persist_state()
 	return false
+
+## Deferred emit helpers — keep the actual signal emission in a later idle frame
+func _deferred_emit_shard_added(item_id: String, current: int, required: int) -> void:
+	print("[GalleryManager] _deferred_emit_shard_added firing for %s -> %d/%d" % [item_id, current, required])
+	shard_added.emit(item_id, current, required)
+
+func _deferred_emit_shard_discovered(item_id: String, context: Dictionary) -> void:
+	print("[GalleryManager] _deferred_emit_shard_discovered firing for %s -> %s" % [item_id, str(context)])
+	shard_discovered.emit(item_id, context)
+
+func _deferred_emit_item_unlocked(item_id: String) -> void:
+	print("[GalleryManager] _deferred_emit_item_unlocked firing for %s" % item_id)
+	item_unlocked.emit(item_id)
+
+func _deferred_emit_gallery_item_unlocked(category: String, item_id: String) -> void:
+	print("[GalleryManager] _deferred_emit_gallery_item_unlocked firing for %s:%s" % [category, item_id])
+	gallery_item_unlocked.emit(category, item_id)
+
+func _deferred_emit_gallery_unlocked(item_id: String) -> void:
+	print("[GalleryManager] _deferred_emit_gallery_unlocked firing for %s" % item_id)
+	gallery_unlocked.emit(item_id)
 
 func get_progress(item_id: String) -> Dictionary:
 	if not _state.has(item_id):
@@ -152,7 +183,7 @@ func get_categories() -> Array:
 		cats[cat] = true
 	return cats.keys()
 
-# ── Legacy unlock API (category-based, kept for backward compat) ──────────────
+# ── Category-based unlock API ──────────────────────────────────────────────────
 
 func unlock_item(category: String, item_id: String) -> void:
 	if not _state.has(item_id):

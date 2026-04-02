@@ -1,18 +1,11 @@
 ## Match3Game — Thin wrapper that surfaces win/loss through the BaseGame interface.
 ##
 ## Responsibilities (and ONLY these):
-##   1. Bridge GameManager.level_complete → BaseGame.game_won signal.
-##   2. Bridge GameManager.game_over    → BaseGame.game_lost signal.
+##   1. Bridge GameBoard.level_complete → BaseGame.game_won signal.
+##   2. Bridge GameBoard.game_over    → BaseGame.game_lost signal.
 ##   3. Implement start() / stop() as required by BaseGame.
-##
-## ⚠️  GameBoard is NOT a child of Match3Game.tscn in shadow mode (PR 2–3).
-##     The board lives in MainGame.tscn and is driven by GameManager.
-##     In PR 6 the board will be moved here and the tscn updated.
-##
-## ✅ PR 2/3 — old system still drives gameplay; this node observes in parallel.
-## ❌ Does NOT touch MatchOrchestrator, EventBus, or any other subsystem.
 class_name Match3Game
-extends BaseGame
+extends "res://games/base/BaseGame.gd"
 
 ## Emitted after game_won to pass along final score and stars (convenience).
 signal match3_level_won(level: int, score: int, stars: int)
@@ -22,7 +15,7 @@ signal match3_level_lost(level: int, score: int)
 
 # ── Private ───────────────────────────────────────────────────────────────────
 
-var _game_manager: Node = null  # Resolved via autoload at start()
+var _board_connected: bool = false
 
 # ── BaseGame overrides ────────────────────────────────────────────────────────
 
@@ -30,63 +23,61 @@ var _game_manager: Node = null  # Resolved via autoload at start()
 ## For now this is a no-op stub — the old system still loads levels.
 func start(_level_data: Dictionary) -> void:
 	print("[Match3Game] start() — level_data keys: ", _level_data.keys())
-	_connect_game_manager()
+	_connect_board()
 
 ## Called when leaving this game (win, loss, or abort).
 func stop() -> void:
 	print("[Match3Game] stop()")
-	_disconnect_game_manager()
+	_disconnect_board()
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
 	# Auto-connect on scene entry so the signals fire even before ExperienceDirector
 	# calls start() (old-system compatibility for PR 2).
-	_connect_game_manager()
+	_connect_board()
 
 func _exit_tree() -> void:
-	_disconnect_game_manager()
+	_disconnect_board()
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
-func _connect_game_manager() -> void:
-	if _game_manager != null:
-		return  # Already connected.
-	_game_manager = get_node_or_null("/root/GameManager")
-	if _game_manager == null:
-		push_warning("[Match3Game] GameManager autoload not found — signals not wired.")
+func _connect_board() -> void:
+	if _board_connected:
 		return
-
-	if not _game_manager.is_connected("level_complete", _on_level_complete):
-		_game_manager.connect("level_complete", _on_level_complete)
-
-	if not _game_manager.is_connected("game_over", _on_game_over):
-		_game_manager.connect("game_over", _on_game_over)
-
-	print("[Match3Game] Connected to GameManager signals.")
-
-func _disconnect_game_manager() -> void:
-	if _game_manager == null:
+	var board = GameRunState.board_ref
+	if board == null:
+		push_warning("[Match3Game] board_ref not yet set — signals not wired.")
 		return
-	if _game_manager.is_connected("level_complete", _on_level_complete):
-		_game_manager.disconnect("level_complete", _on_level_complete)
-	if _game_manager.is_connected("game_over", _on_game_over):
-		_game_manager.disconnect("game_over", _on_game_over)
-	_game_manager = null
+	if board.has_signal("level_complete") and not board.is_connected("level_complete", _on_level_complete):
+		board.connect("level_complete", _on_level_complete)
+	if board.has_signal("game_over") and not board.is_connected("game_over", _on_game_over):
+		board.connect("game_over", _on_game_over)
+	_board_connected = true
+	print("[Match3Game] Connected to board_ref signals")
+
+func _disconnect_board() -> void:
+	var board = GameRunState.board_ref
+	if board and is_instance_valid(board):
+		if board.is_connected("level_complete", _on_level_complete):
+			board.disconnect("level_complete", _on_level_complete)
+		if board.is_connected("game_over", _on_game_over):
+			board.disconnect("game_over", _on_game_over)
+	_board_connected = false
 
 # ── Signal handlers ───────────────────────────────────────────────────────────
 
 func _on_level_complete() -> void:
-	var lvl   = _game_manager.level         if _game_manager else 0
-	var score = _game_manager.score         if _game_manager else 0
-	var stars = _game_manager.last_level_moves_left if _game_manager else 0
+	var lvl   = GameRunState.level
+	var score = GameRunState.score
+	var stars = GameRunState.last_level_moves_left
 	print("[Match3Game] → game_won (level=%d score=%d)" % [lvl, score])
 	match3_level_won.emit(lvl, score, stars)
 	game_won.emit()
 
 func _on_game_over() -> void:
-	var lvl   = _game_manager.level if _game_manager else 0
-	var score = _game_manager.score if _game_manager else 0
+	var lvl   = GameRunState.level
+	var score = GameRunState.score
 	print("[Match3Game] → game_lost (level=%d score=%d)" % [lvl, score])
 	match3_level_lost.emit(lvl, score)
 	game_lost.emit()

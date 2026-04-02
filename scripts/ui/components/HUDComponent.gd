@@ -2,7 +2,7 @@ extends VBoxContainer
 class_name HUDComponent
 
 ## HUDComponent: owns and updates all in-game HUD elements.
-## E1: Self-wiring — connects directly to GameManager + RewardManager signals.
+## E1: Self-wiring — connects directly to GameBoard (via GameRunState.board_ref) + RewardManager signals.
 ## GameUI no longer needs HUD signal handlers.
 ## Registered with VisualAnchorManager as "hud" so narrative effects can
 ## show/hide it independently without touching GameUI.
@@ -18,35 +18,40 @@ signal hud_ready
 @onready var lives_label: Label        = get_node_or_null("CurrencyPanel/HBox/LivesLabel")
 
 func _ready() -> void:
-	# Register with VisualAnchorManager so effects can hide/show the HUD independently
 	if VisualAnchorManager:
 		VisualAnchorManager.register_anchor("hud", self)
-	_connect_signals()
+	call_deferred("_connect_signals")
 	emit_signal("hud_ready")
 
 func _connect_signals() -> void:
-	# Connect to GameManager autoload signals directly
-	var gm = _gm()
-	if gm:
-		if not gm.is_connected("score_changed", _on_score_changed):
-			gm.connect("score_changed", _on_score_changed)
-		if not gm.is_connected("moves_changed", _on_moves_changed):
-			gm.connect("moves_changed", _on_moves_changed)
-		if not gm.is_connected("level_changed", _on_level_changed):
-			gm.connect("level_changed", _on_level_changed)
-		if not gm.is_connected("collectibles_changed", _on_collectibles_changed):
-			gm.connect("collectibles_changed", _on_collectibles_changed)
-		if gm.has_signal("unmovables_changed") and not gm.is_connected("unmovables_changed", _on_unmovables_changed):
-			gm.connect("unmovables_changed", _on_unmovables_changed)
-		if gm.has_signal("level_loaded") and not gm.is_connected("level_loaded", _on_level_loaded):
-			gm.connect("level_loaded", _on_level_loaded)
+	var board = GameRunState.board_ref
+	if board == null:
+		await get_tree().create_timer(0.1).timeout
+		board = GameRunState.board_ref
+	if board:
+		if board.has_signal("score_changed") and not board.is_connected("score_changed", _on_score_changed):
+			board.connect("score_changed", _on_score_changed)
+		if board.has_signal("moves_changed") and not board.is_connected("moves_changed", _on_moves_changed):
+			board.connect("moves_changed", _on_moves_changed)
+		if board.has_signal("level_changed") and not board.is_connected("level_changed", _on_level_changed):
+			board.connect("level_changed", _on_level_changed)
+		if board.has_signal("collectibles_changed") and not board.is_connected("collectibles_changed", _on_collectibles_changed):
+			board.connect("collectibles_changed", _on_collectibles_changed)
+		if board.has_signal("unmovables_changed") and not board.is_connected("unmovables_changed", _on_unmovables_changed):
+			board.connect("unmovables_changed", _on_unmovables_changed)
+		if board.has_signal("level_loaded") and not board.is_connected("level_loaded", _on_level_loaded):
+			board.connect("level_loaded", _on_level_loaded)
+		# level_loaded_ctx fires on every level start — use it as a guaranteed refresh trigger
+		if board.has_signal("level_loaded_ctx") and not board.is_connected("level_loaded_ctx", _on_level_loaded_ctx):
+			board.connect("level_loaded_ctx", _on_level_loaded_ctx)
+		# Catch-up: if level already loaded, refresh now
+		if GameRunState.initialized:
+			_refresh_from_state()
 	# Connect to RewardManager for currency display
 	var rm = _rm()
 	if rm and rm.has_signal("coins_changed") and not rm.is_connected("coins_changed", _on_currency_changed):
 		rm.connect("coins_changed", _on_currency_changed)
 
-func _gm():
-	return Engine.get_singleton("GameManager") if Engine.has_singleton("GameManager") else get_node_or_null("/root/GameManager")
 
 func _rm():
 	return get_node_or_null("/root/RewardManager")
@@ -54,22 +59,22 @@ func _rm():
 # ── Self-wired signal handlers ───────────────────────────────────────────────
 
 func _on_level_loaded() -> void:
-	_refresh_from_gm()
+	_refresh_from_state()
+
+func _on_level_loaded_ctx(_level_id: String = "", _ctx: Dictionary = {}) -> void:
+	_refresh_from_state()
 
 func _on_score_changed(new_score: int) -> void:
-	var gm = _gm()
-	var unmov = gm.unmovable_target if gm else 0
-	var coll  = gm.collectible_target if gm else 0
 	set_score(new_score)
-	if unmov == 0 and coll == 0:
-		set_target_score(new_score, gm.target_score if gm else 1)
+	if GameRunState.unmovable_target == 0 and GameRunState.collectible_target == 0:
+		set_target_score(new_score, GameRunState.target_score)
 
 func _on_moves_changed(moves: int) -> void:
 	set_moves(moves)
 
 func _on_level_changed(new_level: int) -> void:
 	set_level(new_level)
-	_refresh_from_gm()
+	_refresh_from_state()
 
 func _on_collectibles_changed(collected: int, target: int) -> void:
 	set_objective_collectibles(collected, target)
@@ -80,19 +85,17 @@ func _on_unmovables_changed(cleared: int, target: int) -> void:
 func _on_currency_changed(_amount: int) -> void:
 	_refresh_currency()
 
-func _refresh_from_gm() -> void:
-	var gm = _gm()
-	if not gm:
-		return
-	set_score(gm.score)
-	set_level(gm.level)
-	set_moves(gm.moves_left)
-	if gm.unmovable_target > 0:
-		set_objective_unmovables(gm.unmovables_cleared, gm.unmovable_target)
-	elif gm.collectible_target > 0:
-		set_objective_collectibles(gm.collectibles_collected, gm.collectible_target)
-	else:
-		set_target_score(gm.score, gm.target_score)
+func _refresh_from_state() -> void:
+	if GameRunState.initialized:
+		set_score(GameRunState.score)
+		set_level(GameRunState.level)
+		set_moves(GameRunState.moves_left)
+		if GameRunState.unmovable_target > 0:
+			set_objective_unmovables(GameRunState.unmovables_cleared, GameRunState.unmovable_target)
+		elif GameRunState.collectible_target > 0:
+			set_objective_collectibles(GameRunState.collectibles_collected, GameRunState.collectible_target)
+		else:
+			set_target_score(GameRunState.score, GameRunState.target_score)
 	_refresh_currency()
 
 func _refresh_currency() -> void:

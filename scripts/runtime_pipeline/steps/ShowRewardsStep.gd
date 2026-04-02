@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name ShowRewardsStep
 
 ## ShowRewardsStep
@@ -20,14 +20,14 @@ func _init(lvl_num: int = 0, completed: bool = true):
 	level_number = lvl_num
 	level_completed = completed
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	print("[ShowRewardsStep] Showing rewards for level %d (completed: %s)" % [level_number, level_completed])
 
 	# Check if level actually failed
 	if context.get_result("level_failed", false):
 		print("[ShowRewardsStep] Level failed - showing failure screen instead of rewards")
 		# Show failure screen instead
-		var failure_step = ShowLevelFailureStep.new(context.get_result("current_level", level_number))
+		var failure_step = load("res://scripts/runtime_pipeline/steps/ShowLevelFailureStep.gd").new(context.get_result("current_level", level_number))
 		# Note: Don't manually set pipeline_context - execute() receives context as parameter
 		var success = await failure_step.execute(context)
 
@@ -37,7 +37,8 @@ func execute(context: PipelineContext) -> bool:
 			# Restart the experience flow at the same level
 			# This ensures the pipeline is active for the next attempt
 			var level_to_retry = context.get_result("current_level", level_number)
-			var xd = NodeResolvers._get_xd()
+			var _st3 := Engine.get_main_loop() as SceneTree
+			var xd = _st3.root.get_node_or_null("/root/ExperienceDirector") if _st3 else null
 			if xd and xd.has_method("start_flow_at_level"):
 				xd.start_flow_at_level(level_to_retry)
 			else:
@@ -75,19 +76,32 @@ func execute(context: PipelineContext) -> bool:
 	return _show_reward_screen(context)
 
 
-func _show_reward_screen(context: PipelineContext) -> bool:
+func _show_reward_screen(context) -> bool:
 	"""Show the reward screen with animated containers"""
 
 	# Get current theme
-	var theme_name = ThemeManager.get_theme_name() if ThemeManager else "modern"
+	var _st := Engine.get_main_loop() as SceneTree
+	var _theme_mgr = _st.root.get_node_or_null("ThemeManager") if _st else null
+	var theme_name: String = _theme_mgr.get_theme_name() if _theme_mgr and _theme_mgr.has_method("get_theme_name") else "modern"
 
-	# Load appropriate profile for theme
-	var profile_id = RewardPresentationProfile.get_profile_for_theme(theme_name)
-	var profile = RewardPresentationProfile.load_profile(profile_id)
+	# Load reward profile via explicit path to avoid class_name cache dependency
+	var _rpp = load("res://scripts/reward_system/RewardPresentationProfile.gd")
+	var profile_id: String = _rpp.get_profile_for_theme(theme_name) if _rpp else "default_chest"
+	var profile: Dictionary = _rpp.load_profile(profile_id) if _rpp else {}
 
 	if profile.is_empty():
-		push_error("[ShowRewardsStep] Could not load reward profile")
-		return false
+		# Fallback to built-in default so we never hard-fail here
+		profile = {
+			"profile_id": "default",
+			"container_type": "CHEST",
+			"open_method": "tap",
+			"stages": ["spawn_container", "interaction", "reward_reveal", "summary"],
+			"reward_reveal": {
+				"spawn_pattern": "simple",
+				"delay_between_rewards_ms": 200,
+				"hud_fly_animation": true
+			}
+		}
 
 	# Create reward data
 	var reward_data = {

@@ -1,18 +1,7 @@
 extends Node
 class_name EffectExecutorScreenFlash
 
-var NodeResolvers = null
-
-func _ensure_resolvers():
-	if NodeResolvers == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL and s.has_method("_get_vam"):
-			NodeResolvers = s
-		else:
-			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
-
 func execute(context: Dictionary) -> void:
-	_ensure_resolvers()
 	var params = context.get("params", {})
 	var viewport = context.get("viewport", null)
 	if not viewport:
@@ -26,8 +15,7 @@ func execute(context: Dictionary) -> void:
 
 	# Trigger vibration for high-intensity flashes (like lightning)
 	if intensity >= 0.5:
-		# Use fallback autoload lookup to avoid analyzer errors on _get_vm
-		var vm = NodeResolvers._fallback_autoload("VibrationManager")
+		var vm = NodeResolvers._get_vm()
 		if vm and vm.has_method("vibrate_lightning"):
 			vm.vibrate_lightning()
 

@@ -646,19 +646,16 @@ func _update_rewards_display(coins: int, gems: int):
 		rewards_container.remove_child(child)
 		child.free()
 
-	# Add performance summary if we have level data
-	var game_manager = NodeResolvers._get_gm()
-	if game_manager == null:
-		game_manager = NodeResolvers._get_gm()
-	if game_manager and game_manager.last_level_moves_left >= 0:
+	# Use GameRunState for last-level snapshot.
+	if GameRunState.last_level_moves_left >= 0:
 		var level_manager = NodeResolvers._get_lm()
 		if level_manager == null:
 			level_manager = get_node_or_null("/root/LevelManager")
 		if level_manager and has_method("get_level"):
-			var level_data = level_manager.get_level(level_manager.current_level_index)
-			if level_data:
-				var total_moves = level_data.moves
-				var moves_used = total_moves - game_manager.last_level_moves_left
+			var level_data2 = level_manager.get_level(level_manager.current_level_index)
+			if level_data2:
+				var total_moves = level_data2.moves
+				var moves_used = total_moves - GameRunState.last_level_moves_left
 				var efficiency = int((float(total_moves - moves_used) / float(total_moves)) * 100)
 
 				# Performance summary
@@ -1115,58 +1112,40 @@ func _on_replay_pressed():
 	# Hide this screen
 	visible = false
 
-	# Get the level that was just completed
-	var game_manager = NodeResolvers._get_gm()
-	if game_manager:
-		var level_to_replay = game_manager.last_level_number
-		print("[LevelTransition] Want to replay level %d" % level_to_replay)
-		print("[LevelTransition] Current NodeResolvers._get_gm().level = %d" % game_manager.level)
+	# Replay via GameRunState + GameStateBridge.
+	var level_to_replay = GameRunState.last_level_number
+	if level_to_replay <= 0:
+		level_to_replay = GameRunState.level
+	print("[LevelTransition] Replaying level %d" % level_to_replay)
 
-		# Reset GameManager state
-		game_manager.level_transitioning = false
-		game_manager.initialized = false
+	# Reset transient GameRunState flags
+	GameRunState.level_transitioning = false
+	GameRunState.initialized = false
+	GameRunState.level = level_to_replay
 
-		# IMPORTANT: Set the level back to the one we want to replay
-		game_manager.level = level_to_replay
+	# Update LevelManager index
+	var _nr = load("res://scripts/helpers/node_resolvers.gd")
+	var lm = _nr._get_lm() if _nr else get_node_or_null("/root/LevelManager")
+	if lm and lm.has_method("set_current_level"):
+		lm.set_current_level(level_to_replay - 1)
+		print("[LevelTransition] Set LevelManager to index %d (level %d)" % [level_to_replay - 1, level_to_replay])
+	elif lm and "current_level_index" in lm:
+		lm.current_level_index = level_to_replay - 1
 
-		# Set level manager index to the level we want to replay (0-indexed)
-		if game_manager.level_manager:
-			var replay_index = level_to_replay - 1
-			game_manager.level_manager.current_level_index = replay_index
-			print("[LevelTransition] Set level_manager.current_level_index to %d (for level %d)" % [replay_index, level_to_replay])
+	# Ensure board is visible
+	var game_board = GameRunState.board_ref
+	if game_board == null:
+		game_board = NodeResolvers._get_board()
+	if game_board:
+		game_board.visible = true
+		print("[LevelTransition] GameBoard set to visible")
 
-		# Resolve game_board (prefer NodeResolvers._get_gm().get_board())
-		var game_board = null
-		if typeof(NodeResolvers) != TYPE_NIL and NodeResolvers._get_gm() and NodeResolvers._get_gm().has_method("get_board"):
-			game_board = NodeResolvers._get_gm().get_board()
-		else:
-			var rt5 = get_tree().root
-			if rt5:
-				var main_game = rt5.get_node_or_null("MainGame")
-				if main_game:
-					game_board = main_game.get_node_or_null("GameBoard")
-				else:
-					game_board = null
-
-		if game_board == null:
-			print("[LevelTransition] Warning: GameBoard not found for level transition")
-
-		# Show the GameBoard (it was hidden during level complete)
-		if game_board:
-			game_board.visible = true
-			print("[LevelTransition] GameBoard set to visible")
-
-		# Reload the level (this will emit level_loaded signal)
-		game_manager.load_current_level()
-
-		# Show the start page for this level
-		var game_ui = get_node_or_null("../GameUI") if get_parent() else null
-		if game_ui and game_ui.start_page:
-			game_ui.start_page.visible = true
-			if game_ui.start_page.has_method("set_level_info"):
-				game_ui.start_page.set_level_info(level_to_replay)
+	# Reload level via GameStateBridge
+	var bridge = load("res://games/match3/services/GameStateBridge.gd")
+	if bridge != null and bridge.has_method("initialize_game"):
+		bridge.initialize_game()
 	else:
-		print("[LevelTransition] ERROR: GameManager not found for replay")
+		push_error("[LevelTransition] ERROR: GameStateBridge not found for replay — level will not reload")
 
 func _connect_admob_signals():
 	# Connect to AdMobManager signals if available
@@ -1183,3 +1162,10 @@ func _connect_admob_signals():
 		print("[LevelTransition] AdMob signals connected")
 	else:
 		print("[LevelTransition] AdMobManager not found - running in test mode")
+
+func _on_admob_loaded() -> void:
+	print("[LevelTransition] AdMob rewarded ad loaded")
+
+func _on_admob_rewarded(_reward_type: String = "", _reward_amount: int = 0) -> void:
+	print("[LevelTransition] AdMob rewarded: %s x%d" % [_reward_type, _reward_amount])
+

@@ -2,7 +2,7 @@ extends Node
 ## EffectResolver - Central dispatcher that maps events to visual effects
 ## Loads effect definitions from JSON and instantiates executors
 ## This class must NOT contain story-specific logic
-## PR 5d: EventBus removed — all signals now connected directly to GameManager
+## Connects directly to GameBoard signals (true owner).
 
 # Active effect definitions loaded from chapter JSON
 var active_effects: Array = []
@@ -67,7 +67,7 @@ func _ready():
 	# Register effect executors
 	_register_executors()
 
-	# Connect directly to GameManager signals (EventBus removed in PR 5d)
+	# Connect directly to GameBoard signals (true owner)
 	_connect_event_signals()
 
 	# Dev: force-load test chapter for level 4 if enabled
@@ -106,23 +106,45 @@ func _register_executors():
 
 	print("[EffectResolver] Registered %d executors" % executors.size())
 
-## Connect to gameplay signals directly on GameManager (EventBus removed PR 5d)
+## Connect to gameplay signals via GameBoard (true signal owner).
 func _connect_event_signals():
-	var gm = get_node_or_null("/root/GameManager")
-	if not gm:
-		push_warning("[EffectResolver] GameManager not found — visual effects disabled")
-		return
+	# Prefer active registered board_ref (set by GameBoard._ready) to avoid scene traversal and races
+	var board_node: Node = null
+	if GameRunState.board_ref != null:
+		board_node = GameRunState.board_ref
+	else:
+		# Fallback: try to find GameBoard in current scene tree
+		if has_method("get_tree") and get_tree() != null:
+			var tree = get_tree()
+			var stack = [tree.get_root()]
+			while stack.size() > 0 and board_node == null:
+				var rn = stack.pop_back()
+				for i in range(rn.get_child_count()):
+					var c = rn.get_child(i)
+					if not c:
+						continue
+					if str(c.name) == "GameBoard":
+						board_node = c
+						break
+					stack.append(c)
 
-	gm.level_loaded_ctx.connect(_on_level_loaded_ctx)
-	gm.level_complete.connect(_on_level_complete_direct)
-	gm.match_cleared.connect(_on_match_cleared)
-	gm.special_tile_activated.connect(_on_event_with_entity.bind("special_tile_activated"))
-	# tile_destroyed still on EventBus until PR 6 migrates BoardActionExecutor emitter
+	if board_node != null:
+		print("[EffectResolver] Connecting to GameBoard signals")
+		if board_node.has_signal("level_loaded_ctx"):
+			board_node.connect("level_loaded_ctx", Callable(self, "_on_level_loaded_ctx"))
+		if board_node.has_signal("level_complete"):
+			board_node.connect("level_complete", Callable(self, "_on_level_complete_direct"))
+		if board_node.has_signal("match_cleared"):
+			board_node.connect("match_cleared", Callable(self, "_on_match_cleared"))
+	else:
+		push_warning("[EffectResolver] GameBoard not found — visual effects disabled until board_ref is set")
+
+	# EventBus fallback kept for tile_destroyed until EventBus is fully removed
 	var eb = get_node_or_null("/root/EventBus")
 	if eb and eb.has_signal("tile_destroyed"):
 		eb.tile_destroyed.connect(_on_event_with_entity.bind("tile_destroyed"))
 
-	print("[EffectResolver] Connected to GameManager signals")
+	print("[EffectResolver] Signal wiring complete")
 
 ## Load effect definitions from chapter JSON
 func load_effects(chapter_data: Dictionary) -> bool:
@@ -268,11 +290,11 @@ func _exit_tree():
 
 	print("[EffectResolver] Cleanup complete")
 
-## PR 5d: GameManager.level_loaded_ctx handler (level_id: String, context: Dictionary)
+## Handler for level_loaded_ctx signal (level_id: String, context: Dictionary)
 func _on_level_loaded_ctx(level_id: String, context: Dictionary):
 	_process_event("level_loaded", level_id, context)
 
-## PR 5d: GameManager.level_complete handler (no-arg signal)
+## Handler for level_complete signal
 func _on_level_complete_direct():
 	_process_event("level_complete", "level_%d" % GameRunState.level, {
 		"level": GameRunState.level, "score": GameRunState.score
@@ -316,9 +338,7 @@ func _process_event(event_name: String, entity_id: String, context: Dictionary):
 				var required_level = condition.get("level")
 				var current_level = context.get("level", 0)
 				if current_level == 0:
-					var gm_local = _get_gm()
-					if gm_local:
-						current_level = gm_local.level if "level" in gm_local else 0
+					current_level = GameRunState.level
 
 				print("[EffectResolver] Level condition check: current=%d, required=%d" % [current_level, required_level])
 				if current_level != required_level:
@@ -369,7 +389,7 @@ func _execute_effect(binding: Dictionary, entity_id: String, context: Dictionary
 		var tree = get_tree()
 		# Prefer the current scene (more likely to be a Node that supports find_node)
 		var cs = tree.get_current_scene()
-		if cs != null:
+		if cs != null and cs.has_method("find_node"):
 			resolved_viewport = cs
 		# Fallback to the SceneTree root (Window) which contains the scene
 		if resolved_viewport == null and tree.get_root() != null:
@@ -405,16 +425,11 @@ func _execute_effect(binding: Dictionary, entity_id: String, context: Dictionary
 						break
 					stack.append(c)
 
-	# Last resort: absolute path or GameManager-provided board
-	if not board_node:
-		var gm = NodeResolvers._get_gm()
-		if gm and gm.has_method("get_board"):
-			board_node = gm.get_board()
-		else:
-			board_node = NodeResolvers._get_board()
+	if not board_node and GameRunState.board_ref != null:
+		board_node = GameRunState.board_ref
 
 	if board_node == null:
-		print("[EffectResolver] Warning: GameBoard not found via NodeResolvers._get_gm().get_board() (STRICT)")
+		print("[EffectResolver] Warning: GameBoard not found")
 
 	exec_context.board = board_node
 
@@ -436,6 +451,3 @@ func _dev_emit_level_loaded() -> void:
 	print("[EffectResolver] DEV_FLAG: Simulating level_loaded for testing (level_4)")
 	_on_level_loaded_ctx("level_4", {"level": 4, "target": 4960})
 
-# Helper: resolve GameManager autoload safely
-func _get_gm():
-	return NodeResolvers._get_gm()

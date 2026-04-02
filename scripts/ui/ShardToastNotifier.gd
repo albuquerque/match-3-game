@@ -26,6 +26,7 @@ func _ready() -> void:
 		push_error("[ShardToastNotifier] GalleryManager not found")
 	print("[ShardToastNotifier] ready")
 func _on_shard_discovered(item_id: String, _context: Dictionary) -> void:
+	print("[ShardToastNotifier] _on_shard_discovered called for %s context=%s" % [item_id, str(_context)])
 	var prog := GalleryManager.get_progress(item_id)
 	# If already unlocked at this point, the unlock toast will handle it via gallery_item_unlocked
 	if prog.get("unlocked", false):
@@ -38,6 +39,7 @@ func _on_shard_discovered(item_id: String, _context: Dictionary) -> void:
 		_next()
 
 func _on_gallery_item_unlocked(item_id: String) -> void:
+	print("[ShardToastNotifier] _on_gallery_item_unlocked called for %s" % item_id)
 	var item_name: String = _get_item_name(item_id)
 	var prog := GalleryManager.get_progress(item_id)
 	_queue.append({"name": item_name, "shards": prog.get("required", 0), "required": prog.get("required", 0), "unlock": true})
@@ -58,6 +60,7 @@ func _next() -> void:
 	_queue.remove_at(0)
 	_show_popup(data)
 func _show_popup(data: Dictionary) -> void:
+	print("[ShardToastNotifier] _show_popup called: data=%s" % str(data))
 	var is_unlock: bool = data.get("unlock", false)
 	var popup := _build_popup(data)
 	# Ensure the entire popup tree passes input through to the game board

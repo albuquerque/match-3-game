@@ -20,7 +20,6 @@ signal stage_shown(stage_id: String, fullscreen: bool)
 signal stage_cleared()
 signal hud_visibility_changed(visible: bool)  ## Emitted when a stage requires HUD hide/show
 
-var NodeResolvers = null
 var _hud_hidden_by_stage: bool = false  ## tracks whether WE hid the HUD
 
 func _ready():
@@ -295,10 +294,3 @@ func trigger_event(event_name: String, context: Dictionary = {}):
 	print("[NarrativeStageManager] Cannot trigger event; controller missing or method not available: ", event_name)
 	return false
 
-func _ensure_resolvers():
-	if NodeResolvers == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL:
-			NodeResolvers = s
-		else:
-			NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")

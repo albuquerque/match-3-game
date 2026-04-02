@@ -23,34 +23,19 @@ var gems: int = 0
 var title_color: Color = Color(1.0, 0.9, 0.3, 1.0)  # Gold
 var text_color: Color = Color(1.0, 1.0, 1.0, 1.0)  # White
 
-var NodeResolvers = null
-
-func _ensure_resolvers():
-    if NodeResolvers == null:
-        var s = load("res://scripts/helpers/node_resolvers_api.gd")
-        if s != null and typeof(s) != TYPE_NIL:
-            NodeResolvers = s
-        else:
-            NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
-
 # Cached AudioManager for this UI
 var _cached_am: Node = null
 
 func _am():
 	if is_instance_valid(_cached_am):
 		return _cached_am
-	var a = NodeResolvers._fallback_autoload("AudioManager")
-	if a == null and has_method("get_tree"):
-		var _root = get_tree().root
-		if _root:
-			a = _root.get_node_or_null("AudioManager")
+	var a = NodeResolvers._get_am()
 	_cached_am = a
 	return a
 
 func _ready():
-	_ensure_resolvers()
 	# Get theme colors from ThemeManager if available
-	var _tm = NodeResolvers._get_tm() if typeof(NodeResolvers) != TYPE_NIL else null
+	var _tm = NodeResolvers._get_tm()
 	if _tm and _tm.has_method("get_theme_name"):
 		var theme_name = _tm.get_theme_name()
 		if theme_name == "legacy":

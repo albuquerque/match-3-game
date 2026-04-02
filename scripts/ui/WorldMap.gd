@@ -1,16 +1,6 @@
 extends "res://scripts/ui/ScreenBase.gd"
 class_name WorldMap
 
-# Local resolver helper to avoid direct autoload references
-var _NodeResolvers = null
-
-func _ensure_resolvers():
-	if _NodeResolvers == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL:
-			_NodeResolvers = s
-		else:
-			_NodeResolvers = load("res://scripts/helpers/node_resolvers_shim.gd")
 
 signal level_selected(level_number: int)
 signal back_to_menu
@@ -46,7 +36,6 @@ func _ready():
 	print("[WorldMap] loaded (res://scripts/ui/WorldMap.gd) _ready()")
 	"""Initialize the world map"""
 	screen_size = get_viewport_rect().size
-	_ensure_resolvers()
 	# Base design was for 720x1280, calculate scale factors
 	scale_factor = Vector2(screen_size.x / 720.0, screen_size.y / 1280.0)
 	_load_world_map_data()
@@ -129,7 +118,7 @@ func _create_fallback_data():
 
 func _load_dlc_chapters():
 	"""Load installed DLC chapters and integrate into world map"""
-	var ar = _NodeResolvers._get_ar() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var ar = NodeResolvers._get_ar()
 	if not ar:
 		print("[WorldMap] AssetRegistry not available")
 		return
@@ -168,7 +157,7 @@ func _load_dlc_chapters():
 
 func _connect_dlc_signals():
 	"""Connect to DLC manager signals"""
-	var dlc = _NodeResolvers._get_dlc() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var dlc = NodeResolvers._get_dlc()
 	if not dlc:
 		print("[WorldMap] DLCManager not available")
 		return
@@ -181,7 +170,7 @@ func _connect_dlc_signals():
 		dlc.connect("chapter_installed", Callable(self, "_on_dlc_chapter_installed"))
 
 func _fetch_available_dlc():
-	var _dlc_local = _NodeResolvers._get_dlc() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _dlc_local = NodeResolvers._get_dlc()
 	if not _dlc_local:
 		return
 	_dlc_local.fetch_available_chapters()
@@ -248,7 +237,7 @@ func _setup_ui():
 	title_label.offset_right = 200
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var _tm = _NodeResolvers._get_tm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _tm = NodeResolvers._get_tm()
 	if _tm and _tm.has_method("apply_bangers_font_styled"):
 		_tm.apply_bangers_font_styled(title_label, 32, Color.WHITE, Color(0,0,0), 3)
 	top_ui.add_child(title_label)
@@ -274,7 +263,7 @@ func _setup_ui():
 	progress_label = Label.new()
 	progress_label.name = "ProgressText"
 	progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var _tmp = _NodeResolvers._get_tm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _tmp = NodeResolvers._get_tm()
 	if _tmp and _tmp.has_method("apply_bangers_font_styled"):
 		_tmp.apply_bangers_font_styled(progress_label, 18, Color.WHITE, Color(0,0,0), 2)
 	progress_container.add_child(progress_label)
@@ -286,7 +275,7 @@ func _setup_ui():
 	back_button.text = tr("UI_BACK_TO_MENU")
 	back_button.position = Vector2(20, 20)
 	back_button.custom_minimum_size = Vector2(180, 50)
-	var _tmb = _NodeResolvers._get_tm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _tmb = NodeResolvers._get_tm()
 	if _tmb and _tmb.has_method("apply_bangers_font_to_button_styled"):
 		_tmb.apply_bangers_font_to_button_styled(back_button, 16, Color.WHITE, Color(0,0,0), 2)
 	back_button.pressed.connect(_on_back_pressed)
@@ -429,7 +418,7 @@ func _create_chapter_title(chapter_data: Dictionary) -> Control:
 
 	var title = Label.new()
 	title.text = chapter_data.title
-	var _tm_local = _NodeResolvers._get_tm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _tm_local = NodeResolvers._get_tm()
 	if _tm_local and _tm_local.has_method("apply_bangers_font"):
 		_tm_local.apply_bangers_font(title, 20)
 	container.add_child(title)
@@ -474,7 +463,7 @@ func _create_level_button(level_data: Dictionary) -> Control:
 	else:
 		btn.text = str(level_num)
 
-	var _tm2 = _NodeResolvers._get_tm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _tm2 = NodeResolvers._get_tm()
 	if _tm2 and _tm2.has_method("apply_bangers_font_to_button_styled"):
 		_tm2.apply_bangers_font_to_button_styled(btn, 18, Color.WHITE, Color(0,0,0), 2)
 
@@ -502,7 +491,7 @@ func _create_level_button(level_data: Dictionary) -> Control:
 	container.add_child(stars_container)
 
 	# Immediately set unlocked/completed visuals using RewardManager so UI is correct on creation
-	var _rm_init = _NodeResolvers._get_rm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _rm_init = NodeResolvers._get_rm()
 	var completed_init = 0
 	if _rm_init:
 		if _rm_init.has_method("get_levels_completed"):
@@ -524,7 +513,7 @@ func _create_level_button(level_data: Dictionary) -> Control:
 
 	# Populate initial stars (if data available)
 	var initial_stars = 0
-	var srm_init = _NodeResolvers._get_srm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var srm_init = NodeResolvers._get_srm()
 	if _rm_init and _rm_init.level_stars and _rm_init.level_stars.has("level_%d" % level_num):
 		initial_stars = int(_rm_init.level_stars["level_%d" % level_num])
 	elif srm_init and srm_init.has_method("get_level_stars"):
@@ -554,7 +543,7 @@ func _scroll_to_next_chapter(current_chapter_id: int):
 		chapters_scroll.scroll_vertical = int(scroll_position)
 
 func _update_progress_display():
-	var rm = _NodeResolvers._get_rm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	var total_stars = 0
 	var levels_completed = 0
 	if rm:
@@ -578,13 +567,13 @@ func _update_progress_display():
 func _get_level_stars(level_num: int) -> int:
 	var key = "level_%d" % level_num
 	var stars = 0
-	var _rm = _NodeResolvers._get_rm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _rm = NodeResolvers._get_rm()
 	if _rm and _rm.level_stars and _rm.level_stars.has(key):
 		stars = int(_rm.level_stars[key])
 		return stars
 
 	# Resolver-first StarRatingManager access
-	var srm = _NodeResolvers._get_srm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var srm = NodeResolvers._get_srm()
 	if srm and srm.has_method("get_level_stars"):
 		var v = srm.get_level_stars(level_num)
 		stars = int(v) if v != null else 0
@@ -595,7 +584,7 @@ func _get_level_stars(level_num: int) -> int:
 
 func _on_level_selected(level_num: int):
 	print("[WorldMap] Level %d selected" % level_num)
-	var am = _NodeResolvers._get_am() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var am = NodeResolvers._get_am()
 	if am and am.has_method("play_sfx"):
 		am.play_sfx("ui_click")
 	# If a level start is already in progress, ignore subsequent presses
@@ -609,7 +598,7 @@ func _on_level_selected(level_num: int):
 
 	# Resolver-first fallback: if no external system handled the signal, proceed to set level and start it here.
 	# Resolve LevelManager
-	var lm = _NodeResolvers._get_lm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var lm = NodeResolvers._get_lm()
 	if lm == null and has_method("get_tree"):
 		var rt = get_tree().root
 		if rt:
@@ -624,11 +613,11 @@ func _on_level_selected(level_num: int):
 		else:
 			print("[WorldMap] WARNING: LevelManager could not find level_number %d" % level_num)
 
-	# PR 5c: LevelManager index is set here; ExperienceDirector pipeline calls initialize_game()
-	# via LoadLevelStep → do NOT call initialize_game() directly from WorldMap.
+	# LevelManager index is set here; ExperienceDirector pipeline calls initialize_game()
+	# via LoadLevelStep — do NOT call initialize_game() directly from WorldMap.
 
-	# PR 5c: close WorldMap directly via PageManager — no EventBus needed
-	var pm = _NodeResolvers._get_pm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	# Close WorldMap directly via PageManager.
+	var pm = NodeResolvers._get_pm()
 	if pm == null and has_method("get_tree"):
 		var rt3 = get_tree().root
 		if rt3:
@@ -641,11 +630,11 @@ func _on_level_selected(level_num: int):
 
 func _on_back_pressed():
 	print("[WorldMap] Back to menu")
-	var am2 = _NodeResolvers._get_am() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var am2 = NodeResolvers._get_am()
 	if am2 and am2.has_method("play_sfx"):
 		am2.play_sfx("ui_click")
-	# PR 5c: close directly via PageManager
-	var pm = _NodeResolvers._get_pm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	# Close directly via PageManager.
+	var pm = NodeResolvers._get_pm()
 	if pm and pm.has_method("close"):
 		pm.close("WorldMap")
 		return
@@ -657,7 +646,7 @@ func update_progress():
 	call_deferred("_deferred_update_level_buttons")
 
 func _deferred_update_level_buttons(retries := 5):
-	var rm_check = _NodeResolvers._get_rm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var rm_check = NodeResolvers._get_rm()
 	if rm_check:
 		var ls_count = 0
 		if rm_check and typeof(rm_check.level_stars) == TYPE_DICTIONARY:
@@ -707,12 +696,12 @@ func _deferred_update_level_buttons(retries := 5):
 				var level_num = int(level_num_str)
 				var stars = 0
 				# Prefer resolver StarRatingManager when available
-				var srm_local = _NodeResolvers._get_srm() if typeof(_NodeResolvers) != TYPE_NIL else null
+				var srm_local = NodeResolvers._get_srm()
 				if srm_local and srm_local.has_method("get_level_stars"):
 					stars = srm_local.get_level_stars(level_num)
 				else:
 					var key = "level_%d" % level_num
-					var _rm4 = _NodeResolvers._get_rm() if typeof(_NodeResolvers) != TYPE_NIL else null
+					var _rm4 = NodeResolvers._get_rm()
 					if _rm4 and _rm4.level_stars and _rm4.level_stars.has(key):
 						stars = int(_rm4.level_stars[key])
 				print("[WorldMap][DIAG] Level %d -> stars=%d" % [level_num, stars])
@@ -722,7 +711,7 @@ func _update_level_button_state(level_container: Control):
 	var level_num_str = level_container.name.replace("LevelContainer", "")
 	var level_num = int(level_num_str)
 
-	var rm = _NodeResolvers._get_rm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var rm = NodeResolvers._get_rm()
 	var completed = 0
 	if rm:
 		if rm.has_method("get_levels_completed"):
@@ -783,7 +772,7 @@ func _update_level_button_state(level_container: Control):
 			star_tex.position = Vector2(i * (star_size + spacing), 0)
 			star_tex.z_index = 9
 			# Use resolver-first star color if available
-			var srm_color = _NodeResolvers._get_srm() if typeof(_NodeResolvers) != TYPE_NIL else null
+			var srm_color = NodeResolvers._get_srm()
 			if srm_color and srm_color.has_method("get_star_color"):
 				star_tex.modulate = srm_color.get_star_color(i + 1, stars_earned)
 			else:
@@ -835,7 +824,7 @@ func _display_dlc_download_options():
 		var chapter_id = dlc_info.get("chapter_id", "")
 
 		# Skip if already installed
-		var _ar2 = _NodeResolvers._get_ar() if typeof(_NodeResolvers) != TYPE_NIL else null
+		var _ar2 = NodeResolvers._get_ar()
 		if _ar2 and _ar2.is_chapter_installed(chapter_id):
 			continue
 
@@ -856,7 +845,7 @@ func _create_dlc_download_card(dlc_info: Dictionary) -> Control:
 	var title = Label.new()
 	title.name = "DLCTitle"
 	title.text = dlc_info.get("name", "New Chapter")
-	var _tm3 = _NodeResolvers._get_tm() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _tm3 = NodeResolvers._get_tm()
 	if _tm3 and _tm3.has_method("apply_bangers_font"):
 		_tm3.apply_bangers_font(title, 16)
 	vbox.add_child(title)
@@ -894,7 +883,7 @@ func _on_download_dlc_pressed(dlc_info: Dictionary):
 
 func _start_dlc_download(chapter_id: String):
 	"""Start downloading a DLC chapter"""
-	var _dlc4 = _NodeResolvers._get_dlc() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _dlc4 = NodeResolvers._get_dlc()
 	if not _dlc4:
 		print("[WorldMap] DLCManager not available")
 		return
@@ -936,7 +925,7 @@ func _show_download_progress(chapter_id: String):
 	progress_dialog.popup_centered()
 
 	# Connect to DLCManager signals if available
-	var _dlc2 = _NodeResolvers._get_dlc() if typeof(_NodeResolvers) != TYPE_NIL else null
+	var _dlc2 = NodeResolvers._get_dlc()
 	if _dlc2 and _dlc2.has_signal("download_progress"):
 		_dlc2.download_progress.connect(Callable(self, "_on_dlc_download_progress"))
 	# Also listen for completion

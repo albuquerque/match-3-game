@@ -11,10 +11,18 @@ signal flow_failed(flow_id: String, reason: String)
 signal node_started(node: Dictionary)
 signal node_completed(node: Dictionary)
 
+const _ExperiencePipeline = preload("res://scripts/runtime_pipeline/ExperiencePipeline.gd")
+
+func _ctx_builder():
+	return load("res://scripts/runtime_pipeline/ContextBuilder.gd")
+
+func _step_factory():
+	return load("res://scripts/runtime_pipeline/NodeTypeStepFactory.gd")
+
 # Components
 var parser: Node = null  # ExperienceFlowParser
 var state: Node = null   # ExperienceState
-var pipeline: ExperiencePipeline = null
+var pipeline: Node = null  # ExperiencePipeline
 
 # Current flow data
 var current_flow: Dictionary = {}
@@ -39,7 +47,7 @@ func _create_components():
 	add_child(state)
 
 	# Create pipeline
-	pipeline = ExperiencePipeline.new()
+	pipeline = _ExperiencePipeline.new()
 	add_child(pipeline)
 
 	# Connect pipeline signals
@@ -76,13 +84,12 @@ func start_flow() -> void:
 	emit_signal("flow_started", current_flow_id)
 
 	# IMMEDIATELY hide the old board before building context
-	var old_board = ExecutionContextBuilder._find_game_board() if ExecutionContextBuilder else null
+	var old_board = _ctx_builder()._find_game_board() if _ctx_builder() else null
 	if old_board:
 		old_board.visible = false
 		print("[FlowCoordinator] Hidden old GameBoard before starting flow")
 
-	# Build execution context
-	var context = ExecutionContextBuilder.build_from_scene_tree()
+	var context = _ctx_builder().build_from_scene_tree()
 	context.flow_id = current_flow_id
 	context.flow_nodes = current_flow.get("flow", [])
 	context.current_node_index = state.current_level_index
@@ -130,13 +137,12 @@ func start_flow_at_level(level_num: int) -> void:
 	state.current_level_index = target_index
 
 	# IMMEDIATELY hide the old board before building context
-	var old_board = ExecutionContextBuilder._find_game_board() if ExecutionContextBuilder else null
+	var old_board = _ctx_builder()._find_game_board() if _ctx_builder() else null
 	if old_board:
 		old_board.visible = false
 		print("[FlowCoordinator] Hidden old GameBoard before starting new flow")
 
-	# Build context and steps
-	var context = ExecutionContextBuilder.build_from_scene_tree()
+	var context = _ctx_builder().build_from_scene_tree()
 	context.flow_id = current_flow_id
 	context.flow_nodes = flow_nodes
 	context.current_node_index = target_index
@@ -147,36 +153,30 @@ func start_flow_at_level(level_num: int) -> void:
 		push_error("[FlowCoordinator] No valid steps from index %d" % target_index)
 		return
 
-	# Start pipeline
 	if pipeline.is_running:
 		print("[FlowCoordinator] Pipeline already running - stopping existing pipeline before starting new one")
 		pipeline.stop()
 
 	pipeline.start(context, steps)
 
-func _build_steps_from_flow(context: PipelineContext) -> Array:
-	"""Build pipeline steps from flow nodes starting at current index"""
+func _build_steps_from_flow(context) -> Array:
 	return _build_steps_from_index(context, context.current_node_index)
 
-func _build_steps_from_index(context: PipelineContext, start_index: int) -> Array:
-	"""Build pipeline steps from a specific node index"""
+func _build_steps_from_index(context, start_index: int) -> Array:
 	var steps: Array = []
 	var flow_nodes = context.flow_nodes
 
 	if start_index >= flow_nodes.size():
 		return steps
 
-	# Create steps for the remaining flow starting from start_index
-	# This allows narrative -> level -> reward sequences to execute
 	for i in range(start_index, flow_nodes.size()):
 		var node = flow_nodes[i]
-		var step = NodeTypeStepFactory.create_step_from_node(node)
+		var step = _step_factory().create_step_from_node(node)
 
 		if step:
 			steps.append(step)
 			print("[FlowCoordinator] Created step for node %d: %s (%s)" % [i, step.step_name, node.get("type", "unknown")])
 		else:
-			# Skip nodes that don't have step implementations yet
 			print("[FlowCoordinator] No step implementation for node %d type: %s" % [i, node.get("type", "unknown")])
 
 	return steps

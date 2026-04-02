@@ -1,0 +1,308 @@
+extends Node
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
+
+# BoardVisuals: tile creation / clearing / visual grid helpers
+# API:
+#   create_visual_grid(gameboard: Node, tiles_ref: Array)
+#   clear_tiles(gameboard: Node, tiles_ref: Array)
+#   instantiate_tile_visual(gameboard: Node, tile_scene: PackedScene, tile_type: int, grid_pos: Vector2, scale_factor: float, unmovable_meta = null) -> Node
+#   spawn_collectible_visual(gameboard: Node, tiles_ref: Array, x:int, y:int, coll_type:String)
+
+# Avoid module-level non-constant vars that static functions cannot access
+# VisualFactory will be loaded locally inside static functions to keep them self-contained
+
+static func clear_tiles(gameboard: Node, tiles_ref: Array) -> void:
+	var tiles_to_remove = []
+	# check board_container — only remove actual Tile nodes (identified by grid_position property)
+	if gameboard.board_container and is_instance_valid(gameboard.board_container):
+		for child in gameboard.board_container.get_children():
+			if child and is_instance_valid(child) and child.name != "BorderContainer" and "grid_position" in child:
+				tiles_to_remove.append(child)
+	# legacy direct children — exclude known infrastructure nodes
+	for child in gameboard.get_children():
+		if child and is_instance_valid(child) and "grid_position" in child:
+			tiles_to_remove.append(child)
+
+	for t in tiles_to_remove:
+		if t and is_instance_valid(t):
+			var p = t.get_parent()
+			if p:
+				p.remove_child(t)
+			t.queue_free()
+
+	# clear tiles_ref array
+	for i in range(tiles_ref.size()):
+		tiles_ref[i] = []
+	# ensure length
+	while tiles_ref.size() < GameRunState.GRID_WIDTH:
+		tiles_ref.append([])
+
+static func instantiate_tile_visual(gameboard: Node, tile_scene: PackedScene, tile_type: int, grid_pos: Vector2, scale_factor: float, unmovable_meta = null) -> Node:
+	var tile: Node = null
+	# prefer VisualFactory via safe call (load locally to keep static function safe)
+	var vf_local = load("res://games/match3/board/services/VisualFactory.gd")
+	if vf_local != null and vf_local.has_method("create_tile_instance") and (unmovable_meta == null):
+		tile = vf_local.call("create_tile_instance", tile_scene, tile_type, grid_pos, scale_factor)
+	else:
+		tile = tile_scene.instantiate()
+		if tile and tile.has_method("setup"):
+			if unmovable_meta != null:
+				tile.setup(0, grid_pos, scale_factor, true)
+			else:
+				tile.setup(tile_type, grid_pos, scale_factor)
+
+	if unmovable_meta != null and tile != null:
+		if tile.has_method("configure_unmovable_hard"):
+			var textures_arr = []
+			var reveals = {}
+			if unmovable_meta.has("textures"):
+				textures_arr = unmovable_meta["textures"]
+			if unmovable_meta.has("reveals"):
+				reveals = unmovable_meta["reveals"]
+			if typeof(textures_arr) != TYPE_ARRAY:
+				textures_arr = []
+			if typeof(reveals) != TYPE_DICTIONARY:
+				reveals = {}
+			tile.configure_unmovable_hard(unmovable_meta.get("hits",1), unmovable_meta.get("type", GameRunState.unmovable_type), textures_arr, reveals)
+
+	# connect and parent under board_container
+	if tile != null:
+		if tile.has_method("connect"):
+			tile.connect("tile_clicked", Callable(gameboard, "_on_tile_clicked"))
+			tile.connect("tile_swiped", Callable(gameboard, "_on_tile_swiped"))
+		if gameboard.board_container:
+			gameboard.board_container.add_child(tile)
+		else:
+			gameboard.add_child(tile)
+		# Ensure tile is visible and on correct z_index
+		if tile is CanvasItem:
+			# CanvasItem and subclasses (Node2D, Control) have visible property
+			tile.visible = true
+		# If tile is a Node2D, set its z_index above the board_container
+		if tile is Node2D:
+			var parent_z = 0
+			if gameboard.board_container and (gameboard.board_container is Node2D):
+				parent_z = int(gameboard.board_container.z_index)
+			tile.z_index = parent_z + 1
+		# If tile contains a Sprite2D child, ensure its modulate is not transparent
+		var s = tile.get_node_or_null("Sprite2D") if tile.has_method("get_node_or_null") else null
+		if s and s is Sprite2D:
+			s.modulate = Color(1,1,1,1)
+	return tile
+
+static func create_visual_grid(gameboard: Node, tiles_ref: Array) -> void:
+	print("[BoardVisuals] create_visual_grid: entry - GameRunState.grid_size=", GameRunState.grid.size() if GameRunState.grid != null else -1)
+	var sample = []
+	if GameRunState.grid != null:
+		for x in range(min(4, GameRunState.GRID_WIDTH)):
+			var col_sample = []
+			for y in range(min(6, GameRunState.GRID_HEIGHT)):
+				if GameRunState.grid.size() > x and GameRunState.grid[x].size() > y:
+					col_sample.append(GameRunState.grid[x][y])
+				else:
+					col_sample.append(null)
+			sample.append(col_sample)
+	print("[BoardVisuals] grid sample (first 4 cols x 6 rows): ", sample)
+	var non_empty = []
+	if GameRunState.grid != null:
+		for xx in range(GameRunState.GRID_WIDTH):
+			for yy in range(GameRunState.GRID_HEIGHT):
+				if GameRunState.grid[xx][yy] != 0 and GameRunState.grid[xx][yy] != -1:
+					non_empty.append(str(xx) + "," + str(yy) + ":" + str(GameRunState.grid[xx][yy]))
+	print("[BoardVisuals] model non-empty positions count=", non_empty.size(), " sample=", non_empty.slice(0,20))
+	if gameboard.creating_visual_grid:
+		return
+	gameboard.creating_visual_grid = true
+	clear_tiles(gameboard, tiles_ref)
+	await gameboard.get_tree().process_frame
+	tiles_ref.clear()
+	# If grid size is zero but dimensions are present, wait a short while for the model to populate
+	if GameRunState.grid == null or GameRunState.grid.size() == 0:
+		if GameRunState.GRID_WIDTH > 0 and GameRunState.GRID_HEIGHT > 0:
+			print("[BoardVisuals] create_visual_grid: GameRunState.grid empty — waiting for model to populate")
+			var attempts = 0
+			var populated = false
+			var _st = Engine.get_main_loop() as SceneTree
+			while attempts < 40:
+				# Check for any non-zero, non--1 cell in the model grid
+				if GameRunState.grid != null and GameRunState.grid.size() > 0:
+					for cx in range(GameRunState.GRID_WIDTH):
+						for cy in range(GameRunState.GRID_HEIGHT):
+							if GameRunState.grid.size() > cx and GameRunState.grid[cx].size() > cy:
+								var val = GameRunState.grid[cx][cy]
+								if val != 0 and val != -1:
+									populated = true
+									break
+							# end inner
+						if populated:
+							break
+				# if populated break outer
+				if populated:
+					break
+				# await a short timeout
+				if _st:
+					await _st.create_timer(0.05).timeout
+				else:
+					# Engine main loop not available (static context edge-case) — log and break the wait
+					print("[BoardVisuals] WARNING: Engine main loop not available; aborting wait for model population")
+					break
+				attempts += 1
+			# If model still empty after waiting, create a visible fallback grid (tile_type=1)
+			if not populated:
+				print("[BoardVisuals] WARNING: Model grid still empty after wait; creating visible fallback grid to avoid empty board")
+				GameRunState.grid = []
+				for xx in range(GameRunState.GRID_WIDTH):
+					var col = []
+					for yy in range(GameRunState.GRID_HEIGHT):
+						col.append(1) # default visible tile type
+					GameRunState.grid.append(col)
+				print("[BoardVisuals] create_visual_grid: fallback grid created with dimensions", GameRunState.GRID_WIDTH, GameRunState.GRID_HEIGHT)
+		else:
+			gameboard.creating_visual_grid = false
+			return
+	var scale_factor = gameboard.tile_size / 64.0
+	var tiles_created = 0
+	for x in range(GameRunState.GRID_WIDTH):
+		tiles_ref.append([])
+		for y in range(GameRunState.GRID_HEIGHT):
+			var tile_type = _GQS.get_tile_at(null, Vector2(x,y))
+			var key = str(x) + "," + str(y)
+			# If an unmovable_map entry exists, create the unmovable regardless of the grid sentinel
+			var tile = null
+			if tile_type == -1 and not GameRunState.unmovable_map.has(key):
+				tiles_ref[x].append(null)
+				continue
+
+			# Instantiate tile bare (no setup yet — must add to scene first so _ready() wires @onready vars)
+			tile = gameboard.tile_scene.instantiate()
+			if not tile:
+				tiles_ref[x].append(null)
+				continue
+
+			# ── Add to scene FIRST so _ready() fires and sprite/@onready nodes are wired ──
+			if gameboard.board_container:
+				gameboard.board_container.add_child(tile)
+			else:
+				gameboard.add_child(tile)
+
+			# ── Now call setup() — sprite is guaranteed available ──
+			if GameRunState.unmovable_map.has(key) and typeof(GameRunState.unmovable_map[key]) == TYPE_DICTIONARY:
+				# hard unmovable: setup with skip_visual=true, then configure_unmovable_hard
+				if tile.has_method("setup"):
+					tile.setup(0, Vector2(x,y), scale_factor, true)
+				var meta = GameRunState.unmovable_map[key]
+				if tile.has_method("configure_unmovable_hard"):
+					var textures_arr = []
+					var reveals = {}
+					if typeof(meta) == TYPE_DICTIONARY:
+						if meta.has("textures"):
+							textures_arr = meta["textures"]
+						if meta.has("reveals"):
+							reveals = meta["reveals"]
+						if typeof(textures_arr) != TYPE_ARRAY:
+							textures_arr = []
+						if typeof(reveals) != TYPE_DICTIONARY:
+							reveals = {}
+					tile.configure_unmovable_hard(meta.get("hits",1), meta.get("type", GameRunState.unmovable_type), textures_arr, reveals)
+					print("[BoardVisuals] Configured hard unmovable at (", x, ",", y, ") hits=", meta.get("hits",1))
+				else:
+					print("[BoardVisuals] WARNING: Tile missing configure_unmovable_hard at (", x, ",", y, ")")
+			else:
+				# Normal tile: setup with actual tile_type
+				if tile.has_method("setup"):
+					tile.setup(tile_type, Vector2(x,y), scale_factor)
+				if tile_type == GameRunState.COLLECTIBLE and tile.has_method("configure_collectible"):
+					tile.configure_collectible(GameRunState.collectible_type)
+					print("[BoardVisuals] Configured collectible at (", x, ",", y, "): ", GameRunState.collectible_type)
+				if tile_type == GameRunState.SPREADER and tile.has_method("configure_spreader"):
+					var textures = []
+					if GameRunState.spreader_textures_map.has(GameRunState.spreader_type):
+						textures = GameRunState.spreader_textures_map[GameRunState.spreader_type]
+					tile.configure_spreader(GameRunState.spreader_grace_default, GameRunState.spreader_type, textures)
+					print("[BoardVisuals] Configured spreader at (", x, ",", y, ") type='", GameRunState.spreader_type, "'")
+			# Always connect input signals — including unmovables (adjacency detection needs them)
+			if not tile.is_connected("tile_clicked", Callable(gameboard, "_on_tile_clicked")):
+				tile.connect("tile_clicked", Callable(gameboard, "_on_tile_clicked"))
+			if not tile.is_connected("tile_swiped", Callable(gameboard, "_on_tile_swiped")):
+				tile.connect("tile_swiped", Callable(gameboard, "_on_tile_swiped"))
+			# Set world position
+			if gameboard.has_method("grid_to_world_position"):
+				tile.position = gameboard.grid_to_world_position(Vector2(x, y))
+			tiles_ref[x].append(tile)
+			tiles_created += 1
+	gameboard.creating_visual_grid = false
+	print("[BoardVisuals] create_visual_grid: Complete (flag reset)")
+	# show group
+	if gameboard.has_method("show_board_group"):
+		gameboard.show_board_group()
+	print("[BoardVisuals] Board group made visible after tiles created")
+	# show UI if available
+	var gui = gameboard.get_node_or_null("../GameUI")
+	if gui and gui.has_method("show_gameplay_ui"):
+		gui.show_gameplay_ui()
+		print("[BoardVisuals] UI elements shown - level ready")
+
+	# DIAGNOSTIC LOGS
+	print("[BoardVisuals] Created ", tiles_created, " tiles; board_container child_count=", gameboard.board_container.get_child_count() if gameboard.board_container else -1)
+	# Count visible tiles
+	var visible_count = 0
+	for x_i in range(tiles_ref.size()):
+		for y_i in range(tiles_ref[x_i].size()):
+			var t = tiles_ref[x_i][y_i]
+			if t and is_instance_valid(t) and t.visible:
+				visible_count += 1
+	print("[BoardVisuals] visible tiles in tiles_ref=", visible_count)
+	# Print positions of first row and first column sample tiles
+	if tiles_ref.size() > 0:
+		var samples_row = []
+		for i in range(min(4, tiles_ref[0].size())):
+			if tiles_ref[0][i] != null:
+				samples_row.append(tiles_ref[0][i].position)
+			else:
+				samples_row.append(null)
+		print("[BoardVisuals] sample positions row0: ", samples_row)
+	if tiles_ref.size() > 1:
+		var samples_col = []
+		for j in range(min(4, tiles_ref.size())):
+			if tiles_ref[j].size() > 0 and tiles_ref[j][0] != null:
+				samples_col.append(tiles_ref[j][0].position)
+			else:
+				samples_col.append(null)
+		print("[BoardVisuals] sample positions col0: ", samples_col)
+
+static func spawn_collectible_visual(gameboard: Node, tiles_ref: Array, x: int, y: int, coll_type: String = "coin") -> void:
+	if x < 0 or x >= GameRunState.GRID_WIDTH or y < 0 or y >= GameRunState.GRID_HEIGHT:
+		return
+	var existing_tile = null
+	if x < tiles_ref.size() and y < tiles_ref[x].size():
+		existing_tile = tiles_ref[x][y]
+	if existing_tile:
+		if existing_tile.has_method("configure_collectible"):
+			existing_tile.configure_collectible(coll_type)
+			return
+	var scale_factor = gameboard.tile_size / 64.0
+	var tile = null
+	var vf_local = load("res://games/match3/board/services/VisualFactory.gd")
+	if vf_local != null and vf_local.has_method("create_collectible_tile"):
+		tile = vf_local.call("create_collectible_tile", gameboard.tile_scene, coll_type, Vector2(x,y), scale_factor)
+	else:
+		tile = gameboard.tile_scene.instantiate()
+		if tile and tile.has_method("setup"):
+			tile.setup(0, Vector2(x,y), scale_factor)
+			if tile and tile.has_method("configure_collectible"):
+				tile.configure_collectible(coll_type)
+	if tile:
+		if tile.has_method("connect"):
+			tile.connect("tile_clicked", Callable(gameboard, "_on_tile_clicked"))
+			tile.connect("tile_swiped", Callable(gameboard, "_on_tile_swiped"))
+		if gameboard.board_container:
+			gameboard.board_container.add_child(tile)
+		else:
+			gameboard.add_child(tile)
+		# ensure tiles_ref size
+		while tiles_ref.size() <= x:
+			tiles_ref.append([])
+		while tiles_ref[x].size() <= y:
+			tiles_ref[x].append(null)
+		tiles_ref[x][y] = tile
+		return

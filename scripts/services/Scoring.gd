@@ -1,5 +1,4 @@
-extends Node
-class_name Scoring
+extends RefCounted
 
 # Simple scoring utility
 

@@ -1,6 +1,9 @@
 extends Node2D
 class_name RewardContainer
 
+const _RewardRevealSystem = preload("res://scripts/reward_system/RewardRevealSystem.gd")
+const _ContainerParticleSpawner = preload("res://scripts/reward_system/ContainerParticleSpawner.gd")
+
 ## Generalized Reward Container
 ## Theme-agnostic container that can represent any reward presentation style
 ## Configured via JSON, adaptable to any theme without code changes
@@ -34,7 +37,7 @@ var container_config: Dictionary = {}
 var visual_layers: Array = []
 
 # Reward reveal system
-var reward_revealer: RewardRevealSystem = null
+var reward_revealer = null  # RewardRevealSystem
 
 # Reward data
 var rewards_data: Dictionary = {
@@ -66,7 +69,7 @@ func setup(config: Dictionary):
 	_build_visual_layers()
 
 	# Create reward reveal system
-	reward_revealer = RewardRevealSystem.new()
+	reward_revealer = _RewardRevealSystem.new()
 	add_child(reward_revealer)
 
 	# Set HUD target positions (screen coordinates)
@@ -548,7 +551,7 @@ func _spawn_particles(particle_key: String):
 		return
 
 	# Spawn particles at container center
-	ContainerParticleSpawner.spawn_particles(self, particles_config, Vector2.ZERO)
+	_ContainerParticleSpawner.spawn_particles(self, particles_config, Vector2.ZERO)
 
 ## Cleanup
 func cleanup():

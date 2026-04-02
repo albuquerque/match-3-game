@@ -14,7 +14,7 @@ func _init(name: String = "unnamed_step"):
 
 ## Execute this step with the given context
 ## Must be overridden by subclasses
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	push_error("[PipelineStep:%s] execute() not implemented" % step_name)
 	return false
 

@@ -8,14 +8,8 @@ extends Node
 ## 2 Stars: Score >= target * 1.5 (50% above target)
 ## 3 Stars: Score >= target * 2.0 (100% above target) OR use <= 50% of moves
 
-var NodeResolvers = null
-
-func _init_resolvers():
-	if NodeResolvers == null:
-		NodeResolvers = load("res://scripts/helpers/node_resolvers_api.gd")
-
 func _ready():
-	_init_resolvers()
+	pass
 
 ## Calculate star rating based on performance
 func calculate_stars(score: int, target_score: int, moves_used: int, total_moves: int) -> int:

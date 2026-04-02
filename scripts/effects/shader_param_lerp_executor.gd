@@ -1,18 +1,7 @@
 extends Node
 class_name EffectExecutorShaderParamLerp
 
-var _nr = null
-
-func _ensure_resolvers():
-	if _nr == null:
-		var s = load("res://scripts/helpers/node_resolvers_api.gd")
-		if s != null and typeof(s) != TYPE_NIL and s.has_method("_get_vam"):
-			_nr = s
-		else:
-			_nr = load("res://scripts/helpers/node_resolvers_shim.gd")
-
 func execute(context: Dictionary) -> void:
-	_ensure_resolvers()
 	var params = context.get("params", {})
 	var viewport = context.get("viewport", null)
 	var param_name = str(params.get("param", ""))
@@ -29,7 +18,7 @@ func execute(context: Dictionary) -> void:
 	# Resolve target node: prefer VisualAnchorManager, then viewport, then viewport root
 	var target_node: Node = null
 	if anchor != "":
-		var vam = _nr._get_vam()
+		var vam = NodeResolvers._get_vam()
 		if vam and vam.has_method("get_anchor"):
 			target_node = vam.get_anchor(anchor)
 		# try viewport child

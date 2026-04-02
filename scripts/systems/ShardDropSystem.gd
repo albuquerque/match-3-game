@@ -12,6 +12,8 @@ extends Node
 
 const SHARD_COLLECTIBLE_TYPE := "shard"
 const GLOBAL_CONFIG_PATH := "res://data/global_game_config.json"
+const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
+var GameStateBridge = null
 
 # ── Tunable globals ───────────────────────────────────────────────────────────
 ## These defaults are overridden at runtime by data/global_game_config.json.
@@ -33,23 +35,58 @@ var _session_drops: int = 0
 ## Pending random drops queued between match_cleared and pre_refill.
 var _pending_random: int = 0
 
+func _find_node_by_name(root: Node, name: String) -> Node:
+	if root == null:
+		return null
+	if str(root.name) == name:
+		return root
+	for i in range(root.get_child_count()):
+		var c = root.get_child(i)
+		if c == null:
+			continue
+		var res = _find_node_by_name(c, name)
+		if res != null:
+			return res
+	return null
+
 func _ready() -> void:
 	_load_config()
-	var gm: Node = get_node_or_null("/root/GameManager")
-	if gm:
-		gm.match_cleared.connect(_on_match_cleared)
-		gm.shard_tile_collected.connect(_on_shard_tile_collected)
-		gm.pre_refill.connect(_on_pre_refill)
-		gm.post_refill.connect(_on_post_refill)
-		gm.level_loaded_ctx.connect(_on_level_loaded)
-		print("[ShardDropSystem] Connected to GameManager signals")
+	# Prefer active registered board_ref (set by GameBoard._ready) to avoid scene traversal and races
+	var board_node: Node = null
+	if GameRunState.board_ref != null:
+		board_node = GameRunState.board_ref
 	else:
-		push_error("[ShardDropSystem] GameManager not found — shard drops disabled")
-	# TODO PR 6: tile_destroyed emitter (BoardActionExecutor) moves to direct GameManager signal
-	# For now connect via EventBus which still carries tile_destroyed only
+		if has_method("get_tree") and get_tree() != null:
+			var tree = get_tree()
+			var cs = tree.get_current_scene()
+			if cs != null:
+				board_node = _find_node_by_name(cs, "GameBoard")
+			# fallback: try root search
+			if board_node == null:
+				var root = tree.get_root()
+				board_node = _find_node_by_name(root, "GameBoard")
+
+	if board_node != null:
+		if board_node.has_signal("match_cleared"):
+			board_node.connect("match_cleared", Callable(self, "_on_match_cleared"))
+		if board_node.has_signal("shard_tile_collected"):
+			board_node.connect("shard_tile_collected", Callable(self, "_on_shard_tile_collected"))
+		if board_node.has_signal("pre_refill"):
+			board_node.connect("pre_refill", Callable(self, "_on_pre_refill"))
+		if board_node.has_signal("post_refill"):
+			board_node.connect("post_refill", Callable(self, "_on_post_refill"))
+		if board_node.has_signal("level_loaded_ctx"):
+			board_node.connect("level_loaded_ctx", Callable(self, "_on_level_loaded"))
+		print("[ShardDropSystem] Connected to GameBoard signals")
+	else:
+		# No board found — shard drops disabled until board_ref is set.
+		push_error("[ShardDropSystem] GameBoard not found and GameRunState.board_ref is unset — shard drops disabled")
+		return
+
+	# Connect tile_destroyed via EventBus (still active for this signal only)
 	var eb = get_node_or_null("/root/EventBus")
 	if eb and eb.has_signal("tile_destroyed"):
-		eb.tile_destroyed.connect(_on_tile_destroyed)
+		eb.connect("tile_destroyed", Callable(self, "_on_tile_destroyed"))
 	print("[ShardDropSystem] ready (max_per_level=%d unlock_from=%d)" % [max_shards_per_level, shard_unlock_from_level])
 
 func _load_config() -> void:
@@ -90,32 +127,18 @@ func _on_level_loaded(_level_id: String, _context: Dictionary) -> void:
 
 ## Returns true when shards are allowed to drop in the current level context.
 func _can_drop() -> bool:
-	var gm := _get_gm()
-	if gm == null:
-		return false
-
-	# Respect the minimum level gate
-	var current_level: int = int(gm.level) if "level" in gm else 0
+	var current_level: int = int(GameRunState.level)
 	if current_level < shard_unlock_from_level:
 		return false
-
-	# Never exceed the per-level cap
 	if _session_drops >= max_shards_per_level:
 		return false
-
-	# On a replay, only allow drops for shards that were NOT collected last time.
-	# i.e. if the player already collected max_shards_per_level shards on a
-	# previous play of this level, there is nothing left to chase.
 	var level_key := "level_%d" % current_level
 	var collected_before := _get_level_collected_count(level_key)
-	# Total slots available this session = cap minus already-collected on prior runs
 	var allowed_this_session := max_shards_per_level - collected_before
 	if allowed_this_session <= 0:
-		# All collectible shards for this level were already picked up previously
 		return false
 	if _session_drops >= allowed_this_session:
 		return false
-
 	return true
 
 # ── Collection ───────────────────────────────────────────────────────────────
@@ -125,9 +148,8 @@ func _on_shard_tile_collected(item_id: String) -> void:
 		return
 	GalleryManager.add_shard(item_id)
 	# Record the collection against this level so replay logic is correct
-	var gm := _get_gm()
-	if gm and "level" in gm:
-		_record_level_collected("level_%d" % int(gm.level))
+	var lvl = int(GameRunState.level)
+	_record_level_collected("level_%d" % int(lvl))
 	print("[ShardDropSystem] shard collected for item: ", item_id)
 
 # ── Random drop: queue on match_cleared, inject on pre_refill ────────────────
@@ -152,9 +174,7 @@ func _on_pre_refill() -> void:
 	_inject_random_shard()
 
 func _inject_random_shard() -> void:
-	var gm := _get_gm()
-	if gm == null:
-		return
+	# Use GameRunState grid and constants
 	var item_id := _select_item()
 	if item_id.is_empty():
 		print("[ShardDropSystem] _inject_random_shard: no candidates")
@@ -163,17 +183,15 @@ func _inject_random_shard() -> void:
 	# of their column — meaning no unmovable or blocker exists above them.
 	# This guarantees the shard can fall in from above and reach the bottom row.
 	var empty_cells: Array = []
-	for x in range(gm.GRID_WIDTH):
-		for y in range(gm.GRID_HEIGHT):
-			if gm.is_cell_blocked(x, y) or gm._is_unmovable_cell(x, y):
+	for x in range(GameRunState.GRID_WIDTH):
+		for y in range(GameRunState.GRID_HEIGHT):
+			if _GQS.is_cell_blocked(null, x, y) or _GQS.is_unmovable_cell(null, x, y):
 				continue
-			if int(gm.grid[x][y]) != 0:
+			if int(GameRunState.grid[x][y]) != 0:
 				continue
-			# Check that no unmovable or hard blocker sits above this cell
-			# in the same column (which would make it an isolated lower segment).
 			var in_top_segment := true
 			for check_y in range(0, y):
-				if gm.is_cell_blocked(x, check_y) or gm._is_unmovable_cell(x, check_y):
+				if _GQS.is_cell_blocked(null, x, check_y) or _GQS.is_unmovable_cell(null, x, check_y):
 					in_top_segment = false
 					break
 			if in_top_segment:
@@ -185,48 +203,47 @@ func _inject_random_shard() -> void:
 	# Mark the grid cell as COLLECTIBLE so fill_empty_spaces skips it.
 	# Do NOT spawn the visual here — animate_refill will spawn it with the
 	# normal fall-in animation, just like any other new tile.
-	gm.grid[int(pos.x)][int(pos.y)] = gm.COLLECTIBLE
+	GameRunState.grid[int(pos.x)][int(pos.y)] = GameRunState.COLLECTIBLE
 	# Store item_id so animate_refill can configure the tile as a shard.
-	if not gm.has_meta("pending_shard_cells"):
-		gm.set_meta("pending_shard_cells", {})
-	var pending: Dictionary = gm.get_meta("pending_shard_cells")
-	pending[str(int(pos.x)) + "," + str(int(pos.y))] = item_id
-	gm.set_meta("pending_shard_cells", pending)
+	# Stored on GameRunState.pending_shard_cells
+	if not GameRunState.pending_shard_cells:
+		GameRunState.pending_shard_cells = {}
+	GameRunState.pending_shard_cells[str(int(pos.x)) + "," + str(int(pos.y))] = item_id
 	_session_drops += 1
-	_record_level_dropped("level_%d" % int(gm.level))
+	_record_level_dropped("level_%d" % int(GameRunState.level))
 	print("[ShardDropSystem] queued shard at %s for '%s' — will fall in via refill" % [pos, item_id])
 
 func _on_post_refill() -> void:
 	# Tag any shard tiles that animate_refill just spawned with their item_id.
-	var gm := _get_gm()
-	if gm == null or not gm.has_meta("pending_shard_cells"):
-		return
-	var pending: Dictionary = gm.get_meta("pending_shard_cells")
-	if pending.is_empty():
+	var pending: Dictionary = GameRunState.pending_shard_cells if GameRunState.pending_shard_cells else {}
+	if pending == {}:
 		return
 	var board := _get_board()
 	if board == null:
 		return
 	var done: Array = []
-	for key in pending:
+	for key in pending.keys():
 		var parts: Array = key.split(",")
 		if parts.size() != 2:
 			continue
 		var x: int = int(parts[0])
 		var y: int = int(parts[1])
-		var item_id: String = pending[key]
-		if x < board.tiles.size() and y < board.tiles[x].size():
-			var tile: Node = board.tiles[x][y]
-			if tile and is_instance_valid(tile) and not tile.is_queued_for_deletion():
-				tile.set_meta("shard_item_id", item_id)
+		if x < 0 or x >= GameRunState.GRID_WIDTH or y < 0 or y >= GameRunState.GRID_HEIGHT:
+			continue
+		# If visual exists at this pos, attach meta
+		if x < board.tiles.size() and y < board.tiles[x].size() and board.tiles[x][y] != null:
+			var t = board.tiles[x][y]
+			if t and is_instance_valid(t) and t.has_method("set_meta"):
+				t.set_meta("shard_item_id", str(pending[key]))
 				done.append(key)
-				print("[ShardDropSystem] tagged spawned shard at (%d,%d) for '%s'" % [x, y, item_id])
-	for key in done:
-		pending.erase(key)
-	if pending.is_empty():
-		gm.remove_meta("pending_shard_cells")
-	else:
-		gm.set_meta("pending_shard_cells", pending)
+	# clean up handled keys
+	for k in done:
+		pending.erase(k)
+	# persist back to GameRunState.pending_shard_cells
+	GameRunState.pending_shard_cells = pending
+	if pending.size() == 0:
+		GameRunState.pending_shard_cells = {}
+	print("[ShardDropSystem] post_refill tagging complete, pending_remaining=", GameRunState.pending_shard_cells.size())
 
 # ── Obstacle reveal: synchronous, before gravity ─────────────────────────────
 
@@ -251,20 +268,21 @@ func _on_tile_destroyed(entity_id: String, context: Dictionary) -> void:
 
 func _do_reveal_shard(pos: Vector2, item_id: String) -> void:
 	var board := _get_board()
-	var gm := _get_gm()
-	if board == null or gm == null:
+	# Use GameRunState.level
+	var lvl = GameRunState.level if GameRunState != null else 0
+	if board == null:
 		return
 	_session_drops += 1
-	_record_level_dropped("level_%d" % int(gm.level))
-	_spawn_shard_tile(board, gm, pos, item_id)
+	_record_level_dropped("level_%d" % int(lvl))
+	_spawn_shard_tile(board, pos, item_id)
 	print("[ShardDropSystem] revealed shard tile for '%s' under obstacle at %s" % [item_id, pos])
 
 # ── Shared spawn helper ───────────────────────────────────────────────────────
 
-func _spawn_shard_tile(board: Node, gm: Node, pos: Vector2, item_id: String) -> void:
+func _spawn_shard_tile(board: Node, pos: Vector2, item_id: String) -> void:
 	var x := int(pos.x)
 	var y := int(pos.y)
-	gm.grid[x][y] = gm.COLLECTIBLE
+	GameRunState.grid[x][y] = GameRunState.COLLECTIBLE
 	if board.has_method("spawn_collectible_visual"):
 		board.spawn_collectible_visual(x, y, SHARD_COLLECTIBLE_TYPE)
 	else:
@@ -278,17 +296,11 @@ func _spawn_shard_tile(board: Node, gm: Node, pos: Vector2, item_id: String) -> 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 func _is_last_obstacle() -> bool:
-	var gm := _get_gm()
-	if gm == null:
-		return false
 	var count := 0
-	if gm.has_method("get_unmovable_count"):
-		count = gm.get_unmovable_count()
-	else:
-		for x in range(gm.GRID_WIDTH):
-			for y in range(gm.GRID_HEIGHT):
-				if gm._is_unmovable_cell(x, y):
-					count += 1
+	for x in range(GameRunState.GRID_WIDTH):
+		for y in range(GameRunState.GRID_HEIGHT):
+			if _GQS.is_unmovable_cell(null, x, y):
+				count += 1
 	return count <= 1
 
 func _select_item() -> String:
@@ -354,15 +366,10 @@ func _record_level_collected(level_key: String) -> void:
 
 # ── Node helpers ──────────────────────────────────────────────────────────────
 
-func _get_gm() -> Node:
-	return get_node_or_null("/root/GameManager")
 
 func _get_board() -> Node:
-	var gm := _get_gm()
-	if gm == null:
-		return null
-	if "board_ref" in gm and gm.board_ref != null and is_instance_valid(gm.board_ref):
-		return gm.board_ref
-	if gm.has_method("get_board"):
-		return gm.get_board()
-	return null
+	if GameRunState.board_ref != null:
+		return GameRunState.board_ref
+	# fallback scene search
+	var root = get_tree().get_root()
+	return _find_node_by_name(root, "GameBoard")

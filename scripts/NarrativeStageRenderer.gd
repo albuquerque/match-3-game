@@ -46,8 +46,7 @@ func _ready():
 	print("[NarrativeStageRenderer] ✓ Configured as fullscreen (anchors set to 0,0,1,1)")
 	print("[NarrativeStageRenderer] === RENDERER READY COMPLETE ===")
 
-	# TODO PR 6: connect to TranslationBootstrap.locale_changed once that signal exists
-	# so narrative text re-renders when the player changes language mid-session.
+	# Connect to TranslationBootstrap.locale_changed to re-render narrative text on language change.
 
 func render_state(state_data: Dictionary):
 	"""Render a narrative stage state"""

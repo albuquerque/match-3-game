@@ -1,4 +1,4 @@
-extends PipelineStep
+extends "res://scripts/runtime_pipeline/PipelineStep.gd"
 class_name PremiumGateStep
 
 # PremiumGateStep
@@ -10,7 +10,7 @@ func _init(id: String = ""):
 	super("premium_gate")
 	gate_id = id
 
-func execute(context: PipelineContext) -> bool:
+func execute(context) -> bool:
 	print("[PremiumGateStep] Premium gate encountered: %s" % gate_id)
 	# Default: do nothing and continue
 	step_completed.emit(true)
