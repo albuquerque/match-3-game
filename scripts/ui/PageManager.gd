@@ -276,7 +276,7 @@ func is_open(page_name: String) -> bool:
 			return true
 	return false
 
-# EventBus handlers
+# Signal handlers
 func _on_open_page(page_name: String, params: Dictionary = {}) -> void:
 	open(page_name, params)
 

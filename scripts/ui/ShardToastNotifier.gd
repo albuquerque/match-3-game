@@ -1,6 +1,6 @@
 extends CanvasLayer
 ## ShardToastNotifier - center-screen zoom popup on shard/unlock events.
-## Subscribes only to EventBus.shard_discovered. No other dependencies.
+## Subscribes to GalleryManager signals. No other dependencies.
 ## Drop res://assets/gallery/shard.png to show the shard icon.
 ## NOTE: All nodes use MOUSE_FILTER_IGNORE so the toast never blocks gameplay input.
 const SHARD_ICON_PATH := "res://assets/gallery/shard.png"

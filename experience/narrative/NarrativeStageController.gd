@@ -3,7 +3,7 @@ extends Node
 
 ## NarrativeStageController
 ## Manages the narrative stage state machine and coordinates with renderer
-## Load stage JSON, react to EventBus events, trigger state transitions
+## Load stage JSON, react to board signals, trigger state transitions
 
 signal state_changed(new_state: String)
 signal stage_loaded(stage_id: String)

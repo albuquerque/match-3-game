@@ -232,7 +232,7 @@ func _on_language_changed(locale: String):
 
 func _on_level_loaded(level_id: String, context: Dictionary = {}) -> void:
 	"""Hide and remove the StartPage immediately when a level is loaded so it doesn't appear behind gameplay.
-	The EventBus.level_loaded signal provides (level_id, context) so accept both params.
+	Accepts (level_id, context) matching the board's level_loaded_ctx signal.
 	"""
 	print("[StartPage] Received level_loaded: ", level_id, " context=", context, " - hiding+removing StartPage")
 	# Immediate hide to avoid any visual bleed-through
