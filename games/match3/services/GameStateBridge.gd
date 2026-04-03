@@ -2,9 +2,9 @@ extends Node
 # GameStateBridge — thin bridge to mutate GameRunState and emit signals to board_ref.
 # All state reads/writes go through GameRunState.
 
-const _MatchFinder = preload("res://scripts/services/MatchFinder.gd")
+const _MatchFinder = preload("res://games/match3/board/services/MatchFinder.gd")
 const _Spreader = preload("res://games/match3/board/services/SpreaderService.gd")
-const _Scoring = preload("res://scripts/services/Scoring.gd")
+const _Scoring = preload("res://games/match3/board/services/Scoring.gd")
 
 
 static func use_move() -> void:

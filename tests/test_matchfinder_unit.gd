@@ -21,7 +21,7 @@ func _contains_all(set_arr: Array, expected: Array) -> bool:
 	return true
 
 func _ready():
-	MF = load("res://scripts/services/MatchFinder.gd").new()
+	MF = load("res://games/match3/board/services/MatchFinder.gd").new()
 	print("[TEST] test_matchfinder_unit starting")
 	# Case 1: horizontal match on row 0 at x=0..2
 	var w = 5

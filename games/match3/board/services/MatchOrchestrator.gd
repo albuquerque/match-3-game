@@ -1,6 +1,6 @@
 extends Node
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
-const _MatchFinder = preload("res://scripts/services/MatchFinder.gd")
+const _MatchFinder = preload("res://games/match3/board/services/MatchFinder.gd")
 
 static var GameStateBridge = null
 

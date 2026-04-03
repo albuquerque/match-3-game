@@ -133,6 +133,12 @@ func _show_reward_screen(context) -> bool:
 		push_error("[ShowRewardsStep] No UI parent available")
 		return false
 
+	# Freeze board input and hide the board so the reward screen is the only thing visible.
+	GameRunState.level_transitioning = true
+	var board = GameRunState.board_ref
+	if board and is_instance_valid(board):
+		board.visible = false
+
 	# Add controller to scene tree
 	ui_parent.add_child(reward_controller)
 
@@ -167,3 +173,8 @@ func cleanup():
 			reward_controller.transition_completed.disconnect(_on_reward_completed)
 		reward_controller.queue_free()
 		reward_controller = null
+	# Restore board — the next pipeline step (LoadLevelStep) will re-populate it.
+	# level_transitioning stays true until LoadLevelStep resets it on level load.
+	var board = GameRunState.board_ref
+	if board and is_instance_valid(board):
+		board.visible = true

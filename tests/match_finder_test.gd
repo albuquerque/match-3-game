@@ -2,7 +2,7 @@ extends SceneTree
 
 func _init():
 	print("Running MatchFinder tests...")
-	var MF = load("res://scripts/services/MatchFinder.gd")
+	var MF = load("res://games/match3/board/services/MatchFinder.gd")
 	var passed = 0
 	var failed = 0
 

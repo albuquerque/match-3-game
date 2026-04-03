@@ -101,6 +101,23 @@ func _on_level_complete_direct():
 	var coins := 100 + (50 * level_number)
 	var gems := 5 if stars == 3 else 0
 	print("[LoadLevelStep] Resolved rewards — stars=%d coins=%d gems=%d" % [stars, coins, gems])
+
+	# ── Save progress ─────────────────────────────────────────────────────────
+	# RewardManager.grant_level_completion_reward is the single place that
+	# increments levels_completed and persists player_progress.json.
+	# Without this call, start_flow() always resumes at the same level.
+	var rm := root.get_node_or_null("RewardManager") if root else null
+	if rm and rm.has_method("grant_level_completion_reward"):
+		rm.grant_level_completion_reward(level_number, stars)
+		print("[LoadLevelStep] grant_level_completion_reward called — levels_completed now %d" % rm.levels_completed)
+	else:
+		push_warning("[LoadLevelStep] RewardManager not found — progress not saved")
+
+	# Also update ProgressManager (used by WorldMap unlock logic)
+	var pm := root.get_node_or_null("ProgressManager") if root else null
+	if pm and pm.has_method("complete_level"):
+		pm.complete_level("level_%d" % level_number, stars, GameRunState.score, 0)
+
 	_on_level_complete("level_%d" % level_number, {
 		"score": GameRunState.score,
 		"stars": stars,

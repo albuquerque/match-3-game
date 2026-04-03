@@ -20,6 +20,17 @@ var _definitions: Dictionary = {}
 # item_id -> { shards: int, unlocked: bool }  (runtime state, persisted via ProgressManager)
 var _state: Dictionary = {}
 
+# ── Deduplication guard ───────────────────────────────────────────────────────
+## Tracks item_ids for which add_shard was already called this engine frame.
+## Cleared at the end of each frame via _process so rapid multi-caller paths
+## (CollectibleService + MatchOrchestrator + ShardDropSystem all firing for the
+## same tile) only register one shard award.
+var _shard_awarded_this_frame: Dictionary = {}
+
+func _process(_delta: float) -> void:
+	if not _shard_awarded_this_frame.is_empty():
+		_shard_awarded_this_frame.clear()
+
 # ── Session tracking (reset each level, used by reward summary) ───────────────
 ## Total shards collected since the last reset_session() call.
 var session_shards_collected: int = 0
@@ -99,6 +110,14 @@ func add_shard(item_id: String) -> bool:
 	if not _definitions.has(item_id):
 		push_warning("[GalleryManager] add_shard: unknown item '%s'" % item_id)
 		return false
+	# ── Deduplication guard ───────────────────────────────────────────────────
+	# Multiple code paths (CollectibleService, MatchOrchestrator, ShardDropSystem,
+	# GameBoard) can all call add_shard for the same physical shard tile in the same
+	# frame. Only honour the first call per item_id per frame to prevent double popups.
+	if _shard_awarded_this_frame.has(item_id):
+		print("[GalleryManager] add_shard: duplicate call for '%s' this frame — ignored" % item_id)
+		return false
+	_shard_awarded_this_frame[item_id] = true
 	if not _state.has(item_id):
 		_state[item_id] = {"shards": 0, "unlocked": false, "discovered": false}
 	var st: Dictionary = _state[item_id]
