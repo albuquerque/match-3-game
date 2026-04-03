@@ -23,27 +23,27 @@ var auto_enable_camera_impulse_on_match: bool = true
 # Executor script preloads (split into scripts/effects/)
 # ============================================
 var executor_scripts = {
-	"play_animation": preload("res://scripts/effects/play_animation_executor.gd"),
-	"state_swap": preload("res://scripts/effects/state_swap_executor.gd"),
-	"timeline_sequence": preload("res://scripts/effects/timeline_sequence_executor.gd"),
-	"spawn_particles": preload("res://scripts/effects/spawn_particles_executor.gd"),
-	"shader_param_lerp": preload("res://scripts/effects/shader_param_lerp_executor.gd"),
-	"camera_impulse": preload("res://scripts/effects/camera_impulse_executor.gd"),
-	"screen_overlay": preload("res://scripts/effects/screen_overlay_executor.gd"),
-	"narrative_dialogue": preload("res://scripts/effects/narrative_dialogue_executor.gd"),
+	"play_animation": preload("res://systems/effects/play_animation_executor.gd"),
+	"state_swap": preload("res://systems/effects/state_swap_executor.gd"),
+	"timeline_sequence": preload("res://systems/effects/timeline_sequence_executor.gd"),
+	"spawn_particles": preload("res://systems/effects/spawn_particles_executor.gd"),
+	"shader_param_lerp": preload("res://systems/effects/shader_param_lerp_executor.gd"),
+	"camera_impulse": preload("res://systems/effects/camera_impulse_executor.gd"),
+	"screen_overlay": preload("res://systems/effects/screen_overlay_executor.gd"),
+	"narrative_dialogue": preload("res://systems/effects/narrative_dialogue_executor.gd"),
 
 	# Visual effects
-	"background_dim": preload("res://scripts/effects/background_dim_executor.gd"),
-	"foreground_dim": preload("res://scripts/effects/foreground_dim_executor.gd"),
-	"screen_flash": preload("res://scripts/effects/screen_flash_executor.gd"),
-	"vignette": preload("res://scripts/effects/vignette_executor.gd"),
-	"background_tint": preload("res://scripts/effects/background_tint_executor.gd"),
-	"progressive_brightness": preload("res://scripts/effects/progressive_brightness_executor.gd"),
+	"background_dim": preload("res://systems/effects/background_dim_executor.gd"),
+	"foreground_dim": preload("res://systems/effects/foreground_dim_executor.gd"),
+	"screen_flash": preload("res://systems/effects/screen_flash_executor.gd"),
+	"vignette": preload("res://systems/effects/vignette_executor.gd"),
+	"background_tint": preload("res://systems/effects/background_tint_executor.gd"),
+	"progressive_brightness": preload("res://systems/effects/progressive_brightness_executor.gd"),
 
 	# New narrative effects
-	"gameplay_pause": preload("res://scripts/effects/gameplay_pause_executor.gd"),
-	"camera_lerp": preload("res://scripts/effects/camera_lerp_executor.gd"),
-	"symbolic_overlay": preload("res://scripts/effects/symbolic_overlay_executor.gd")
+	"gameplay_pause": preload("res://systems/effects/gameplay_pause_executor.gd"),
+	"camera_lerp": preload("res://systems/effects/camera_lerp_executor.gd"),
+	"symbolic_overlay": preload("res://systems/effects/symbolic_overlay_executor.gd")
 }
 
 # ============================================

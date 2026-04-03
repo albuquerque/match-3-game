@@ -1,6 +1,6 @@
 extends Node
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
-const _MatchFinder = preload("res://scripts/services/MatchFinder.gd")
+const _MatchFinder = preload("res://games/match3/board/services/MatchFinder.gd")
 const GameStateBridge = preload("res://games/match3/services/GameStateBridge.gd")
 # BoardInputHandler — loaded and instantiated via script resource in GameBoard._ready()
 

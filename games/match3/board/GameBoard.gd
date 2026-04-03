@@ -87,7 +87,7 @@ func _ready():
 	# Lazy-load helper modules to avoid parse-time non-constant assignment errors
 	# Load lightweight script references at runtime to avoid parse-time preload cycles
 	if _MatchFinder == null:
-		_MatchFinder = load("res://scripts/services/MatchFinder.gd")
+		_MatchFinder = load("res://games/match3/board/services/MatchFinder.gd")
 	# Load tile scene resource at runtime
 	if tile_scene == null:
 		tile_scene = load("res://scenes/Tile.tscn")
