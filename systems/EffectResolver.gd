@@ -136,13 +136,11 @@ func _connect_event_signals():
 			board_node.connect("level_complete", Callable(self, "_on_level_complete_direct"))
 		if board_node.has_signal("match_cleared"):
 			board_node.connect("match_cleared", Callable(self, "_on_match_cleared"))
+		if board_node.has_signal("tile_destroyed"):
+			board_node.connect("tile_destroyed", Callable(self, "_on_event_with_entity").bind("tile_destroyed"))
 	else:
 		push_warning("[EffectResolver] GameBoard not found — visual effects disabled until board_ref is set")
 
-	# EventBus fallback kept for tile_destroyed until EventBus is fully removed
-	var eb = get_node_or_null("/root/EventBus")
-	if eb and eb.has_signal("tile_destroyed"):
-		eb.tile_destroyed.connect(_on_event_with_entity.bind("tile_destroyed"))
 
 	print("[EffectResolver] Signal wiring complete")
 

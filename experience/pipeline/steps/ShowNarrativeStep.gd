@@ -446,7 +446,7 @@ func execute(context) -> bool:
 
 	# Success! Narrative is now showing
 	# IMPORTANT: Keep waiting_for_completion = true so pipeline waits for the narrative to finish
-	# The narrative will complete via EventBus signal or safety/watchdog timers
+	# The narrative will complete via NarrativeStageManager signal or safety/watchdog timers
 	_context.waiting_for_completion = true
 	return true
 
@@ -617,7 +617,7 @@ func _on_overlay_watchdog() -> void:
 	_finish_narrative_stage()
 
 func _on_narrative_complete(stage_id: String) -> void:
-	"""Callback when narrative stage completes via EventBus signal"""
+	"""Callback when narrative stage completes via NarrativeStageManager signal"""
 	print("[ShowNarrativeStep] Received narrative_stage_complete for: ", stage_id)
 	# Only finish if this matches our stage_id
 	if stage_id == self.stage_id:

@@ -77,16 +77,12 @@ func _ready() -> void:
 			board_node.connect("post_refill", Callable(self, "_on_post_refill"))
 		if board_node.has_signal("level_loaded_ctx"):
 			board_node.connect("level_loaded_ctx", Callable(self, "_on_level_loaded"))
+		if board_node.has_signal("tile_destroyed"):
+			board_node.connect("tile_destroyed", Callable(self, "_on_tile_destroyed"))
 		print("[ShardDropSystem] Connected to GameBoard signals")
 	else:
-		# No board found — shard drops disabled until board_ref is set.
 		push_error("[ShardDropSystem] GameBoard not found and GameRunState.board_ref is unset — shard drops disabled")
 		return
-
-	# Connect tile_destroyed via EventBus (still active for this signal only)
-	var eb = get_node_or_null("/root/EventBus")
-	if eb and eb.has_signal("tile_destroyed"):
-		eb.connect("tile_destroyed", Callable(self, "_on_tile_destroyed"))
 	print("[ShardDropSystem] ready (max_per_level=%d unlock_from=%d)" % [max_shards_per_level, shard_unlock_from_level])
 
 func _load_config() -> void:

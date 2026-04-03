@@ -116,7 +116,6 @@ func test_autoloads() -> bool:
 		success = false
 	else:
 		print("  ✅ DLCManager found")
-	# EventBus is no longer used.
 
 	if success:
 		print("  ✅ TEST PASSED: All autoloads present")

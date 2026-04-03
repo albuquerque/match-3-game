@@ -17,6 +17,7 @@ signal unmovables_changed(cleared: int, target: int)
 signal spreaders_changed(current_count: int)
 signal collectible_landed(pos: Vector2, coll_type: String)
 signal unmovable_destroyed(pos: Vector2)
+signal tile_destroyed(entity_id: String, context: Dictionary)
 signal special_tile_activated(entity_id: String, context: Dictionary)
 signal bonus_skipped()
 

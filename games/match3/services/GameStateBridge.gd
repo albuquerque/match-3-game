@@ -199,6 +199,15 @@ static func report_unmovable_destroyed(pos, skip_clear: bool = false) -> void:
 	if GameRunState.board_ref != null and GameRunState.board_ref.has_signal and GameRunState.board_ref.has_signal("unmovable_destroyed"):
 		GameRunState.board_ref.emit_signal("unmovable_destroyed", vec_pos)
 
+	# Emit tile_destroyed so EffectResolver / ShardDropSystem receive obstacle events
+	# entity_id uses grid-key format; context flags is_obstacle.
+	if GameRunState.board_ref != null and GameRunState.board_ref.has_signal and GameRunState.board_ref.has_signal("tile_destroyed"):
+		var entity_id := str(int(vec_pos.x)) + "," + str(int(vec_pos.y))
+		GameRunState.board_ref.emit_signal("tile_destroyed", entity_id, {
+			"is_obstacle": true,
+			"grid_position": vec_pos
+		})
+
 static func report_spreader_destroyed(pos: Vector2) -> void:
 	# Update GameRunState and notify via centralized emitter
 	GameRunState.spreader_count = max(0, GameRunState.spreader_count - 1)
