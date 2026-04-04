@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="UID_BOOSTERPANEL"]
 
-[ext_resource type="Script" uid="uid://BoosterPanelComponent" path="res://scripts/ui/components/BoosterPanelComponent.gd" id="1_bp"]
+[ext_resource type="Script" uid="uid://BoosterPanelComponent" path="res://games/match3/ui/components/BoosterPanelComponent.gd" id="1_bp"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bp"]
 bg_color = Color(0.15, 0.15, 0.2, 0.85)

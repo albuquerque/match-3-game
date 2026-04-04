@@ -91,7 +91,7 @@ func _ready():
 		_MatchFinder = load("res://games/match3/board/services/MatchFinder.gd")
 	# Load tile scene resource at runtime
 	if tile_scene == null:
-		tile_scene = load("res://scenes/Tile.tscn")
+		tile_scene = load("res://games/match3/board/Tile.tscn")
 
 	if VF == null:
 		VF = load("res://games/match3/board/services/VisualFactory.gd")

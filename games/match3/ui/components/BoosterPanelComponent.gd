@@ -1,5 +1,4 @@
-extends Control
-class_name BoosterPanelComponent
+extends PanelContainer
 
 ## BoosterPanelComponent: owns the booster bar shown during gameplay.
 ## E2: Self-wiring — connects to RewardManager.booster_changed and
@@ -17,22 +16,8 @@ const BUTTON_NAMES := {
 	"row_clear": "RowClearButton", "column_clear": "ColumnClearButton",
 }
 
-var _active_button: Button = null
-var _active_tween: Tween = null
-
-func _ready() -> void:
-	var hbox = get_node_or_null("HBoxContainer")
-	if hbox:
-		for id in BOOSTER_KEYS:
-			var btn: Button = hbox.get_node_or_null(BUTTON_NAMES.get(id, ""))
-			if btn:
-				self._ignore_children_recursive(btn)
-				btn.pressed.connect(_on_button_pressed.bind(id))
-	# Defer so GameBoard._ready() has time to set GameRunState.board_ref first
-	call_deferred("_connect_signals")
-
-# Recursively set mouse_filter IGNORE on all children of node (but not node itself)
-static func _ignore_children_recursive(node: Node) -> void:
+# Helper: Recursively set mouse_filter IGNORE on all children of node (but not node itself)
+func _ignore_children_recursive(node: Node) -> void:
 	for child in node.get_children():
 		if child is Control:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -42,21 +27,44 @@ static func _ignore_children_recursive(node: Node) -> void:
 			# still recurse to handle nested control trees
 			_ignore_children_recursive(child)
 
-func _connect_signals() -> void:
+var _active_button: Button = null
+var _active_tween: Tween = null
+var _populated: bool = false
+
+func _ready() -> void:
+	print("[BoosterPanel] _ready")
+	var hbox = get_node_or_null("HBoxContainer")
+	if hbox:
+		for id in BOOSTER_KEYS:
+			var btn: Button = hbox.get_node_or_null(BUTTON_NAMES.get(id, ""))
+			if btn:
+				_ignore_children_recursive(btn)
+				btn.pressed.connect(_on_button_pressed.bind(id))
+
+	# Connect RewardManager so count labels update when boosters are used/added
 	var rm = _rm()
-	if rm and rm.has_signal("booster_changed") and not rm.is_connected("booster_changed", _on_booster_changed):
+	if rm and not rm.is_connected("booster_changed", _on_booster_changed):
 		rm.connect("booster_changed", _on_booster_changed)
+		print("[BoosterPanel] connected to RewardManager.booster_changed")
 
-	# Connect to level_loaded_ctx on board_ref — this is the signal GameStateBridge emits
-	var board = GameRunState.board_ref
-	if board and board.has_signal("level_loaded_ctx"):
-		if not board.is_connected("level_loaded_ctx", _on_level_loaded_ctx):
-			board.connect("level_loaded_ctx", _on_level_loaded_ctx)
-
+	# Populate immediately if level is already loaded (e.g. returning from menu)
 	if GameRunState.initialized:
-		_on_level_loaded()
+		_populate()
+		return
 
+	# Otherwise poll each frame until GameRunState.initialized becomes true
+	set_process(true)
 
+func _process(_delta: float) -> void:
+	if GameRunState.initialized and not _populated:
+		_populate()
+		# Also try to connect board signal for future level loads
+		var board = GameRunState.board_ref
+		if board and board.has_signal("level_loaded_ctx"):
+			if not board.is_connected("level_loaded_ctx", _on_level_loaded_ctx):
+				board.connect("level_loaded_ctx", _on_level_loaded_ctx)
+				print("[BoosterPanel] connected to board.level_loaded_ctx")
+		set_process(false)
 
 func _rm():
 	return get_node_or_null("/root/RewardManager")
@@ -64,18 +72,23 @@ func _rm():
 func _tm():
 	return get_node_or_null("/root/ThemeManager")
 
-# ── Self-wired handlers ───────────────────────────────────────────────────────
+# ── Populate ──────────────────────────────────────────────────────────────────
 
-func _on_level_loaded_ctx(_level_id: String, _ctx: Dictionary) -> void:
-	_on_level_loaded()
-
-func _on_level_loaded() -> void:
-	if GameRunState.available_boosters and GameRunState.available_boosters.size() > 0:
+func _populate() -> void:
+	_populated = true
+	print("[BoosterPanel] _populate — boosters: ", GameRunState.available_boosters)
+	if GameRunState.available_boosters.size() > 0:
 		set_available_boosters(GameRunState.available_boosters)
 	_refresh_counts()
 	var tm = _tm()
 	if tm and tm.has_method("get_theme_name"):
 		load_icons(tm.get_theme_name())
+
+# ── Self-wired handlers ───────────────────────────────────────────────────────
+
+func _on_level_loaded_ctx(_level_id: String, _ctx: Dictionary) -> void:
+	_populated = false
+	_populate()
 
 func _on_booster_changed(_type: String, _amount: int) -> void:
 	_refresh_counts()
@@ -83,12 +96,16 @@ func _on_booster_changed(_type: String, _amount: int) -> void:
 func _refresh_counts() -> void:
 	var rm = _rm()
 	var counts: Dictionary = {}
-	if rm and rm.has_method("get_booster_count"):
+	if rm:
 		for id in BOOSTER_KEYS:
 			counts[id] = rm.get_booster_count(id)
+	else:
+		for id in BOOSTER_KEYS:
+			counts[id] = 0
 	refresh_counts(counts)
 
-# ── Public API ───────���────────────────────────────────────────────────────────
+
+# ── Public API ─────────────────────────────────────────────────────────
 
 func refresh_counts(counts: Dictionary) -> void:
 	var hbox = get_node_or_null("HBoxContainer")
@@ -164,3 +181,4 @@ func _stop_highlight() -> void:
 		_active_button.scale = Vector2.ONE
 	_active_button = null
 	_active_tween = null
+
