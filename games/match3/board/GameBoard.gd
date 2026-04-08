@@ -20,6 +20,8 @@ signal unmovable_destroyed(pos: Vector2)
 signal tile_destroyed(entity_id: String, context: Dictionary)
 signal special_tile_activated(entity_id: String, context: Dictionary)
 signal bonus_skipped()
+signal shard_collected(item_id: String)
+signal gameplay_ui_hide_requested()
 
 
 # Safe script resource handles - avoid using load() at parse time which GDScript flags as non-constant
@@ -522,8 +524,16 @@ func _attempt_level_complete() -> void:
 			gfc.name = "GameFlowController"
 			gfc.setup()
 			add_child(gfc)
+			# Wire GFC request signals to GameBoard handler methods
+			if gfc.has_signal("request_show_skip_bonus_hint") and not gfc.is_connected("request_show_skip_bonus_hint", show_skip_bonus_hint):
+				gfc.connect("request_show_skip_bonus_hint", show_skip_bonus_hint)
+			if gfc.has_signal("request_hide_skip_bonus_hint") and not gfc.is_connected("request_hide_skip_bonus_hint", hide_skip_bonus_hint):
+				gfc.connect("request_hide_skip_bonus_hint", hide_skip_bonus_hint)
+			if gfc.has_signal("request_update_tile_visual") and not gfc.is_connected("request_update_tile_visual", update_tile_visual):
+				gfc.connect("request_update_tile_visual", update_tile_visual)
 	if gfc:
 		gfc.attempt_level_complete()
+
 
 func _on_level_complete():
 	print("[GameBoard] Level Complete")
@@ -533,11 +543,9 @@ func _on_level_complete():
 	hide_board_group()
 	print("[GameBoard] Board group hidden for clean transition to next level")
 
-	# CRITICAL: Also hide UI elements (booster panel, HUD) to prevent showing old level state
-	var game_ui = get_node_or_null("../GameUI")
-	if game_ui and game_ui.has_method("hide_gameplay_ui"):
-		game_ui.hide_gameplay_ui()
-		print("[GameBoard] UI elements hidden for clean transition")
+	# Ask the UI layer to hide gameplay UI via signal — keeps GameBoard decoupled from scene tree layout
+	emit_signal("gameplay_ui_hide_requested")
+	print("[GameBoard] gameplay_ui_hide_requested emitted")
 
 	# Actions to perform on level completion, e.g. showing a summary, transitioning to next level, etc.
 
@@ -798,8 +806,7 @@ func _task_deferred_gravity_then_refill() -> void:
 						break
 				if last_row == py:
 					print("[GameBoard] Direct-award pending shard %s at (%d,%d) because visual missing" % [iid, px, py])
-					if GalleryManager:
-						GalleryManager.add_shard(iid)
+					emit_signal("shard_collected", iid)
 					to_erase.append(key)
 		# clean up handled keys
 		for k in to_erase:

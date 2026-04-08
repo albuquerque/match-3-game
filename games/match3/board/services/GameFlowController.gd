@@ -5,6 +5,9 @@ signal level_complete_ready(stars: int, coins: int, gems: int)
 signal level_failed_ready
 signal bonus_cascade_started(remaining_moves: int)
 signal bonus_cascade_complete
+signal request_show_skip_bonus_hint
+signal request_hide_skip_bonus_hint
+signal request_update_tile_visual(pos: Vector2, tile_type: int)
 
 var GameStateBridge = null
 const _GQS = preload("res://games/match3/board/services/GridQueryService.gd")
@@ -185,6 +188,8 @@ func convert_remaining_moves_to_bonus(remaining_moves: int) -> void:
 
 	if board.has_method("show_skip_bonus_hint"):
 		board.show_skip_bonus_hint()
+	# Also signal-based path for decoupled callers
+	emit_signal("request_show_skip_bonus_hint")
 
 	for i in range(remaining_moves):
 		if GameRunState.bonus_skipped:
@@ -199,6 +204,8 @@ func convert_remaining_moves_to_bonus(remaining_moves: int) -> void:
 			break
 
 		GameRunState.grid[int(random_pos.x)][int(random_pos.y)] = GameRunState.FOUR_WAY_ARROW
+		# Signal-driven: board listens to request_update_tile_visual
+		emit_signal("request_update_tile_visual", random_pos, GameRunState.FOUR_WAY_ARROW)
 		if board.has_method("update_tile_visual"):
 			board.update_tile_visual(random_pos, GameRunState.FOUR_WAY_ARROW)
 		if tree:
@@ -212,6 +219,8 @@ func convert_remaining_moves_to_bonus(remaining_moves: int) -> void:
 
 	if board.has_method("hide_skip_bonus_hint"):
 		board.hide_skip_bonus_hint()
+	# Also signal-based path for decoupled callers
+	emit_signal("request_hide_skip_bonus_hint")
 	if GameRunState.bonus_skipped:
 		if tree:
 			await tree.create_timer(0.5).timeout

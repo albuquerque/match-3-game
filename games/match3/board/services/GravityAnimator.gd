@@ -127,9 +127,10 @@ static func animate_gravity(gameboard: Node, tiles_ref: Array) -> void:
 					extra.queue_free()
 
 	if gravity_tweens.size() > 0:
-		for tween in gravity_tweens:
-			if tween != null:
-				await tween.finished
+		# All gravity tweens run concurrently. Awaiting each sequentially in Godot 4 hangs
+		# when earlier tweens have already finished (finished signal won't re-fire).
+		# Use a single timer covering the maximum fall duration instead.
+		await gameboard.get_tree().create_timer(0.35).timeout
 	else:
 		await gameboard.get_tree().create_timer(0.01).timeout
 
@@ -238,11 +239,11 @@ static func animate_refill(gameboard: Node, tiles_ref: Array) -> Array:
 
 	var valid_tweens = spawn_tweens.filter(func(tw): return tw != null)
 	if valid_tweens.size() > 0:
-		# Await ALL tweens so every tile reaches its destination before proceeding
-		for tw in valid_tweens:
-			if tw != null and not tw.is_valid():
-				continue
-			await tw.finished
+		# All fall tweens run concurrently with the same 0.3s duration (animate_to_position default).
+		# Awaiting each tween sequentially is wrong in Godot 4 — a tween that has already finished
+		# will never fire .finished again, causing subsequent awaits to hang indefinitely.
+		# Use a single timer covering the maximum fall duration instead.
+		await gameboard.get_tree().create_timer(0.4).timeout
 	else:
 		await gameboard.get_tree().create_timer(0.3).timeout
 
