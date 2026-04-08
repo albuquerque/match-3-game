@@ -55,6 +55,10 @@ func execute(context) -> bool:
 
 	# Load level via GameUI
 	print("[LoadLevelStep] Attempting to load level via GameUI (has game_ui: %s)" % (context.game_ui != null))
+
+	# Load level-specific visual effects into EffectResolver before the board initialises
+	_load_level_effects(level_number)
+
 	if context.game_ui and context.game_ui.has_method("_load_level_by_number"):
 		print("[LoadLevelStep] Calling GameUI._load_level_by_number(%d)" % level_number)
 		var res = context.game_ui._load_level_by_number(level_number)
@@ -80,6 +84,32 @@ func execute(context) -> bool:
 	else:
 		push_error("[LoadLevelStep] Cannot load level - no GameUI or board loader")
 		return false
+
+func _load_level_effects(lvl_num: int) -> void:
+	var root = (Engine.get_main_loop() as SceneTree).root
+	var er = root.get_node_or_null("EffectResolver") if root else null
+	if er == null:
+		push_warning("[LoadLevelStep] EffectResolver autoload not found — skipping level effects")
+		return
+
+	# Clear any effects from the previous level
+	if er.has_method("clear_effects"):
+		er.clear_effects()
+
+	# Try level-specific file first, then fall back to default
+	var level_path = "res://data/narrative_stages/levels/level_%d.json" % lvl_num
+	var default_path = "res://data/narrative_stages/levels/default.json"
+
+	if FileAccess.file_exists(level_path):
+		if er.has_method("load_effects_from_file"):
+			var ok = er.load_effects_from_file(level_path)
+			print("[LoadLevelStep] Loaded level effects: %s (ok=%s)" % [level_path, ok])
+	elif FileAccess.file_exists(default_path):
+		if er.has_method("load_effects_from_file"):
+			var ok = er.load_effects_from_file(default_path)
+			print("[LoadLevelStep] No level-specific effects for level %d — loaded default effects (ok=%s)" % [lvl_num, ok])
+	else:
+		print("[LoadLevelStep] No effects file found for level %d and no default.json" % lvl_num)
 
 func _clear_narrative_stage() -> void:
 	# Engine.get_main_loop().root works from RefCounted; get_node_or_null("/root/...") does not

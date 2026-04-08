@@ -170,6 +170,131 @@ Replace all global events with: - signals - direct connections
 
 ------------------------------------------------------------------------
 
+------------------------------------------------------------------------
+
+# PR 5e --- Final Decoupling Fix Plan
+
+## 🎯 Goal
+
+Eliminate remaining architectural coupling: 1. GameBoard → UI / Meta
+systems 2. GameFlowController → GameBoard direct calls
+
+------------------------------------------------------------------------
+
+## 🚨 Issue 1 --- GameBoard coupled to UI / Meta
+
+### Problem
+
+GameBoard directly calls: - GalleryManager - GameUI
+
+### Fix Strategy
+
+Convert all outward effects into signals.
+
+### Step 1 --- Add Signals to GameBoard
+
+``` gdscript
+signal shard_collected(amount)
+signal level_completed(result)
+```
+
+------------------------------------------------------------------------
+
+### Step 2 --- Replace Direct Calls
+
+#### Before:
+
+``` gdscript
+GalleryManager.add_shard(amount)
+GameUI.hide_level_complete_ui()
+```
+
+#### After:
+
+``` gdscript
+emit_signal("shard_collected", amount)
+emit_signal("level_completed", result)
+```
+
+------------------------------------------------------------------------
+
+### Step 3 --- Wire in Match3Game
+
+``` gdscript
+game_board.shard_collected.connect(GalleryManager.add_shard)
+game_board.level_completed.connect(GameUI.on_level_complete)
+```
+
+------------------------------------------------------------------------
+
+## 🚨 Issue 2 --- GameFlowController controlling GameBoard
+
+### Problem
+
+GameFlowController calls: - show_skip_bonus_hint - update_tile_visual -
+hide_skip_bonus_hint
+
+### Fix Strategy
+
+Convert to signal-driven commands.
+
+------------------------------------------------------------------------
+
+### Step 1 --- Add Signals to GameFlowController
+
+``` gdscript
+signal request_show_skip_bonus_hint
+signal request_hide_skip_bonus_hint
+signal request_update_tile_visual(tile)
+```
+
+------------------------------------------------------------------------
+
+### Step 2 --- Replace Direct Calls
+
+#### Before:
+
+``` gdscript
+game_board.show_skip_bonus_hint()
+```
+
+#### After:
+
+``` gdscript
+emit_signal("request_show_skip_bonus_hint")
+```
+
+------------------------------------------------------------------------
+
+### Step 3 --- Connect in GameBoard
+
+``` gdscript
+flow_controller.request_show_skip_bonus_hint.connect(show_skip_bonus_hint)
+flow_controller.request_hide_skip_bonus_hint.connect(hide_skip_bonus_hint)
+flow_controller.request_update_tile_visual.connect(update_tile_visual)
+```
+
+------------------------------------------------------------------------
+
+## ✅ Validation Checklist
+
+-   GameBoard has ZERO references to UI / Meta systems
+-   GameFlowController has ZERO direct calls to GameBoard
+-   All interactions use signals
+-   Game remains fully playable
+
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+
+## 🚀 Outcome
+
+-   GameBoard = pure gameplay owner
+-   GameFlowController = pure decision maker
+-   UI / Meta = passive listeners
+
+Architecture is now fully decoupled and scalable.
+
+
 ## 🚨 HARD RULES
 
 -   No cross-layer access

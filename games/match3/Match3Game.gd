@@ -53,6 +53,11 @@ func _connect_board() -> void:
 		board.connect("level_complete", _on_level_complete)
 	if board.has_signal("game_over") and not board.is_connected("game_over", _on_game_over):
 		board.connect("game_over", _on_game_over)
+	# PR 5e — decouple GameBoard from GalleryManager and GameUI
+	if board.has_signal("shard_collected") and not board.is_connected("shard_collected", _on_shard_collected):
+		board.connect("shard_collected", _on_shard_collected)
+	if board.has_signal("gameplay_ui_hide_requested") and not board.is_connected("gameplay_ui_hide_requested", _on_gameplay_ui_hide_requested):
+		board.connect("gameplay_ui_hide_requested", _on_gameplay_ui_hide_requested)
 	_board_connected = true
 	print("[Match3Game] Connected to board_ref signals")
 
@@ -63,6 +68,10 @@ func _disconnect_board() -> void:
 			board.disconnect("level_complete", _on_level_complete)
 		if board.is_connected("game_over", _on_game_over):
 			board.disconnect("game_over", _on_game_over)
+		if board.has_signal("shard_collected") and board.is_connected("shard_collected", _on_shard_collected):
+			board.disconnect("shard_collected", _on_shard_collected)
+		if board.has_signal("gameplay_ui_hide_requested") and board.is_connected("gameplay_ui_hide_requested", _on_gameplay_ui_hide_requested):
+			board.disconnect("gameplay_ui_hide_requested", _on_gameplay_ui_hide_requested)
 	_board_connected = false
 
 # ── Signal handlers ───────────────────────────────────────────────────────────
@@ -81,3 +90,20 @@ func _on_game_over() -> void:
 	print("[Match3Game] → game_lost (level=%d score=%d)" % [lvl, score])
 	match3_level_lost.emit(lvl, score)
 	game_lost.emit()
+
+# ── PR 5e: decoupled handlers ─────────────────────────────────────────────────
+
+func _on_shard_collected(item_id: String) -> void:
+	print("[Match3Game] shard_collected: item_id=%s" % item_id)
+	if GalleryManager:
+		GalleryManager.add_shard(item_id)
+	else:
+		push_warning("[Match3Game] GalleryManager not available — shard not recorded")
+
+func _on_gameplay_ui_hide_requested() -> void:
+	print("[Match3Game] gameplay_ui_hide_requested — hiding gameplay UI")
+	var game_ui = get_node_or_null("../GameUI")
+	if game_ui and game_ui.has_method("hide_gameplay_ui"):
+		game_ui.hide_gameplay_ui()
+		print("[Match3Game] GameUI.hide_gameplay_ui() called")
+
